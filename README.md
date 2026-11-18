@@ -1,0 +1,101 @@
+# paseo-office
+
+A community port of [my-office](https://github.com/khanh020905/my-office) for
+[Paseo](https://github.com/getpaseo/paseo): your agents at their desks, in 3D.
+
+It is based on my-office by [khanh020905](https://github.com/khanh020905), with the author's
+permission, and is not an official version of it. Report issues with this Paseo plugin in
+[this repository's issue tracker](https://github.com/allrested/paseo-office/issues), not in
+my-office's.
+
+## What it does
+
+- Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
+  is a room, and each agent sits at a desk and walks to the kind of work it is doing.
+- Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
+  Activity, and a team Chat where an `@` prompts an agent.
+- Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
+  that names an idle agent wakes it.
+- Writes the day's stand-up entry at 8:00, Sunday to Thursday (the days are not a setting yet): an
+  agent on the host gets the office's stand-up report and writes a `## DD Month YYYY` entry into
+  `daily-standup-YYYYMM.md` in a folder of notes you choose, following the stand-up notes
+  instructions for that folder, which may sit in its own or a parent folder's `AGENTS.md` or
+  `CLAUDE.md`.
+- Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
+- Reads the host (on Linux): memory, CPU, and what each agent left running, with a way to clean it
+  up.
+
+[docs/office.md](docs/office.md) says how each part works.
+
+## Install
+
+You need Paseo 0.16.0 or newer; the plugin is tested on 0.16.2. Installed plugins must be turned on
+in `config.json` under the host's Paseo home (`$PASEO_HOME/config.json`, by default
+`~/.paseo/config.json`):
+
+```json
+{ "pluginsEnabled": true }
+```
+
+The daemon reads that key when it starts. On a running daemon, apply the change with
+`paseo daemon reload` or restart the daemon.
+
+Then install it on the host:
+
+```
+paseo plugin install git:allrested/paseo-office
+```
+
+The host supplies the plugin SDK and `zod`, so installing runs no build and needs no
+`node_modules`.
+
+The settings are in Settings > Plugins > Office. The gear over the floor opens them too.
+
+## What works where
+
+| Where                    | What you get                                                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop app and browsers | The 3D floor, the 2D floor and the list                                                                                                         |
+| The store phone app      | The 2D floor and the list: its plugin frame runs no script                                                                                      |
+| Stock Paseo 0.16         | Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on the agent card, and the Host card does not close an idle agent's runtime |
+
+[docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
+
+The stand-up notes and the incidents check run on the plugin's own timers. After a daemon
+restart, a run waits until the office is opened or an agent opens or ends a turn. A run missed
+while the daemon was down is not made up.
+
+## What it reads and where it sends it
+
+- It reads the host's agents and workspaces, their status, and the kind of thing each agent does
+  (a read, an edit, a command, a test run). The kind is worked out on the host.
+- The 3D scene is told who is there and what kind of thing each does, never a file name, a command
+  or a prompt. The scene makes no network call.
+- It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
+  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
+- The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
+  notes' prompt to the host's own agents, and so to whichever provider runs them.
+- It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
+  in `office/`.
+
+## Based on
+
+The 3D scene is my-office at commit
+[`b68228871fe30cd2c759a2c919337a9a9d1f5644`](https://github.com/khanh020905/my-office/tree/b68228871fe30cd2c759a2c919337a9a9d1f5644)
+(v0.6.0), with three.js 0.160.0. [vendor/SOURCES.md](vendor/SOURCES.md) says what is taken, what
+stands in for the rest, and how to take a newer my-office.
+
+## Develop
+
+```
+npm install
+npm run typecheck
+npm test
+npm run test:scripts   # the scripts under scripts/
+npm run lint
+npm run build:world    # after any change under vendor/
+```
+
+## Licence
+
+MIT. my-office and three.js keep their own MIT licences; see [LICENSE](LICENSE).

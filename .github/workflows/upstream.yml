@@ -1,0 +1,61 @@
+name: my-office upstream
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream
+  cancel-in-progress: false
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Fetch my-office
+        run: git clone https://github.com/khanh020905/my-office "$RUNNER_TEMP/my-office"
+      - name: Fetch the three.js upstream pins
+        run: |
+          version=$(node scripts/three-version.mjs "$RUNNER_TEMP/my-office")
+          npm install --prefix "$RUNNER_TEMP/three" --ignore-scripts --no-audit --no-fund "three@$version"
+      - name: Compare
+        id: report
+        run: |
+          node scripts/upstream-report.mjs --upstream "$RUNNER_TEMP/my-office" \
+            --three "$RUNNER_TEMP/three/node_modules/three" > "$RUNNER_TEMP/report.json"
+          echo "moved=$(node -p "require('$RUNNER_TEMP/report.json').moved")" >> "$GITHUB_OUTPUT"
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MOVED: ${{ steps.report.outputs.moved }}
+        run: |
+          # The job's own issue: written by the Actions bot, with the marker the report starts with
+          # (scripts/own-issue.mjs). A person's issue is left alone, whatever its label.
+          number=$(gh issue list --state open --limit 100 --json number,body,author \
+            | node scripts/own-issue.mjs)
+          if [ "$MOVED" = "true" ]; then
+            node -e "const r=require(process.env.RUNNER_TEMP+'/report.json');require('fs').writeFileSync(process.env.RUNNER_TEMP+'/body.md',r.body);require('fs').writeFileSync(process.env.RUNNER_TEMP+'/title.txt','my-office moved to '+r.to.slice(0,7)+' ('+r.version+')')"
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --title "$(cat "$RUNNER_TEMP/title.txt")" --body-file "$RUNNER_TEMP/body.md"
+            else
+              gh label create upstream --description "A newer my-office" --color 0E8A16 2>/dev/null || true
+              gh issue create --label upstream --title "$(cat "$RUNNER_TEMP/title.txt")" --body-file "$RUNNER_TEMP/body.md"
+            fi
+          elif [ -n "$number" ]; then
+            gh issue comment "$number" --body "my-office is at the vendored commit again."
+            gh issue close "$number"
+          fi

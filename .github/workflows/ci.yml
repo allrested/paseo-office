@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck against the published plugin SDK
+        run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: The embedded scene is what the build makes
+        run: npm run check:world
+      - run: npm test
+      - name: The upstream report's tests
+        run: npm run test:scripts
