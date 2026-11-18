@@ -421,4 +421,5 @@ the workspace, where it is in the changes to review. The office installs and rem
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`,
 `notes-writer.json` and `incidents.json`. Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
-device.
+device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
+the plugin refuses a document a newer one has saved, and removing the plugin deletes it.

@@ -67,8 +67,8 @@ export interface NotesDaysProps {
 
 /**
  * The weekdays of the stand-up notes' 8:00 run, Sunday to Saturday, as the view switch's pills: a
- * press turns a day on or off. The press shows until the host has answered; a refused save goes
- * back to the stored days.
+ * press turns a day on or off. The press shows, and the row takes no other, until the host has
+ * answered; a refused save goes back to the stored days.
  */
 export function NotesDays({ value, onSave, problem, styles }: NotesDaysProps) {
   const mounted = useRef(true);
@@ -81,26 +81,32 @@ export function NotesDays({ value, onSave, problem, styles }: NotesDaysProps) {
   // The days as pressed, until the host has answered; null shows the stored days.
   const [wanted, setWanted] = useState<readonly number[] | null>(null);
   const days = wanted ?? value;
+  // A press saves against the stored revision: a second one before the host has answered would
+  // go against a revision already gone, so the row takes none until then.
+  const saving = useRef(false);
   const toggle = useCallback(
     (day: number) => {
-      if (days === null) return;
+      if (days === null || saving.current) return;
+      saving.current = true;
       const next = days.includes(day)
         ? days.filter((other) => other !== day)
         : [...days, day].toSorted((a, b) => a - b);
       setWanted(next);
       void onSave(next).finally(() => {
+        saving.current = false;
         if (mounted.current) setWanted(null);
       });
     },
     [days, onSave],
   );
+  const disabled = days === null || wanted !== null;
   return (
     <View style={styles.headerField}>
       <Text style={styles.sheetLabel}>{NOTES_DAYS_LABEL}</Text>
       <View
         role="group"
         aria-label={NOTES_DAYS_LABEL}
-        style={days === null ? styles.notesDaysDisabled : styles.notesDays}
+        style={disabled ? styles.notesDaysDisabled : styles.notesDays}
       >
         {DAY_NAMES.map((name, day) => (
           <Day
@@ -108,7 +114,7 @@ export function NotesDays({ value, onSave, problem, styles }: NotesDaysProps) {
             day={day}
             name={name}
             on={days?.includes(day) ?? false}
-            disabled={days === null}
+            disabled={disabled}
             onPress={toggle}
             styles={styles}
           />

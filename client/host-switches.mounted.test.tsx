@@ -286,6 +286,31 @@ test("a pressed day saves the new list, in order, and keeps every other setting"
   expect(saved.at(-1)?.values).toEqual({ ...stored, notesDays: [1, 2, 3, 4] });
 });
 
+test("while the host has not answered a day, the days take no press", async () => {
+  let reply: (saved: boolean) => void = () => undefined;
+  answer = new Promise((resolve) => {
+    reply = resolve;
+  });
+  await mount();
+  await pressDay("Saturday");
+  await pressDay("Friday");
+  expect(saved.map((save) => save.values.notesDays)).toEqual([[0, 1, 2, 3, 4, 6]]);
+  const disabled = () =>
+    [...dayRow().querySelectorAll('[role="button"]')].map((button) =>
+      button.getAttribute("aria-disabled"),
+    );
+  expect(disabled()).toEqual(DAYS.map(() => "true"));
+
+  await act(async () => reply(true));
+  answer = null;
+  expect(disabled()).toEqual(DAYS.map(() => null));
+  await pressDay("Friday");
+  expect(saved.map((save) => save.values.notesDays)).toEqual([
+    [0, 1, 2, 3, 4, 6],
+    [0, 1, 2, 3, 4, 5],
+  ]);
+});
+
 test("a refused day goes back and shows the reason under the row", async () => {
   answer = Promise.resolve(false);
   await mount();
