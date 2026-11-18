@@ -54,7 +54,8 @@ interface Sent {
   options: unknown;
 }
 
-const NO_NOTES = { notesFolder: "", notesTimeZone: "" };
+const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
+const NO_NOTES = { notesFolder: "", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY };
 const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
@@ -505,32 +506,56 @@ test("settings that are not ready are logged, and both schedules' cards show why
   await stop();
 });
 
-test("the notes schedule follows the host settings from load and on each save, until the office stops", async () => {
-  const notes = (notesFolder: string, notesTimeZone: string): SettingsState => ({
+function notesSettings(
+  notesFolder: string,
+  notesTimeZone: string,
+  notesDays = SUNDAY_TO_THURSDAY,
+): SettingsState {
+  return {
     status: "ready",
-    revision: notesFolder + notesTimeZone,
-    values: { agentTools: true, notesFolder, notesTimeZone, ...NO_TRACKERS },
-  });
-  const { recorded, stop } = setup(async () => notes("/notes", ""));
+    revision: notesFolder + notesTimeZone + notesDays.join(""),
+    values: { agentTools: true, notesFolder, notesTimeZone, notesDays, ...NO_TRACKERS },
+  };
+}
+
+test("the notes schedule follows the host settings from load and on each save, until the office stops", async () => {
+  const { recorded, stop } = setup(async () => notesSettings("/notes", ""));
   const notesCalls = () => recorded.schedules.filter((call) => call.includes(" standup-notes"));
   await settle();
-  expect(notesCalls()).toEqual(["upsert standup-notes 0 8 * * 0-4 Asia/Riyadh"]);
+  expect(notesCalls()).toEqual(["upsert standup-notes 0 8 * * 0,1,2,3,4 Asia/Riyadh"]);
 
   const follow = (state: SettingsState) =>
     Promise.all([...recorded.listeners].map((listener) => listener(state)));
-  await follow(notes("/notes", "Europe/Berlin"));
+  await follow(notesSettings("/notes", "Europe/Berlin"));
   // A document that is not valid leaves the schedule as it is.
   await follow({ status: "invalid", revision: "x", error: "Expected string" });
-  await follow(notes("", "Europe/Berlin"));
+  await follow(notesSettings("", "Europe/Berlin"));
   await settle();
   expect(notesCalls()).toEqual([
-    "upsert standup-notes 0 8 * * 0-4 Asia/Riyadh",
-    "upsert standup-notes 0 8 * * 0-4 Europe/Berlin",
+    "upsert standup-notes 0 8 * * 0,1,2,3,4 Asia/Riyadh",
+    "upsert standup-notes 0 8 * * 0,1,2,3,4 Europe/Berlin",
     "remove standup-notes",
   ]);
 
   await stop();
   expect(recorded.listeners.size).toBe(0);
+});
+
+test("a save that changes only the notes days sets the schedule again; no day removes it", async () => {
+  const { recorded, stop } = setup(async () => notesSettings("/notes", ""));
+  const notesCalls = () => recorded.schedules.filter((call) => call.includes(" standup-notes"));
+  await settle();
+  const follow = (state: SettingsState) =>
+    Promise.all([...recorded.listeners].map((listener) => listener(state)));
+  await follow(notesSettings("/notes", "", [1, 2, 3, 4, 5]));
+  await follow(notesSettings("/notes", "", []));
+  await settle();
+  expect(notesCalls()).toEqual([
+    "upsert standup-notes 0 8 * * 0,1,2,3,4 Asia/Riyadh",
+    "upsert standup-notes 0 8 * * 1,2,3,4,5 Asia/Riyadh",
+    "remove standup-notes",
+  ]);
+  await stop();
 });
 
 test("a post made through the board call wakes the agent it names over the daemon's API", async () => {
@@ -921,7 +946,7 @@ afterAll(() => rm(NOTES_FOLDER, { recursive: true, force: true }));
 const NOTES: SettingsState = {
   status: "ready",
   revision: "notes",
-  values: { agentTools: true, notesFolder: NOTES_FOLDER, notesTimeZone: "", ...NO_TRACKERS },
+  values: { agentTools: true, ...NO_NOTES, notesFolder: NOTES_FOLDER, ...NO_TRACKERS },
 };
 
 /** The writer leaves the day's entry in the notes: the fake clock's day in Asia/Riyadh. */

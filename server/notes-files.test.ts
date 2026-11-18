@@ -42,6 +42,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       agentTools: true,
       notesFolder,
       notesTimeZone,
+      notesDays: [1, 2, 3, 4, 5],
       jiraProjects: "",
       sentryOrg: "",
       sentryProjects: "",

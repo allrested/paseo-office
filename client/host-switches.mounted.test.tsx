@@ -27,6 +27,7 @@ let saveError: string | null;
 /** Set to keep each save waiting for the host's answer. */
 let answer: Promise<boolean> | null;
 let stored: HostValues;
+const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 /** The incident fields as a host that never set them holds them. */
 const NO_TRACKERS = {
   jiraProjects: "",
@@ -98,7 +99,13 @@ beforeEach(() => {
   saved = [];
   saveError = null;
   answer = null;
-  stored = { agentTools: false, notesFolder: "", notesTimeZone: "Asia/Riyadh", ...NO_TRACKERS };
+  stored = {
+    agentTools: false,
+    notesFolder: "",
+    notesTimeZone: "Asia/Riyadh",
+    notesDays: SUNDAY_TO_THURSDAY,
+    ...NO_TRACKERS,
+  };
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -150,6 +157,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         agentTools: false,
         notesFolder: "/workspace/notes",
         notesTimeZone: "Asia/Riyadh",
+        notesDays: SUNDAY_TO_THURSDAY,
         ...NO_TRACKERS,
       },
       revision: "r1",
@@ -185,7 +193,13 @@ test("the switch keeps the notes settings when it saves", async () => {
     container.querySelector<HTMLElement>('[aria-label="Agent tools"]')?.click(),
   );
   expect(saved.map((save) => save.values)).toEqual([
-    { agentTools: true, notesFolder: "", notesTimeZone: "Asia/Riyadh", ...NO_TRACKERS },
+    {
+      agentTools: true,
+      notesFolder: "",
+      notesTimeZone: "Asia/Riyadh",
+      notesDays: SUNDAY_TO_THURSDAY,
+      ...NO_TRACKERS,
+    },
   ]);
 });
 
@@ -228,6 +242,69 @@ test("a bad key shows the schema's message and is not saved", async () => {
     'Unable to save the Jira projects setting: jiraProjects: "shop" is not a Jira project key',
   );
   expect(field("Jira projects").value).toBe("");
+});
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function dayRow(): HTMLElement {
+  const found = container.querySelector<HTMLElement>('[role="group"][aria-label="Stand-up days"]');
+  if (!found) throw new Error("No Stand-up days group");
+  return found;
+}
+
+/** Each day's button as `<name> <aria-pressed>`, in the row's order. */
+const dayButtons = () =>
+  [...dayRow().querySelectorAll('[role="button"]')].map(
+    (button) => `${button.getAttribute("aria-label")} ${button.getAttribute("aria-pressed")}`,
+  );
+
+async function pressDay(day: string): Promise<void> {
+  await act(async () =>
+    dayRow().querySelector<HTMLElement>(`[role="button"][aria-label="${day}"]`)?.click(),
+  );
+}
+
+test("the stand-up days are seven buttons, pressed for the stored days", async () => {
+  await mount();
+  expect(dayButtons()).toEqual(DAYS.map((day, index) => `${day} ${index <= 4}`));
+});
+
+test("a pressed day saves the new list, in order, and keeps every other setting", async () => {
+  let reply: (saved: boolean) => void = () => undefined;
+  answer = new Promise((resolve) => {
+    reply = resolve;
+  });
+  await mount();
+  await pressDay("Saturday");
+  // The press shows at once, before the host has answered.
+  expect(dayButtons().at(6)).toBe("Saturday true");
+  expect(saved).toEqual([{ values: { ...stored, notesDays: [0, 1, 2, 3, 4, 6] }, revision: "r1" }]);
+  await act(async () => reply(true));
+
+  answer = null;
+  await pressDay("Sunday");
+  expect(saved.at(-1)?.values).toEqual({ ...stored, notesDays: [1, 2, 3, 4] });
+});
+
+test("a refused day goes back and shows the reason under the row", async () => {
+  answer = Promise.resolve(false);
+  await mount();
+  await pressDay("Friday");
+  saveError = "Settings changed on another client. Reload before saving again.";
+  await mount();
+  expect(dayButtons().at(5)).toBe("Friday false");
+  expect(dayRow().parentElement?.textContent).toContain(
+    "Unable to save the Stand-up days setting: Settings changed on another client.",
+  );
+});
+
+test("with no day chosen the hint says nothing runs at 8:00 and the bell still does", async () => {
+  stored = { ...stored, notesDays: [] };
+  await mount();
+  expect(dayButtons().every((button) => button.endsWith(" false"))).toBe(true);
+  expect(dayRow().parentElement?.textContent).toContain(
+    "No day chosen: nothing runs at 8:00. The bell still starts the notes.",
+  );
 });
 
 const JIRA_HINT =

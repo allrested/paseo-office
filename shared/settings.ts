@@ -40,6 +40,10 @@ const HostValuesSchema = z.object({
   agentTools: z.boolean().default(true),
   notesFolder: z.string().default(""),
   notesTimeZone: z.string().default(""),
+  notesDays: z
+    .array(z.number())
+    .default([1, 2, 3, 4, 5])
+    .transform((days) => days.toSorted((a, b) => a - b)),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
@@ -80,21 +84,39 @@ function refuseBadTrackerValues(values: HostValues, context: z.RefinementCtx): v
   }
 }
 
+function refuseBadDays(values: HostValues, context: z.RefinementCtx): void {
+  const days = values.notesDays;
+  const bad = days.find((day) => !Number.isInteger(day) || day < 0 || day > 6);
+  const twice = days.find((day, index) => days.indexOf(day) !== index);
+  let message: string | null = null;
+  if (bad !== undefined) message = `notesDays: ${bad} is not a day from 0 (Sunday) to 6 (Saturday)`;
+  else if (twice !== undefined) message = `notesDays: ${twice} is there twice`;
+  if (message !== null) context.addIssue({ code: "custom", path: ["notesDays"], message });
+}
+
+/** The days the notes were written on before they were a setting. */
+const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
+
 /**
  * Host-wide. `agentTools` off removes the office tools from agent sessions opened afterwards.
  * `notesFolder` is the absolute path the stand-up notes are written in, empty for none, and
- * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `jiraProjects` and
- * `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
+ * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `notesDays` are the
+ * weekdays of that run, 0 for Sunday to 6 for Saturday, in order; none is no run. `jiraProjects`
+ * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 3,
-  schema: HostValuesSchema.superRefine(refuseBadTrackerValues),
-  // Version 1 had only `agentTools` and version 2 no incident fields: what a document has stays,
-  // and the rest take their defaults.
-  migrate: (values) => values,
+  version: 4,
+  schema: HostValuesSchema.superRefine(refuseBadTrackerValues).superRefine(refuseBadDays),
+  // Version 1 had only `agentTools`, version 2 no incident fields and version 3 no `notesDays`:
+  // what a document has stays, and the rest take their defaults, but for the days. Before
+  // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.
+  migrate: (values, fromVersion) =>
+    fromVersion < 4 && typeof values === "object" && values !== null
+      ? { notesDays: SUNDAY_TO_THURSDAY, ...values }
+      : values,
 });
 
 /** The office's views: the 3D floor, the 2D pixel floor and the list. */

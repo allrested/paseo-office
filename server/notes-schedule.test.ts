@@ -8,37 +8,88 @@ import {
   syncNotesSchedule,
 } from "./notes-schedule.js";
 
-const RIYADH_EIGHT = { type: "cron", expression: "0 8 * * 0-4", timezone: "Asia/Riyadh" } as const;
+const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
+const RIYADH_EIGHT = {
+  type: "cron",
+  expression: "0 8 * * 0,1,2,3,4",
+  timezone: "Asia/Riyadh",
+} as const;
 
 test("no folder, no schedule", () => {
-  expect(notesCadence({ notesFolder: "", notesTimeZone: "" }, "Asia/Riyadh")).toBeNull();
+  expect(
+    notesCadence(
+      { notesFolder: "", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
+  ).toBeNull();
 });
 
-test("8:00 Sunday to Thursday in the chosen zone, else the host's", () => {
-  expect(notesCadence({ notesFolder: "/n", notesTimeZone: "" }, "Asia/Riyadh")).toEqual({
-    type: "cron",
-    expression: "0 8 * * 0-4",
-    timezone: "Asia/Riyadh",
-  });
+test("8:00 on the chosen days in the chosen zone, else the host's", () => {
   expect(
-    notesCadence({ notesFolder: "/n", notesTimeZone: "Europe/Berlin" }, "Asia/Riyadh"),
+    notesCadence(
+      { notesFolder: "/n", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
+  ).toEqual(RIYADH_EIGHT);
+  expect(
+    notesCadence({ notesFolder: "/n", notesTimeZone: "", notesDays: [1, 3, 5] }, "Asia/Riyadh"),
+  ).toMatchObject({ expression: "0 8 * * 1,3,5" });
+  expect(
+    notesCadence(
+      { notesFolder: "/n", notesTimeZone: "Europe/Berlin", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
   ).toMatchObject({ timezone: "Europe/Berlin" });
 });
 
-test("a folder of spaces is no folder, and a zone of spaces is the host's", () => {
-  expect(notesCadence({ notesFolder: "  ", notesTimeZone: "" }, "Asia/Riyadh")).toBeNull();
-  expect(notesCadence({ notesFolder: " /n ", notesTimeZone: " " }, "Asia/Riyadh")).toEqual(
-    RIYADH_EIGHT,
-  );
+test("no day chosen, no schedule", () => {
   expect(
-    notesCadence({ notesFolder: "/n", notesTimeZone: " Europe/Berlin " }, "Asia/Riyadh"),
+    notesCadence({ notesFolder: "/n", notesTimeZone: "", notesDays: [] }, "Asia/Riyadh"),
+  ).toBeNull();
+});
+
+test("a changed day list is a different cadence, so the schedule is saved again", async () => {
+  const fake = fakeSchedules();
+  const notes = createNotesSchedule({
+    schedules: fake,
+    hostTimeZone: "Asia/Riyadh",
+    log: () => {},
+  });
+  await notes.sync({ notesFolder: "/n", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY });
+  await notes.sync({ notesFolder: "/n", notesTimeZone: "", notesDays: [1, 2, 3, 4, 5] });
+  expect(
+    fake.upserted.map((input) => input.cadence.type === "cron" && input.cadence.expression),
+  ).toEqual(["0 8 * * 0,1,2,3,4", "0 8 * * 1,2,3,4,5"]);
+});
+
+test("a folder of spaces is no folder, and a zone of spaces is the host's", () => {
+  expect(
+    notesCadence(
+      { notesFolder: "  ", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
+  ).toBeNull();
+  expect(
+    notesCadence(
+      { notesFolder: " /n ", notesTimeZone: " ", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
+  ).toEqual(RIYADH_EIGHT);
+  expect(
+    notesCadence(
+      { notesFolder: "/n", notesTimeZone: " Europe/Berlin ", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
   ).toMatchObject({ timezone: "Europe/Berlin" });
 });
 
 test("a folder that is not an absolute path is refused", () => {
-  expect(() => notesCadence({ notesFolder: "docs", notesTimeZone: "" }, "Asia/Riyadh")).toThrow(
-    "The notes folder must be an absolute path: docs",
-  );
+  expect(() =>
+    notesCadence(
+      { notesFolder: "docs", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY },
+      "Asia/Riyadh",
+    ),
+  ).toThrow("The notes folder must be an absolute path: docs");
 });
 
 test("a set folder saves the schedule under its name, with its handler and label", async () => {
@@ -83,7 +134,13 @@ test("an invalid time zone is an error from the save", async () => {
   const fake = fakeSchedules();
   fake.upsertRejects(new Error("Invalid time zone: Mars/Base"));
   await expect(
-    syncNotesSchedule(fake, notesCadence({ notesFolder: "/n", notesTimeZone: "Mars/Base" }, "UTC")),
+    syncNotesSchedule(
+      fake,
+      notesCadence(
+        { notesFolder: "/n", notesTimeZone: "Mars/Base", notesDays: SUNDAY_TO_THURSDAY },
+        "UTC",
+      ),
+    ),
   ).rejects.toThrow("Invalid time zone");
 });
 
@@ -96,18 +153,26 @@ test("a failed save is logged and kept until a later save succeeds", async () =>
     log: (message) => logs.push(message),
   });
   fake.upsertRejects(new Error("Invalid cron time zone: Mars/Base"));
-  await notes.sync({ notesFolder: "/n", notesTimeZone: "Mars/Base" });
+  await notes.sync({
+    notesFolder: "/n",
+    notesTimeZone: "Mars/Base",
+    notesDays: SUNDAY_TO_THURSDAY,
+  });
   expect(notes.error()).toBe("Invalid cron time zone: Mars/Base");
   expect(logs).toEqual(["[office] notes schedule failed: Invalid cron time zone: Mars/Base"]);
 
   // A relative folder fails before the daemon is asked, and the schedule stays as it was.
   fake.upsertRejects(null);
-  await notes.sync({ notesFolder: "docs", notesTimeZone: "" });
+  await notes.sync({ notesFolder: "docs", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY });
   expect(notes.error()).toBe("The notes folder must be an absolute path: docs");
   expect(fake.upserted).toEqual([]);
   expect(fake.removed).toEqual([]);
 
-  await notes.sync({ notesFolder: "/n", notesTimeZone: "Europe/Berlin" });
+  await notes.sync({
+    notesFolder: "/n",
+    notesTimeZone: "Europe/Berlin",
+    notesDays: SUNDAY_TO_THURSDAY,
+  });
   expect(notes.error()).toBeNull();
   expect(fake.upserted.map((input) => input.cadence)).toEqual([
     { ...RIYADH_EIGHT, timezone: "Europe/Berlin" },
@@ -122,8 +187,12 @@ test("changes are synced one at a time, so a slow save cannot land after a later
     log: () => {},
   });
   const release = fake.holdNextUpsert();
-  const first = notes.sync({ notesFolder: "/n", notesTimeZone: "" });
-  const second = notes.sync({ notesFolder: "/n", notesTimeZone: "Europe/Berlin" });
+  const first = notes.sync({ notesFolder: "/n", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY });
+  const second = notes.sync({
+    notesFolder: "/n",
+    notesTimeZone: "Europe/Berlin",
+    notesDays: SUNDAY_TO_THURSDAY,
+  });
   release();
   await Promise.all([first, second]);
   expect(

@@ -7,6 +7,7 @@ import { officeHostSettings } from "../shared/settings.js";
 import { failureText } from "./action-button.js";
 import { wakeSummary } from "./board-text.js";
 import { LabeledSwitch } from "./labeled-switch.js";
+import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
@@ -17,6 +18,7 @@ type HostSetting =
   | "Agent tools"
   | "Notes folder"
   | "Time zone"
+  | typeof NOTES_DAYS_LABEL
   | "Jira projects"
   | "Sentry organisation"
   | "Sentry projects"
@@ -65,7 +67,7 @@ export interface HostSwitchesProps {
  * The header's switches. Host-wide: "Wake agents" pauses every wake, and "Agent tools" adds the
  * board tools to sessions opened from then on. Each follows the tap at once and goes back if the
  * host refuses it, with the reason on a line under the row. Under them, the stand-up notes'
- * folder and time zone, then the trackers the incidents check reads.
+ * folder, time zone and days, then the trackers the incidents check reads.
  */
 export function HostSwitches({
   wake,
@@ -137,6 +139,10 @@ export function HostSwitches({
     (next: string) => change("Time zone", { notesTimeZone: next }),
     [change],
   );
+  const saveDays = useCallback(
+    (next: number[]) => change(NOTES_DAYS_LABEL, { notesDays: next }),
+    [change],
+  );
   const saveProblem = useCallback(
     (setting: HostSetting): string | null =>
       saveError !== null && lastChange === setting
@@ -189,6 +195,12 @@ export function HostSwitches({
           value={stored?.notesTimeZone ?? null}
           onSave={saveTimeZone}
           problem={timeZoneProblem}
+          styles={styles}
+        />
+        <NotesDays
+          value={stored?.notesDays ?? null}
+          onSave={saveDays}
+          problem={saveProblem(NOTES_DAYS_LABEL)}
           styles={styles}
         />
       </View>

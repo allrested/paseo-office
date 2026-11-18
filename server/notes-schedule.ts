@@ -5,12 +5,15 @@ import { createScheduleFollower, type OfficeSchedule, syncSchedule } from "./sch
 /** The daily schedule's name among the office's schedules, and the handler that answers it. */
 export const NOTES_SCHEDULE = "standup-notes";
 const NOTES: OfficeSchedule = { name: NOTES_SCHEDULE, label: "Stand-up notes", logName: "notes" };
-/** 8:00, Sunday to Thursday: a Sunday to Thursday work week. */
-const NOTES_CRON = "0 8 * * 0-4";
 
 export interface NotesSettings {
   notesFolder: string;
   notesTimeZone: string;
+}
+
+/** What the 8:00 run follows: the folder and zone, and its weekdays, 0 for Sunday. */
+export interface NotesScheduleSettings extends NotesSettings {
+  notesDays: readonly number[];
 }
 
 /**
@@ -56,10 +59,17 @@ export function lateNotesRun(
   return dueDay === startDay ? null : { dueDay, startDay };
 }
 
-/** When the stand-up notes are written: null while no folder is set. */
-export function notesCadence(values: NotesSettings, hostTimeZone: string): OfficeCadence | null {
-  if (notesFolder(values) === null) return null;
-  return { type: "cron", expression: NOTES_CRON, timezone: notesTimeZone(values, hostTimeZone) };
+/** When the stand-up notes are written: 8:00 on their days, null while no folder or day is set. */
+export function notesCadence(
+  values: NotesScheduleSettings,
+  hostTimeZone: string,
+): OfficeCadence | null {
+  if (notesFolder(values) === null || values.notesDays.length === 0) return null;
+  return {
+    type: "cron",
+    expression: `0 8 * * ${values.notesDays.join(",")}`,
+    timezone: notesTimeZone(values, hostTimeZone),
+  };
 }
 
 /**
@@ -81,7 +91,7 @@ export interface NotesSchedulePorts {
 
 export interface NotesSchedule {
   /** Follows these settings. Never rejects: a failure is logged and kept for `error`. */
-  sync(values: NotesSettings): Promise<void>;
+  sync(values: NotesScheduleSettings): Promise<void>;
   /** Why the schedule could not follow the settings; null once a later sync succeeds. */
   error(): string | null;
   /** Keeps a reason found outside a sync until a sync succeeds. */

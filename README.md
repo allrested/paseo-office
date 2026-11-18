@@ -16,7 +16,7 @@ my-office's.
   Activity, and a team Chat where an `@` prompts an agent.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
-- Writes the day's stand-up entry at 8:00, Sunday to Thursday (the days are not a setting yet): an
+- Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
   agent on the host gets the office's stand-up report and writes a `## DD Month YYYY` entry into
   `daily-standup-YYYYMM.md` in a folder of notes you choose, following the stand-up notes
   instructions for that folder, which may sit in its own or a parent folder's `AGENTS.md` or

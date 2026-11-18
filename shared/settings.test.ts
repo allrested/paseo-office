@@ -19,25 +19,72 @@ function hostIssues(values: Record<string, unknown>): string[] {
   return parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
 }
 
+/** As the daemon reads a stored document of an older version: migrate, then parse. */
+async function upgraded(stored: Record<string, unknown>, fromVersion: number): Promise<unknown> {
+  const migrated = await officeHostSettings.migrate?.(stored, fromVersion);
+  return officeHostSettings.schema.parseAsync(migrated);
+}
+
+const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
+
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
-  // As the daemon reads a stored document of an older version: migrate, then parse.
-  const migrated = await officeHostSettings.migrate?.({ agentTools: false }, 1);
-  expect(await officeHostSettings.schema.parseAsync(migrated)).toEqual({
+  expect(await upgraded({ agentTools: false }, 1)).toEqual({
     agentTools: false,
     notesFolder: "",
     notesTimeZone: "",
+    notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
   });
 });
 
 test("host settings: version 2 values stay and the incident fields take their defaults", async () => {
   const stored = { agentTools: false, notesFolder: "/n", notesTimeZone: "" };
-  const migrated = await officeHostSettings.migrate?.(stored, 2);
-  expect(officeHostSettings.version).toBe(3);
-  expect(await officeHostSettings.schema.parseAsync(migrated)).toEqual({
+  expect(await upgraded(stored, 2)).toEqual({
     ...stored,
+    notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
   });
+});
+
+test("a version 3 document keeps its values and its Sunday to Thursday notes", async () => {
+  const stored = {
+    agentTools: false,
+    notesFolder: "/n",
+    notesTimeZone: "Asia/Riyadh",
+    jiraProjects: "SHOP",
+    sentryOrg: "acme",
+    sentryProjects: "web",
+    sentryUrl: "https://sentry.acme.dev",
+  };
+  expect(officeHostSettings.version).toBe(4);
+  expect(await upgraded(stored, 3)).toEqual({ ...stored, notesDays: SUNDAY_TO_THURSDAY });
+});
+
+test("a document with its own days keeps them", async () => {
+  const stored = { notesFolder: "/n", notesDays: [1, 3] };
+  expect(await upgraded(stored, 3)).toMatchObject({ notesDays: [1, 3] });
+  expect(officeHostSettings.schema.parse({ notesDays: [] })).toMatchObject({ notesDays: [] });
+});
+
+test("a host with no settings writes its notes Monday to Friday", () => {
+  expect(officeHostSettings.schema.parse({})).toMatchObject({ notesDays: [1, 2, 3, 4, 5] });
+});
+
+test("the notes days are stored in order", () => {
+  expect(officeHostSettings.schema.parse({ notesDays: [5, 0, 3] })).toMatchObject({
+    notesDays: [0, 3, 5],
+  });
+});
+
+test("a day that is not 0 to 6, or is there twice, is refused", () => {
+  const notWeekday = (day: number) => [
+    `notesDays: ${day} is not a day from 0 (Sunday) to 6 (Saturday)`,
+  ];
+  expect(hostIssues({ notesDays: [1, 7] })).toEqual(notWeekday(7));
+  expect(hostIssues({ notesDays: [-1] })).toEqual(notWeekday(-1));
+  expect(hostIssues({ notesDays: [1.5] })).toEqual(notWeekday(1.5));
+  expect(hostIssues({ notesDays: [3, 1, 3] })).toEqual(["notesDays: 3 is there twice"]);
+  expect(hostIssues({ notesDays: [0, 6] })).toEqual([]);
 });
 
 test("a Jira list with a bad key is refused", () => {

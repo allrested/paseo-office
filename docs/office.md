@@ -241,9 +241,9 @@ holds every wake until it is turned back on; wakes that wait are not kept across
 
 The office's settings are a screen in its page under Settings > Plugins > Office
 (`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Notes folder", "Time
-zone" and the tracker fields. Three things open it with `client.openSettings("office")`: the gear
-beside the view switch, the Command Center's "Office settings", and the Attention tab's Settings
-card.
+zone", "Stand-up days" and the tracker fields. Three things open it with
+`client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
+settings", and the Attention tab's Settings card.
 
 ## The host
 
@@ -301,7 +301,10 @@ is off. "Copy as text" copies the report.
 
 The office also writes the day's entry in a folder of stand-up notes, one `daily-standup-YYYYMM.md`
 per month. Nothing runs until you set "Notes folder", an absolute path. "Time zone" is the notes'
-zone, the host's when empty.
+zone, the host's when empty. "Stand-up days" are the days of the 8:00 run, a row of seven buttons,
+Monday to Friday by default. A host that had the office's settings before the days were a setting
+keeps Sunday to Thursday. With no day chosen nothing runs at 8:00, and the bell still starts the
+notes.
 
 Each run, and each click on the 3D floor's bell, starts an agent titled "Stand-up notes" in the
 notes folder's workspace, unattended: the first enabled, ready provider in the daemon's order, with
@@ -328,11 +331,10 @@ notes card: a month's file as Markdown at its newest entry, read only. The serve
 ## Schedules
 
 The office runs two schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
-Sunday to Thursday in the notes' zone, while a notes folder is set (the days are not a setting
-yet), and the incidents check every
-5 minutes, while a tracker is on. They are timers in the plugin's process, not Paseo schedules, so
-they are not in the app, `paseo schedule ls` or `list_schedules`. The office sets them from its
-settings each time it starts and at each save, and stores nothing.
+on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, and the
+incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
+not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
+office sets them from its settings each time it starts and at each save, and stores nothing.
 
 - A run that came due while the daemon was down is not made up.
 - After a daemon restart, a run waits until the office is opened or an agent opens or ends a turn.

@@ -68,6 +68,9 @@ export interface OfficeStyles {
   /** The view switch: a row of pills, the chosen one filled. */
   segments: ViewStyle;
   segmentsDisabled: ViewStyle;
+  /** The stand-up days' pills: the segments, wrapping on a phone. */
+  notesDays: ViewStyle;
+  notesDaysDisabled: ViewStyle;
   segment: ViewStyle;
   /** The chosen pill's fill, and a fainter one under a pointer or a finger: layers, as buttonFill is. */
   segmentFill: ViewStyle;
@@ -643,6 +646,8 @@ export function useOfficeStyles(
       switchOffThumb: { ...thumb, backgroundColor: colors.surface0 },
       segments,
       segmentsDisabled: { ...segments, opacity: 0.5 },
+      notesDays: { ...segments, flexWrap: "wrap" },
+      notesDaysDisabled: { ...segments, flexWrap: "wrap", opacity: 0.5 },
       // As tall as the row's other controls and at least a touch target wide.
       segment: {
         minHeight: controlHeight,

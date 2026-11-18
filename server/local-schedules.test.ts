@@ -25,6 +25,16 @@ test("Friday and Saturday are skipped: Thursday's run is followed by Sunday's", 
   );
 });
 
+test("a list of days that is not a range runs on those days only", () => {
+  // Wednesday 18 November 2026, after 8:00 in Riyadh: Friday is next, then Monday.
+  expect(iso(nextCronRun("0 8 * * 1,3,5", "Asia/Riyadh", at("2026-11-18T05:00:00Z")))).toBe(
+    "2026-11-20T05:00:00.000Z",
+  );
+  expect(iso(nextCronRun("0 8 * * 1,3,5", "Asia/Riyadh", at("2026-11-20T05:00:00Z")))).toBe(
+    "2026-11-23T05:00:00.000Z",
+  );
+});
+
 test("the hour is the zone's wall clock across a daylight-saving change", () => {
   // New York springs forward on Sunday 8 March 2026: 8:00 EDT is 12:00 UTC.
   expect(iso(nextCronRun("0 8 * * *", "America/New_York", at("2026-03-07T14:00:00Z")))).toBe(
