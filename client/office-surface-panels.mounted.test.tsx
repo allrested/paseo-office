@@ -1121,6 +1121,26 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     await pressFirst("Ada:");
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
     expect(container.textContent).toContain("Reading the ledger");
+    const sidebarSearch = labelled("Search agents");
+    expect(sidebarSearch).not.toBeNull();
+    await typeReply("Keep this draft");
+    await press("Hide sessions sidebar");
+    expect(labelled("Show sessions sidebar")?.getAttribute("aria-expanded")).toBe("false");
+    expect(reply()).toBe("Keep this draft");
+    await press("Hide details sidebar");
+    expect(labelled("Message")).toBeNull();
+    expect(labelled("Show details sidebar")).not.toBeNull();
+    expect(labelled("Chat")?.getAttribute("role")).toBe("tab");
+    await press("Show details sidebar");
+    expect(reply()).toBe("Keep this draft");
+    expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+    await press("Show sessions sidebar");
+    expect(labelled("Search agents")).toBe(sidebarSearch);
+    await sizeSurface(820);
+    expect(labelled("Hide sessions sidebar")).toBeNull();
+    expect(container.querySelector('[role="tab"][aria-label^="Sessions"]')).not.toBeNull();
+    await sizeSurface(1440);
+    expect(labelled("Hide sessions sidebar")).not.toBeNull();
 
     target = null;
     await act(async () => void document.dispatchEvent(new Event("fullscreenchange")));

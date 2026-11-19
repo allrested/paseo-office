@@ -133,6 +133,7 @@ afterEach(() => {
 
 test("empty: Nothing yet since the office opened.", async () => {
   await mount();
+  expect(container.querySelector('[role="heading"], h1')?.textContent).toBe("Activity");
   expect(container.textContent).toContain(FEED_EMPTY);
 });
 

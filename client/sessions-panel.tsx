@@ -2,74 +2,131 @@ import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { agentTitle, buildOfficeModel, dotTone } from "../shared/model.js";
-import { loadProblem, Pill } from "./activity-panel.js";
+import { loadProblem } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";
 import { ActionButton } from "./action-button.js";
 import { NewAgentForm } from "./new-agent-form.js";
-import { LIST_TABS, NO_MATCH, SEARCH_LABEL, tabCounts, type ListTab } from "./list-text.js";
+import { NO_MATCH, SEARCH_LABEL, tabCounts, type ListTab } from "./list-text.js";
 import type { ColumnPanelProps, OfficeLink } from "./office-link.js";
-import { NO_AGENTS, sessionRows, type SessionRow } from "./sessions-text.js";
+import {
+  NO_AGENTS,
+  avatarInitials,
+  sessionDetail,
+  sessionSections,
+  type GroupedSession,
+  type SessionGroup,
+} from "./sessions-text.js";
 import type { OfficeStyles } from "./styles.js";
 
 interface AgentRowProps {
-  entry: SessionRow;
-  /** The last sub-agent of its parent. */
-  endsGroup: boolean;
+  entry: GroupedSession;
   link: OfficeLink;
   styles: OfficeStyles;
 }
 
-function AgentRow({ entry, endsGroup, link, styles }: AgentRowProps) {
-  const { row, room } = entry;
+function AgentRow({ entry, link, styles }: AgentRowProps) {
+  const { row, room, level } = entry;
   const { agent } = row;
-  const child = row.depth === 1;
-  const press = useCallback(() => link.select(agent.id), [agent.id, link]);
-  const [hovered, setHovered] = useState(false);
-  const hoverIn = useCallback(() => setHovered(true), []);
-  const hoverOut = useCallback(() => setHovered(false), []);
-  const [pressed, setPressed] = useState(false);
-  const pressIn = useCallback(() => setPressed(true), []);
-  const pressOut = useCallback(() => setPressed(false), []);
-  const lit = pressed || hovered;
+  const ui = styles.sessions;
   const title = agentTitle(agent);
   const tone = dotTone(agent);
   const state = stateLabel(agent);
-  let wrapper = child ? undefined : styles.rowDivider;
-  if (child && endsGroup) wrapper = styles.rowGroupEnd;
+  const text = sessionDetail(entry);
+  const press = useCallback(() => link.select(agent.id), [link, agent.id]);
+  let accent: typeof ui.error | undefined;
+  let detailColor: typeof ui.warningText | undefined;
+  if (tone === "warning") {
+    accent = ui.approval;
+    detailColor = ui.warningText;
+  }
+  if (tone === "danger") {
+    accent = ui.error;
+    detailColor = ui.errorText;
+  }
+  const rowStyle = useMemo(() => [ui.row, accent], [ui, accent]);
+  const detailStyle = useMemo(() => [ui.detail, detailColor], [ui, detailColor]);
+  const [hovered, setHovered] = useState(false);
+  const hoverIn = useCallback(() => setHovered(true), []);
+  const hoverOut = useCallback(() => setHovered(false), []);
+  const nested = level > 1 ? ui.deep : ui.nested;
   return (
-    <View style={wrapper}>
+    <View style={level ? nested : undefined}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${title}: ${state}`}
+        accessibilityHint={text || room.name}
         onPress={press}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
         onHoverIn={hoverIn}
         onHoverOut={hoverOut}
-        style={child ? styles.rowChild : styles.row}
+        style={rowStyle}
       >
-        {lit ? <View style={styles.pressedFill} /> : null}
-        <View style={styles.lead}>
-          <View style={styles.dot[tone]} />
-        </View>
-        <View style={styles.rowBody}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.rowMeta} numberOfLines={1}>
-            {room.name}
-          </Text>
-          {row.activity ? (
-            <Text style={styles.rowActivity} numberOfLines={1}>
-              {row.activity}
-            </Text>
-          ) : (
-            <Text style={styles.rowState[tone]} numberOfLines={1}>
-              {state}
-            </Text>
-          )}
-        </View>
+        {({ pressed }) => (
+          <>
+            {(pressed || hovered) && <View style={styles.pressedFill} />}
+            <View style={ui.avatar}>
+              <Text style={ui.initials}>{avatarInitials(title)}</Text>
+              <View style={ui.badge}>
+                <View style={styles.dot[tone]} />
+              </View>
+            </View>
+            <View style={styles.rowBody}>
+              <View style={ui.rowTitle}>
+                <Text style={ui.name} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Text numberOfLines={1} style={ui.project}>
+                  {room.name}
+                </Text>
+              </View>
+              {text ? (
+                <Text style={detailStyle} numberOfLines={1}>
+                  {text}
+                </Text>
+              ) : null}
+            </View>
+          </>
+        )}
       </Pressable>
+    </View>
+  );
+}
+
+const METRICS = [
+  { group: "working", label: "Working", tone: "running" },
+  { group: "attention", label: "Needs you", tone: "warning" },
+  { group: "resting", label: "Resting", tone: "idle" },
+] as const;
+const GROUPS: readonly SessionGroup[] = ["attention", "working", "resting"];
+function SectionHeading({
+  group,
+  rows,
+  styles,
+}: {
+  group: SessionGroup;
+  rows: GroupedSession[];
+  styles: OfficeStyles;
+}) {
+  const ui = styles.sessions;
+  let title = group === "working" ? "Working" : "Resting";
+  let accent: typeof ui.warningText | undefined;
+  if (group === "attention") {
+    title = rows.every(
+      ({ row }) =>
+        row.agent.permissions.length > 0 && row.agent.permissions[0]?.kind !== "question",
+    )
+      ? "Needs your approval"
+      : "Needs your attention";
+    accent = rows.every(({ row }) => dotTone(row.agent) === "danger")
+      ? ui.errorText
+      : ui.warningText;
+  }
+  const headingStyle = useMemo(() => [ui.headingText, accent], [ui, accent]);
+  return (
+    <View style={ui.heading}>
+      <Text accessibilityRole="header" style={headingStyle}>
+        {title}
+      </Text>
+      <Text style={ui.headingCount}>{rows.length}</Text>
     </View>
   );
 }
@@ -117,25 +174,34 @@ function SessionList({
   const model = useMemo(() => buildOfficeModel(state), [state]);
   // The counts ignore the search, as the List view's do.
   const counts = useMemo(() => tabCounts(model.rooms.flatMap((room) => room.rows)), [model]);
-  const shown = useMemo(() => sessionRows(model, tab, query), [model, tab, query]);
+  const shown = useMemo(() => sessionSections(model, tab, query), [model, tab, query]);
+  const filtered = tab !== "all" || query.length > 0;
+  const reset = useCallback(() => {
+    setTab("all");
+    setQuery("");
+  }, []);
+  const ui = styles.sessions;
   const problem = loadProblem(subscription);
   let status: string | null = null;
   if (!loaded) status = problem === null ? "Loading..." : null;
   else if (counts.all === 0) status = NO_AGENTS;
-  else if (shown.length === 0) status = NO_MATCH;
+  else if (GROUPS.every((group) => shown[group].length === 0)) status = NO_MATCH;
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
-        <View style={styles.panelTop}>
-          <View style={styles.sessionTools}>
-            <TextInput
-              accessibilityLabel={SEARCH_LABEL}
-              placeholder="Search"
-              placeholderTextColor={styles.placeholderColor}
-              value={query}
-              onChangeText={setQuery}
-              style={styles.sessionSearch}
-            />
+        <View style={ui.top}>
+          <View style={ui.actions}>
+            <Pressable
+              accessibilityRole="tab"
+              aria-selected={!filtered}
+              accessibilityLabel={filtered ? "Clear filters" : `All, ${counts.all}`}
+              onPress={reset}
+              style={ui.all}
+            >
+              <Text style={filtered ? ui.resetText : ui.allText}>
+                {filtered ? "Clear filters" : `All sessions · ${counts.all}`}
+              </Text>
+            </Pressable>
             <ActionButton
               primary
               label="New agent"
@@ -144,26 +210,28 @@ function SessionList({
               styles={styles}
             />
           </View>
-          <View role="group" aria-label="Sessions" style={styles.panelChips}>
-            {[LIST_TABS.slice(0, 2), LIST_TABS.slice(2)].map((pair) => (
-              <View key={pair[0].tab} style={styles.sessionFilterPair}>
-                {pair.map(({ tab: each, label }) => (
-                  <Pill<ListTab>
-                    key={each}
-                    compact
-                    value={each}
-                    label={label}
-                    name={`${label}, ${counts[each]}`}
-                    count={counts[each]}
-                    on={each === tab}
-                    toggle={false}
-                    onPress={setTab}
-                    styles={styles}
-                  />
-                ))}
-              </View>
+          <View role="group" aria-label="Sessions" style={ui.summary}>
+            {METRICS.map(({ group, label, tone }) => (
+              <Metric
+                key={group}
+                group={group}
+                label={label}
+                tone={tone}
+                count={counts[group]}
+                chosen={tab === group}
+                choose={setTab}
+                styles={styles}
+              />
             ))}
           </View>
+          <TextInput
+            accessibilityLabel={SEARCH_LABEL}
+            placeholder="Search sessions"
+            placeholderTextColor={styles.placeholderColor}
+            value={query}
+            onChangeText={setQuery}
+            style={ui.search}
+          />
         </View>
         {problem === null ? null : (
           <View style={styles.bannerSlot}>
@@ -175,16 +243,47 @@ function SessionList({
           </View>
         )}
         {status === null ? null : <Text style={styles.sceneStatus}>{status}</Text>}
-        {shown.map((entry, index) => (
-          <AgentRow
-            key={entry.row.agent.id}
-            entry={entry}
-            endsGroup={entry.row.depth === 1 && shown[index + 1]?.row.depth !== 1}
-            link={link}
-            styles={styles}
-          />
-        ))}
+        {GROUPS.map((group) =>
+          shown[group].length ? (
+            <View key={group} style={ui.section}>
+              <SectionHeading group={group} rows={shown[group]} styles={styles} />
+              {shown[group].map((entry) => (
+                <AgentRow key={entry.row.agent.id} entry={entry} link={link} styles={styles} />
+              ))}
+            </View>
+          ) : null,
+        )}
       </ScrollView>
     </View>
+  );
+}
+
+interface MetricProps {
+  group: SessionGroup;
+  label: string;
+  tone: "running" | "warning" | "idle";
+  count: number;
+  chosen: boolean;
+  choose(tab: ListTab): void;
+  styles: OfficeStyles;
+}
+function Metric({ group, label, tone, count, chosen, choose, styles }: MetricProps) {
+  const press = useCallback(() => choose(chosen ? "all" : group), [chosen, choose, group]);
+  const ui = styles.sessions;
+  const metricStyle = useMemo(() => [ui.metric, chosen && ui.selectedMetric], [ui, chosen]);
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      aria-selected={chosen}
+      accessibilityLabel={`${label}, ${count}`}
+      onPress={press}
+      style={metricStyle}
+    >
+      <View style={ui.metricTop}>
+        <View style={styles.dot[count ? tone : "idle"]} />
+        <Text style={ui.count}>{count}</Text>
+      </View>
+      <Text style={ui.caption}>{label}</Text>
+    </Pressable>
   );
 }

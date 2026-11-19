@@ -113,7 +113,10 @@ rested, and its cost (`client/list-text.ts`).
 In browsers that support fullscreen, the Full screen button beside the view switch expands the
 office. Wide screens show Sessions on the left, the floor in the center, and Activity, Chat, and
 open conversations on the right. Select an agent to read the conversation, reply, or answer a
-permission request. Narrow screens use the column or its compact sheet. Exit full screen or
+permission request. Use **Sessions** and **Details** in the top bar to hide either sidebar or both.
+The device remembers your choice. Restoring Sessions brings back its search and filter, and
+restoring Details brings back the conversation and reply draft. Narrow screens open these panels
+as sheets. Exit full screen or
 press Escape to return to Paseo.
 
 ## The column
