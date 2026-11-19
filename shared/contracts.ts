@@ -4,7 +4,7 @@ import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
 import { ACTIVITY_KINDS, TEST_RESULTS } from "./names.js";
 
-export { ACTIVITY_KINDS, LOBBY, USER_AUTHOR } from "./names.js";
+export { ACTIVITY_KINDS, DUTY, LOBBY, USER_AUTHOR } from "./names.js";
 export type { ActivityKind, ActivityStep, TestResult } from "./names.js";
 export const POST_TEXT_MAX = 2000;
 /** The checks of one pull request the office carries. */
@@ -157,10 +157,36 @@ export const PostSchema = z.object({
   claimedBy: z.string().optional(),
   /** Persisted until Paseo acknowledges an automatic lobby assignment. */
   pickupMessageId: z.string().optional(),
+  /** On the duty board: the duty of the list it was posted for, and its day (YYYY-MM-DD). */
+  duty: z.object({ id: z.string(), day: z.string() }).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Post = z.output<typeof PostSchema>;
+
+/** The scene's four pantry chores, which a duty of the starting list is acted out as. */
+export const DUTY_CHORES = ["cups", "trash", "plants", "table"] as const;
+export type DutyChore = (typeof DUTY_CHORES)[number];
+
+/** A duty of the owner's list. Without instructions it is pretend: the 3D office acts it out. */
+export const DutySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** What an agent handed the duty is asked to do; empty for a pretend duty. */
+  instructions: z.string(),
+  /** The weekdays it comes due, 0 for Sunday to 6 for Saturday. */
+  days: z.array(z.number().int().min(0).max(6)),
+  /** The chore the 3D office acts it out as; absent for a duty the owner added. */
+  chore: z.enum(DUTY_CHORES).optional(),
+});
+export type Duty = z.output<typeof DutySchema>;
+
+/** The duty list, and the day the duty board was last brought up to (null before the first). */
+export const DutyBoardSchema = z.object({
+  duties: z.array(DutySchema),
+  day: z.string().nullable(),
+});
+export type DutyBoard = z.output<typeof DutyBoardSchema>;
 
 export const WakeStateSchema = z.object({
   paused: z.boolean(),
@@ -426,6 +452,8 @@ export const OfficeSnapshotSchema = z.object({
   weather: WeatherStateSchema.optional(),
   /** Absent until the office's server has loaded the chat. */
   chat: ChatSnapshotSchema.optional(),
+  /** The duty list; absent until the office's server has read it. Its posts are `boards.duty`. */
+  duties: DutyBoardSchema.optional(),
 });
 export type OfficeSnapshot = z.output<typeof OfficeSnapshotSchema>;
 
