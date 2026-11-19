@@ -37,6 +37,124 @@ interface Row extends Omit<LifeLine["options"], "key"> {
 const ask = (key: string, ...chances: number[]) => chances.map((chance) => ({ key, chance }));
 
 const ROWS: Readonly<Record<string, Row>> = {
+  lunchOrder: {
+    from: "reception",
+    key: "lunchOrder",
+    extra: { from: "person", key: "chat.reply.parcelGot", delay: 4000 },
+  },
+  store: { from: "person", key: "store", answer: ask("storeAsk", 0.7) },
+  plateau: {
+    from: "person",
+    key: (v) => (v.why === "morning" ? "plateauMorning" : "plateauCoffee"),
+    react: ["❤️", "👍"],
+    reacts: 2,
+    answer: ask("plateauAsk", 0.8),
+  },
+  handset: {
+    from: "anyone",
+    key: "handset",
+    react: ["😮", "❤️", "😆"],
+    reacts: 4,
+    answer: ask("handsetAsk", 0.9, 0.5),
+  },
+  frosty: {
+    from: "person",
+    key: (v) => (v.why === "treat" ? "frostyTreat" : "frostyHot"),
+    react: ["❤️", "😆"],
+    reacts: 3,
+    answer: ask("frostyAsk", 0.9, 0.5),
+  },
+  jadetea: {
+    from: "person",
+    key: "jadeteaTea",
+    react: ["❤️", "👍"],
+    reacts: 2,
+    answer: ask("jadeteaAsk", 0.8, 0.4),
+  },
+  navycafe: {
+    from: "person",
+    key: (v) => (v.why === "checkin" ? "navycafeCheckin" : "navycafeTea"),
+    react: ["❤️", "😆", "😮"],
+    reacts: 4,
+    answer: ask("navycafeAsk", 0.9, 0.5),
+  },
+  harbor: {
+    from: "person",
+    key: "harborHeadache",
+    react: ["😭", "❤️"],
+    reacts: 3,
+    answer: ask("harborAsk", 0.8),
+  },
+  olivecafe: {
+    from: "person",
+    key: (v) => (v.why === "olivecafeWeekend" ? "olivecafeWeekend" : "olivecafe"),
+    react: ["❤️", "😋"],
+    reacts: 3,
+    answer: ask("olivecafeAsk", 0.9, 0.5),
+  },
+  payday: {
+    from: "anyone",
+    key: "payday",
+    react: ["💸", "😆", "❤️"],
+    reacts: 5,
+    answer: ask("paydayAsk", 0.9, 0.6),
+  },
+  atm: { from: "person", key: "atm", answer: ask("atmAsk", 0.5) },
+  com: {
+    from: "anyone",
+    key: (v) => (v.friday === "true" ? "comFriday" : "com"),
+    react: ["😋", "👍"],
+    reacts: 3,
+    answer: ask("comAsk", 0.9, 0.6),
+  },
+  pickleAsk: {
+    from: "anyone",
+    key: "pickleAsk",
+    react: ["🏓", "👍", "😆"],
+    reacts: 4,
+    answer: ask("pickleAsk", 0.95, 0.8, 0.5),
+  },
+  pickleDone: {
+    from: "person",
+    key: "pickleDone",
+    react: ["🏓", "😆", "❤️"],
+    reacts: 4,
+    answer: ask("pickleDone", 0.9, 0.6),
+  },
+  photoGo: {
+    from: "anyone",
+    key: "photoGo",
+    react: ["📸", "🎉", "❤️"],
+    reacts: 4,
+    answer: ask("photoGo", 0.9, 0.5),
+  },
+  photoStrip: {
+    from: "person",
+    key: "photoStrip",
+    react: ["😆", "❤️", "📸"],
+    reacts: 5,
+    answer: ask("photoStrip", 0.9, 0.6),
+  },
+  photoQueue: { from: "person", key: "photoQueue", react: ["😭", "😆"], reacts: 3 },
+  evLow: {
+    from: "person",
+    key: "evLow",
+    react: ["🔋", "⚡"],
+    reacts: 2,
+    answer: ask("evLow", 0.6),
+  },
+  evDone: {
+    from: "person",
+    key: "evDone",
+    react: ["⚡", "👍"],
+    reacts: 2,
+    answer: ask("evDone", 0.4),
+  },
+  nhauInvite: { from: "person", key: "nhauInvite" },
+  nhauYes: { from: "person", key: "nhauYes" },
+  nhauCheers: { from: "person", key: "nhauCheers" },
+  nhauNoDrive: { from: "person", key: "nhauNoDrive" },
+  nhauRide: { from: "person", key: "nhauRide" },
   standup: {
     from: "hr",
     key: "standup",
@@ -206,6 +324,7 @@ export function lifeLine(kind: string, vars: Vars, ctx: LifeContext): LifeLine |
     vars: { ...vars, name: vars.name ?? ctx.name(id) ?? "" },
     options: { ...options, key: `life:${kind}:${id}:${Math.floor(ctx.now / every)}` },
   };
+  if (kind === "com" && vars.friday === "true") line.options.answer = ask("bunDauAsk", 0.9, 0.6);
   if (extra) {
     const to = extra.from === "who" ? vars.who : id;
     if (to && ctx.name(to) !== null) line.extra = { ...extra, from: to };

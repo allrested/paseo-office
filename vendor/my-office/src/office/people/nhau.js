@@ -14,7 +14,8 @@ import { lift } from '../world/entrance.js';
 import { later } from './errands.js';
 import { dn, hash, sessions, workers } from './workers.js';
 import { called, coatOf, goUp, here, live, mainExit, outside, settleIn, street, walk, wayOf } from './outings.js';
-import { chatSay } from '../ui/group-chat.js';
+// PASEO: only named chat events cross the frame. The host supplies their words.
+import { chatLife } from '../ui/group-chat.js';
 import { queueUi } from '../ui/activity.js';
 import { t as tr } from '../../i18n/index.js';
 
@@ -52,8 +53,8 @@ function blush(w, n) {
 /* the evening: who, from when, how long */
 function start(list, S, Q) {
   NH = { members: [], stage: 'going', since: state.sim, endAt: state.sim + (FORCE ? rand(150, 200) : rand(55, 95) * 60), nextToast: Infinity, toasts: 0, Q };
-  chatSay(list[0].id, tr('world.nhau.chat.invite'));
-  list.slice(1).forEach((w, k) => chatSay(w.id, tr('world.nhau.chat.yes'), { delay: 2500 + k * 2200 }));
+  chatLife('nhauInvite', { id: list[0].id });
+  list.slice(1).forEach((w, k) => later(2.5 + k * 2.2, () => chatLife('nhauYes', { id: w.id })));
   // one by one, a few seconds apart; whoever got busy meanwhile (a coffee, the loo) is replaced by someone else free
   list.forEach((w, i) => later(1.5 + i * rand(2.5, 5), () => enlist(free(w) ? w : spare())));
   queueUi();
@@ -108,7 +109,7 @@ function toast(seated) {
     for (const m of seated) if (live(m, 'sit')) { m.w.say('idle', tr('world.nhau.say.do')); m.drinks++; blush(m.w, m.drinks); }
     NH.Q.toast(); sync();
   });
-  if (NH.toasts === 1) chatSay(lead.w.id, tr('world.nhau.chat.cheers'), { delay: 3000 });
+  if (NH.toasts === 1) later(3, () => chatLife('nhauCheers', { id: lead.w.id }));
 }
 // work came in: back to the office at a run (a drink in them: home by Ridely later on)
 function backToWork(m, S) {
@@ -127,8 +128,8 @@ function endNight(S, Q) {
   const seated = NH.members.filter((m) => m.stage === 'sit');
   if (!seated.length) return;
   seated[0].w.say('idle', tr('world.nhau.say.noDrive'));
-  chatSay(seated[0].w.id, tr('world.nhau.chat.noDrive'));
-  if (seated[1]) chatSay(seated[1].w.id, tr('world.nhau.chat.grab'), { delay: 3200 });
+  chatLife('nhauNoDrive', { id: seated[0].w.id });
+  if (seated[1]) later(3.2, () => chatLife('nhauRide', { id: seated[1].w.id }));
   seated.forEach((m, k) => later(2 + k * rand(2, 3.5), () => { if (live(m, 'sit')) callRide(m, S, Q, k); }));
 }
 function callRide(m, S, Q, k) {
