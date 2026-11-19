@@ -101,16 +101,18 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
     seed(teams) {
       if (seeded) return;
       const at = now();
-      for (const { name, first, daysSeen } of teams)
+      for (const { name, first, daysSeen } of teams) {
+        const before = projects.get(name);
         projects.set(name, {
-          first,
+          first: Math.min(first, before?.first ?? first),
           last: at,
-          days: daysSeen,
+          days: Math.max(daysSeen, before?.days ?? 0),
           lastDay: day(at),
-          turns: 0,
+          turns: before?.turns ?? 0,
           pre: true,
           checked: true,
         });
+      }
       seeded = true;
       save();
     },

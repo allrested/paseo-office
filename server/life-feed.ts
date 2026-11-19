@@ -109,8 +109,8 @@ export function createLifeFeed(deps: {
       readFolders(view, names);
       changed();
     },
-    turnEnded(id: string) {
-      const name = teams.get(id);
+    async turnEnded(id: string, lookup?: () => Promise<string | null>) {
+      const name = teams.get(id) ?? (await lookup?.());
       if (name) {
         deps.tenure.touch(name, { at: deps.now(), turn: true });
         changed();

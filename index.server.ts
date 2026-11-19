@@ -494,7 +494,16 @@ export function createOfficePlugin(
         holder.remember(context.paseo);
         office.noteAgent(agent);
         office.turnEnded(agent.id);
-        feed.turnEnded(agent.id);
+        await feed.turnEnded(agent.id, async () => {
+          // With the office closed there is no subscribed roster. Resolve the hook's team on demand.
+          const workspaceId =
+            agent.workspaceId ??
+            (agent.parentAgentId
+              ? (await context.paseo.agents.ref(agent.parentAgentId).refresh())?.agent.workspaceId
+              : null);
+          if (!workspaceId) return null;
+          return (await context.paseo.workspaces.ref(workspaceId).refresh())?.name ?? null;
+        });
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);
       }

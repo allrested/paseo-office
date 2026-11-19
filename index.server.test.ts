@@ -202,6 +202,7 @@ function fakeContext(
         }),
       },
       workspaces: {
+        ref: (id: string) => ({ refresh: async () => (id === "w1" ? { name: "api" } : null) }),
         list: async () => listOf([]),
         open: async (cwd: string) => ({
           id: "wks_notes",
