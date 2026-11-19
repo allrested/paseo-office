@@ -815,15 +815,23 @@ test("only a farewell and promotion are sent to the host tenure ledger", async (
   expect(onLife).toHaveBeenCalledWith("parcel", { id: "a1" });
 });
 
-test("the pantry's duty board opens Paseo's duty board; without one it keeps the scene's own note", async () => {
+test("the pantry's duty board opens Paseo's duty board once the host gave its duties; before, and without one, it keeps the scene's own note", async () => {
+  const toasts = h.dutyToasts;
   const duties = vi.fn();
   const props = await startPage({ onDuties: duties });
+  // No duty list from the host yet: the scene's rota is up, and so is its note.
+  props.get("dutyBoard")?.act();
+  expect(duties).not.toHaveBeenCalled();
+  expect(h.dutyToasts).toBe(toasts + 1);
+  (
+    globalThis as unknown as { PaseoOfficeWorld: { setDuties(list: unknown): void } }
+  ).PaseoOfficeWorld.setDuties([]);
   props.get("dutyBoard")?.act();
   expect(duties).toHaveBeenCalledTimes(1);
-  expect(h.dutyToasts).toBe(0);
+  expect(h.dutyToasts).toBe(toasts + 1);
   const own = await startPage({});
   own.get("dutyBoard")?.act();
-  expect(h.dutyToasts).toBe(1);
+  expect(h.dutyToasts).toBe(toasts + 2);
 });
 
 test("the host's duties replace the scene's rota, and a pretend duty acted out is reported", async () => {

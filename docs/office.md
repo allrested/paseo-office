@@ -430,7 +430,9 @@ too. It shows today's duties with who has each, with Mark done or Reopen, and th
 duty's name, instructions and day buttons, saved whole. The scene is told each duty's name, its
 chore, its holder's title cut to 24 characters and its state, never its instructions
 (`worldDuties` in `client/world/adapter.ts`). The board and its tooltip show them, and the scene
-keeps no rota of its own. The four starting duties keep the cups, bin, plants and tables chores.
+keeps no rota of its own. Until the host has sent its list (an older host has none) nothing offers
+the duty board, and the scene keeps upstream's rota and its note. The four starting duties keep the
+cups, bin, plants and tables chores.
 For a duty you add, the person walks to the board and back. The person of an agent that holds a
 duty acts its chore out once. HR posts the day's list in the chat in the morning. The scene's part
 is `paseo-duty-plan.js` and `people/duty.js`.

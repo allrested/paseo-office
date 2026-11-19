@@ -232,9 +232,10 @@ export interface WorldApi {
   setBoardRows(rows: readonly WorldBoardRow[]): void;
   /**
    * The day's duties for the pantry's board. Once given, the scene no longer keeps a rota of its
-   * own. Absent on a page built from before the duty board.
+   * own. Null while the host has sent no duty list (an older host, or before it is read): the
+   * scene keeps upstream's rota. Absent on a page built from before the duty board.
    */
-  setDuties?(duties: readonly WorldDuty[]): void;
+  setDuties?(duties: readonly WorldDuty[] | null): void;
   /**
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.

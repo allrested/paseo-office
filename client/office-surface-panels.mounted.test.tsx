@@ -315,6 +315,16 @@ test("the page has no settings: no switch and no field", async () => {
   expect(container.querySelector("input:not(#office-list-search)")).toBeNull();
 });
 
+test("Duty board is offered once the host has sent its duty list, not before", async () => {
+  await mount();
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+  expect(labelled("Duty board")).toBeNull();
+  await act(async () =>
+    deliver?.({ type: "snapshot", state: { ...EMPTY_OFFICE, duties: { duties: [], day: null } } }),
+  );
+  expect(labelled("Duty board")).not.toBeNull();
+});
+
 const BROKEN_NOTES = {
   folderSet: true,
   writing: false,

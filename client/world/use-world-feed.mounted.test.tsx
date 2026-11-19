@@ -116,9 +116,19 @@ test("seats the people, writes the board, sets the machine and the selection onc
     ]),
   );
   expect(calls).toContain("setSessions:[[]]");
-  expect(calls).toContain("setDuties:[[]]");
+  // No duty list from the host yet: the scene keeps its own rota.
+  expect(calls).toContain("setDuties:[null]");
   expect(calls).toContain("setMachine:[null]");
   expect(calls).toContain("select:[null]");
+});
+
+test("a duty list from the host, even an empty one, replaces the scene's rota", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={api} feed={input({ model: { ...MODEL, dutyList: [] } })} />),
+  );
+  expect(calls).toContain("setDuties:[[]]");
+  expect(calls).not.toContain("setDuties:[null]");
 });
 
 test("follows the selection and the stand-up", async () => {

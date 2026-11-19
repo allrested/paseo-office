@@ -168,7 +168,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
 | `world/backdrops/index.js`  | Builds the selected Plain, City, Countryside, or Beach backdrop and its day and night window views. Photo mode can hold either lighting setting. |
 
-A click on the pantry's duty board opens Paseo's duty board (`onDuties`); its tooltip stays the scene's. The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
+A click on the pantry's duty board opens Paseo's duty board (`onDuties`) once the host has given its duties, and is upstream's note before that; its tooltip stays the scene's. The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
 follow the app's theme (`paseo.clock.hint` in `OURS`). A person already in the office whose status
 becomes `wait` glides the camera to them (upstream's `ui/permissions.js` `onPerm`, in
 `paseo-entry.js`).

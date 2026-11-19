@@ -385,9 +385,13 @@ const api = {
     if (tv && host.resources) { tv.act = () => host.resources(); tv.hint = tr('paseo.tv.resources'); }
     // (the wall clock cycled upstream's time of day: auto, day, night. Here the lights follow the app's theme and only photo
     // mode's buttons hold day or night, so a click on the clock changes nothing and its tooltip says why)
-    // (the pantry's duty board opens Paseo's duty board, where its duties are kept; its tooltip stays)
+    // (the pantry's duty board opens Paseo's duty board, where its duties are kept; its tooltip stays. Until the host
+    // gives its duties the scene's rota is up, and the click is upstream's note)
     const dutyBoard = PROPS.get('dutyBoard');
-    if (dutyBoard && host.dutyBoard) dutyBoard.act = () => host.dutyBoard();
+    if (dutyBoard && host.dutyBoard) {
+      const own = dutyBoard.act;
+      dutyBoard.act = () => (Array.isArray(host.duties) ? host.dutyBoard() : own?.());
+    }
     const clock = PROPS.get('clock');
     if (clock) { clock.act = () => {}; clock.hint = tr('paseo.clock.hint'); }
     everyFrame(updateLeisure);
@@ -470,6 +474,7 @@ const api = {
    * The day's duties the host keeps, for the pantry's board (paseo-duty-plan.js): [{ id, name, chore, pretend,
    * holder: { id, name } | null, state, owed }]. Once given, the scene keeps no rota of its own; a pretend duty a free
    * figure acts out goes back to Paseo through onDutyDone(id, agentId). Never instructions: names and states only.
+   * Null while the host has no list: the scene's own rota is up again.
    */
   setDuties(list) { if (!started || stopped) return; host.duties = Array.isArray(list) ? list : null; },
   /** The host's readings, for the server racks and the wall screen; null when unknown. */

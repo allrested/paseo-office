@@ -657,8 +657,11 @@ interface SurfaceBodyProps {
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
-  /** The duty board's editor: the 3D pantry's board and the List's lobby card open it. */
-  onOpenDuties(): void;
+  /**
+   * The duty board's editor: the 3D pantry's board and the List's lobby card open it. Absent while
+   * the host has sent no duty list.
+   */
+  onOpenDuties: (() => void) | undefined;
   /** The 3D office acted out a pretend duty with this agent's figure. */
   onDutyActed(id: string, agentId: string): void;
   machine: Machine | null;
@@ -1756,6 +1759,8 @@ export function OfficeSurface(
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
+  // Until the host sends its duty list (an older host has none) nothing offers the duty board.
+  const openDuties = model.dutyList === null ? undefined : dutyCard.show;
   const dutyActions = useDutyActions();
   const { acted } = dutyActions;
   // A report the host refuses changes nothing: its duty board is what the scene is told next.
@@ -1923,7 +1928,7 @@ export function OfficeSurface(
     draft,
     newAgent,
     ...chatTasks,
-    onDuties: dutyCard.show,
+    onDuties: openDuties,
     onGroupPhoto,
   };
   const sessions = useMemo(
@@ -2005,7 +2010,7 @@ export function OfficeSurface(
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
             onOpenBoard={board.open}
-            onOpenDuties={dutyCard.show}
+            onOpenDuties={openDuties}
             onDutyActed={dutyActed}
             machine={machine}
             onOpenMachine={openMachine}

@@ -215,7 +215,7 @@ interface RoomCardProps {
   onSelectAgent(agentId: string): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
-  onOpenDuties(): void;
+  onOpenDuties: (() => void) | undefined;
 }
 
 function RoomCard({
@@ -380,8 +380,11 @@ export interface StructureViewProps {
   /** Opens an agent's session from its row, in the office's column. The surface always supplies it. */
   onOpenSession?(agentId: string): void;
   onOpenBoard(roomId: string): void;
-  /** The duty board's editor, from the lobby's card: the way to it without the 3D floor. */
-  onOpenDuties(): void;
+  /**
+   * The duty board's editor, from the lobby's card: the way to it without the 3D floor. Absent
+   * while the host has sent no duty list.
+   */
+  onOpenDuties?: (() => void) | undefined;
 }
 
 /**
