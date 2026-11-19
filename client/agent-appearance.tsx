@@ -4,10 +4,12 @@ import { usePaseo } from "@getpaseo/plugin/client";
 import { TextInput } from "@getpaseo/plugin/client/ui";
 import {
   APPEARANCE_KEY,
+  savedAppearance,
   AVATARS,
   GENDERS,
   COLORS,
   SHIRTS,
+  shirtColor,
   type Appearance,
 } from "../shared/appearance.js";
 import type { OfficeAgent } from "../shared/contracts.js";
@@ -27,10 +29,7 @@ export function AppearanceEditor({
   close(): void;
 }) {
   const paseo = usePaseo();
-  const [name, setName] = useState(agent.appearance?.name ?? "");
-  const [gender, setGender] = useState(agent.appearance?.gender);
-  const [avatar, setAvatar] = useState(agent.appearance?.avatar);
-  const [color, setColor] = useState(agent.appearance?.color);
+  const [draft, setDraft] = useState<Appearance>(agent.appearance ?? {});
   const modalChange = useCallback(
     (open: boolean) => {
       if (!open) close();
@@ -38,31 +37,106 @@ export function AppearanceEditor({
     [close],
   );
   const save = useCallback(async () => {
-    const appearance: Appearance = {};
-    if (name.trim()) appearance.name = name.trim();
-    if (gender) appearance.gender = gender;
-    if (avatar) appearance.avatar = avatar;
-    if (color) appearance.color = color;
-    await paseo.agents
-      .ref(agent.id)
-      .setMetadata({ [APPEARANCE_KEY]: Object.keys(appearance).length ? appearance : null });
+    await paseo.agents.ref(agent.id).setMetadata({ [APPEARANCE_KEY]: savedAppearance(draft) });
     close();
-  }, [name, gender, avatar, color, paseo, agent.id, close]);
+  }, [draft, paseo, agent.id, close]);
   return (
     <OfficeModal open title="Customize agent" onOpenChange={modalChange}>
       <OfficeModal.Content>
         <View style={styles.sheet}>
-          <View style={styles.sheetField}>
-            <Text style={styles.sheetLabel}>Office display name</Text>
-            <TextInput
-              accessibilityLabel="Office display name"
-              maxLength={60}
-              value={name}
-              onChangeText={setName}
-              placeholder="Use default name"
-              style={styles.fieldInput}
-            />
+          <AppearanceFields
+            draft={draft}
+            change={setDraft}
+            fallback={agentTitle(agent)}
+            styles={styles}
+          />
+          <ActionButton
+            label="Save appearance"
+            pendingLabel="Saving…"
+            primary
+            onPress={save}
+            styles={styles}
+          />
+        </View>
+      </OfficeModal.Content>
+    </OfficeModal>
+  );
+}
+
+const emptyProfile: Appearance = {};
+
+export function AppearanceFields({
+  draft,
+  change,
+  fallback = "",
+  styles,
+  collapsible = false,
+}: {
+  draft?: Appearance;
+  change(next: Appearance): void;
+  fallback?: string;
+  styles: OfficeStyles;
+  collapsible?: boolean;
+}) {
+  const { name = "", gender, avatar, color } = draft ?? emptyProfile;
+  const badgeColor = shirtColor(draft) ?? styles.placeholderColor;
+  const badgeStyle = useMemo(
+    () => [styles.sessions.identityAvatar, { borderWidth: 2, borderColor: badgeColor }],
+    [styles.sessions.identityAvatar, badgeColor],
+  );
+  const character = [gender, avatar, color].filter(Boolean).join(" · ");
+  const nameLabel = collapsible ? "Agent name" : "Office display name";
+  const [expanded, setExpanded] = useState(false);
+  const toggle = useCallback(() => setExpanded((value) => !value), []);
+  const setName = useCallback(
+    (value: string) => change({ ...draft, name: value }),
+    [change, draft],
+  );
+  const setGender = useCallback(
+    (value: Appearance["gender"]) => change({ ...draft, gender: value }),
+    [change, draft],
+  );
+  const setAvatar = useCallback(
+    (value: Appearance["avatar"]) => change({ ...draft, avatar: value }),
+    [change, draft],
+  );
+  const setColor = useCallback(
+    (value: Appearance["color"]) => change({ ...draft, color: value }),
+    [change, draft],
+  );
+  return (
+    <>
+      <View style={styles.sheetField}>
+        <Text style={styles.sheetLabel}>{nameLabel}</Text>
+        <TextInput
+          accessibilityLabel={nameLabel}
+          maxLength={60}
+          value={name}
+          onChangeText={setName}
+          placeholder="Use default name"
+          style={styles.fieldInput}
+        />
+      </View>
+      {collapsible && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Customize character"
+          aria-expanded={expanded}
+          onPress={toggle}
+          style={styles.newAgentSelector}
+        >
+          <View aria-hidden style={badgeStyle}>
+            <Text style={styles.sessions.initials}>
+              {avatar ? AVATARS[avatar] : avatarInitials(name || "Agent")}
+            </Text>
           </View>
+          <Text style={styles.sidebarButtonText}>
+            {expanded ? "Hide character options" : character || "Customize character"}
+          </Text>
+        </Pressable>
+      )}
+      {(!collapsible || expanded) && (
+        <>
           <Text style={styles.sheetLabel}>Character gender</Text>
           <View style={choiceRow}>
             {[undefined, ...GENDERS].map((option) => (
@@ -87,7 +161,7 @@ export function AppearanceEditor({
               choose={setAvatar}
               styles={styles}
             >
-              {avatarInitials(name.trim() || agentTitle(agent))}
+              {avatarInitials(name.trim() || fallback)}
             </Choice>
             {Object.entries(AVATARS).map(([key, icon]) => (
               <Choice<keyof typeof AVATARS>
@@ -126,16 +200,9 @@ export function AppearanceEditor({
               </Choice>
             ))}
           </View>
-          <ActionButton
-            label="Save appearance"
-            pendingLabel="Saving…"
-            primary
-            onPress={save}
-            styles={styles}
-          />
-        </View>
-      </OfficeModal.Content>
-    </OfficeModal>
+        </>
+      )}
+    </>
   );
 }
 

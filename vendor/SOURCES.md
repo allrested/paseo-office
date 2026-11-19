@@ -64,7 +64,7 @@ The following copied files include changes marked with `// PASEO:`.
   exported for the camera bar.
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,
   and the launch pad's card lists no repositories (a team is a workspace, and Paseo sends no
-  repository state).
+  repository state). Floating place cards fade after five seconds away from the pointer.
 - `src/office/life/weather.js` draws rain, storm flashes, fog and light. The host supplies readings through `setWeather`. The upstream city list, storage, chips, timer and Open-Meteo fetch are removed. `wx.city` stays empty.
 - `src/office/life/tests.js`: `clearRun` puts out the lamp of a test run whose end Paseo never
   learns.

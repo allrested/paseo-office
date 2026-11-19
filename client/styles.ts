@@ -171,7 +171,7 @@ export interface OfficeStyles {
   notesMonthBar: ViewStyle;
   notesPaper: ViewStyle;
   notesDateStrip: ViewStyle;
-  notesMonthTitle: TextStyle;
+  panelHeading: TextStyle;
   /** The Contents' links to the month's entries, as a list. */
   notesLinks: ViewStyle;
   notesLinkRow: ViewStyle;
@@ -299,6 +299,9 @@ export interface OfficeStyles {
   pickerSearch: TextStyle;
   /** The New agent form, and its list of workspaces: it scrolls inside the form past this height. */
   newAgentForm: ViewStyle;
+  newAgentHeader: ViewStyle;
+  newAgentFooter: ViewStyle;
+  newAgentSelector: ViewStyle;
   newAgentWorkspaces: ViewStyle;
   /** A text setting's field, as the search field. */
   fieldInput: TextStyle;
@@ -948,7 +951,7 @@ export function useOfficeStyles(
         justifyContent: "space-between",
         gap: 12,
       },
-      notesMonthTitle: { ...base, color: colors.foreground, fontWeight: "700", fontSize: 19 },
+      panelHeading: { ...base, color: colors.foreground, fontWeight: "700", fontSize: 19 },
       notesDateStrip: { alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 2 },
       notesPaper: {
         padding: touch ? 12 : 20,
@@ -1240,8 +1243,37 @@ export function useOfficeStyles(
       // As wide as the dot even without one, so "Nobody" starts on the agents' rail.
       pickerLead: { width: DOT, height: 20, justifyContent: "center" },
       pickerSearch: lineInput,
+      newAgentHeader: {
+        paddingHorizontal: pad,
+        paddingVertical: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      newAgentFooter: {
+        paddingHorizontal: pad,
+        paddingVertical: 10,
+        gap: 6,
+        backgroundColor: colors.surface0,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
+      newAgentSelector: {
+        minHeight: 40,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 8,
+        backgroundColor: colors.surface1,
+      },
       newAgentForm: { padding: pad, gap: 16 },
-      newAgentWorkspaces: { maxHeight: 240 },
+      newAgentWorkspaces: { maxHeight: 160 },
       fieldInput: lineInput,
       iconColor: colors.foregroundMuted,
       scene: { flex: 1, minHeight: SCENE_MIN_HEIGHT },

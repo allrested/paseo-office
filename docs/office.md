@@ -148,8 +148,8 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   Janitor, Stand-up, Reviews, QA and Library.
 - **Sessions** groups agents by status. Green marks working agents, amber marks agents that need you and gray marks resting agents. Task bars count completed checklist items. When only context usage is available it has its own label. Searching and status filters work together. Its "New agent"
   button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
-  a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
-  of the providers that are ready and enabled; and the first prompt. Create starts the agent in
+  enter an optional agent name and open **Customize character** to choose gender, avatar and color.
+  Choose a workspace, provider and model, then enter the first prompt. Create starts the agent in
   that workspace (not in a new one for its folder), closes the form and opens the agent's session
   as a tab. The workspaces and providers are read when the form opens, not when the office does; a
   provider still loading after five seconds is left out of the choices.
@@ -158,7 +158,7 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   first provider's default model when that choice is gone. A failure shows its reason with
   everything typed kept. Whether the form is open, the workspace, provider and model chosen and
   the prompt typed are the surface's, as the Chat box is: another tab, Back and a dismissed phone
-  sheet keep them while the office is mounted, and a create clears the prompt. A new project folder,
+  sheet keep them while the office is mounted, and a successful creation clears the name, character and prompt. A new project folder,
   a new worktree, attachments and modes
   stay in the app's own screen.
 - **Activity** is a feed derived on the client from the office's state, kept in memory for this
