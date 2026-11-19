@@ -55,6 +55,9 @@ import * as peopleGaming from './people/gaming.js';
 import * as peopleBilliards from './people/billiards.js';
 import * as peopleKaraoke from './people/karaoke.js';
 import * as lifeTrophies from './life/trophies.js';
+import * as lifeSeasons from './life/seasons.js';
+import * as lifeRain from './life/rain.js';
+import * as lifeWeather from './life/weather.js';
 import * as lifeQuota from './life/quota.js';
 import * as lifeTests from './life/tests.js';
 import * as worldRoomUpdate from './world/room-update.js';
@@ -128,6 +131,9 @@ export const MODULES = [
   ['peopleBilliards', peopleBilliards],
   ['peopleKaraoke', peopleKaraoke],
   ['lifeTrophies', lifeTrophies],
+  ['lifeSeasons', lifeSeasons],
+  ['lifeRain', lifeRain],
+  ['lifeWeather', lifeWeather],
   ['lifeQuota', lifeQuota],
   ['lifeTests', lifeTests],
   ['worldRoomUpdate', worldRoomUpdate],

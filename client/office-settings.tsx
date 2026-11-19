@@ -37,6 +37,7 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
         styles={styles}
         deviceProblem={deviceProblemOf(view.unsaved, sound.unsaved)}
         scheduleError={office.state.notes?.scheduleError ?? null}
+        weather={office.state.weather}
         incidents={office.state.incidents}
       >
         <>

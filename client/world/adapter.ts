@@ -7,6 +7,7 @@ import {
   type OfficeRow,
 } from "../../shared/model.js";
 import type {
+  WeatherScene,
   ActivityKind,
   ActivityStep,
   Machine,
@@ -16,6 +17,7 @@ import type {
 import { machineTitle, memoryPercent, memoryTone } from "../../shared/machine-text.js";
 import { relativeLuminance } from "../luminance.js";
 import type {
+  WorldWeather,
   WorldBoardRow,
   WorldBrand,
   WorldColors,
@@ -386,4 +388,11 @@ const PRODUCT_NAME = "Paseo";
 /** What the lobby's sign shows: the host's brand, or the product's name over the scene's mark. */
 export function worldBrand(brand: OfficeBrand | null): WorldBrand {
   return { name: brand?.name ?? PRODUCT_NAME, logoUrl: brand?.logoUrl ?? null };
+}
+
+/** What the scene is told of the weather: the host's scene, or none while the host has not said. */
+export function worldWeather(scene: WeatherScene | undefined): WorldWeather {
+  if (scene === undefined || scene.kind === "none") return { kind: "none" };
+  if (scene.kind === "season") return { kind: "season" };
+  return { kind: "reading", code: scene.code, temp: scene.temp, cloud: scene.cloud };
 }

@@ -54,6 +54,13 @@ describe("the embedded scene", () => {
     expect(script).toContain("onOpen");
     // The bell tells Paseo, which has the stand-up notes written, and the label over the meeting
     // room's screen opens them.
+    // Seasons, rain and weather: upstream's decorations, umbrellas and rain, drawing what the host sends.
+    expect(script).toContain("setWeather");
+    expect(script).toContain("life.season.");
+    expect(script).toContain("WET");
+    // The scene asks nobody: upstream's weather call and its storage key are gone.
+    expect(script).not.toContain("open-meteo");
+    expect(script).not.toContain("office-wx");
     expect(script).toContain("onBell");
     expect(script).toContain("onNotes");
     expect(script).toContain("Stand-up notes");

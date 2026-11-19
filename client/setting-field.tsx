@@ -1,0 +1,71 @@
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Text, View } from "react-native";
+import { TextInput } from "@getpaseo/plugin/client/ui";
+import type { OfficeStyles } from "./styles.js";
+interface SettingFieldProps {
+  label: string;
+  hint: string;
+  /** Null while the settings are read or cannot be read: the field is then not usable. */
+  value: string | null;
+  /** Resolves once the host has answered, and never rejects. */
+  onSave(next: string): Promise<unknown>;
+  problem: string | null;
+  styles: OfficeStyles;
+}
+
+/**
+ * A host setting typed as text. It saves when it is submitted or loses focus, not on each
+ * keystroke, since each save brings the daemon's schedule in step again. The text, trimmed, shows
+ * until the host has answered; a refused save goes back to the stored value.
+ */
+export function SettingField({ label, hint, value, onSave, problem, styles }: SettingFieldProps) {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  // What is typed, until the host has answered its save; null shows the stored value.
+  const [draft, setDraft] = useState<string | null>(null);
+  // A submit blurs the field too: one save, not a second against a revision already gone.
+  const saving = useRef(false);
+  const commit = useCallback(() => {
+    if (draft === null || saving.current) return;
+    const next = draft.trim();
+    if (value === null || next === value) {
+      setDraft(null);
+      return;
+    }
+    saving.current = true;
+    setDraft(next);
+    void onSave(next).finally(() => {
+      saving.current = false;
+      if (mounted.current) setDraft(null);
+    });
+  }, [draft, value, onSave]);
+  return (
+    <View style={styles.headerField}>
+      <Text style={styles.sheetLabel}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        accessibilityHint={hint}
+        value={draft ?? value ?? ""}
+        editable={value !== null}
+        onChangeText={setDraft}
+        onBlur={commit}
+        onSubmitEditing={commit}
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
+        style={styles.fieldInput}
+      />
+      <Text style={styles.fieldHint}>{hint}</Text>
+      {problem === null ? null : (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {problem}
+        </Text>
+      )}
+    </View>
+  );
+}

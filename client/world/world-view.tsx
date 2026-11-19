@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { IncidentsState, Machine } from "../../shared/contracts.js";
+import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
 import type { FocusRequest } from "../focus-request.js";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
@@ -63,6 +63,7 @@ export interface WorldViewProps {
   /** The stand-up is open: the bell on the meeting table rings once. */
   meeting: boolean;
   /** The host's incidents: the banner while any is open, and the alarm for one not rung for here. */
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** A tap on the incidents' banner. */
   onOpenIncidents(): void;
@@ -102,6 +103,7 @@ function WorldScene({
   onOpenLibrary,
   onOpenNotes,
   meeting,
+  weather,
   incidents,
   onOpenIncidents,
   onProblem,
@@ -220,6 +222,7 @@ function WorldScene({
     selectedAgentId,
     machine,
     meeting,
+    weather,
     incidents,
     sound: sound.on,
     plan,

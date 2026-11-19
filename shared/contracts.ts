@@ -232,6 +232,32 @@ export const IncidentsStateSchema = z.object({
   /** Why the check's schedule could not follow the settings; null once it does. */
   scheduleError: z.string().nullable(),
 });
+/** What the 3D scene is told of the weather. `season` leaves the weather to the scene's own season. */
+export const WeatherSceneSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }),
+  z.object({ kind: z.literal("season") }),
+  z.object({
+    kind: z.literal("reading"),
+    /** A WMO weather code. */
+    code: z.number().int().min(0).max(99),
+    /** Degrees Celsius; null when not known. */
+    temp: z.number().nullable(),
+    /** Cloud as a share, 0 to 1. */
+    cloud: z.number().min(0).max(1),
+  }),
+]);
+export type WeatherScene = z.output<typeof WeatherSceneSchema>;
+
+/** The weather the host holds: what the scene draws, why a service could not be read, and when it last was. */
+export const WeatherStateSchema = z.object({
+  scene: WeatherSceneSchema,
+  /** Why the service's last read failed, one sentence that never holds the address; null once one succeeds. */
+  problem: z.string().nullable(),
+  /** Epoch ms of the answer the scene is drawing; null when it draws no service's answer. */
+  readAt: z.number().nullable(),
+});
+export type WeatherState = z.output<typeof WeatherStateSchema>;
+
 export type IncidentsState = z.output<typeof IncidentsStateSchema>;
 
 /** The most characters of one chat message the office takes. */
@@ -341,6 +367,7 @@ export const OfficeSnapshotSchema = z.object({
   notes: NotesStateSchema.optional(),
   /** Absent until the office's server has read the incidents. */
   incidents: IncidentsStateSchema.optional(),
+  weather: WeatherStateSchema.optional(),
   /** Absent until the office's server has loaded the chat. */
   chat: ChatSnapshotSchema.optional(),
 });

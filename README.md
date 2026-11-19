@@ -13,6 +13,7 @@ my-office's.
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
+- Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
@@ -85,8 +86,13 @@ while the daemon was down is not made up.
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
   music choice. The column keeps when this device last had the chat open (`office-chat-seen`).
+- With Settings > Weather > From a service and an address set, the host reads that address while an
+  office is open, at most once in 15 minutes. The request sets only the `Accept` header. The
+  scene receives a weather code, temperature and cloud share. The host stores the address,
+  including any key in its query, in `<PASEO_HOME>/plugin-settings/office/office.json`.
+  Anyone who can open the settings page can see it there.
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
-  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
+  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
 - The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
   notes' prompt to the host's own agents, and so to whichever provider runs them.
 - It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,

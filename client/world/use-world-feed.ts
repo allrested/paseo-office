@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { IncidentsState, Machine } from "../../shared/contracts.js";
+import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { onChatAct } from "../chat-acts.js";
 import type { FocusRequest } from "../focus-request.js";
@@ -12,6 +12,7 @@ import {
   teamOfRoom,
   worldBoardRows,
   worldChanges,
+  worldWeather,
   worldMachine,
   worldPeople,
   withRestTimes,
@@ -33,6 +34,7 @@ export interface WorldFeedInput {
   machine: Machine | null;
   /** The stand-up is open: the bell on the meeting table rings once. */
   meeting: boolean;
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
   sound: boolean | null;
@@ -57,6 +59,7 @@ export function useWorldFeed(
     selectedAgentId,
     machine,
     meeting,
+    weather,
     incidents,
     sound,
     plan,
@@ -104,6 +107,9 @@ export function useWorldFeed(
     world.current?.setMachine(worldReadings);
   }, [worldReadings, api]);
 
+  useEffect(() => {
+    world.current?.setWeather?.(worldWeather(weather));
+  }, [weather, api]);
   const focusTeam = useMemo(() => teamOfRoom(model, focusRoomId), [model, focusRoomId]);
   useEffect(() => {
     if (focusTeam !== null) world.current?.focusProject(focusTeam);

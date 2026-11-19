@@ -8,6 +8,7 @@ import {
   SENTRY_SLUG,
 } from "./settings.js";
 
+const WEATHER_DEFAULTS = { weatherMode: "off", weatherManual: "season", weatherUrl: "" };
 const INCIDENT_DEFAULTS = {
   jiraProjects: "",
   sentryOrg: "",
@@ -29,7 +30,7 @@ async function upgraded(stored: Record<string, unknown>, fromVersion: number): P
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 
 /** A document from before the floor plan was a setting draws the company floor, as its scene always did. */
-const COMPANY = { floorPlan: "pro" };
+const COMPANY = { floorPlan: "pro", ...WEATHER_DEFAULTS };
 
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
   expect(await upgraded({ agentTools: false }, 1)).toEqual({
@@ -218,4 +219,40 @@ test("a device document without sound has it off, and one with it keeps it", asy
   expect(officeDeviceSettings.version).toBe(2);
   expect(officeDeviceSettings.schema.parse({ threeD: true })).toMatchObject({ sound: false });
   expect(officeDeviceSettings.schema.parse({ sound: true })).toMatchObject({ sound: true });
+});
+
+test("a host that never set the weather has it off, following the season, with no address", async () => {
+  expect(officeHostSettings.schema.parse({})).toMatchObject(WEATHER_DEFAULTS);
+  // A document of the version before this one (read its number in settings.ts) parses to the same.
+  expect(await upgraded({ agentTools: true }, officeHostSettings.version - 1)).toMatchObject(
+    WEATHER_DEFAULTS,
+  );
+});
+
+test("the weather mode and the hand-picked choice are from their lists", () => {
+  expect(hostIssues({ weatherMode: "radar" })).not.toEqual([]);
+  expect(hostIssues({ weatherManual: "snow" })).not.toEqual([]);
+  expect(hostIssues({ weatherMode: "service", weatherManual: "storm" })).toEqual([]);
+});
+
+test("the weather address is empty, https, or http on this machine", () => {
+  const refused = ["weatherUrl: not an https address (plain http only on this machine)"];
+  expect(hostIssues({ weatherUrl: "" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "https://weather.example.test/v1/forecast?x=1" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://127.0.0.1:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://localhost:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://[::1]:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://weather.example.test/x" })).toEqual(refused);
+  expect(hostIssues({ weatherUrl: "weather.example.test" })).toEqual(refused);
+  expect(hostIssues({ weatherUrl: "ftp://127.0.0.1/x" })).toEqual(refused);
+});
+
+test("the weather address is checked in every mode, and its refusal does not hold it", () => {
+  const secret = "http://weather.example.test/x?apikey=SECRET";
+  for (const weatherMode of ["off", "manual", "service"]) {
+    const issues = hostIssues({ weatherMode, weatherUrl: secret });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).not.toContain("SECRET");
+    expect(issues[0]).not.toContain("weather.example.test");
+  }
 });

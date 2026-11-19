@@ -41,7 +41,9 @@ offered on a desktop or in a browser only (a recorder, a capturable canvas, a fi
 `host.photo`); its markup and styles are in `ui/camera-bar.js`. Its music is made in the page and
 goes into the recording, never to the speakers.
 
-Nine copied files are changed by hand, and each change starts with `// PASEO:`:
+The seasonal decorations and animated centrepieces come from `life/seasons.js`; the umbrella stand and entrance rain props come from `life/rain.js`.
+
+Ten copied files are changed by hand, and each change starts with `// PASEO:`:
 
 - `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
   gap); the engine and every other sound are upstream's.
@@ -53,6 +55,7 @@ Nine copied files are changed by hand, and each change starts with `// PASEO:`:
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,
   and the launch pad's card lists no repositories (a team is a workspace, and Paseo sends no
   repository state).
+- `src/office/life/weather.js` draws rain, storm flashes, fog and light. The host supplies readings through `setWeather`. The upstream city list, storage, chips, timer and Open-Meteo fetch are removed. `wx.city` stays empty.
 - `src/office/life/tests.js`: `clearRun` puts out the lamp of a test run whose end Paseo never
   learns.
 - `src/office/ui/photo.js`: the mark painted into a photo is the host's brand name (Paseo's when
@@ -128,7 +131,7 @@ The Headquarters wing (`src/office/world/pro/wing.js`) is imported from upstream
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
 connection, the replay, the demo, other languages, the street outside
-with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
+with its shops, and the daily-life scenes (lunch runs, the midday nap and
 the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, the list
 button is left out on purpose.
 
@@ -181,7 +184,7 @@ still comes, from an agent. The engine's `tea` act does nothing.
 ### What the scene is told
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
-world-api.ts`), never a file name, a command or a prompt. It also sends the open incidents' keys
+world-api.ts`), never a file name, a command or a prompt. The host resolves the weather into a mode or a reading (weather code, temperature and cloud share); `paseo-weather-plan.js` resolves the seasonal sky. It also sends the open incidents' keys
 and titles for the banner. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.

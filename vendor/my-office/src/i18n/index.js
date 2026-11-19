@@ -47,6 +47,7 @@ const OURS = {
   'tips.person.title': 'Each person is an agent',
   'tips.person.text': 'Click someone to open their card: what they are doing now, and a way into their session.',
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
+  'props.season.hint': '{season} decorations',
   'paseo.notes': 'Stand-up notes',
   'places.deploy.today': { one: '{n} deploy since the office opened', other: '{n} deploys since the office opened' },
   'places.live.deployToday': '{n} so far',

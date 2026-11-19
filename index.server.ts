@@ -11,6 +11,8 @@ import { createChatService, type ChatService } from "./server/chat-service.js";
 import { createChatStore, type ChatStore } from "./server/chat-store.js";
 import { errorMessage } from "./server/errors.js";
 import { createHub } from "./server/hub.js";
+import { createWeatherService } from "./server/weather-service.js";
+import { createWeatherReader } from "./server/weather-read.js";
 import { createIncidentsCheck, type IncidentsCheckState } from "./server/incidents-check.js";
 import { jiraEnv } from "./server/incidents-jira.js";
 import {
@@ -79,6 +81,7 @@ import { officeHostSettings } from "./shared/settings.js";
 
 /** What the office needs from outside the daemon's plugin API. */
 export interface OfficePluginDeps {
+  fetchFn?: typeof fetch;
   store: BoardStore;
   /** Where the stand-up notes writer keeps its state. */
   notesStore: NotesStore;
@@ -237,6 +240,14 @@ export function createOfficePlugin(
     .catch((error: unknown) => log(`[office] incidents load failed: ${errorMessage(error)}`));
   // One service for the office's life, made as the server starts. Its file is read first; until
   // then the chat call waits, and a snapshot has no chat.
+  // The weather: read from the user's address only while an office is open, on its own timers.
+  const weather = createWeatherService({
+    clock: deps.clock,
+    read: createWeatherReader({ fetchFn: deps.fetchFn }),
+    changed: (state) => hub.setWeather(state),
+    log,
+  });
+  const stopWatchingWeather = hub.watch((view) => weather.officeOpen(view !== null));
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
   async function startChat(): Promise<void> {
@@ -271,6 +282,7 @@ export function createOfficePlugin(
       settingsUnreadable(state.error);
       return;
     }
+    weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
     // The writer reads the folder again, and its push carries the schedule's error with it.
     await writer
@@ -498,6 +510,8 @@ export function createOfficePlugin(
 
   return async () => {
     stopFollowingSettings();
+    stopWatchingWeather();
+    weather.stop();
     stopNotesRuns();
     stopIncidentsRuns();
     deps.schedules.stop();

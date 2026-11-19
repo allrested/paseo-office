@@ -1,4 +1,5 @@
 import { defineSettings } from "@getpaseo/plugin";
+import { WEATHER_MODES, MANUAL_CHOICES } from "./weather.js";
 import { z } from "zod";
 
 /** A Jira project key and a Sentry slug: only these reach a JQL query or a Sentry address. */
@@ -24,7 +25,7 @@ export function parseKeys(text: string, pattern: RegExp): string[] {
 }
 
 /** A token goes to this address, so it is https; plain http is accepted on this machine only. */
-function isTokenSafe(address: string): boolean {
+export function isTokenSafe(address: string): boolean {
   let url: URL;
   try {
     url = new URL(address);
@@ -56,6 +57,9 @@ const HostValuesSchema = z.object({
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
+  weatherMode: z.enum(WEATHER_MODES).default("off"),
+  weatherManual: z.enum(MANUAL_CHOICES).default("season"),
+  weatherUrl: z.string().default(""),
   sentryUrl: z.string().default("https://sentry.io"),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
@@ -119,7 +123,16 @@ export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
   version: 5,
-  schema: HostValuesSchema.superRefine(refuseBadTrackerValues).superRefine(refuseBadDays),
+  schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
+    .superRefine(refuseBadDays)
+    .superRefine(({ weatherUrl }, ctx) => {
+      if (weatherUrl.trim() && !isTokenSafe(weatherUrl.trim()))
+        ctx.addIssue({
+          code: "custom",
+          path: ["weatherUrl"],
+          message: "weatherUrl: not an https address (plain http only on this machine)",
+        });
+    }),
   // Version 1 had only `agentTools`, version 2 no incident fields and version 3 no `notesDays`:
   // what a document has stays, and the rest take their defaults, but for the days. Before
   // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.

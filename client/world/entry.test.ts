@@ -10,6 +10,7 @@ import { WORLD_API_VERSION } from "./world-api.js";
 import { openWorldFrame } from "./world-frame.web.js";
 
 const h = vi.hoisted(() => ({
+  weather: vi.fn(),
   sessions: new Map<string, Record<string, unknown>>(),
   workers: new Map<string, Record<string, unknown>>(),
   applauded: [] as string[],
@@ -32,6 +33,7 @@ const h = vi.hoisted(() => ({
   panned: [] as string[],
 }));
 
+vi.mock("../../vendor/my-office/src/office/life/weather.js", () => ({ setWeather: h.weather }));
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
   MODULES: [
     [
@@ -156,6 +158,7 @@ interface World {
   meet(): void;
   gather(): void;
   setSound(on: boolean): void;
+  setWeather(scene: object): void;
 }
 const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
 // A page with Web Audio whose context runs: the entry's probe finds it ready, and the switch can be
@@ -690,4 +693,12 @@ test("no glide when the camera may not move, for a newcomer, or for a change tha
   h.workers.set("b", { id: "b", push() {} });
   world.setSessions([session("a"), { ...session("b"), status: "wait" }]); // b is new to the scene
   expect(h.panned).toEqual([]);
+});
+
+test("identical host readings draw once and clearing the sky draws none", () => {
+  const rain = { kind: "reading", code: 63, temp: 14, cloud: 0.9 };
+  world.setWeather(rain);
+  world.setWeather({ ...rain });
+  world.setWeather({ kind: "none" });
+  expect(h.weather.mock.calls).toEqual([[{ code: 63, temp: 14, cloud: 0.9 }], [null]]);
 });

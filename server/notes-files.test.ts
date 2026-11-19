@@ -47,6 +47,9 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       jiraProjects: "",
       sentryOrg: "",
       sentryProjects: "",
+      weatherMode: "off" as const,
+      weatherManual: "season" as const,
+      weatherUrl: "",
       sentryUrl: "https://sentry.io",
     },
   };
