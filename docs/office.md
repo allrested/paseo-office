@@ -597,7 +597,7 @@ the workspace, where it is in the changes to review. The office installs and rem
 ## Data
 
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`,
-`notes-writer.json` and `incidents.json`. Its settings are Paseo settings documents
+`notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger) and `lift.json` (the build last serviced). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
@@ -612,10 +612,14 @@ quarterly fire drill. They run on the office clock. During the 12:30–13:30 des
 floor pauses new activities. Street outings are separate.
 
 The accountant reads provider-reported spending. HR uses the repository’s first commit month for
-birthdays. The first set of workspaces is permanent. A later team can graduate after 20 turns over
+birthdays. The tenure ledger identifies each team by workspace name. A rename starts a new team
+record and the previous name goes quiet. The first set of workspaces is permanent. A later team
+can graduate after 20 turns over
 two days. A previously active team can have a farewell after 30 quiet days. The lift is serviced
 for three minutes at server start or five when the scene build has changed. Commits put letters in the post box and pushes send the postman to collect them. The other indoor scenes
-use the office clock and the people already seated.
+use the office clock and the people already seated. The `office.life` subscription carries
+repository birthdays, tenure and lift servicing. For a changed build, the lift receives the time
+remaining and a sticker containing its short build ID and the servicing timestamp.
 
 | Chat sender            | Moments                                                                                                     |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |

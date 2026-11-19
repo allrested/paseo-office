@@ -193,7 +193,7 @@ cards, voice, push notifications and prompt rewriting are not. All seven staff h
 ### What the scene is told
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
-world-api.ts`), never a file name, a command or a prompt. It sends the team’s spending, repository birthday, tenure and lift servicing, the weather mode or reading, plus the open incidents' keys
+world-api.ts`), never a file name, a command or a prompt. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It also sends the weather mode or reading and the open incidents' keys
 and titles for the banner. A translated scene receives its language and dictionary. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
@@ -202,7 +202,7 @@ The scene writes office state to the app origin's `localStorage`, under keys tha
 `office-`: which team sits where, the plants, the graphics level, the Sound switch
 (`office-sound`, which the host's setting overwrites at each start), that the tour was seen
 (`office-tips`), and the clip's shape and music choice (`office-clip-shape`, `office-clip-music`).
-It also records the duty roster, the drill, `office-gone` and `office-back:*`. It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
+It also records the duty roster (`office-duty`), the fire drill’s day (`office-drill-day`), team farewells (`office-gone`) and returns (`office-back:*`). It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
 that nothing here writes. It makes no network call; a clip is recorded in the page and saved as a
 download.
 

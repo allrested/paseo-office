@@ -64,6 +64,7 @@ test("every kind the scenes call has a line, a sender and words that exist", () 
       kind,
       {
         id: "a1",
+        who: "a1",
         name: "Ann",
         names: "Ann",
         chore: "cups",
@@ -80,6 +81,7 @@ test("every kind the scenes call has a line, a sender and words that exist", () 
     if (line === null) continue;
     expect(typeof line.from).toBe("string");
     expect(chatT(line.key, line.vars), kind).not.toBe(line.key);
+    if (line.extra) expect(chatT(line.extra.key, {}), kind).not.toBe(line.extra.key);
     for (const reply of line.options.answer || [])
       expect(chatT("chat.reply." + reply.key, {})).not.toBe("chat.reply." + reply.key);
   }
@@ -95,16 +97,19 @@ test("the staff speak for themselves and a person speaks as themselves", () => {
   expect(lifeLine("parcel", { id: "a1" }, ctx)).toMatchObject({
     from: "reception",
     vars: { name: "Ann" },
+    extra: { from: "a1", key: "chat.reply.parcelGot", delay: 4500 },
   });
 });
 
 test("a kind that needs a person and has none says nothing", () => {
   expect(lifeLine("stairs", {}, ctx)).toBeNull();
-  expect(lifeLine("microSmell", {}, { ...ctx, resting: () => [] })).toBeNull();
+  expect(lifeLine("stairs", { id: "gone" }, ctx)).toBeNull();
 });
 
 test("someone at rest speaks when the scene names nobody", () => {
   expect(lifeLine("nap", {}, ctx)?.from).toBe("a1");
+  expect(lifeLine("nap", {}, { ...ctx, resting: () => [] })?.from).toBe("reception");
+  expect(lifeLine("microSmell", {}, { ...ctx, resting: () => [] })?.from).toBe("reception");
 });
 
 test("a kind no table has is refused", () => {
@@ -115,7 +120,8 @@ test("a kind no table has is refused", () => {
 test("the key a line is said once under changes with the period", () => {
   const a = lifeLine("altar", { every: "1200000" }, { ...ctx, now: 0 });
   const b = lifeLine("altar", { every: "1200000" }, { ...ctx, now: 1_300_000 });
-  expect(a?.options.key).not.toBe(b?.options.key);
+  expect(a?.options.key).toBe("life:altar::0");
+  expect(b?.options.key).toBe("life:altar::1");
 });
 
 test("outdoor scenes use their own words and the registered participant", () => {

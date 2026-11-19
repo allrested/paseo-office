@@ -7,18 +7,26 @@ const DAY = 86_400_000;
 const MAX = 300;
 const BACK_SHOWN = DAY;
 
-export interface TenureEntry {
-  first: number;
-  last: number;
-  days: number;
-  lastDay: string;
-  turns: number;
-  farewell?: number;
-  back?: number;
-  pre?: boolean;
-  official?: number;
-  checked?: boolean;
-}
+const TenureEntrySchema = z.object({
+  first: z.number(),
+  last: z.number(),
+  days: z.number(),
+  lastDay: z.string(),
+  turns: z.number(),
+  farewell: z.number().optional(),
+  back: z.number().optional(),
+  pre: z.boolean().optional(),
+  official: z.number().optional(),
+  checked: z.boolean().optional(),
+});
+export type TenureEntry = z.output<typeof TenureEntrySchema>;
+/** office/tenure.json. */
+export const TenureLedgerSchema = z.object({
+  v: z.literal(1),
+  seeded: z.boolean(),
+  projects: z.record(z.string(), TenureEntrySchema),
+});
+export type TenureLedger = z.output<typeof TenureLedgerSchema>;
 export interface TenureProject {
   name: string;
   last: number;
@@ -38,7 +46,7 @@ export interface SeedTeam {
 }
 export interface TenureStore {
   load(): unknown;
-  save(data: unknown): void;
+  save(data: TenureLedger): void;
 }
 export interface Tenure {
   touch(team: string, input: { at?: number; turn?: boolean }): "new" | "back" | "ready" | null;
@@ -72,38 +80,27 @@ export const promoteDue = (
 ) => isIntern(p) && (p?.turns ?? 0) >= PROMOTE_TURNS && (p?.days ?? 0) >= PROMOTE_DAYS;
 export function createTenure(deps: { store: TenureStore; now?: () => number }): Tenure {
   const now = deps.now ?? Date.now;
-  const entry = z.object({
-    first: z.number(),
-    last: z.number(),
-    days: z.number(),
-    lastDay: z.string(),
-    turns: z.number(),
-    farewell: z.number().optional(),
-    back: z.number().optional(),
-    pre: z.boolean().optional(),
-    official: z.number().optional(),
-    checked: z.boolean().optional(),
-  });
-  const parsed = z
-    .object({ v: z.literal(1), seeded: z.boolean(), projects: z.record(z.string(), entry) })
-    .safeParse(deps.store.load());
-  let seeded = parsed.success && parsed.data.seeded;
-  const projects = new Map<string, TenureEntry>(Object.entries(parsed.data?.projects ?? {}));
+  const parsed = TenureLedgerSchema.safeParse(deps.store.load());
+  const ledger: TenureLedger = parsed.data ?? { v: 1, seeded: false, projects: {} };
+  // Workspace names can be object property names. Keep one live dictionary until the save queue flushes.
+  const projects: Record<string, TenureEntry> = Object.assign(Object.create(null), ledger.projects);
+  ledger.projects = projects;
   const day = (at: number) => new Date(at).toLocaleDateString("sv");
-  const ordered = () => [...projects].sort((a, b) => b[1].last - a[1].last);
-  function save() {
-    if (projects.size > MAX) for (const [team] of ordered().slice(MAX)) projects.delete(team);
-    deps.store.save({ v: 1, seeded, projects: Object.fromEntries(projects) });
+  const ordered = () => Object.entries(projects).sort((a, b) => b[1].last - a[1].last);
+  function cap() {
+    for (const [name] of ordered().slice(MAX)) delete projects[name];
   }
+  const save = () => deps.store.save(ledger);
   return {
-    seeded: () => seeded,
-    get: (team) => projects.get(team) ?? null,
+    seeded: () => ledger.seeded,
+    get: (team) => projects[team] ?? null,
     seed(teams) {
-      if (seeded) return;
+      if (ledger.seeded) return;
       const at = now();
       for (const { name, first, daysSeen } of teams) {
-        const before = projects.get(name);
-        projects.set(name, {
+        if (!name) continue;
+        const before = projects[name];
+        projects[name] = {
           first: Math.min(first, before?.first ?? first),
           last: at,
           days: Math.max(daysSeen, before?.days ?? 0),
@@ -111,13 +108,15 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
           turns: before?.turns ?? 0,
           pre: true,
           checked: true,
-        });
+        };
       }
-      seeded = true;
+      ledger.seeded = true;
+      cap();
       save();
     },
     touch(team, { at = now(), turn }) {
-      const existing = projects.get(team);
+      if (!team) return null;
+      const existing = projects[team];
       const p: TenureEntry = existing ?? {
         first: at,
         last: at,
@@ -132,27 +131,30 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
         p.back = at;
         p.farewell = 0;
       }
-      p.last = at;
+      p.last = Math.max(p.last, at);
       if (day(at) !== p.lastDay) {
         p.days++;
         p.lastDay = day(at);
       }
       if (turn) p.turns++;
-      projects.set(team, p);
+      if (!existing) {
+        projects[team] = p;
+        cap();
+      }
       save();
       if (!existing) return "new";
       if (back) return "back";
       return !ready && promoteDue(p) ? "ready" : null;
     },
     markOfficial(team) {
-      const p = projects.get(team);
+      const p = projects[team];
       if (!p || !promoteDue(p)) return false;
       p.official = now();
       save();
       return true;
     },
     markFarewell(team, live) {
-      const p = projects.get(team),
+      const p = projects[team],
         at = now();
       if (!p || !farewellDue(p, FAREWELL_DAYS, at, live)) return false;
       p.farewell = at;
@@ -170,15 +172,12 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
           turns: p.turns,
           due: farewellDue(p, FAREWELL_DAYS, at, live.has(name)),
           farewell: p.farewell ?? 0,
-          back: p.back ?? 0,
+          back: p.back && at - p.back < BACK_SHOWN ? p.back : 0,
           intern: isIntern(p),
           ready: promoteDue(p),
           official: p.official ?? 0,
         }))
-        .filter(
-          (p) =>
-            p.due || p.farewell || (p.back && at - p.back < BACK_SHOWN) || p.intern || p.official,
-        )
+        .filter((p) => p.due || p.farewell || p.back || p.intern || p.official)
         .slice(0, 60);
     },
   };

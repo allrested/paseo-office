@@ -504,7 +504,7 @@ export function createHub(ports: HubPorts): Hub {
     },
     watch(listener) {
       watchers.add(listener);
-      if (stopDirectory !== null) tell(view, [listener]);
+      if (stopDirectory !== null && view !== EMPTY_VIEW) tell(view, [listener]);
       return () => {
         watchers.delete(listener);
       };

@@ -34,11 +34,12 @@ let receiveStreet: (event: import("../../shared/contracts.js").StreetEvent) => v
 vi.mock("@getpaseo/plugin/client", () => ({
   useRpc: () => async () => "car models",
   useSubscription: (
-    _contract: unknown,
+    contract: { name: string },
     _input: unknown,
     onEvent: (event: import("../../shared/contracts.js").StreetEvent) => void,
   ) => {
-    receiveStreet = onEvent;
+    if (contract.name === "office.street.events") receiveStreet = onEvent;
+    return { status: "live" };
   },
   useSettings: () => ({ status: "loading" }),
 }));

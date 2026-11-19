@@ -1,41 +1,92 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { nodeTimers } from "./timers.js";
+import type { z } from "zod";
 import { errorMessage } from "./errors.js";
+import type { Timers } from "./timers.js";
 
-/** Coalesce ledger updates and replace the file atomically. Flush pending work on shutdown. */
-export function createLifeStore(file: string, delay: number, log: (message: string) => void) {
-  let pending: unknown;
-  let cancel: (() => void) | undefined;
-  function flush() {
-    cancel?.();
-    cancel = undefined;
-    if (pending === undefined) return;
+/** A small JSON file the office keeps for the staff scenes: office/tenure.json, office/lift.json. */
+export interface LifeFile<T> {
+  /** The file's value; null when it is missing, unreadable or not of the expected shape. */
+  load(): Promise<T | null>;
+  /** Writes through a temporary file; one write at a time, in call order. */
+  save(data: T): Promise<void>;
+}
+
+export function createLifeFile<T>(file: string, schema: z.ZodType<T>): LifeFile<T> {
+  let chain: Promise<void> = Promise.resolve();
+  let temp = 0;
+  function enqueue<R>(task: () => Promise<R>): Promise<R> {
+    const run = chain.then(task);
+    chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+  async function read(): Promise<T | null> {
+    let text: string;
     try {
-      mkdirSync(dirname(file), { recursive: true });
-      const tmp = file + ".tmp-" + process.pid;
-      writeFileSync(tmp, JSON.stringify(pending), { mode: 0o600 });
-      renameSync(tmp, file);
-      pending = undefined;
-    } catch (error) {
-      log("Office state write failed: " + errorMessage(error));
+      text = await readFile(file, "utf8");
+    } catch {
+      return null;
+    }
+    try {
+      const parsed = schema.safeParse(JSON.parse(text));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
     }
   }
+  async function write(data: T): Promise<void> {
+    temp += 1;
+    const tempFile = `${file}.tmp-${temp}`;
+    await mkdir(dirname(file), { recursive: true });
+    try {
+      await writeFile(tempFile, `${JSON.stringify(data)}\n`, { encoding: "utf8", mode: 0o600 });
+      await rename(tempFile, file);
+    } catch (error) {
+      await rm(tempFile, { force: true }).catch(() => undefined);
+      throw error;
+    }
+  }
+  return { load: () => enqueue(read), save: (data) => enqueue(() => write(data)) };
+}
+
+/** The value last given, as it is when written: at most once per `ms`; `flush()` writes what waits now. */
+export interface SaveQueue<T> {
+  save(data: T): void;
+  flush(): Promise<void>;
+}
+
+export function createSaveQueue<T>(
+  file: LifeFile<T>,
+  timers: Timers,
+  log: (message: string) => void,
+  ms = 10_000,
+): SaveQueue<T> {
+  let waiting: T | null = null;
+  let cancel: (() => void) | null = null;
+  let writing: Promise<void> = Promise.resolve();
+  function flush(): Promise<void> {
+    cancel?.();
+    cancel = null;
+    if (waiting !== null) {
+      // The ledger keeps changing its object: what is written is the object as it is now.
+      const data = structuredClone(waiting);
+      waiting = null;
+      writing = writing
+        .then(() => file.save(data))
+        .catch((error: unknown) =>
+          log(`[office] a staff scene's file could not be saved: ${errorMessage(error)}`),
+        );
+    }
+    return writing;
+  }
   return {
-    load(): unknown {
-      if (pending !== undefined) return pending;
-      try {
-        return JSON.parse(readFileSync(file, "utf8"));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-          log("Office state read failed: " + errorMessage(error));
-        return null;
-      }
-    },
-    save(value: unknown) {
-      pending = value;
-      if (!delay) flush();
-      else cancel ??= nodeTimers.setTimeout(flush, delay);
+    save(data) {
+      // Kept, not copied: the ledger saves at every change, many times a second on a busy host.
+      waiting = data;
+      cancel ??= timers.setTimeout(() => void flush(), ms);
     },
     flush,
   };

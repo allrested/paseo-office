@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
 import { StreetEvents } from "./street-events.js";
+import { useLife } from "./use-life.js";
 import { useStreetStart } from "./use-street-kit.js";
 import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
@@ -13,7 +14,6 @@ import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
-  useSceneLifeChat,
   useWorldScript,
   worldStartOptions,
   type WorldLatest,
@@ -47,8 +47,6 @@ function WorldViewNativeScene({
   selectedAgentId,
   onSelectAgent,
   onSelectBoard,
-  life,
-  onTenure,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -64,7 +62,7 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
-  const onLife = useSceneLifeChat();
+  const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const latest = useRef<WorldLatest>({
     model,

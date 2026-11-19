@@ -144,3 +144,26 @@ test("posts a full-sized street kit intact as start data", () => {
   api.start(options({ street: { kit } }));
   expect(posted[0].args[0]).toMatchObject({ street: { kit } });
 });
+
+test("the tenure list and the lift go to the page as calls, and the scenes' lines come back as callbacks", () => {
+  const { api, posted, receive } = bridge();
+  const onLife = vi.fn();
+  const onTenure = vi.fn();
+  api.start(options({ onLife, onTenure }));
+  const tenure = { days: 30, choices: [30], projects: [] };
+  const lift = { left: 1, total: 2, newBuild: false, sticker: null };
+  api.setTenure?.(tenure);
+  api.setLiftService?.(lift);
+  expect(posted.slice(1)).toEqual([
+    { call: "setTenure", args: [tenure] },
+    { call: "setLiftService", args: [lift] },
+  ]);
+  expect(posted[0]).toEqual({
+    call: "start",
+    args: [expect.objectContaining({ callbacks: expect.arrayContaining(["onLife", "onTenure"]) })],
+  });
+  receive(JSON.stringify({ callback: "onLife", args: ["tea", {}] }));
+  receive(JSON.stringify({ callback: "onTenure", args: [{ op: "official", name: "web" }] }));
+  expect(onLife).toHaveBeenCalledWith("tea", {});
+  expect(onTenure).toHaveBeenCalledWith({ op: "official", name: "web" });
+});

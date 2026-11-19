@@ -25,12 +25,12 @@ const deps = (extra = {}) => ({
     touch: vi.fn(),
     seed: vi.fn(),
     seeded: () => false,
-    list: () => [],
+    list: vi.fn<import("./tenure.js").Tenure["list"]>(() => []),
     markFarewell: vi.fn(() => true),
     markOfficial: vi.fn(() => true),
     get: () => null,
   },
-  age: vi.fn(async () => "2020-02-03"),
+  age: vi.fn(async (_folder: string): Promise<string | null> => "2020-02-03"),
   lift: { pub: () => ({ left: 1, total: 2, newBuild: false, sticker: null }) },
   days: () => ({ choices: [30], days: 30 }),
   now: () => Date.parse("2026-11-19T00:00:00Z"),
@@ -128,10 +128,10 @@ test("workspaces sharing a name retain the first repository age to arrive", asyn
     folders: { w1: "/slow", w2: "/fast" },
   });
   await Promise.resolve();
-  expect(feed.snapshot().born.api).toBe("2020-01-01");
+  expect(feed.snapshot().born.api).toBeUndefined();
   finish("2021-01-01");
   await feed.settled();
-  expect(feed.snapshot().born.api).toBe("2020-01-01");
+  expect(feed.snapshot().born.api).toBe("2021-01-01");
 });
 
 test("a turn with the office closed resolves its team from the hook", async () => {
@@ -140,4 +140,76 @@ test("a turn with the office closed resolves its team from the hook", async () =
   feed.view(null);
   await feed.turnEnded("unseen", async () => "api");
   expect(d.tenure.touch).toHaveBeenCalledWith("api", expect.objectContaining({ turn: true }));
+});
+
+test("the scenes are told again only when something but the lift's countdown changed", () => {
+  const d = deps();
+  let left = 5;
+  d.lift.pub = () => ({ left, total: 10, newBuild: false, sticker: null });
+  const feed = createLifeFeed(d);
+  feed.view(view());
+  left = 4;
+  feed.view(view());
+  expect(d.emit).toHaveBeenCalledTimes(1);
+  left = 0;
+  feed.view(view());
+  expect(d.emit).toHaveBeenCalledTimes(2);
+});
+
+test("the ages are read one folder at a time, so a host of many workspaces starts one git, not one each", async () => {
+  const d = deps();
+  const answers: ((day: string | null) => void)[] = [];
+  d.age.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+  const feed = createLifeFeed(d);
+  feed.view({
+    agents: [],
+    workspaces: [
+      { id: "w1", name: "api", projectName: "shop" },
+      { id: "w2", name: "web", projectName: "shop" },
+    ],
+    folders: { w1: "/work/api", w2: "/work/web" },
+  });
+  await Promise.resolve();
+  expect(d.age.mock.calls).toEqual([["/work/api"]]);
+  answers[0]?.(null);
+  await vi.waitFor(() => expect(d.age.mock.calls).toEqual([["/work/api"], ["/work/web"]]));
+  answers[1]?.("2021-03-04");
+  await feed.settled();
+  expect(feed.snapshot().born).toEqual({ web: "2021-03-04" });
+});
+
+test("how lately a listed team worked is not news: the scenes read who is due, away, back, an intern, ready or permanent", () => {
+  const d = deps();
+  const listed = (last: number, patch: object = {}) => [
+    {
+      name: "api",
+      last,
+      days: 1,
+      turns: last,
+      due: false,
+      farewell: 0,
+      back: 0,
+      intern: true,
+      ready: false,
+      official: 0,
+      ...patch,
+    },
+  ];
+  d.tenure.list.mockReturnValueOnce(listed(1));
+  const feed = createLifeFeed(d);
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(1);
+  d.tenure.list.mockReturnValueOnce(listed(2));
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(1);
+  d.tenure.list.mockReturnValueOnce(listed(3, { ready: true }));
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(2);
+});
+
+test("the first complete directory seeds even a workspace without agents", () => {
+  const d = deps();
+  const initial = view();
+  createLifeFeed(d).view({ ...initial, agents: [] });
+  expect(d.tenure.seed).toHaveBeenCalledWith([{ name: "api", first: d.now(), daysSeen: 1 }]);
 });

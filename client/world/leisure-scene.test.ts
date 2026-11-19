@@ -16,9 +16,12 @@ const h = vi.hoisted(() => ({
   env: { PRO: true },
   /** What the lively floor last told its plan is open now (paseo-leisure-plan.js step's `open`). */
   open: null as Record<string, boolean> | null,
+  /** Upstream's midday nap is on (life/nap.js napOn). */
+  nap: false,
+  /** Whether the lively floor last told its plan to stay quiet. */
+  quiet: null as boolean | null,
 }));
 
-vi.mock("../../vendor/my-office/src/office/life/nap.js", () => ({ napOn: false }));
 vi.mock("../../vendor/my-office/src/office/core/env.js", () => ({
   get PRO() {
     return h.env.PRO;
@@ -72,11 +75,16 @@ vi.mock("../../vendor/my-office/src/office/people/karaoke.js", () => ({
   karaoke: () => false,
   ktvState: () => ({}),
 }));
+vi.mock("../../vendor/my-office/src/office/life/nap.js", () => ({
+  get napOn() {
+    return h.nap;
+  },
+}));
 vi.mock("../../vendor/my-office/src/i18n/index.js", () => ({ t: (key: string) => key }));
 // The real plan, with what it is told is open recorded.
 vi.mock("../../vendor/my-office/src/office/paseo-leisure-plan.js", async (importOriginal) => {
   const real = await importOriginal<{
-    createPlan(): { step(input: { open: Record<string, boolean> }): unknown };
+    createPlan(): { step(input: { open: Record<string, boolean>; quiet: boolean }): unknown };
   }>();
   return {
     ...real,
@@ -84,8 +92,9 @@ vi.mock("../../vendor/my-office/src/office/paseo-leisure-plan.js", async (import
       const plan = real.createPlan();
       return {
         ...plan,
-        step: (input: { open: Record<string, boolean> }) => {
+        step: (input: { open: Record<string, boolean>; quiet: boolean }) => {
           h.open = input.open;
+          h.quiet = input.quiet;
           return plan.step(input);
         },
       };
@@ -153,6 +162,8 @@ beforeEach(() => {
   h.stations.dining = [];
   h.stations.wc = [];
   h.open = null;
+  h.nap = false;
+  h.quiet = null;
 });
 
 /** One look of the lively floor at what is open: its plan is asked at most once a second of the scene. */
@@ -239,4 +250,14 @@ test("on the cozy room nothing opens that needs the sofa, the games or the restr
     cup: false,
     wc: false,
   });
+});
+
+test("the lively floor starts nothing during upstream's midday nap", () => {
+  person("a");
+  openNow();
+  expect(h.quiet).toBe(false);
+
+  h.nap = true;
+  openNow();
+  expect(h.quiet).toBe(true);
 });

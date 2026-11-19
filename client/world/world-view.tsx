@@ -8,6 +8,7 @@ import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { StreetEvents } from "./street-events.js";
+import { useLife } from "./use-life.js";
 import { useStreetStart } from "./use-street-kit.js";
 import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
@@ -18,7 +19,6 @@ import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
-  useSceneLifeChat,
   useWorldScript,
   worldStartOptions,
   type WorldLatest,
@@ -44,8 +44,6 @@ export interface WorldViewProps {
   /** A tap on a team's chip or on the whiteboard: opens that room's board. */
   onSelectBoard(roomId: string): void;
   /** The host's readings; null when the host has none, and then the server room is furniture. */
-  life?: import("../../shared/contracts.js").LifeEvent | null;
-  onTenure?: WorldLatest["onTenure"];
   machine: Machine | null;
   /**
    * A tap on the server room: its chip, the racks or a server box, and the wall screen while
@@ -107,8 +105,6 @@ function WorldScene({
   selectedAgentId,
   onSelectAgent,
   onSelectBoard,
-  life,
-  onTenure,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -124,7 +120,7 @@ function WorldScene({
 }: WorldSceneProps) {
   const containerId = useId();
   const onBell = useStandupBell();
-  const onLife = useSceneLifeChat();
+  const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);

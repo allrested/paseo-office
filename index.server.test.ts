@@ -380,8 +380,8 @@ function setup(
     incidentsStore,
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
-    tenureStore: { load: () => null, save: () => {}, flush: () => {} },
-    liftStore: { load: () => null, save: () => {}, flush: () => {} },
+    tenureFile: { load: async () => null, save: async () => {} },
+    liftFile: { load: async () => null, save: async () => {} },
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
@@ -1433,5 +1433,39 @@ test("weather is read only for an open office, reaches its snapshot and stops wh
   clock.advance(3 * 3600_000);
   await settle();
   expect(fetchFn).toHaveBeenCalledTimes(1);
+  await stop();
+});
+
+test("a page hears the staff scenes' data as it subscribes: the lift is serviced from the start", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  await settle();
+  const events: unknown[] = [];
+  const leaving = new AbortController();
+  const done = recorded.handlers.get("office.life")?.({}, {
+    ...context,
+    signal: leaving.signal,
+    push: async (event: unknown) => void events.push(event),
+  } as never);
+  for (let round = 0; round < 50 && events.length === 0; round += 1) await settle();
+
+  // "the scene" is the fake world's script: its build is a hash of it, and the first start ever
+  // is not a new build.
+  expect(events).toEqual([
+    {
+      type: "life",
+      born: {},
+      tenure: { days: 30, choices: [30], projects: [] },
+      lift: { left: 180_000, total: 180_000, newBuild: false, sticker: null },
+    },
+  ]);
+  leaving.abort();
+  await done;
+  await stop();
+});
+
+test("a tenure write the ledger does not hold is refused", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  const write = recorded.handlers.get("office.tenure.request");
+  expect(await write?.({ op: "official", name: "api" }, context as never)).toEqual({ ok: false });
   await stop();
 });

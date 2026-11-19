@@ -1171,3 +1171,47 @@ test("weather broadcasts changes and later subscribers receive the current readi
   two.controller.abort();
   await Promise.all([one.done, two.done]);
 });
+
+test("a watcher gets the workspaces' folders, and no subscriber ever does", async () => {
+  const view: DirectoryView = {
+    agents: [agent("a", "idle")],
+    workspaces: [{ id: "w1", name: "api", projectName: "shop" }],
+    folders: { w1: "/work/api" },
+  };
+  const harness = startHarness(view);
+  const seen: (DirectoryView | null)[] = [];
+  harness.hub.watch((next) => seen.push(next));
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  expect(seen).toEqual([view]);
+  harness.directory.emit({ ...view, agents: [agent("a", "running")] });
+  harness.clock.advance(DIRECTORY_FLUSH_MS);
+  await settle();
+  expect(subscriber.events.map((event) => event.type)).toEqual(["snapshot", "agents"]);
+  expect(JSON.stringify(subscriber.events)).not.toContain("/work/api");
+  expect(JSON.stringify(subscriber.events)).not.toContain("folders");
+  subscriber.controller.abort();
+  await subscriber.done;
+});
+
+test("a watcher joining an open directory waits for its first measured roster", async () => {
+  let answer: ((view: DirectoryView) => void) | undefined;
+  const harness = startHarness(
+    { agents: [], workspaces: [] },
+    {
+      openDirectory: async (listener) => {
+        answer = listener;
+        return async () => {};
+      },
+    },
+  );
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  const seen: (DirectoryView | null)[] = [];
+  harness.hub.watch((view) => seen.push(view));
+  expect(seen).toEqual([]);
+  answer?.({ agents: [], workspaces: [{ id: "w1", name: "empty", projectName: "shop" }] });
+  expect(seen[0]?.workspaces[0]?.name).toBe("empty");
+  subscriber.controller.abort();
+  await subscriber.done;
+});

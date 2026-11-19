@@ -11,6 +11,7 @@ test("farewell.js and interns.js tell the host, not a server", () => {
     expect(text, file).not.toContain("fetch(");
     expect(text, file).not.toContain("/api/");
     expect(text, file).toContain("host.tenure(");
+    expect(text, file).not.toMatch(/\bTOKEN\b|state\.isLocal/);
   }
 });
 

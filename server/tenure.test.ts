@@ -105,3 +105,11 @@ test("first census keeps turns finished before the office was opened", () => {
   ledger.seed([{ name: "api", first: 3 * DAY, daysSeen: 2 }]);
   expect(ledger.get("api")).toMatchObject({ first: 3 * DAY, pre: true, turns: 1, days: 2 });
 });
+
+test("a name that is an object's own key is a team like any other", () => {
+  const t = createTenure({ store: memory(), now: () => 0 });
+  t.seed([]);
+  expect(t.get("__proto__")).toBeNull();
+  expect(t.get("constructor")).toBeNull();
+  expect(t.markOfficial("toString")).toBe(false);
+});

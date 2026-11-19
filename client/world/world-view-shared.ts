@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
-import { chatRpc, notesWriteRpc, worldRpc } from "../../shared/contracts.js";
+import { notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { isWordsLanguage, type SceneLanguage } from "../../shared/scene-language.js";
 import { failureText } from "../action-button.js";
@@ -167,14 +167,4 @@ export function useStandupBell(): () => Promise<void> {
       toast.error(failureText("Write the stand-up notes", error));
     }
   }, [writeNotes, toast]);
-}
-
-export function useSceneLifeChat() {
-  const chat = useRpc(chatRpc);
-  return useCallback(
-    (kind: string, vars: Record<string, string>) => {
-      void chat({ op: "life", kind, vars }).catch(() => undefined);
-    },
-    [chat],
-  );
 }

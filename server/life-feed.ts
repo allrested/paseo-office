@@ -17,6 +17,7 @@ export function createLifeFeed(deps: {
   const pending = new Map<string, Promise<void>>();
   const folderTeams = new Map<string, Set<string>>();
   let connected = false;
+  let queuedAge = Promise.resolve();
   function snapshot(): Snapshot {
     const born = new Map<string, string>();
     // Map insertion order keeps the first answer when workspaces share a team name.
@@ -32,8 +33,15 @@ export function createLifeFeed(deps: {
   }
   let previous = "";
   function changed() {
-    const next = snapshot(),
-      key = JSON.stringify([next.born, next.tenure]);
+    const next = snapshot();
+    // Streaming timestamps and counters would redraw the floor on each directory pulse.
+    // The scenes act on transitions. A new subscriber still gets the full current ledger.
+    const projects = next.tenure.projects
+      .map((p) =>
+        JSON.stringify([p.name, p.due, p.farewell, p.back, p.intern, p.ready, p.official]),
+      )
+      .sort();
+    const key = JSON.stringify([next.born, projects, { ...next.lift, left: next.lift.left > 0 }]);
     if (key !== previous) {
       previous = key;
       deps.emit(next);
@@ -43,6 +51,8 @@ export function createLifeFeed(deps: {
     try {
       ages.set(folder, await deps.age(folder));
       changed();
+    } catch {
+      ages.set(folder, null);
     } finally {
       pending.delete(folder);
     }
@@ -55,7 +65,8 @@ export function createLifeFeed(deps: {
       atFolder.add(name);
       folderTeams.set(folder, atFolder);
       if (ages.has(folder) || pending.has(folder)) continue;
-      pending.set(folder, readAge(folder));
+      queuedAge = queuedAge.then(() => readAge(folder));
+      pending.set(folder, queuedAge);
     }
   }
   return {
@@ -89,11 +100,12 @@ export function createLifeFeed(deps: {
           if (!next) break;
           parent = next;
         }
-        const name = names.get(parent.workspaceId ?? "") ?? names.get(agent.workspaceId ?? "");
+        const name = names.get(agent.workspaceId ?? "") ?? names.get(parent.workspaceId ?? "");
         if (!name) continue;
         teams.set(agent.id, name);
-        if (agent.status !== "closed") live.add(name);
-        if (agent.status === "running" || agent.status === "initializing") active.add(name);
+        if (agent.status === "closed") continue;
+        live.add(name);
+        if (agent.status !== "idle") active.add(name);
         const seed = seeds.get(name),
           first = Date.parse(agent.createdAt);
         if (seed && Number.isFinite(first)) {

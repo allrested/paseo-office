@@ -95,7 +95,7 @@ photo lighting group title are English in every language.
 - It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
   of activity. On the host it runs Git once per workspace folder to read the first commit date.
 - The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
-  and the lift’s servicing time. It receives no file names, commands or prompts and makes no
+  and the lift’s servicing time and build sticker. It receives no file names, commands or prompts and makes no
   network calls. It sends chat moments with a name or count, and reports farewells and promotions.
 - With the street enabled, the device receives the bundled Kenney Car Kit (CC0). While a street
   is open, the host checks local Git tags and the installed Claude CLI version. New tags can
@@ -105,7 +105,7 @@ photo lighting group title are English in every language.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
-  music choice, the duty roster, drill and farewell history. The column keeps when this device last had the chat open (`office-chat-seen`).
+  music choice, the duty roster with team members’ names, the fire drill day, and team farewells and returns. The column keeps when this device last had the chat open (`office-chat-seen`).
 - With Settings > Weather > From a service and an address set, the host reads that address while an
   office is open, at most once in 15 minutes. The request sets only the `Accept` header. The
   scene receives a weather code, temperature and cloud share. The host stores the address,

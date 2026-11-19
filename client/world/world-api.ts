@@ -1,4 +1,5 @@
 import type { WordsLanguage } from "../../shared/scene-language.js";
+import type { LifeEvent } from "../../shared/contracts.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 
 /**
@@ -125,29 +126,9 @@ export interface WorldBrand {
   logoUrl: string | null;
 }
 
-export interface WorldTenureProject {
-  name: string;
-  last: number;
-  days: number;
-  turns: number;
-  due: boolean;
-  farewell: number;
-  back: number;
-  intern: boolean;
-  ready: boolean;
-  official: number;
-}
-export interface WorldTenure {
-  days: number;
-  choices: number[];
-  projects: WorldTenureProject[];
-}
-export interface WorldLiftService {
-  left: number;
-  total: number;
-  newBuild: boolean;
-  sticker: { version: string; at: number; build: string } | null;
-}
+export type WorldTenure = LifeEvent["tenure"];
+export type WorldTenureProject = WorldTenure["projects"][number];
+export type WorldLiftService = LifeEvent["lift"];
 
 export interface WorldStartOptions {
   /** Something the office's people would say in the team chat: a kind of moment and a few words. */

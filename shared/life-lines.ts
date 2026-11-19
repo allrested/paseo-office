@@ -298,15 +298,12 @@ const ROWS: Readonly<Record<string, Row>> = {
 
 export const LIFE_KINDS: readonly string[] = Object.keys(ROWS);
 
-function sender(role: Row["from"], kind: string, id: string, ctx: LifeContext): string | null {
+function sender(role: Row["from"], id: string, ctx: LifeContext): string | null {
   if (role === "hr" || role === "reception") return role;
   const person = id && ctx.name(id) !== null ? id : null;
   if (role === "person" || person !== null) return person;
   const resting = ctx.resting();
-  return (
-    resting[Math.floor(Math.random() * resting.length)] ??
-    (kind === "microSmell" || kind === "microPop" ? null : "reception")
-  );
+  return resting[Math.floor(Math.random() * resting.length)] ?? "reception";
 }
 
 /** The office chooses the words, sender and a period key shared by all devices. */
@@ -315,7 +312,7 @@ export function lifeLine(kind: string, vars: Vars, ctx: LifeContext): LifeLine |
   if (!row) return null;
   const { from: role, key, prefix = "chat.life.", extra, ...options } = row;
   const id = vars.id ?? "";
-  const from = sender(role, kind, id, ctx);
+  const from = sender(role, id, ctx);
   if (from === null) return null;
   const every = Number(vars.every) > 0 ? Number(vars.every) : 20 * 60_000;
   const line: LifeLine = {

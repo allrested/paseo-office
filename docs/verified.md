@@ -450,7 +450,10 @@ was initially empty. With a local JSON service returning code 63, 14.2 °C, 90% 
 Malformed JSON fields and a closed loopback port produced the shape and ECONNREFUSED messages.
 Each failure logged its reason without the URL. The Weather card in Attention opened the
 settings page, and a successful read cleared the card. At 390 px the address field remained
-visible, and restoring the working address brought back the rain reading. The disposable host’s
+visible, and restoring the working address brought back the rain reading. The local endpoint
+received exactly one request during a 14-minute open-office run. The office was then closed.
+A listener on the same address saw no request across the next 15-minute polling boundary.
+The disposable host’s
 `plugin-settings/office/office.json` contained the saved address.
 
 In a separate Chromium scene, date overrides exercised Halloween (1280 px), Christmas (390 px)
@@ -563,6 +566,20 @@ In a separate 1280 px Chromium frame, Walk mode and the lift reached the street.
 The measurements used standalone plugin frames. Physical phone memory, the car payload through a real native bridge, timed staff outings, audio and the version-triggered shopping trip still need observation. The evening chip alone does not establish that an office worker joined the tables.
 
 ## Staff and daily life, indoors
+
+Earlier stock Paseo 0.16.2 checks used three to five Mock agents at 1280 and 390 px.
+At `640fc4a` the floor showed a technician, barrier and cone during lift servicing. A second
+scene build started five minutes of servicing and supplied a sticker with the build ID. The
+courier appeared under the made-up Bazaarly name. The receptionist announced the parcel in
+team chat, the agent replied, and the lift’s completion appeared once. The server supplied
+the first commit dates from the workspaces. Mock supplied tokens and context usage without a
+cost value, leaving the accountant’s screen empty.
+
+Those runs found an existing team misclassified as an intern when the directory delivered
+agents before workspaces. On a fresh stock daemon at `d5df6cc`, two teams present when the
+office first opened were stored as permanent and a workspace added afterwards was an intern.
+At 390 px, reloading restored the team plates. The browser recorded the duty roster under
+`office-duty`.
 
 On 2026-11-19 the company floor started in Chromium with software WebGL at 1280 and 390 px.
 The standalone page loaded the piece 5 bundle and passed the normal world API three fixture

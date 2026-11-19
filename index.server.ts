@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
 import { execCommand } from "@getpaseo/plugin/server";
-import { WORLD_SCRIPT } from "./server/world.generated.js";
-import { createTenure, type TenureStore } from "./server/tenure.js";
-import { createLiftService } from "./server/lift-service.js";
+import { createTenure, TenureLedgerSchema, type TenureLedger } from "./server/tenure.js";
+import { createLiftService, LiftKeptSchema, type LiftKept } from "./server/lift-service.js";
 import { readRepoAge } from "./server/repo-age.js";
 import { createStreetWatch, streetReaders } from "./server/street-watch.js";
 import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
-import { createLifeStore } from "./server/life-store.js";
+import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
 import { liftFile, tenureFile } from "./server/paths.js";
 import { lifeSubscription, tenureRpc, type LifeEvent } from "./shared/contracts.js";
 import { embeddedWorldWords, type WorldWords } from "./server/world-words.js";
@@ -104,8 +103,8 @@ export interface OfficePluginDeps {
   incidentsStore: IncidentsStore;
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
-  tenureStore: TenureStore & { flush(): void };
-  liftStore: TenureStore & { flush(): void };
+  tenureFile: LifeFile<TenureLedger>;
+  liftFile: LifeFile<LiftKept>;
   /** The daemon's environment: the trackers' tokens are read from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -266,24 +265,44 @@ export function createOfficePlugin(
   const stopWatchingWeather = hub.watch((view) => weather.officeOpen(view !== null));
   const now = () => deps.clock.now();
   const listeners = new Map<(event: LifeEvent) => void, () => void>();
-  const lift = createLiftService({
-    ...deps.liftStore,
-    build: createHash("sha256").update(WORLD_SCRIPT).digest("hex").slice(0, 7),
-    now: now(),
-  });
-  const feed = createLifeFeed({
-    now,
-    tenure: createTenure({ store: deps.tenureStore, now }),
-    lift,
-    days: () => ({ choices: [30], days: 30 }),
-    age: (folder) => readRepoAge(folder, execCommand),
-    emit: (snapshot) => {
-      for (const send of listeners.keys()) send({ type: "life", ...snapshot });
-    },
+  const tenureSaves = createSaveQueue(deps.tenureFile, deps.clock, log);
+  let liftSaved = Promise.resolve();
+  let stopLife: (() => void) | undefined;
+  async function startLife() {
+    const [ledger, kept, script] = await Promise.all([
+      deps.tenureFile.load(),
+      deps.liftFile.load(),
+      deps.world.read(),
+    ]);
+    const lift = createLiftService({
+      last: kept,
+      build: createHash("sha256").update(script).digest("hex").slice(0, 7),
+      now: now(),
+      save: (data) => {
+        liftSaved = deps.liftFile
+          .save(data)
+          .catch((error) => log("[office] lift save failed: " + errorMessage(error)));
+      },
+    });
+    const feed = createLifeFeed({
+      now,
+      tenure: createTenure({ store: { load: () => ledger, save: tenureSaves.save }, now }),
+      lift,
+      days: () => ({ choices: [30], days: 30 }),
+      age: (folder) => readRepoAge(folder, execCommand),
+      emit: (snapshot) => {
+        for (const send of listeners.keys()) send({ type: "life", ...snapshot });
+      },
+    });
+    stopLife = hub.watch(feed.view);
+    return feed;
+  }
+  const lifeReady = startLife().catch((error: unknown) => {
+    log("[office] staff scenes unavailable: " + errorMessage(error));
+    return null;
   });
   const streets = createStreetWatch(streetReaders(execCommand), deps.clock, log);
   const stopStreet = hub.watch(streets.view);
-  const stopLife = hub.watch(feed.view);
   // One service for the office's life, made as the server starts. Its file is read first; until
   // then the chat call waits, and a snapshot has no chat.
   let chat: ChatService | null = null;
@@ -464,9 +483,10 @@ export function createOfficePlugin(
       return chat.request(input);
     });
   });
-  server.handle(lifeSubscription, (_input, context) => {
+  server.handle(lifeSubscription, async (_input, context) => {
     holder.remember(context.paseo);
-    if (context.signal.aborted) return Promise.resolve();
+    const feed = await lifeReady;
+    if (!feed || context.signal.aborted) return Promise.resolve();
     return new Promise<void>((resolve) => {
       const send = (event: LifeEvent) => {
         void context
@@ -484,7 +504,10 @@ export function createOfficePlugin(
     });
   });
   server.handle(streetSubscription, (_input, context) => streets.attach(context));
-  server.handle(tenureRpc, (input) => feed.write(input));
+  server.handle(tenureRpc, async (input, context) => {
+    holder.remember(context.paseo);
+    return (await lifeReady)?.write(input) ?? { ok: false };
+  });
   // A check never rejects: a tracker that fails shows its problem on the Incidents card. It is
   // about now, so a run that waited checks when it resumes.
   const stopIncidentsRuns = deps.schedules.handle(INCIDENTS_SCHEDULE, async () => {
@@ -517,7 +540,9 @@ export function createOfficePlugin(
         holder.remember(context.paseo);
         office.noteAgent(agent);
         office.turnEnded(agent.id);
-        await feed.turnEnded(agent.id, async () => {
+        await (
+          await lifeReady
+        )?.turnEnded(agent.id, async () => {
           // With the office closed there is no subscribed roster. Resolve the hook's team on demand.
           const workspaceId =
             agent.workspaceId ??
@@ -589,10 +614,10 @@ export function createOfficePlugin(
     for (const remove of removeHooks) remove();
     stopStreet();
     streets.stop();
-    stopLife();
+    await lifeReady;
+    stopLife?.();
     for (const close of listeners.values()) close();
-    deps.tenureStore.flush();
-    deps.liftStore.flush();
+    await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
     office.stop();
     // A chat still loading would start its clock after this stop.
@@ -615,8 +640,8 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     }),
     notesStore: createNotesStore({ file: notesWriterFile(process.env, homedir()), log }),
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
-    tenureStore: createLifeStore(tenureFile(process.env, homedir()), 10_000, log),
-    liftStore: createLifeStore(liftFile(process.env, homedir()), 0, log),
+    tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
+    liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),

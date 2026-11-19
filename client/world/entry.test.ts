@@ -770,3 +770,22 @@ test("the street entry delivers the tag to the photo booth and the CLI reading t
   expect(streetHost.claudeVersion()).toEqual({ version: "2.2.0", at: 123 });
   expect(h.lookForUpgrade).toHaveBeenCalled();
 });
+
+test("only a farewell and promotion are sent to the host tenure ledger", async () => {
+  const onTenure = vi.fn(),
+    onLife = vi.fn();
+  await startPage({ onTenure, onLife });
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { host: current } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  current.tenure({ op: "farewell", name: "api" });
+  current.tenure({ op: "official", name: "web", other: true });
+  current.tenure({ op: "config", days: 0 });
+  current.tenure({ op: "official", name: "x".repeat(300) });
+  current.life("parcel", { id: "a1" });
+  expect(onTenure.mock.calls).toEqual([
+    [{ op: "farewell", name: "api" }],
+    [{ op: "official", name: "web" }],
+    [{ op: "official", name: "x".repeat(200) }],
+  ]);
+  expect(onLife).toHaveBeenCalledWith("parcel", { id: "a1" });
+});

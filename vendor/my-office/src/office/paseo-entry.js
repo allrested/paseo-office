@@ -314,8 +314,11 @@ const api = {
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
-    host.tenure = (op) => options.onTenure?.(op);
-    host.life = (kind, vars) => options.onLife?.(kind, vars);
+    // Only completed farewells and promotions are writes to the tenure ledger.
+    host.tenure = typeof options.onTenure === 'function'
+      ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }
+      : () => {};
+    host.life = typeof options.onLife === 'function' ? (kind, vars) => options.onLife(kind, vars) : () => {};
     host.street = options.street != null;
     host.streetKit = options.street?.kit ?? null;
     host.photo = options.photo !== false;
