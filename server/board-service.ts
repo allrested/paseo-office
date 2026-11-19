@@ -140,14 +140,24 @@ function finishedDay(post: Post, plan: DutySync): string {
   return plan.dayOf(Date.parse(post.updatedAt));
 }
 
+/** The weekday of a day (YYYY-MM-DD), 0 for Sunday. */
+function weekdayOf(day: string): number {
+  return new Date(`${day}T00:00:00.000Z`).getUTCDay();
+}
+
 /**
- * Off the board at a sync: a duty of an earlier day finished on an earlier day, and an open duty
- * no longer listed. (A move of the notes' zone west can put either day after the plan's.)
+ * Off the board at a sync: a duty of an earlier day finished on an earlier day (a move of the
+ * notes' zone west can put either day after the plan's), and an open duty nobody holds that is no
+ * longer listed, or whose day is the plan's and no longer one of its weekdays.
  */
-function leavesAtSync(post: Post, plan: DutySync, listed: ReadonlySet<string>): boolean {
+function leavesAtSync(post: Post, plan: DutySync, listed: ReadonlyMap<string, Duty>): boolean {
   if (!isDutyTask(post) || post.duty === undefined) return false;
   if (post.state === "done") return post.duty.day < plan.day && finishedDay(post, plan) < plan.day;
-  return post.state === "open" && post.claimedBy === undefined && !listed.has(post.duty.id);
+  if (post.state !== "open" || post.claimedBy !== undefined) return false;
+  const duty = listed.get(post.duty.id);
+  return (
+    duty === undefined || (post.duty.day === plan.day && !duty.days.includes(weekdayOf(plan.day)))
+  );
 }
 
 export function createBoardService(ports: BoardServicePorts): BoardService {
@@ -321,7 +331,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     let changed = false;
     const kept: Post[] = [];
     for (const post of data.posts) {
-      if (leavesAtSync(post, plan, new Set(listed.keys()))) {
+      if (leavesAtSync(post, plan, listed)) {
         changed = true;
         continue;
       }

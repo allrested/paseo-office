@@ -253,6 +253,27 @@ test("moving the notes zone west does not post again a duty done today", async (
   expect(shown(later.board.postsOf("duty"))).toEqual([["open", "2026-11-20"]]);
 });
 
+test("unticking today on a duty takes its open post of today off at the save; a claimed one stays", async () => {
+  const { begin, board, service } = setup({ start: WED_7AM + 2 * HOUR });
+  await begin();
+  await board.update({ id: "p2", action: "claim", actor: "a" });
+  const notWednesday = [1, 2, 4, 5];
+  const [cups, bin, plants, tables] = STARTING_DUTIES.map((duty) => ({ ...duty }));
+  expect(
+    await service.save([
+      { ...cups!, days: notWednesday },
+      { ...bin!, days: notWednesday },
+      plants!,
+      tables!,
+    ]),
+  ).toEqual({ ok: true });
+  expect(board.postsOf("duty").map((post) => [post.id, post.duty?.id, post.state])).toEqual([
+    ["p3", "plants", "open"],
+    ["p4", "tables", "open"],
+    ["p2", "bin", "claimed"],
+  ]);
+});
+
 test("a save is checked, keeps ids and chores, names new duties, and posts one due today at once", async () => {
   const { begin, board, service, file, listed, told } = setup({ start: WED_7AM + 2 * HOUR });
   await begin();
