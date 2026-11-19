@@ -159,6 +159,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera; `state.isLocal` for the tour |
 | `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons; `togglePop` does nothing |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
+| `ui/group-chat.js` | `chatLife` tells the host a moment (a kind and a few words); `chatSay` does nothing; `chatPhoto` is null |
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor; runs Paseo's lively floor every frame |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
 | `people/outings.js`         | `resting`, `called`, `resume` are upstream's; there is no street (`street()` is null) |
@@ -190,11 +191,15 @@ and the bookshelf open Paseo's Library card.
 
 Of the team chat, only the engine and its words are taken, into `shared/upstream/`. Its window
 (`ui/group-chat*.js`; the games' `ui/group-chat.js` stays a stand-in), its CI, loop and denied
-cards, voice, push notifications and prompt rewriting are not. Of the staff the engine names, only
-the director has a name (upstream's English "Director"); reception, HR, the cleaner, the guard,
-the courier and the accountant stay silent. So the engine's morning hello, its Monday stand-up
-and Friday tea reminders, and HR's line when you write about a meeting never come. The lunch poll
-still comes, from an agent. The engine's `tea` act does nothing.
+cards, voice, push notifications and prompt rewriting are not. The staff speak under Paseo's
+names for them (`server/chat-service.ts`, `staffNameOf`): the director, reception, HR, the cleaner,
+the guard, the courier and the accountant, so the engine's morning hello, its Monday stand-up and
+Friday tea reminders, and HR's line when you write about a meeting come as upstream has them. The
+lunch poll still comes from an agent. The engine's `tea` act does nothing. The scene's moments (a
+birthday, the fire drill, the lift back in service, ...) reach it through `ui/group-chat.js`'s
+stand-in, which sends the host a kind and a few words, once per period; `shared/life-lines.ts`, a
+copy of upstream's `chatLife` table read from the names script's text, gives each kind its sender,
+words and answers. A photo is not sent, and the games' own `chatSay` lines still go nowhere.
 
 ### What the scene is told
 

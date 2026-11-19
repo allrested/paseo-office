@@ -129,17 +129,21 @@ async function send(h: Harness, text: string): Promise<void> {
 
 /* ---------- the pure parts ---------- */
 
-test("only the director has a name", () => {
-  expect(staffNameOf("__director", chatT)).toBe("Director");
-  for (const key of [
-    "__reception",
-    "__hr",
-    "__cleaner",
-    "__guard",
-    "__courier",
-    "__accountant",
-    "__claude",
-  ]) {
+test("the staff on the floor have names, and nobody else", () => {
+  expect(
+    ["__director", "__reception", "__hr", "__cleaner", "__guard", "__courier", "__accountant"].map(
+      (key) => staffNameOf(key, chatT),
+    ),
+  ).toEqual([
+    "Director",
+    "Receptionist",
+    "HR",
+    "Cleaner",
+    "Security guard",
+    "Courier",
+    "Accountant",
+  ]);
+  for (const key of ["__claude", "__proto__", "toString", "a1"]) {
     expect(staffNameOf(key, chatT)).toBeNull();
   }
 });
@@ -586,7 +590,7 @@ test("each office event is the engine's line: a new agent is added and says hell
   expect(messages(h)).toContainEqual(
     expect.objectContaining({
       kind: "sys",
-      text: chatT("chat.sys.added", { by: "Boss", name: "Bea" }),
+      text: chatT("chat.sys.added", { by: "HR", name: "Bea" }),
     }),
   );
   const hello = said(h, "Bea");
@@ -651,11 +655,13 @@ test("each office event is the engine's line: a turn that ends says it is done w
 
 /* ---------- the office's life ---------- */
 
-test("the director is the only staff, so the morning hello does not come and the lunch poll comes from an agent", async () => {
+test("reception says the morning hello, and the lunch poll comes from an agent", async () => {
   const early = await harness({ at: new Date(2026, 10, 18, 8, 0).getTime() });
   early.service.view(view(agent("a1", "Alice")));
-  early.clock.advance(CHAT_CLOCK_MS);
-  expect(messages(early)).toEqual([expect.objectContaining({ text: chatT("chat.sys.created") })]);
+  early.clock.advance(CHAT_CLOCK_MS + 10_000);
+  const hello = messages(early).filter((message) => message.from === "__reception");
+  expect(hello).toEqual([expect.objectContaining({ kind: "text", name: "Receptionist" })]);
+  expect(chatT("chat.life.morning", null, "list")).toContain(hello[0]?.text);
 
   const noon = await harness({ at: new Date(2026, 10, 18, 10, 50).getTime() });
   noon.service.view(view(agent("a1", "Alice")));
@@ -912,4 +918,39 @@ test("lines are told to subscribers as changes, and not while the engine is bein
   // A pinned poll tells the whole conversation again.
   await send(h, "lunch?");
   expect(h.changes.at(-1)).toEqual({ op: "all", messages: messages(h) });
+});
+
+/* ---------- the scene's moments ---------- */
+
+test("a moment of the office's life is said by its staff member, under their name", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  expect(await h.service.request({ op: "life", kind: "drillNotice", vars: { q: "4" } })).toEqual({
+    ok: true,
+  });
+  h.clock.advance(10_000);
+  const notice = messages(h).filter((message) => message.from === "__hr");
+  expect(notice).toEqual([expect.objectContaining({ kind: "text", name: "HR" })]);
+  expect(filled(chatT("chat.life.drillNotice", null, "list"), { q: "4" })).toContain(
+    notice[0]?.text,
+  );
+});
+
+test("a kind no table has is refused, and says nothing", async () => {
+  const h = await harness();
+  expect(await h.service.request({ op: "life", kind: "handset", vars: {} })).toEqual({
+    ok: false,
+    error: "There is no such line.",
+  });
+  h.clock.advance(10_000);
+  expect(messages(h)).toEqual([expect.objectContaining({ text: chatT("chat.sys.created") })]);
+});
+
+test("the same moment told twice in one period is said once", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await h.service.request({ op: "life", kind: "altar", vars: {} });
+  await h.service.request({ op: "life", kind: "altar", vars: {} });
+  h.clock.advance(10_000);
+  expect(messages(h).filter((message) => message.from === "__reception")).toHaveLength(1);
 });

@@ -62,6 +62,8 @@ export interface SayOptions {
   reacts?: number;
   key?: string;
   tag?: string;
+  pin?: boolean;
+  answer?: { key: string; chance?: number }[];
 }
 
 export interface ChatEngine {

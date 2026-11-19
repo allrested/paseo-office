@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
+import { useLife } from "./use-life.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { createWorldBridge, type WorldBridge } from "./world-bridge.js";
@@ -53,6 +54,7 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const life = useLife();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -68,6 +70,7 @@ function WorldViewNativeScene({
     onOpenIncidents,
     onBell,
     onSound: sound.set,
+    onLife: life.say,
     onProblem,
   });
   useEffect(() => {
@@ -86,6 +89,7 @@ function WorldViewNativeScene({
       onOpenIncidents,
       onBell,
       onSound: sound.set,
+      onLife: life.say,
       onProblem,
     };
   });

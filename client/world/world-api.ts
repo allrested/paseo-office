@@ -166,6 +166,11 @@ export interface WorldStartOptions {
    * answers with `setSound`; the scene has already applied it, since audio starts only inside a press.
    */
   onSound?(on: boolean): void;
+  /**
+   * A moment of the office's life for the team chat (a birthday, the fire drill): its kind and a
+   * few words, as upstream's chatLife is called. The office's server words it.
+   */
+  onLife?(kind: string, vars: Record<string, string>): void;
   /** False hides Photo mode: a WebView cannot keep a download. Absent: Photo mode is offered. */
   photo?: boolean;
 }

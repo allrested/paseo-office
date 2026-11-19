@@ -31,6 +31,7 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onOpenIncidents: vi.fn(),
       onBell: vi.fn(),
       onSound: vi.fn(),
+      onLife: vi.fn(),
       onProblem: vi.fn(),
       ...overrides,
     },
@@ -117,5 +118,16 @@ test("a press on the scene's Sound button goes to the latest handler, and keeps 
   now.current = { ...now.current, onSound: later };
   options.onSound?.(true);
   expect(later).toHaveBeenCalledWith(true);
+  expect(focus).not.toHaveBeenCalled();
+});
+
+test("a moment for the team chat goes to the latest handler, and keeps no focus from the app", () => {
+  const now = latest();
+  const focus = vi.fn();
+  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const said = vi.fn();
+  now.current = { ...now.current, onLife: said };
+  options.onLife?.("parcel", { id: "a1" });
+  expect(said).toHaveBeenCalledWith("parcel", { id: "a1" });
   expect(focus).not.toHaveBeenCalled();
 });

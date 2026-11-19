@@ -316,6 +316,12 @@ export const ChatRequestSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("vote"), id: z.string().min(1), index: z.number().int().min(0) }),
   z.object({ op: z.literal("rsvp"), id: z.string().min(1), yes: z.boolean() }),
   z.object({ op: z.literal("recall"), id: z.string().min(1) }),
+  /** A moment of the office's life the scene saw (a birthday, the fire drill), with a few words. */
+  z.object({
+    op: z.literal("life"),
+    kind: z.string().min(1).max(40),
+    vars: z.record(z.string().max(40), z.string().max(200)).default({}),
+  }),
 ]);
 export type ChatRequest = z.output<typeof ChatRequestSchema>;
 

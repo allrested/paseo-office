@@ -7,6 +7,7 @@ import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
+import { useLife } from "./use-life.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
@@ -109,6 +110,7 @@ function WorldScene({
 }: WorldSceneProps) {
   const containerId = useId();
   const onBell = useStandupBell();
+  const life = useLife();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -127,6 +129,7 @@ function WorldScene({
     onOpenIncidents,
     onBell,
     onSound: sound.set,
+    onLife: life.say,
     onProblem,
   });
   useEffect(() => {
@@ -145,6 +148,7 @@ function WorldScene({
       onOpenIncidents,
       onBell,
       onSound: sound.set,
+      onLife: life.say,
       onProblem,
     };
   }, [
@@ -162,6 +166,7 @@ function WorldScene({
     onOpenIncidents,
     onBell,
     sound.set,
+    life.say,
     onProblem,
   ]);
 
