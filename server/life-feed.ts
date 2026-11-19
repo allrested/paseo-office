@@ -69,10 +69,20 @@ export function createLifeFeed(deps: LifeFeedDeps): LifeFeed {
       lift: deps.lift.pub(deps.now()),
     };
   }
-  // Told again only when something but the lift's countdown changed.
+  // Told again only when something the scenes read changed: not the lift's countdown, and not how
+  // lately a listed team worked, which changes with every view (the scenes read who is due, away,
+  // back, an intern, ready or permanent).
   function changed(): void {
     const now = snapshot();
-    const key = JSON.stringify({ ...now, lift: { ...now.lift, left: now.lift.left > 0 } });
+    const key = JSON.stringify({
+      born: now.born,
+      lift: { ...now.lift, left: now.lift.left > 0 },
+      teams: now.tenure.projects
+        .map((p) =>
+          JSON.stringify([p.name, p.due, p.farewell, p.back, p.intern, p.ready, p.official]),
+        )
+        .sort(),
+    });
     if (key === sent) return;
     sent = key;
     deps.emit(now);

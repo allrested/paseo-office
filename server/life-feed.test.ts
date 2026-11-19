@@ -132,3 +132,32 @@ test("the ages are read one folder at a time, so a host of many workspaces start
   await feed.settled();
   expect(feed.snapshot().born).toEqual({ web: "2021-03-04" });
 });
+
+test("how lately a listed team worked is not news: the scenes read who is due, away, back, an intern, ready or permanent", () => {
+  const d = deps();
+  const listed = (last: number, patch: object = {}) => [
+    {
+      name: "api",
+      last,
+      days: 1,
+      turns: last,
+      due: false,
+      farewell: 0,
+      back: 0,
+      intern: true,
+      ready: false,
+      official: 0,
+      ...patch,
+    },
+  ];
+  d.tenure.list.mockReturnValueOnce(listed(1));
+  const feed = createLifeFeed(d);
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(1);
+  d.tenure.list.mockReturnValueOnce(listed(2));
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(1);
+  d.tenure.list.mockReturnValueOnce(listed(3, { ready: true }));
+  feed.view({ ...view(), folders: {} });
+  expect(d.emit).toHaveBeenCalledTimes(2);
+});

@@ -46,3 +46,16 @@ test("the queue writes the newest value once its time is up, or at once when flu
   expect(clock.pending()).toBe(0);
   expect(logs).toEqual([]);
 });
+
+test("the queue keeps the object it is given and writes it as it is when its time is up", async () => {
+  const file = join(directory, "tenure.json");
+  const clock = createFakeClock(0);
+  const queue = createSaveQueue(createLifeFile(file, Shape), clock, () => undefined);
+  const ledger = { n: 1 };
+  queue.save(ledger);
+  ledger.n = 2;
+  clock.advance(10_000);
+  ledger.n = 3;
+  await queue.flush();
+  expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ n: 2 });
+});

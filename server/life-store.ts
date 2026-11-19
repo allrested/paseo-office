@@ -52,7 +52,7 @@ export function createLifeFile<T>(file: string, schema: z.ZodType<T>): LifeFile<
   return { load: () => enqueue(read), save: (data) => enqueue(() => write(data)) };
 }
 
-/** The newest value written at most once per `ms`; `flush()` writes what waits now. */
+/** The value last given, as it is when written: at most once per `ms`; `flush()` writes what waits now. */
 export interface SaveQueue<T> {
   save(data: T): void;
   flush(): Promise<void>;
@@ -71,7 +71,8 @@ export function createSaveQueue<T>(
     cancel?.();
     cancel = null;
     if (waiting !== null) {
-      const data = waiting;
+      // The ledger keeps changing its object: what is written is the object as it is now.
+      const data = structuredClone(waiting);
       waiting = null;
       writing = writing
         .then(() => file.save(data))
@@ -83,8 +84,8 @@ export function createSaveQueue<T>(
   }
   return {
     save(data) {
-      // The ledger hands over its own object and keeps changing it.
-      waiting = structuredClone(data);
+      // Kept, not copied: the ledger saves at every change, many times a second on a busy host.
+      waiting = data;
       cancel ??= timers.setTimeout(() => void flush(), ms);
     },
     flush,
