@@ -137,7 +137,7 @@ export const officeHostSettings = defineSettings({
   // Version 1 had only `agentTools`, version 2 no incident fields and version 3 no `notesDays`:
   // what a document has stays, and the rest take their defaults, but for the days. Before
   // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.
-  // Version 5 offers Headquarters. Existing plans keep their values.
+  // Version 5 adds Headquarters and weather. Older documents keep their floor plan and start with weather off.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

@@ -68,3 +68,17 @@ test("bounds both waiting for headers and streaming the answer", async () => {
     );
   }
 });
+
+test("an unfamiliar transport code or cause message never reaches the problem", async () => {
+  const read = createWeatherReader({
+    fetchFn: async () => {
+      const cause = Object.assign(new Error("SECRET"), {
+        code: "https://example.test/?key=SECRET",
+      });
+      throw new Error("SECRET", { cause });
+    },
+  });
+  await expect(read("https://weather.test")).rejects.toThrow(
+    /^The weather service could not be reached$/,
+  );
+});
