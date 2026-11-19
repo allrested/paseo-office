@@ -45,6 +45,13 @@ vi.mock("./world/world-view.js", () => ({
 const sends = vi.hoisted(() => ({
   run: async (_agentId: string, _text: string): Promise<void> => undefined,
 }));
+const ssh = vi.hoisted(() => ({
+  discover: vi.fn(async () => ({
+    servers: [] as { id: string; name: string }[],
+    discoveryIncomplete: false,
+  })),
+  read: vi.fn(async () => ({ status: "ok" as const, hosts: [] })),
+}));
 
 // One object for every render, as the host's SDK object is. An agent's timeline holds one line.
 const sdk = vi.hoisted(() => ({
@@ -136,8 +143,12 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
     if (contract.name !== "office.state") return { status: "live" };
     return { status: subscriptionStatus, error: { message: "The office is out of reach" } };
   },
-  useRpc: () => async () => {
-    throw new Error("The header asks for nothing");
+  useRpc: (contract: { name: string }) => {
+    if (contract.name === "office.ssh.servers") return ssh.discover;
+    if (contract.name === "office.ssh.reading") return ssh.read;
+    return async () => {
+      throw new Error("Unconfigured test RPC");
+    };
   },
   usePaseo: () => sdk,
 }));
@@ -268,6 +279,8 @@ function chatMessage(at: number, from: string | undefined, kind = "text"): ChatM
 }
 
 beforeEach(() => {
+  ssh.discover.mockClear();
+  ssh.read.mockClear();
   floor.webgl = false;
   floor.refuse = false;
   floor.props = null;
@@ -327,6 +340,19 @@ async function openAttention(): Promise<void> {
     container.querySelector<HTMLElement>('[role="tab"][aria-label^="Attention"]')?.click(),
   );
 }
+
+test("the Host card opens directly to SSH when there is no local machine reading", async () => {
+  compact = false;
+  const server = { id: "cafecafecafecafe", name: "ssh" };
+  ssh.discover.mockResolvedValueOnce({ servers: [server], discoveryIncomplete: false });
+  await mount();
+  await seeAda();
+  await openAttention();
+  expect(ssh.read).not.toHaveBeenCalled();
+  await pressFirst("Host:");
+  expect(labelled("SSH")?.getAttribute("aria-selected")).toBe("true");
+  expect(ssh.read).toHaveBeenCalledWith({ id: server.id });
+});
 
 test("a schedule the settings broke shows a Settings card that opens the settings", async () => {
   compact = false;
