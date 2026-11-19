@@ -78,10 +78,11 @@ const you = (text: string): AgentTimelineItem => ({
   type: "user_message",
   text,
 });
-const entry = (seq: number, item: AgentTimelineItem, seqEnd = seq) => ({
+const entry = (seq: number, item: AgentTimelineItem, seqEnd = seq, turnId?: string) => ({
   seqStart: seq,
   seqEnd,
   item,
+  turnId,
 });
 const page = (entries: Page["entries"], extra: Partial<Page> = {}): Page => ({
   entries,
@@ -90,12 +91,12 @@ const page = (entries: Page["entries"], extra: Partial<Page> = {}): Page => ({
   error: null,
   ...extra,
 });
-const live = (seq: number | undefined, item: AgentTimelineItem) => ({
+const live = (seq: number | undefined, item: AgentTimelineItem, turnId?: string, epoch = "e1") => ({
   agentId: "a1",
   timestamp: "t",
   seq,
-  epoch: "e1",
-  event: { type: "timeline", provider: "claude", item },
+  epoch,
+  event: { type: "timeline", provider: "claude", item, turnId },
 });
 const texts = () => conversation.rows.map((row) => row.text);
 
@@ -193,6 +194,14 @@ test("a read after a restored subscription keeps what is live past the page; a r
   await push({ agentId: "a1", event: { type: "replacement", epoch: "e2" } });
   await answer(2, page([entry(1, you("Fresh"))]));
   expect(texts()).toEqual(["Fresh"]);
+});
+
+test("the turn of a page entry and of a live piece reaches the rows", async () => {
+  await mount();
+  await answer(0, page([entry(1, say("From the page"), 1, "t1")]));
+  await push(live(2, say("A new turn"), "t2"));
+  await push(live(3, say(" goes on"), "t2"));
+  expect(texts()).toEqual(["From the page", "A new turn goes on"]);
 });
 
 test("a tool call's live updates are one row, as it is after a reopen", async () => {

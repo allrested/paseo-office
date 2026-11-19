@@ -15,6 +15,8 @@ export type ConversationRow =
 export interface TimelineEntry {
   seq: number;
   item: AgentTimelineItem;
+  /** The server's turn the entry belongs to; absent on an entry that carries none. */
+  turnId?: string;
 }
 
 type ToolCall = Extract<AgentTimelineItem, { type: "tool_call" }>;
@@ -91,25 +93,33 @@ function mergedCall(earlier: ToolCall, later: ToolCall): ToolCall {
   return { ...earlier, ...later, detail };
 }
 
+/** Two entries are of one turn unless both name a turn and the names differ. */
+function sameTurn(a: string | undefined, b: string | undefined): boolean {
+  return a === undefined || b === undefined || a === b;
+}
+
 /**
  * The rows of a timeline, in order. A page comes merged from the server and live events do not,
  * so the same merging is done here: the streamed pieces of one assistant message are one row (a
  * piece with no messageId continues the message right before it), and a tool call's updates are
- * one row, rewritten in place from the newest.
+ * one row, rewritten in place from the newest. Both merges stay within one turn: a call id used
+ * again, or a piece with no messageId, in a later turn starts a new row.
  */
 export function conversationRows(entries: readonly TimelineEntry[]): ConversationRow[] {
   const rows: ConversationRow[] = [];
-  const calls = new Map<string, { index: number; item: ToolCall }>();
+  const calls = new Map<string, { index: number; item: ToolCall; turnId?: string }>();
   // Whether the row at the end of `rows` is an assistant message the next piece may continue,
   // and its messageId.
   let open = false;
   let openMessageId: string | null = null;
+  let openTurnId: string | undefined;
   for (const entry of entries) {
     const { item } = entry;
     const last = rows[rows.length - 1];
     if (
       open &&
       item.type === "assistant_message" &&
+      sameTurn(entry.turnId, openTurnId) &&
       (item.messageId === undefined || item.messageId === openMessageId) &&
       last?.kind === "agent"
     ) {
@@ -117,9 +127,9 @@ export function conversationRows(entries: readonly TimelineEntry[]): Conversatio
       continue;
     }
     const known = item.type === "tool_call" ? calls.get(item.callId) : undefined;
-    if (known && item.type === "tool_call") {
+    if (known && item.type === "tool_call" && sameTurn(entry.turnId, known.turnId)) {
       const merged = mergedCall(known.item, item);
-      calls.set(item.callId, { index: known.index, item: merged });
+      calls.set(item.callId, { index: known.index, item: merged, turnId: known.turnId });
       rows[known.index] = { kind: "tool", key: rows[known.index].key, text: toolLine(merged) };
       open = false;
       continue;
@@ -127,8 +137,11 @@ export function conversationRows(entries: readonly TimelineEntry[]): Conversatio
     const row = rowFor(entry);
     open = row?.kind === "agent" && item.type === "assistant_message";
     openMessageId = open && item.type === "assistant_message" ? (item.messageId ?? null) : null;
+    openTurnId = entry.turnId;
     if (row) {
-      if (item.type === "tool_call") calls.set(item.callId, { index: rows.length, item });
+      if (item.type === "tool_call") {
+        calls.set(item.callId, { index: rows.length, item, turnId: entry.turnId });
+      }
       rows.push(row);
     }
   }

@@ -160,7 +160,7 @@ describe("what the plugin imports", () => {
       'import eight = require("eighth");',
       'type H = typeof import("ninth");',
       "const quoted = 'import x from \"not-an-import\"';",
-      "// import y from \"in-a-comment\"",
+      '// import y from "in-a-comment"',
       "const dynamic = import(name);",
     ].join("\n");
     expect(importsOf(source)).toEqual([

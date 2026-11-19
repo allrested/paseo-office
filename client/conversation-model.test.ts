@@ -242,3 +242,53 @@ test("calls with different ids are different rows; a repeat with no detail keeps
   );
   expect(rows.map((row) => row.text)).toEqual(["Bash: ls", "Bash: pwd"]);
 });
+
+/** Entries with the turn each belongs to: `[turnId, item]` pairs, numbered from 1. */
+function turns(...pairs: [string | undefined, AgentTimelineItem][]): TimelineEntry[] {
+  return pairs.map(([turnId, item], index) => ({ seq: index + 1, item, turnId }));
+}
+
+test("a call id used again in a later turn is a new row, not the earlier turn's call", () => {
+  const call = (status: ToolCall["status"], command: string) =>
+    tool({ callId: "c1", status, detail: { type: "shell", command } });
+  const rows = conversationRows(
+    turns(
+      ["t1", call("completed", "npm test")],
+      ["t2", call("running", "npm run lint")],
+      ["t2", call("completed", "npm run lint")],
+    ),
+  );
+  expect(rows).toEqual([
+    { kind: "tool", key: "1", text: "Bash: npm test" },
+    { kind: "tool", key: "2", text: "Bash: npm run lint" },
+  ]);
+});
+
+test("the first piece of a new turn with no messageId starts a new row; the same turn continues", () => {
+  const say = (text: string): AgentTimelineItem => ({ type: "assistant_message", text });
+  const rows = conversationRows(
+    turns(["t1", say("Done")], ["t1", say(" now.")], ["t2", say("Next")], ["t2", say(" step")]),
+  );
+  expect(rows).toEqual([
+    { kind: "agent", key: "1", text: "Done now." },
+    { kind: "agent", key: "3", text: "Next step" },
+  ]);
+});
+
+test("pieces of one message id in different turns are different rows", () => {
+  const say = (text: string): AgentTimelineItem => ({
+    type: "assistant_message",
+    text,
+    messageId: "m1",
+  });
+  expect(conversationRows(turns(["t1", say("One")], ["t2", say("Two")])).map((r) => r.key)).toEqual(
+    ["1", "2"],
+  );
+});
+
+test("entries that carry no turn merge as before", () => {
+  const say = (text: string): AgentTimelineItem => ({ type: "assistant_message", text });
+  expect(conversationRows(turns([undefined, say("a")], [undefined, say("b")]))).toEqual([
+    { kind: "agent", key: "1", text: "ab" },
+  ]);
+});
