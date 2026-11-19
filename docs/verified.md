@@ -441,6 +441,32 @@ Seen and left: a Mock agent that waits from its first moment is a newcomer, so t
 try showed no glide; and a clip runs on the page's clock, so in this slow browser a Stop pressed
 by the look's script, seconds late, found the clip already saved.
 
+## Weather and seasons
+
+Stock Paseo 0.16.2 ran the Git-installed plugin at `05e238a` in a disposable home on loopback.
+At 1280 px, the settings page accepted Manual → Storm and From a service. The weather address
+was initially empty. With a local JSON service returning code 63, 14.2 °C, 90% cloud and
+`is_day: 0`, the page reported “Last answer just now: rain, 14°.” Remote plain HTTP was refused.
+Malformed JSON fields and a closed loopback port produced the shape and ECONNREFUSED messages.
+Each failure logged its reason without the URL. The Weather card in Attention opened the
+settings page, and a successful read cleared the card. At 390 px the address field remained
+visible, and restoring the working address brought back the rain reading. The disposable host’s
+`plugin-settings/office/office.json` contained the saved address.
+
+In a separate Chromium scene, date overrides exercised Halloween (1280 px), Christmas (390 px)
+and Lunar New Year (1280 px). On the dark surface the Halloween pumpkins and Christmas tree
+were visible, with pale storm streaks outside. An instrumented copy of the scene showed nine
+Halloween bats and a ghost. Each season registered a clickable centrepiece and its corresponding
+English decorations hint. Rain code 63 drew 2,124 streaks, storm code 95 drew 3,600, and none
+of their start points lay inside the room. The entrance props were visible in rain and storms
+and hidden in fog and clear weather. Code 45 changed the fog range to 14–52. The Halloween
+seasonal sky was overcast, Christmas and Lunar New Year were clear. None of the three scenes
+made a network request or raised an error after loading.
+
+These checks used a local service, date overrides and software WebGL. The live Open-Meteo
+service, a calendar-driven holiday on a real device, audible thunder, screen-reader output and
+phone graphics performance remain host or device checks.
+
 ## Not seen, and why
 
 | What                                                                            | Why                                                                                                                                                     |
