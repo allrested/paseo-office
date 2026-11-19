@@ -1,3 +1,4 @@
+import type { WordsLanguage } from "../../shared/scene-language.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 
 /**
@@ -122,6 +123,8 @@ export interface WorldBrand {
 }
 
 export interface WorldStartOptions {
+  language?: WordsLanguage;
+  words?: string;
   /**
    * The floor plan: "pro" is the company floor, "cozy" one open room. A page starts once, so a new
    * plan is a new page.

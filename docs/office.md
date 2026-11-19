@@ -183,7 +183,7 @@ frame ends it. Keys pressed inside a frame do not reach the app's shortcuts, so 
 scene, and anything the scene opens in the app (the agent card, a board), gives keyboard focus back
 to the app's window.
 
-The scene is told who is there and what kind of thing each does, and the open incidents' keys and
+The scene receives its language and words and is told who is there and what kind of thing each does, and the open incidents' keys and
 titles for the banner; never a file name, a command or a prompt. It makes no network call. It
 writes seven things to the app origin's `localStorage` under keys that start with `office-`:
 which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
@@ -265,6 +265,20 @@ rest the gaps are 10 to 20 minutes. The games are my-office's; the office's plan
 (`vendor/my-office/src/office/paseo-leisure.js`) only starts them, and starts nothing at night,
 during a gathering or with reduced motion. After 21:00 an agent that has rested 30 minutes walks
 home, its rest counted from the host's last change of the agent.
+
+### Languages
+
+The device setting `office-language` chooses Automatic, English, Tiếng Việt, ไทย or Bahasa
+Indonesia. Automatic takes the app locale’s primary language subtag (including legacy `in` for
+Indonesian) and falls back to English. The scene bundles English. For another language the
+client requests one JSON text from `office.world.words`, backed by `server/words.generated.ts`,
+and caches the successful response. The scene waits for the words before drawing labels. A change
+of language starts a fresh frame. A failed download leaves the floor in English with a note.
+
+The lookup checks the chosen language’s port overrides, the English port overrides, the chosen
+dictionary and finally the English dictionary. It removes decorative emoji and preserves lines
+made entirely of emoji. The column, chat, settings, whiteboard and host messages keep their
+existing text. Vietnamese has its own karaoke lyrics. Thai and Indonesian use English lyrics.
 
 ### Sound
 
@@ -365,7 +379,7 @@ holds every wake until it is turned back on; wakes that wait are not kept across
 
 The office's settings are a screen in its page under Settings > Plugins > Office 3D
 (`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Floor plan", "Notes
-folder", "Time zone", "Stand-up days", "Sound" and the tracker fields. Three things open it with
+folder", "Time zone", "Stand-up days", "3D office language", "Sound" and the tracker fields. Three things open it with
 `client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
 settings", and the Attention tab's Settings card.
 

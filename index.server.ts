@@ -1,3 +1,4 @@
+import { embeddedWorldWords, type WorldWords } from "./server/world-words.js";
 import { homedir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import type {
@@ -73,6 +74,7 @@ import {
   skillsRpc,
   updateRpc,
   worldRpc,
+  worldWordsRpc,
 } from "./shared/contracts.js";
 import { chatT } from "./shared/chat-words.js";
 import { officeHostSettings } from "./shared/settings.js";
@@ -92,6 +94,7 @@ export interface OfficePluginDeps {
   log(message: string): void;
   /** The 3D office's page script. */
   world: WorldScript;
+  words: WorldWords;
   /** Where the host's processes are read, and how one is asked to end. */
   machine: MachineHost;
   /** The host's skills folders the library lists. */
@@ -307,6 +310,7 @@ export function createOfficePlugin(
     return hub.attach(context);
   });
   server.handle(worldRpc, () => guarded("world", () => deps.world.read()));
+  server.handle(worldWordsRpc, (input) => guarded("words", () => deps.words.read(input.language)));
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
   server.handle(machineSubscription, (_input, context) => {
     holder.remember(context.paseo);
@@ -533,6 +537,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     clock: nodeClock,
     log,
     world: embeddedWorldScript(),
+    words: embeddedWorldWords(),
     machine: {
       procRoot: "/proc",
       cgroupRoot: "/sys/fs/cgroup",

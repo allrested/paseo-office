@@ -11,5 +11,11 @@
   "arrowParens": "always",
   "bracketSameLine": false,
   "bracketSpacing": true,
-  "ignorePatterns": ["*.lock", "vendor/**", "shared/upstream/**", "server/world.generated.ts"]
+  "ignorePatterns": [
+    "*.lock",
+    "vendor/**",
+    "shared/upstream/**",
+    "server/world.generated.ts",
+    "server/words.generated.ts"
+  ]
 }
