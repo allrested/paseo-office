@@ -21,6 +21,7 @@ import { WorldLoading } from "./world-loading.js";
 import type { GroupPhotoCapture } from "../use-group-photo.js";
 import { messageOf } from "./world-loader.js";
 import {
+  useHomeDeparture,
   useStandupBell,
   useWorldScript,
   worldStartOptions,
@@ -63,11 +64,9 @@ export interface WorldViewProps {
    */
   onOpenResources: (() => void) | undefined;
   /**
-   * E by a person while walking in: the agent card's "Open session". The surface always supplies
-   * it, and it opens the session in the office's column, as the card does. Read when the office
-   * starts.
+   * Walk-in interaction opens the agent’s workspace over the floor. Read at scene start.
    */
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   /** A tap on the library: its chip or the bookshelf. */
   onOpenLibrary(): void;
   /** A tap on the label over the meeting room's screen. */
@@ -79,6 +78,10 @@ export interface WorldViewProps {
   incidents: IncidentsState | undefined;
   /** A tap on the incidents' banner. */
   onOpenIncidents(): void;
+  /** A tap on the pantry's duty board: the duty board's editor. */
+  onOpenDuties?: () => void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?: (id: string, agentId: string) => void;
   /** The script could not load, the office could not start, or the WebGL context was lost. */
   onProblem(message: string): void;
   /**
@@ -119,13 +122,15 @@ function WorldScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
   meeting,
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldSceneProps) {
@@ -133,6 +138,7 @@ function WorldScene({
   const containerId = useId();
   const onToggleFullscreen = fullscreen?.toggle;
   const onBell = useStandupBell();
+  const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const brand = useOfficeBrand();
@@ -148,12 +154,15 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,
@@ -171,12 +180,15 @@ function WorldScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
+      onWentHome,
       onTenure,
       scene,
       night,
@@ -193,12 +205,15 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,

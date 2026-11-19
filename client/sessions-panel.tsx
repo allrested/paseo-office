@@ -1,6 +1,6 @@
 import { AVATARS, shirtColor } from "../shared/appearance.js";
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, View, type ViewStyle } from "react-native";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { Platform, Pressable, Text, View, type ViewStyle } from "react-native";
 import type { ChecklistProgress } from "../shared/contracts.js";
 import { useRowClock } from "./structure-view.js";
 import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
@@ -55,6 +55,59 @@ function SessionMeter({ meter, styles }: { meter: Meter; styles: OfficeStyles })
       </View>
       <Text style={ui.meterText}>{meter.label}</Text>
     </View>
+  );
+}
+
+const desktopWorkspaceButton: CSSProperties = {
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+  width: 44,
+  minHeight: 44,
+  padding: 0,
+  border: 0,
+  borderRadius: 8,
+  background: "transparent",
+  cursor: "pointer",
+  WebkitAppRegion: "no-drag",
+} as CSSProperties;
+const workspaceGlyph: CSSProperties = { display: "inline-flex", pointerEvents: "none" };
+
+function WorkspaceButton({
+  title,
+  open,
+  styles,
+}: {
+  title: string;
+  open(): void;
+  styles: OfficeStyles;
+}) {
+  const label = `Open ${title}'s workspace`;
+  const icon = <Icon name="ArrowUpRight" size={16} color={styles.iconColor} />;
+  if (Platform.OS === "web") {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        style={desktopWorkspaceButton}
+        onClick={open}
+      >
+        <span aria-hidden="true" style={workspaceGlyph}>
+          {icon}
+        </span>
+      </button>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={open}
+      style={styles.sessions.rowOpen}
+    >
+      {icon}
+    </Pressable>
   );
 }
 
@@ -148,22 +201,7 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
           </>
         )}
       </Pressable>
-      {/* Beside the row, not in it: a button inside a button is no button to a screen reader. */}
-      {openWorkspace && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${title}'s workspace`}
-          onPress={showWorkspace}
-          style={ui.rowOpen}
-        >
-          {({ pressed }) => (
-            <>
-              {pressed && <View style={styles.pressedFill} />}
-              <Icon name="ArrowUpRight" size={16} color={styles.iconColor} />
-            </>
-          )}
-        </Pressable>
-      )}
+      {openWorkspace && <WorkspaceButton title={title} open={showWorkspace} styles={styles} />}
     </View>
   );
 }
@@ -238,7 +276,7 @@ export function SessionsPanel(props: ColumnPanelProps) {
   const created = useCallback(
     (agentId: string) => {
       setOpen(false);
-      change({ prompt: "" });
+      change({ prompt: "", appearance: undefined });
       link.openSession(agentId);
     },
     [link, setOpen, change],

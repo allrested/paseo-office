@@ -3,43 +3,23 @@
  */
 // The Stand-up notes card, mounted. The sheet, its scroller and the Markdown renderer are the
 // host's, so plain stand-ins show what the card passed them; the notes come from a fake read.
-// jsdom lays nothing out, so the test reports where each entry starts.
-import { act, createElement, forwardRef, useImperativeHandle, type ReactNode } from "react";
+import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import type { LayoutChangeEvent, ViewProps } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { NotesState } from "../shared/contracts.js";
 import { NotesCard, type NotesMonth } from "./notes-card.js";
 import { useOfficeStyles } from "./styles.js";
 
-const seen = vi.hoisted(() => ({
-  scrollTo: [] as unknown[],
-  /** The onLayout of each View that has one, in draw order: the month's sections'. */
-  layouts: [] as ((event: LayoutChangeEvent) => void)[],
-}));
-
-vi.mock("react-native", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-native")>();
-  const View = (props: ViewProps) => {
-    if (props.onLayout) seen.layouts.push(props.onLayout);
-    return createElement(actual.View, props);
-  };
-  return { ...actual, View };
-});
-
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { View } = await import("react-native");
-  const ScrollView = forwardRef<unknown, { children?: ReactNode }>((props, ref) => {
-    useImperativeHandle(ref, () => ({ scrollTo: (to: unknown) => seen.scrollTo.push(to) }));
-    return createElement(View, null, props.children);
-  });
+  const ScrollView = View;
   const Modal = (props: { title: string; open: boolean; children: ReactNode }) =>
     props.open ? createElement("section", { "aria-label": props.title }, props.children) : null;
   Modal.Content = (props: { children: ReactNode }) => createElement("div", null, props.children);
   const Markdown = ({ children }: { children: string }) =>
     createElement("div", { "data-markdown": "" }, children);
-  return { Markdown, Modal, ScrollView };
+  return { Markdown, Modal, ScrollView, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -91,8 +71,6 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
-  seen.scrollTo = [];
-  seen.layouts = [];
   asked = [];
   refusal = null;
   opened = [];
@@ -133,15 +111,6 @@ async function press(label: string): Promise<void> {
   await settle();
 }
 
-/** Reports where each of the month's sections starts, in draw order, as a layout would. */
-async function placeSections(...tops: number[]): Promise<void> {
-  const layouts = seen.layouts.slice(-tops.length);
-  await act(async () => {
-    tops.forEach((y, index) =>
-      layouts[index]?.({ nativeEvent: { layout: { x: 0, y, width: 300, height: 40 } } } as never),
-    );
-  });
-}
 const link = (label: string) =>
   [...container.querySelectorAll<HTMLElement>('[role="link"]')].find(
     (each) => each.textContent === label,
@@ -151,13 +120,7 @@ test("this month's notes, an entry at a time, with only the months that have a f
   await mount();
   expect(asked).toEqual([undefined]);
   expect(card()?.textContent).toContain("November 2026");
-  expect(markdown()).toEqual([
-    "# Notes\n\n",
-    "## Contents\n\n",
-    "\n---\n\n",
-    "## 15 November 2026\n\nA\n\n---\n\n",
-    "## 16 November 2026\n\nB\n",
-  ]);
+  expect(markdown()).toEqual(["## 16 November 2026\n\nB\n"]);
   expect(isOff("Previous month")).toBe(false);
   expect(isOff("Next month")).toBe(true);
 
@@ -166,31 +129,22 @@ test("this month's notes, an entry at a time, with only the months that have a f
   expect(card()?.textContent).toContain("October 2026");
 });
 
-test("the notes open at the newest entry, once per read", async () => {
+test("choosing a day displays its entry and a writer refresh keeps the selection", async () => {
   await mount();
-  await placeSections(0, 40, 120, 300);
-  expect(seen.scrollTo).toEqual([{ y: 300, animated: false }]);
-  // A later layout leaves the reader where they scrolled.
-  await placeSections(0, 40, 130, 320);
-  expect(seen.scrollTo).toEqual([{ y: 300, animated: false }]);
+  await press("15 November 2026");
+  await mount({ ...NOTES, writtenAt: NOW });
+  expect(markdown()).toEqual(["## 15 November 2026\n\nA\n\n---\n\n"]);
 });
 
-test("a Contents link scrolls to its entry", async () => {
+test("Contents links open their entries, and the preamble is still readable", async () => {
   await mount();
-  await placeSections(0, 40, 120, 300);
-  await act(async () => link("15 November 2026")?.click());
-  expect(seen.scrollTo).toEqual([
-    { y: 300, animated: false },
-    { y: 120, animated: true },
-  ]);
-  // An entry laid out again is scrolled to where it is now.
-  await placeSections(0, 40, 150, 330);
-  await act(async () => link("16 November 2026")?.click());
-  await act(async () => link("15 November 2026")?.click());
-  expect(seen.scrollTo.slice(2)).toEqual([
-    { y: 330, animated: true },
-    { y: 150, animated: true },
-  ]);
+  await press("Overview");
+  expect(markdown()).toEqual(["# Notes\n\n"]);
+  await press("Contents");
+  expect(link("15 November 2026")).toBeDefined();
+  await act(async () => link("15 November 2026")!.click());
+  expect(markdown()).toEqual(["## 15 November 2026\n\nA\n\n---\n\n"]);
+  expect(byLabel("15 November 2026").getAttribute("aria-selected")).toBe("true");
 });
 
 test("a month without a file says so", async () => {

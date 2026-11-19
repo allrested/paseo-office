@@ -1,6 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
-import { Text, View } from "react-native";
-import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import type { Appearance } from "../shared/appearance.js";
+import { AppearanceFields } from "./agent-appearance.js";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
+import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { Pill } from "./activity-panel.js";
 import { ActionButton } from "./action-button.js";
 import { Row as ChoiceRow } from "./agent-picker.js";
@@ -121,26 +123,109 @@ interface ReadyBodyProps {
   styles: OfficeStyles;
 }
 
+function OptionGroup({
+  label,
+  value,
+  compact,
+  open,
+  toggle,
+  styles,
+  children,
+}: {
+  label: string;
+  value?: string;
+  compact: boolean;
+  open: boolean;
+  toggle(): void;
+  styles: OfficeStyles;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.sheetField}>
+      <Text style={styles.sheetLabel}>{label}</Text>
+      {compact && (
+        <Pressable
+          accessibilityRole="button"
+          aria-expanded={open}
+          accessibilityLabel={`Choose ${label.toLowerCase()}`}
+          onPress={toggle}
+          style={styles.newAgentSelector}
+        >
+          <Text numberOfLines={1} style={styles.sidebarButtonText}>
+            {value ?? `Select ${label.toLowerCase()}`}
+          </Text>
+          <Icon name={open ? "ChevronUp" : "ChevronDown"} size={16} color={styles.iconColor} />
+        </Pressable>
+      )}
+      {(!compact || open) && (
+        <View role="group" aria-label={label} style={styles.panelChips}>
+          {children}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps) {
   const { create, chooseProvider } = agent;
+  const customize = useCallback((appearance: Appearance) => change({ appearance }), [change]);
   const chooseWorkspace = useCallback((workspaceId: string) => change({ workspaceId }), [change]);
-  const chooseModel = useCallback((model: string) => change({ model }), [change]);
+  const [menu, setMenu] = useState<"provider" | "model" | null>(null);
+  const toggleProvider = useCallback(
+    () => setMenu((current) => (current === "provider" ? null : "provider")),
+    [],
+  );
+  const toggleModel = useCallback(
+    () => setMenu((current) => (current === "model" ? null : "model")),
+    [],
+  );
+  const selectProvider = useCallback(
+    (provider: string) => {
+      chooseProvider(provider);
+      setMenu(null);
+    },
+    [chooseProvider],
+  );
+  const chooseModel = useCallback(
+    (model: string) => {
+      change({ model });
+      setMenu(null);
+    },
+    [change],
+  );
   const setPrompt = useCallback((prompt: string) => change({ prompt }), [change]);
   const submit = useCallback(async () => onCreated(await create()), [create, onCreated]);
   const problem = newAgentProblem(choice, agent.starting);
   const waiting = agent.starting.some((entry) => entry.id === choice.provider);
-  const models = agent.providers.find((entry) => entry.id === choice.provider)?.models ?? [];
+  const provider = agent.providers.find((entry) => entry.id === choice.provider);
+  const models = provider?.models ?? [];
   return (
     <>
-      <Workspaces
-        workspaces={agent.workspaces}
-        value={choice.workspaceId}
-        onChoose={chooseWorkspace}
-        styles={styles}
-      />
-      <View style={styles.sheetField}>
-        <Text style={styles.sheetLabel}>Provider</Text>
-        <View role="group" aria-label="Provider" style={styles.panelChips}>
+      <ScrollView
+        style={styles.columnBody}
+        contentContainerStyle={styles.newAgentForm}
+        nestedScrollEnabled
+      >
+        <AppearanceFields
+          draft={choice.appearance}
+          change={customize}
+          collapsible
+          styles={styles}
+        />
+        <Workspaces
+          workspaces={agent.workspaces}
+          value={choice.workspaceId}
+          onChoose={chooseWorkspace}
+          styles={styles}
+        />
+        <OptionGroup
+          label="Provider"
+          value={provider?.label ?? choice.provider ?? undefined}
+          compact={agent.providers.length + agent.starting.length > 3}
+          open={menu === "provider"}
+          toggle={toggleProvider}
+          styles={styles}
+        >
           {agent.providers.map((entry) => (
             <Pill<string>
               key={entry.id}
@@ -149,7 +234,7 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
               disabled={entry.models.length === 0}
               on={entry.id === choice.provider}
               toggle={false}
-              onPress={chooseProvider}
+              onPress={selectProvider}
               styles={styles}
             />
           ))}
@@ -161,15 +246,19 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
               disabled
               on={entry.id === choice.provider}
               toggle={false}
-              onPress={chooseProvider}
+              onPress={selectProvider}
               styles={styles}
             />
           ))}
-        </View>
-      </View>
-      <View style={styles.sheetField}>
-        <Text style={styles.sheetLabel}>Model</Text>
-        <View role="group" aria-label="Model" style={styles.panelChips}>
+        </OptionGroup>
+        <OptionGroup
+          label="Model"
+          value={models.find((entry) => entry.id === choice.model)?.label}
+          compact={models.length > 3}
+          open={menu === "model"}
+          toggle={toggleModel}
+          styles={styles}
+        >
           {models.map((entry) => (
             <Pill<string>
               key={entry.id}
@@ -181,38 +270,40 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
               styles={styles}
             />
           ))}
+        </OptionGroup>
+        <View style={styles.sheetField}>
+          <Text style={styles.sheetLabel}>First prompt</Text>
+          <TextInput
+            accessibilityLabel="First prompt"
+            placeholder="What should the agent do?"
+            placeholderTextColor={styles.placeholderColor}
+            value={choice.prompt}
+            onChangeText={setPrompt}
+            multiline
+            style={styles.input}
+          />
         </View>
-      </View>
-      <View style={styles.sheetField}>
-        <Text style={styles.sheetLabel}>First prompt</Text>
-        <TextInput
-          accessibilityLabel="First prompt"
-          placeholder="What should the agent do?"
-          placeholderTextColor={styles.placeholderColor}
-          value={choice.prompt}
-          onChangeText={setPrompt}
-          multiline
-          style={styles.input}
-        />
-      </View>
-      {problem === null ? null : <Text style={styles.muted}>{problem}</Text>}
-      <View style={styles.actions}>
-        <ActionButton
-          label="Create"
-          pendingLabel="Creating..."
-          onPress={submit}
-          disabled={problem !== null}
-          primary
-          styles={styles}
-        />
-        {waiting ? (
+      </ScrollView>
+      <View style={styles.newAgentFooter}>
+        {problem === null ? null : <Text style={styles.muted}>{problem}</Text>}
+        <View style={styles.actions}>
           <ActionButton
-            label="Try again"
-            pendingLabel="Trying..."
-            onPress={agent.retry}
+            label="Create"
+            pendingLabel="Creating..."
+            onPress={submit}
+            disabled={problem !== null}
+            primary
             styles={styles}
           />
-        ) : null}
+          {waiting ? (
+            <ActionButton
+              label="Try again"
+              pendingLabel="Trying..."
+              onPress={agent.retry}
+              styles={styles}
+            />
+          ) : null}
+        </View>
       </View>
     </>
   );
@@ -244,18 +335,19 @@ export function NewAgentForm({ choice, change, onBack, onCreated, styles }: NewA
   const agent = useNewAgent({ choice, change });
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.newAgentForm}>
-        <View style={styles.actions}>
-          <ActionButton label="Back" pendingLabel="Back" onPress={onBack} styles={styles} />
-        </View>
-        <FormBody
-          agent={agent}
-          choice={choice}
-          change={change}
-          onCreated={onCreated}
-          styles={styles}
-        />
-      </ScrollView>
+      <View style={styles.newAgentHeader}>
+        <Text accessibilityRole="header" style={styles.panelHeading}>
+          New agent
+        </Text>
+        <ActionButton label="Back" pendingLabel="Back" onPress={onBack} styles={styles} />
+      </View>
+      <FormBody
+        agent={agent}
+        choice={choice}
+        change={change}
+        onCreated={onCreated}
+        styles={styles}
+      />
     </View>
   );
 }

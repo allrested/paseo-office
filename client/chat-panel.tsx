@@ -780,6 +780,7 @@ export function ChatPanel({
   draft,
   onClose,
   onBoard,
+  onDuties,
   onNewAgent,
   onGroupPhoto,
 }: ChatPanelProps) {
@@ -1025,6 +1026,7 @@ export function ChatPanel({
           run={run}
           styles={styles}
           onBoard={onBoard}
+          onDuties={onDuties}
           onNewAgent={onNewAgent}
           onGroupPhoto={onGroupPhoto}
           openSession={link.openSession}

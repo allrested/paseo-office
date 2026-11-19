@@ -3,6 +3,8 @@
 
 /** The host-wide board. Every other board id is a workspace id. */
 export const LOBBY = "lobby";
+/** The host-wide board of the day's duties, posted from the duty list. */
+export const DUTY = "duty";
 /** The author of a post the user made in the office. */
 export const USER_AUTHOR = "user";
 

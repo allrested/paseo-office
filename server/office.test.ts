@@ -450,6 +450,160 @@ test("a session without its board tool can confirm just its current assignment",
   await office.stop();
 });
 
+const CUPS = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const };
+const BUILD = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
+const TODAY = "2026-11-11";
+const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
+
+test("an instructed duty goes to an idle agent as a lobby task does; a pretend one never does", async () => {
+  const { office, clock, store, prompts, sources } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([
+    [
+      "b: The office assigned you duty p2 from the duty board.",
+      "  Build",
+      "  ",
+      "  Run the build",
+      'Work on this task. When it is complete, use office_update with id "p2" and action "done". If you need input, leave it claimed and explain what you need.',
+      "If the tool is unavailable and you have finished, put this exact line at the end of your reply: Completed office task p2 (assignment 3).",
+    ].join("\n"),
+  ]);
+  expect(sources).toEqual([null]);
+  expect(store.current().posts[0]).toMatchObject({ id: "p1", state: "open" });
+  expect(store.current().posts[0]).not.toHaveProperty("claimedBy");
+  await office.checkCompletion("b", async () => "Done.\nCompleted office task p2 (assignment 3).");
+  expect(store.current().posts[1]).toMatchObject({ id: "p2", state: "done", claimedBy: "b" });
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("an agent cannot claim a pretend duty; the 3D office's report of one acted out is recorded", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const claimed = await update?.execute(
+    { id: "p1", action: "claim" },
+    toolContext({ id: "a", title: "Planner" }),
+  );
+  expect(claimed).toEqual({
+    text: "Unable to claim p1: it is a pretend duty, which the 3D office acts out",
+    isError: true,
+  });
+  expect(await office.actDuty("p1", "a")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "a" },
+  });
+  expect(await office.actDuty("p2", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p2: an agent is handed this duty",
+  });
+  expect(await office.post({ board: "duty", kind: "task", text: "Extra" })).toEqual({
+    ok: false,
+    error: "Unable to post: the duty board takes its duties from the duty list",
+  });
+  await office.stop();
+});
+
+test("on the duty board an agent finishes or reopens only a duty it holds; the owner's hand marks any", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const as = (agentId: string, id: string, action: string) =>
+    update?.execute({ id, action }, toolContext({ id: agentId, title: null }));
+  const refused = (text: string) => ({ text, isError: true });
+  // A pretend duty has no holder: no agent finishes it.
+  expect(await as("a", "p1", "done")).toEqual(
+    refused("Unable to finish p1: it is a pretend duty, which the 3D office acts out"),
+  );
+  expect(await as("a", "p2", "done")).toEqual(refused("Unable to finish p2: claim it first"));
+  expect(await as("b", "p2", "claim")).not.toHaveProperty("isError");
+  expect(await as("a", "p2", "done")).toEqual(refused("Unable to finish p2: claimed by b"));
+  expect(await as("a", "p2", "reopen")).toEqual(refused("Unable to reopen p2: claimed by b"));
+  // The holder lets it go, as the pickup's release does, and finishes it, as its finish does.
+  expect(await as("b", "p2", "reopen")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "claim")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "done")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "reopen")).toEqual(refused("Unable to reopen p2: it is done"));
+  // The owner's hand, from the duty board's editor.
+  expect(await office.update({ id: "p2", action: "reopen" })).toMatchObject({
+    ok: true,
+    post: { state: "open" },
+  });
+  expect(await office.update({ id: "p1", action: "done" })).toMatchObject({
+    ok: true,
+    post: { state: "done" },
+  });
+  await office.stop();
+});
+
+test("a duty acted out names an agent of the office; an unknown one is refused", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS]);
+  await office.syncDuties({ duties: [CUPS], day: TODAY, due: [CUPS], dayOf });
+  expect(await office.actDuty("p1", "nobody")).toEqual({
+    ok: false,
+    error: "Unable to record p1: no agent nobody",
+  });
+  // A start of an id names the agent, as everywhere on the boards.
+  expect(await office.actDuty("p1", "bo")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "b" },
+  });
+  await office.stop();
+});
+
+test("a duty that loses its instructions while it is handed out is still delivered, and its agent gets work after it", async () => {
+  const harness = setup();
+  let failNext = true;
+  const office = harness.build({
+    send: async (agentId, prompt) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("the network is down");
+      }
+      harness.prompts.push(`${agentId}: ${prompt}`);
+    },
+  });
+  const { clock, store, prompts } = harness;
+  await office.ready;
+  office.setDuties([BUILD]);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  expect(store.current().posts[0]?.pickupMessageId).toEqual(expect.any(String));
+  // The owner takes the instructions out before the delivery is tried again.
+  const pretend = { ...BUILD, instructions: "" };
+  office.setDuties([pretend]);
+  await office.syncDuties({ duties: [pretend], day: TODAY, due: [], dayOf });
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([expect.stringContaining("b: The office assigned you duty p1")]);
+  expect(store.current().posts[0]).not.toHaveProperty("pickupMessageId");
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  expect(
+    await update?.execute({ id: "p1", action: "done" }, toolContext({ id: "b", title: null })),
+  ).not.toHaveProperty("isError");
+  await office.post({ board: "lobby", kind: "task", text: "Next" });
+  clock.advance(0);
+  await settle();
+  expect(prompts[1]).toContain("b: The office assigned you lobby task");
+  await office.stop();
+});
+
 test("a pickup by an agent with a workspace puts the task on its board, and its completion line finishes both", async () => {
   const { build, clock, store, prompts, hub } = setup();
   const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
@@ -514,5 +668,42 @@ test("a named lobby assignment reaches only its recipient and completion checks 
   expect(store.current().posts.map((post) => post.state)).toEqual(["claimed", "claimed"]);
   await office.checkCompletion("b", async () => "Completed office task p1 (assignment 2).");
   expect(store.current().posts.map((post) => post.state)).toEqual(["done", "done"]);
+  await office.stop();
+});
+
+test("a duty handed to an agent with a workspace gets no copy there; a task named for it waits for the duty", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setDuties([BUILD]);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([
+    expect.stringContaining("b: The office assigned you duty p1 from the duty board."),
+  ]);
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "duty", state: "claimed", claimedBy: "b" }),
+  ]);
+  expect(store.current().posts[0]).not.toHaveProperty("link");
+  await office.post({ board: "lobby", kind: "task", text: "Customize the avatar", to: "b" });
+  office.turnEnded("b");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.checkCompletion("b", async () => "Completed office task p1 (assignment 2).");
+  office.turnEnded("b");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(2);
+  expect(prompts[1]).toContain("b: The office assigned you lobby task p3 from the user.");
+  expect(prompts[1]).toContain("Completed office task p3 (assignment 5).");
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "duty", state: "done", claimedBy: "b" }),
+    expect.objectContaining({ id: "p3", board: "lobby", state: "claimed", link: "p6" }),
+    expect.objectContaining({ id: "p6", board: "w2", state: "claimed", link: "p3" }),
+  ]);
+  expect(store.current().posts[0]).not.toHaveProperty("link");
   await office.stop();
 });

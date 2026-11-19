@@ -6,7 +6,7 @@ import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
 import { ACTIVITY_KINDS, TEST_RESULTS } from "./names.js";
 
-export { ACTIVITY_KINDS, LOBBY, USER_AUTHOR } from "./names.js";
+export { ACTIVITY_KINDS, DUTY, LOBBY, USER_AUTHOR } from "./names.js";
 export type { ActivityKind, ActivityStep, TestResult } from "./names.js";
 export const POST_TEXT_MAX = 2000;
 /** The checks of one pull request the office carries. */
@@ -162,12 +162,38 @@ export const PostSchema = z.object({
   namedPickup: z.literal(true).optional(),
   /** Persisted until Paseo acknowledges an automatic lobby assignment. */
   pickupMessageId: z.string().optional(),
+  /** On the duty board: the duty of the list it was posted for, and its day (YYYY-MM-DD). */
+  duty: z.object({ id: z.string(), day: z.string() }).optional(),
   /** A claimed lobby task's copy on the claimer's board, and the copy's lobby task: each other's id. */
   link: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Post = z.output<typeof PostSchema>;
+
+/** The scene's four pantry chores, which a duty of the starting list is acted out as. */
+export const DUTY_CHORES = ["cups", "trash", "plants", "table"] as const;
+export type DutyChore = (typeof DUTY_CHORES)[number];
+
+/** A duty of the owner's list. Without instructions it is pretend: the 3D office acts it out. */
+export const DutySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** What an agent handed the duty is asked to do; empty for a pretend duty. */
+  instructions: z.string(),
+  /** The weekdays it comes due, 0 for Sunday to 6 for Saturday. */
+  days: z.array(z.number().int().min(0).max(6)),
+  /** The chore the 3D office acts it out as; absent for a duty the owner added. */
+  chore: z.enum(DUTY_CHORES).optional(),
+});
+export type Duty = z.output<typeof DutySchema>;
+
+/** The duty list, and the day the duty board was last brought up to (null before the first). */
+export const DutyBoardSchema = z.object({
+  duties: z.array(DutySchema),
+  day: z.string().nullable(),
+});
+export type DutyBoard = z.output<typeof DutyBoardSchema>;
 
 export const WakeStateSchema = z.object({
   paused: z.boolean(),
@@ -436,6 +462,8 @@ export const OfficeSnapshotSchema = z.object({
   weather: WeatherStateSchema.optional(),
   /** Absent until the office's server has loaded the chat. */
   chat: ChatSnapshotSchema.optional(),
+  /** The duty list; absent until the office's server has read it. Its posts are `boards.duty`. */
+  duties: DutyBoardSchema.optional(),
 });
 export type OfficeSnapshot = z.output<typeof OfficeSnapshotSchema>;
 
@@ -663,6 +691,37 @@ export const setWakesPausedRpc = defineRpc({
   output: WakeStateSchema,
 });
 
+/** The duty list as the editor saves it: a duty already listed keeps its id. */
+export const DutyDraftSchema = z.object({
+  id: z.string().min(1).max(80).optional(),
+  name: z.string().max(400),
+  instructions: z.string().max(20_000),
+  days: z.array(z.number()).max(14),
+});
+
+export const DutiesResultSchema = z.union([
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+export type DutiesResult = z.output<typeof DutiesResultSchema>;
+
+/** Saves the whole duty list; a duty due today that has no post yet is posted at once. */
+export const dutiesSaveRpc = defineRpc({
+  name: "office.duties.save.request",
+  input: z.object({ duties: z.array(DutyDraftSchema).max(50) }),
+  output: DutiesResultSchema,
+});
+
+/**
+ * The 3D office acted out a pretend duty with this agent's figure: it is done by that agent. The
+ * first report wins; one for a duty an agent is handed is refused.
+ */
+export const dutyActedRpc = defineRpc({
+  name: "office.duty.acted.request",
+  input: z.object({ id: z.string().min(1), agentId: z.string().min(1).max(80) }),
+  output: PostResultSchema,
+});
+
 /**
  * Starts the stand-up notes writer, as the bell does. `started` is false when none started: one
  * is at work, no folder is set, or it could not start (the snapshot's `notes.problem` says why).
@@ -731,6 +790,11 @@ export const lifeSubscription = defineSubscription({
   name: "office.life",
   input: z.object({}),
   event: LifeEventSchema,
+});
+export const homeDepartureRpc = defineRpc({
+  name: "office.home.departure",
+  input: z.object({ agentId: z.string().min(1), idleSince: z.string().min(1) }),
+  output: z.object({ archived: z.boolean() }),
 });
 export const tenureRpc = defineRpc({
   name: "office.tenure.request",

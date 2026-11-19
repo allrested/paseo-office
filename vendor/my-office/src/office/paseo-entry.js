@@ -297,7 +297,8 @@ const api = {
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
    * chip and the bookshelf), onBell() (a click on the meeting table's bell), onNotes() (the label over
    * the meeting room's screen, on the company floor), onOpen(id) (E by a person while walking: their
-   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
+   * session), onIncidents() (the incidents' banner), onDuties() (the pantry's duty board), onDutyDone(id, agentId) (a
+   * pretend duty a figure acted out), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
    * Throws when the world cannot be built (no WebGL, a module failed).
    */
   start(options = {}) {
@@ -306,6 +307,7 @@ const api = {
     setLanguage(options.language, options.words);
     host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
+    host.wentHome = (id, idleSince) => { if (!stopped) options.onWentHome?.(id, idleSince); };
     host.select = (id) => options.onSelect?.(id);
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
     onMachine = typeof options.onMachine === 'function' ? options.onMachine : null;
@@ -316,6 +318,8 @@ const api = {
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
+    host.dutyBoard = typeof options.onDuties === 'function' ? () => options.onDuties() : null;
+    host.dutyDone = typeof options.onDutyDone === 'function' ? (id, agentId) => options.onDutyDone(id, String(agentId ?? '').slice(0, 80)) : () => {};
     // Only completed farewells and promotions are writes to the tenure ledger.
     host.tenure = typeof options.onTenure === 'function'
       ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }
@@ -383,6 +387,13 @@ const api = {
     if (tv && host.resources) { tv.act = () => host.resources(); tv.hint = tr('paseo.tv.resources'); }
     // (the wall clock cycled upstream's time of day: auto, day, night. Here the lights follow the app's theme and only photo
     // mode's buttons hold day or night, so a click on the clock changes nothing and its tooltip says why)
+    // (the pantry's duty board opens Paseo's duty board, where its duties are kept; its tooltip stays. Until the host
+    // gives its duties the scene's rota is up, and the click is upstream's note)
+    const dutyBoard = PROPS.get('dutyBoard');
+    if (dutyBoard && host.dutyBoard) {
+      const own = dutyBoard.act;
+      dutyBoard.act = () => (Array.isArray(host.duties) ? host.dutyBoard() : own?.());
+    }
     const clock = PROPS.get('clock');
     if (clock) { clock.act = () => {}; clock.hint = tr('paseo.clock.hint'); }
     everyFrame(updateLeisure);
@@ -401,6 +412,7 @@ const api = {
     if (!started || stopped) return;
     stopped = true;
     stopWatchingAudio();
+    closePlace();
     renderer.dispose();
     renderer.forceContextLoss();
   },
@@ -461,6 +473,13 @@ const api = {
   },
   /** The whiteboard's rows: [{ id, name, color, text, state: 'doing' | 'wait' | 'done' }]. */
   setBoardRows(rows) { boardRows = Array.isArray(rows) ? rows : []; state.boardDirty = true; },
+  /**
+   * The day's duties the host keeps, for the pantry's board (paseo-duty-plan.js): [{ id, name, chore, pretend,
+   * holder: { id, name } | null, state, owed }]. Once given, the scene keeps no rota of its own; a pretend duty a free
+   * figure acts out goes back to Paseo through onDutyDone(id, agentId). Never instructions: names and states only.
+   * Null while the host has no list: the scene's own rota is up again.
+   */
+  setDuties(list) { if (!started || stopped) return; host.duties = Array.isArray(list) ? list : null; },
   /** The host's readings, for the server racks and the wall screen; null when unknown. */
   captureGroupPhoto() { return started && !stopped ? captureGroupPhoto() : null; },
   setMachine(snapshot) {

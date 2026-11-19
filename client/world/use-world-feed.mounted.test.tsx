@@ -23,6 +23,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
 
@@ -104,11 +106,29 @@ test("seats the people, writes the board, sets the machine and the selection onc
   await act(async () => root.render(<Probe api={api} feed={input()} />));
   const names = calls.map((call) => call.split(":")[0]);
   expect(names).toEqual(
-    expect.arrayContaining(["setTheme", "setSessions", "setBoardRows", "setMachine", "select"]),
+    expect.arrayContaining([
+      "setTheme",
+      "setSessions",
+      "setBoardRows",
+      "setDuties",
+      "setMachine",
+      "select",
+    ]),
   );
   expect(calls).toContain("setSessions:[[]]");
+  // No duty list from the host yet: the scene keeps its own rota.
+  expect(calls).toContain("setDuties:[null]");
   expect(calls).toContain("setMachine:[null]");
   expect(calls).toContain("select:[null]");
+});
+
+test("a duty list from the host, even an empty one, replaces the scene's rota", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={api} feed={input({ model: { ...MODEL, dutyList: [] } })} />),
+  );
+  expect(calls).toContain("setDuties:[[]]");
+  expect(calls).not.toContain("setDuties:[null]");
 });
 
 test("follows the selection and the stand-up", async () => {

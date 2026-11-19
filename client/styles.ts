@@ -1,4 +1,5 @@
 import { transcriptStyles } from "./transcript-styles.js";
+import { hostStyles } from "./host-styles.js";
 import { sessionStyles } from "./session-styles.js";
 import { messengerStyles } from "./messenger-styles.js";
 import { useMemo } from "react";
@@ -13,6 +14,7 @@ const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
+  host: ReturnType<typeof hostStyles>;
   sessions: ReturnType<typeof sessionStyles>;
   transcript: ReturnType<typeof transcriptStyles>;
   messenger: ReturnType<typeof messengerStyles>;
@@ -145,16 +147,12 @@ export interface OfficeStyles {
   stripReason: Record<AttentionReason, TextStyle>;
   /** The host's note in the strip, in its tone. */
   stripNote: Record<HostTone, TextStyle>;
-  /** The host card: two meters side by side, then groups of agents. */
-  machineMeters: ViewStyle;
-  machineMeter: ViewStyle;
   machineTrack: ViewStyle;
   /** The empty part of a meter: the plain button's grey, as a layer under the fill. */
   machineTrackBase: ViewStyle;
   machineFill: Record<HostTone, ViewStyle>;
   /** A figure: digits of one width, so a column of them lines up. */
   machineValue: TextStyle;
-  machineGroup: ViewStyle;
   machineRow: ViewStyle;
   machineRowHead: ViewStyle;
   machineRowTitle: TextStyle;
@@ -168,6 +166,10 @@ export interface OfficeStyles {
   standupPeople: ViewStyle;
   /** The month's notes: the rest of the card's height, scrolled on its own. */
   notesScroll: ViewStyle;
+  notesMonthBar: ViewStyle;
+  notesPaper: ViewStyle;
+  notesDateStrip: ViewStyle;
+  panelHeading: TextStyle;
   /** The Contents' links to the month's entries, as a list. */
   notesLinks: ViewStyle;
   notesLinkRow: ViewStyle;
@@ -262,6 +264,8 @@ export interface OfficeStyles {
   lobbyRecipient: ViewStyle;
   lobbyTask: ViewStyle;
   lobbyTaskLine: ViewStyle;
+  /** A duty of the duty board's editor: a to-do's card with room for its fields. */
+  dutyCard: ViewStyle;
   lobbyDelete: ViewStyle;
   lobbyDeleteText: TextStyle;
   lobbyConfirm: ViewStyle;
@@ -293,6 +297,9 @@ export interface OfficeStyles {
   pickerSearch: TextStyle;
   /** The New agent form, and its list of workspaces: it scrolls inside the form past this height. */
   newAgentForm: ViewStyle;
+  newAgentHeader: ViewStyle;
+  newAgentFooter: ViewStyle;
+  newAgentSelector: ViewStyle;
   newAgentWorkspaces: ViewStyle;
   /** A text setting's field, as the search field. */
   fieldInput: TextStyle;
@@ -901,8 +908,6 @@ export function useOfficeStyles(
         warning: { ...small, color: colors.statusWarning },
         danger: { ...small, color: colors.statusDanger },
       },
-      machineMeters: { flexDirection: "row", gap: 16 },
-      machineMeter: { flex: 1, minWidth: 0, gap: 4 },
       machineTrack: { height: 4, borderRadius: 2, overflow: "hidden" },
       machineTrackBase: fill,
       // As on the Resources screen: grey while all is well, so a colour means something.
@@ -917,7 +922,6 @@ export function useOfficeStyles(
         color: colors.foreground,
         fontVariant: ["tabular-nums"],
       },
-      machineGroup: { gap: 12 },
       machineRow: { gap: 8 },
       machineRowHead: { flexDirection: "row", alignItems: "baseline", gap: 12 },
       machineRowTitle: { ...base, flex: 1, minWidth: 0, color: colors.foreground },
@@ -936,6 +940,22 @@ export function useOfficeStyles(
       standupHeading: { ...base, color: colors.foreground, fontWeight: "500" },
       standupBlocker: { ...base, color: colors.statusWarning },
       standupPeople: { gap: 6 },
+      notesMonthBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+      },
+      panelHeading: { ...base, color: colors.foreground, fontWeight: "700", fontSize: 19 },
+      notesDateStrip: { alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 2 },
+      notesPaper: {
+        padding: touch ? 12 : 20,
+        backgroundColor: colors.surface1,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 12,
+        gap: 8,
+      },
       notesScroll: { flex: 1, minHeight: 0 },
       notesLinks: { paddingBottom: 8 },
       notesLinkRow: { alignSelf: "flex-start", paddingVertical: touch ? 8 : 2 },
@@ -1152,6 +1172,14 @@ export function useOfficeStyles(
         paddingHorizontal: 12,
       },
       lobbyTaskLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+      dutyCard: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        padding: 12,
+        gap: 8,
+      },
       lobbyDelete: {
         minWidth: controlHeight,
         minHeight: controlHeight,
@@ -1210,8 +1238,37 @@ export function useOfficeStyles(
       // As wide as the dot even without one, so "Nobody" starts on the agents' rail.
       pickerLead: { width: DOT, height: 20, justifyContent: "center" },
       pickerSearch: lineInput,
+      newAgentHeader: {
+        paddingHorizontal: pad,
+        paddingVertical: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      newAgentFooter: {
+        paddingHorizontal: pad,
+        paddingVertical: 10,
+        gap: 6,
+        backgroundColor: colors.surface0,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
+      newAgentSelector: {
+        minHeight: 40,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 8,
+        backgroundColor: colors.surface1,
+      },
       newAgentForm: { padding: pad, gap: 16 },
-      newAgentWorkspaces: { maxHeight: 240 },
+      newAgentWorkspaces: { maxHeight: 160 },
       fieldInput: lineInput,
       iconColor: colors.foregroundMuted,
       scene: { flex: 1, minHeight: SCENE_MIN_HEIGHT },
@@ -1235,6 +1292,7 @@ export function useOfficeStyles(
         pointerEvents: "none",
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
+      host: hostStyles(colors, compact, touch),
       sessions: sessionStyles(colors, touch),
       transcript: transcriptStyles(colors, touch),
       messenger: messengerStyles(theme, compact, touch),

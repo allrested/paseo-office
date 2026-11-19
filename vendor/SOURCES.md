@@ -60,11 +60,12 @@ The following copied files include changes marked with `// PASEO:`.
   gap); the engine and every other sound are upstream's.
 - `src/office/core/env.js`: the build flag upstream reads from `process.env` is a constant, and
   the floor plan comes from Paseo, not from the page's address and storage.
+- `src/office/people/workers.js`: an idle worker reports its end-of-shift departure or completed evening trip to Paseo for session archiving.
 - `src/office/interact/first-person.js`: E at the lift enters the enabled street. E on a person passes `opts.open` to the session drawer, and `floorBounds` is
   exported for the camera bar.
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,
   and the launch pad's card lists no repositories (a team is a workspace, and Paseo sends no
-  repository state).
+  repository state). Floating place cards fade after five seconds away from the pointer.
 - `src/office/life/weather.js` draws rain, storm flashes, fog and light. The host supplies readings through `setWeather`. The upstream city list, storage, chips, timer and Open-Meteo fetch are removed. `wx.city` stays empty.
 - `src/office/life/tests.js`: `clearRun` puts out the lamp of a test run whose end Paseo never
   learns.
@@ -83,6 +84,15 @@ The following copied files include changes marked with `// PASEO:`.
   on.
 
 - `src/office/people/farewell.js` and `interns.js` read the host’s tenure list and report ceremonies through its callback.
+- `src/office/people/duty.js`: while the host gives its duty board (`host.duties`, from `setDuties`), the day's duties and
+  who has each are the host's. The scene keeps no rota, assigns nobody and posts no grumble, so an owed duty gets no apology either. HR posts the host's list in
+  the morning. A free person acts out a pretend duty, chosen by `paseo-duty-plan.js`, and `host.dutyDone` tells Paseo.
+  An agent's duty is acted out once by its holder. A duty with no chore of its own has its person walk to the board and
+  back. The tooltip is the host's list with short names. The cups in the sink are still counted here. Without host
+  duties it is upstream's rota.
+- `src/office/world/props/duty-board.js`: a row may carry the duty's own `label`, no chore marker, and `owed` in red.
+  More than five rows share the board's height, a host row's tick has no time, `none` is said with no row, and
+  `BOARD_AT` is exported for the walk.
 - `src/office/people/staff.js` uses a plain parcel mark on the courier’s carton.
 
 ### Made-up names
@@ -159,7 +169,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
 | `world/backdrops/index.js`  | Builds the selected Plain, City, Countryside, or Beach backdrop and its day and night window views. Photo mode can hold either lighting setting. |
 
-The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
+A click on the pantry's duty board opens Paseo's duty board (`onDuties`) once the host has given its duties, and is upstream's note before that; its tooltip stays the scene's. The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
 follow the app's theme (`paseo.clock.hint` in `OURS`). A person already in the office whose status
 becomes `wait` glides the camera to them (upstream's `ui/permissions.js` `onPerm`, in
 `paseo-entry.js`).
@@ -172,7 +182,8 @@ the probe that finds out whether the page lets audio start: it runs on a real ac
 never on Escape or a bare modifier key or while the frame has no active user activation; 'blocked'
 is tried again on the next press, 'ready' and 'unsupported' are final), `paseo-style.js` (the page's
 stylesheet, in Paseo's design language, the tour's cards included), `paseo-modules.js` (generated: the kept modules in start-up order),
-`paseo-sign.js` (the picture on the lobby's sign and the reception's plaque, with the host's
+`paseo-duty-plan.js` (the host's duty board: the pantry board's rows, its tooltip, and who acts out which duty next;
+no scene in it, so `client/world/duty-plan.test.ts` runs it), `paseo-sign.js` (the picture on the lobby's sign and the reception's plaque, with the host's
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
 `paseo-leisure-plan.js` (who gets up from a rest, when and for what; no scene in it, so
 `client/world/leisure.test.ts` runs it) and `paseo-leisure.js` (which moves the people with
@@ -188,7 +199,7 @@ cards, voice, push notifications and prompt rewriting are not. All seven staff h
 ### What the scene is told
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
-world-api.ts`), never a file name, a command or a prompt. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It also sends the weather mode or reading and the open incidents' keys
+world-api.ts`), never a file name, a command or a prompt. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It sends the day's duties (`setDuties`): each one's name, chore, holder and state, never its instructions. It also sends the weather mode or reading and the open incidents' keys
 and titles for the banner. A translated scene receives its language and dictionary. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
@@ -197,7 +208,7 @@ The scene writes office state to the app origin's `localStorage`, under keys tha
 `office-`: which team sits where, the plants, the graphics level, the Sound switch
 (`office-sound`, which the host's setting overwrites at each start), that the tour was seen
 (`office-tips`), and the clip's shape and music choice (`office-clip-shape`, `office-clip-music`).
-It also records the duty roster (`office-duty`), the fire drill’s day (`office-drill-day`), team farewells (`office-gone`) and returns (`office-back:*`). It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
+It also records the cups in the pantry's sink (`office-duty`, which holds upstream's duty rota only where the host gives no duties), the fire drill’s day (`office-drill-day`), team farewells (`office-gone`) and returns (`office-back:*`). It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
 that nothing here writes. It makes no network call; a clip is recorded in the page and saved as a
 download.
 

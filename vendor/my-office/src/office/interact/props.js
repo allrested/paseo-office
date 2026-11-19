@@ -1,5 +1,6 @@
 // Furniture you can point at: highlight, tooltip, click actions.
 import * as THREE from '../../../three/three.module.min.js';
+import { host } from '../paseo-host.js';
 import { state } from '../core/state.js';
 import { $, PRO, SEASON, el, rand, reduceMotion } from '../core/env.js';
 import { STATUS_LABEL } from '../ui/event-text.js';
@@ -29,7 +30,7 @@ import { tableClick } from '../people/billiards.js';
 import { KTV } from '../world/props/karaoke.js';
 import { MW, mwMeshes, openOven } from '../world/props/microwave.js';
 import { boardMeshes } from '../world/props/duty-board.js';
-import { dutyText } from '../people/duty.js';
+import { dutyRows, dutyText } from '../people/duty.js';   // PASEO: dutyRows, the tooltip as rows
 import { boothClick } from '../people/karaoke.js';
 import { neonG, neonM } from '../world/props/neon.js';
 import { SOFA, cat, catGo, petCat } from '../world/props/cat.js';
@@ -152,6 +153,7 @@ export function buildProps() {
   if (lift) prop('door', { name: tr('props.lift.name'), hint: tr('props.lift.hint'), place: 'door', meshes: meshesOf(lift.g), act: () => { liftCall(3); sfx.play('click'); } });
   else prop('door', { name: tr('props.door.name'), hint: tr('props.door.hint'), place: 'door', meshes: [...meshesOf(doorPivot), ...meshesIn([-8.1, 0, DZ - 1.0, -7.8, 2.75, DZ + 1.0])], act: () => { doorKick = state.sim + 2.2; } });
   prop('coffee', { name: tr(PRO ? 'props.coffee.namePro' : 'props.coffee.name'), hint: tr('props.coffee.hint'), place: 'coffee', meshes: PRO ? [...meshesOf(coffeeG), ...meshesIn([11.9, 0, -8.1, 14.1, 2.2, -7.1])] : meshesOf(coffeeG), act: () => { brewCoffee(); coffeeMade(); } });
+  if (host.notes && PRO_FX.notesScreen) prop('notes', { name: tr('paseo.notes'), hint: '', meshes: PRO_FX.notesScreen, act: () => host.notes() });
   prop('meeting', { name: tr('props.meeting.name'), hint: tr('props.meeting.hint'), place: 'meeting', meshes: meshesIn(REG.meeting) });
   prop('printer', { name: tr('props.printer.name'), hint: tr('props.printer.hint'), place: 'printer', meshes: [...meshesIn([PRN.x - 0.4, 0, PRN.z - 0.35, PRN.x + 0.4, 1.05, PRN.z + 0.35]), paper], act: () => { printPage(); pagePrinted(); } });
   prop('arcade', { name: tr('props.arcade.name'), hint: tr('props.arcade.hint'), place: PRO ? 'lounge' : undefined, meshes: meshesIn([ARC.x - 0.45, 0, ARC.z - 0.42, ARC.x + 0.45, 1.85, ARC.z + 0.53]), act: () => { state.arcCoin = state.sim + 3; sfx.play('coin'); toast(tr('props.arcade.soon')); } });
@@ -171,7 +173,7 @@ export function buildProps() {
     if (BIL) prop('billiards', { name: tr('props.billiards.name'), hint: tr('props.billiards.hint'), place: 'lounge', meshes: [...meshesOf(BIL.g), ...meshesOf(BIL.rack)], act: tableClick });
     // the microwaves (people/comnha.js): a click opens a free one's door, or shuts it
     // the duty board in the pantry (people/duty.js): today's names under the pointer, and in a toast when tapped
-    if (boardMeshes().length) prop('dutyBoard', { name: tr('props.dutyBoard.name'), hintFn: dutyText, meshes: boardMeshes(), act: () => toast(dutyText()) });
+    if (boardMeshes().length) prop('dutyBoard', { name: tr('props.dutyBoard.name'), hintFn: dutyText, rowsFn: dutyRows, meshes: boardMeshes(), act: () => toast(dutyText()) });
     if (MW.g) prop('microwave', { name: tr('props.microwave.name'), hint: tr('props.microwave.hint'), place: 'coffee', meshes: mwMeshes(), act: () => { const O = MW.ovens.find((o) => o.stage === 'idle' && !o.by); if (O) { openOven(O, O.openGoal < 1); sfx.play('click'); } } });
     if (KTV) prop('karaoke', { name: tr('props.karaoke.name'), hint: tr('props.karaoke.hint'), meshes: meshesOf(KTV.g), act: boothClick });
   }
@@ -228,6 +230,15 @@ export function updateProps(dt, t) {
 let ptip;
 let ptipT;
 let ptipH;
+let ptipR;   // PASEO: the tooltip's rows
+// PASEO: one row of the tooltip: the duty, then who has it ("open" when nobody), a tick once done, "owed" from an earlier day
+function tipRow(r) {
+  const row = el('div', `ptip-row ptip-row--${r.state}`);
+  const name = el('span', 'ptip-row-name', r.name);
+  if (r.owed) name.append(el('i', 'ptip-row-owed', tr('paseo.duty.owed')));
+  row.append(name, el('span', 'ptip-row-who', `${r.state === 'done' ? '✓ ' : ''}${r.who || (r.state === 'done' ? tr('paseo.duty.done') : tr('paseo.duty.open'))}`));
+  return row;
+}
 export let hoverProp = null;
 export function setHoverProp(p, ev) {
   if (p !== hoverProp) {
@@ -236,7 +247,10 @@ export function setHoverProp(p, ev) {
     for (const [id, pl] of Object.entries(PLACES)) pl.el?.classList.toggle('zone--hot', !!p && p.place === id);
   }
   if (!p || !ev) { ptip.hidden = true; return; }
-  ptipT.textContent = p.name; ptipH.textContent = propHint(p);
+  // PASEO: a prop with rows (the duty board) lists them, a duty a row, in place of one long line
+  const rows = p.rowsFn?.() || null;
+  ptipT.textContent = p.name; ptipH.textContent = rows ? '' : propHint(p); ptipH.hidden = !!rows;
+  ptipR.hidden = !rows; ptipR.replaceChildren(...(rows || []).map(tipRow));
   const r = $('stage-wrap').getBoundingClientRect();
   ptip.hidden = false;
   const x = ev.clientX - r.left + 16, y = ev.clientY - r.top + 18, w = ptip.offsetWidth, h = ptip.offsetHeight;
@@ -277,8 +291,8 @@ export function setup() {
   ptip = el('div', 'ptip');
    ptip.hidden = true;
    ptip.setAttribute('role', 'tooltip');
-  ptipT = el('b'); ptipH = el('span');
-   ptip.append(ptipT, ptipH);
+  ptipT = el('b'); ptipH = el('span'); ptipR = el('div', 'ptip-rows');   // PASEO: ptipR
+   ptip.append(ptipT, ptipH, ptipR);
    $('stage-wrap').append(ptip);
   state.hoverPlace = null;
 }

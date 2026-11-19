@@ -1,7 +1,7 @@
 import type { Appearance } from "../../shared/appearance.js";
 import type { OfficeScene } from "../../shared/settings.js";
 import type { WordsLanguage } from "../../shared/scene-language.js";
-import type { LifeEvent } from "../../shared/contracts.js";
+import type { DutyChore, LifeEvent } from "../../shared/contracts.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 
 /**
@@ -34,6 +34,8 @@ export interface WorldSession {
    * it works, waits or is stopped on an error.
    */
   doneAt?: number;
+  /** Host revision for an idle session eligible for archive when its worker gets home. */
+  idleSince?: string;
   /** A red name tag: the agent ended in an error. */
   stuck: boolean;
   /**
@@ -95,6 +97,25 @@ export interface WorldBoardRow {
   state: "doing" | "wait" | "done";
 }
 
+/**
+ * A duty of the day's duty board, as the pantry's board shows it. Never its instructions: only
+ * its name, who has it and its state.
+ */
+export interface WorldDuty {
+  /** The duty's post: a pretend duty acted out is reported by it (`onDutyDone`). */
+  id: string;
+  name: string;
+  /** The chore it is acted out as; null: its figure walks to the board and back. */
+  chore: DutyChore | null;
+  /** No agent is asked: the scene picks a free figure to act it out, and reports it done. */
+  pretend: boolean;
+  /** Who has it: the agent and its name cut short; null while open, or when ticked by hand. */
+  holder: { id: string; name: string } | null;
+  state: "open" | "claimed" | "done";
+  /** Not done on its day: still on the board. */
+  owed: boolean;
+}
+
 /** Something an agent left listening, as the scene draws it: a small server box. */
 export interface WorldDevServer {
   /** Whose it is. Not alive: forgotten, so the box stands in the server room with a red light. */
@@ -136,6 +157,7 @@ export type WorldTenureProject = WorldTenure["projects"][number];
 export type WorldLiftService = LifeEvent["lift"];
 
 export interface WorldStartOptions {
+  onWentHome?(agentId: string, idleSince: string): void;
   /** Something the office's people would say in the team chat: a kind of moment and a few words. */
   onLife?(kind: string, vars: Record<string, string>): void;
   /** The tenure list's two writes: a farewell was held, an intern was made permanent. */
@@ -175,13 +197,15 @@ export interface WorldStartOptions {
   /** The label over the meeting room's screen was chosen. Absent: the scene shows no label. */
   onNotes?(): void;
   /**
-   * A person's session was asked for: E by them while walking in. The surface always supplies it
-   * and it opens the session in the office's column, as the card's "Open session" does. Absent
-   * only in a caller with no session to open; the scene then chooses the person, as a click does.
+   * Walk-in requests the person's workspace. Without a workspace handler the scene selects the person.
    */
   onOpen?(agentId: string): void;
   /** The incidents' banner was chosen. */
   onIncidents?(): void;
+  /** The pantry's duty board was chosen. Absent: a click says the day's duties in a note. */
+  onDuties?(): void;
+  /** A figure acted out a pretend duty (`WorldDuty.id`): the host records it done by that agent. */
+  onDutyDone?(id: string, agentId: string): void;
   /** A short line the office says once. */
   onToast?(text: string): void;
   /**
@@ -208,6 +232,12 @@ export interface WorldApi {
   select(agentId: string | null): void;
   focusProject(project: string): void;
   setBoardRows(rows: readonly WorldBoardRow[]): void;
+  /**
+   * The day's duties for the pantry's board. Once given, the scene no longer keeps a rota of its
+   * own. Null while the host has sent no duty list (an older host, or before it is read): the
+   * scene keeps upstream's rota. Absent on a page built from before the duty board.
+   */
+  setDuties?(duties: readonly WorldDuty[] | null): void;
   /**
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.

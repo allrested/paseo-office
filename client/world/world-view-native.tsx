@@ -14,6 +14,7 @@ import { bridgePageScript } from "./world-bridge-page.js";
 import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
+  useHomeDeparture,
   useStandupBell,
   useWorldScript,
   worldStartOptions,
@@ -53,7 +54,7 @@ function WorldViewNativeScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
   onPhotoReady,
@@ -61,11 +62,14 @@ function WorldViewNativeScene({
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const brand = useOfficeBrand();
@@ -78,12 +82,15 @@ function WorldViewNativeScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,
@@ -101,12 +108,15 @@ function WorldViewNativeScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
+      onWentHome,
       onTenure,
       scene,
       night,

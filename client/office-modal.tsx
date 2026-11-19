@@ -57,6 +57,7 @@ const dialogCss = `
 .paseo-office-dialog[data-size="wide"] .office-dialog-bounded { height: min(84dvh, 880px); }
 .paseo-office-dialog[data-size="settings"] .office-dialog-bounded { height: min(620px, calc(100dvh - 110px)); }
 .paseo-office-dialog .office-dialog-tools { min-width: 0; }
+.paseo-office-dialog[inert] { position: fixed; inset: 0; margin: auto; z-index: 10; pointer-events: none; }
 .paseo-office-dialog::backdrop { background: rgba(6,10,16,.5); backdrop-filter: blur(3px); }
 .paseo-office-dialog .office-dialog-frame {
   display: flex; flex-direction: column; max-height: calc(100dvh - 36px); min-height: 0;
@@ -243,12 +244,23 @@ function BrowserDialog({
     if (!element || !button || (!minimized && !wasMinimized.current)) return;
     if (minimized && wasMinimized.current && !element.open) return;
     wasMinimized.current = minimized;
-    if (!element.open) element.showModal();
+    // Release the top layer before animating. Its backdrop otherwise intercepts the next
+    // session click while the workspace is shrinking toward the camera toolbar.
+    if (minimized) {
+      element.close();
+      element.inert = true;
+      element.show();
+    } else {
+      if (element.open) element.close();
+      element.inert = false;
+      element.showModal();
+    }
     const from = element.getBoundingClientRect();
     const to = dockBounds(button, element.ownerDocument);
     const finish = () => {
       if (minimized) {
         element.close();
+        element.inert = false;
         button.focus({ preventScroll: true });
       } else {
         setDockVisible(false);

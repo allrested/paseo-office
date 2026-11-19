@@ -109,6 +109,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 const ignore = () => undefined;
 /** The surface holds the Sound switch: still being read here. */
@@ -163,7 +165,7 @@ function office(
       machine={null}
       onOpenMachine={ignore}
       onOpenResources={undefined}
-      onOpenSession={undefined}
+      onOpenAgentWorkspace={undefined}
       onOpenLibrary={ignore}
       onOpenNotes={ignore}
       meeting={false}

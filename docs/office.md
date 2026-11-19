@@ -1,11 +1,15 @@
-# The office
+# Office 3D guide
 
-The office shows every agent on a Paseo host in one place. The Office item in the sidebar opens it
-as a screen, and "Open office" in the Command Center opens it as a workspace tab, which lists that
-workspace's room first. Each workspace is a room, and the lobby holds agents without a workspace.
+Open **Office 3D** from the Paseo sidebar to see the host’s workspaces and agents. **Open office** in the Command Center opens a tab with the current workspace’s room first. Agents without a workspace appear in the lobby.
 
-This doc says what each part does, where its code is, and what the code cannot tell you. What is
-taken from my-office, and how to take a newer version, is in [vendor/SOURCES.md](../vendor/SOURCES.md).
+## Work in fullscreen
+
+1. Choose **3D** and **Full screen**. **Sessions** on the left shows who is working, resting or waiting for you. **Details** on the right shows activity or the selected conversation. Toggle either sidebar in the header to give the floor more room. [Office with both sidebars](fullscreen-office.png) · [Floor with both sidebars hidden](fullscreen-floor.png)
+2. Select a session row to read its conversation. Click the **↗** beside the row to open the agent’s full Paseo workspace over the floor. In **Walk in**, press **E** at an agent’s desk for the same workspace. The minimize button keeps it available from the camera toolbar. Closing it returns you to the floor. [Embedded workbench](fullscreen-workspace.webp)
+3. Inside the workspace dialog, choose **Office controls** for the conversation, steps and subagents. A reply can join the running turn. **Workspace** switches back to the embedded workbench. On clients without an embeddable workbench, Office shows the session controls directly. [Desktop controls](workspace-controls.webp) · [Controls at phone width](workspace-controls-mobile.webp)
+4. Choose **Team chat** in the header for the shared conversation. Address a session through **To** when you want it to take an action. An assignment that should remain visible until completion belongs on the lobby board. [Floating team chat](fullscreen-team-chat.webp)
+
+For configuration, see [Office settings](#settings), [branding](#custom-branding), [boards and wakes](#boards-and-wakes) and the [duty board](#the-duty-board). The port’s upstream revision and asset credits are recorded in [the vendor sources](../vendor/SOURCES.md).
 
 ## Where the code is
 
@@ -78,8 +82,7 @@ turn, and is offered only on a host whose SDK has an agent's
 `cancel()` (`shared/host-extras.ts`); stock Paseo 0.16 does not.
 
 "Open session" shows the session in the office's column (see below) in every app, and the card
-closes as it does. Every way in (the card, an Activity card, the List's "Open session",
-the 3D office's walk-in) calls the surface's one `openSession`. **Open in workspace** opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
+closes as it does. In walk-in mode, face an agent and press **E** or tap the on-screen prompt to open their workspace. The same action wakes a sleeping character. **Open in workspace** also opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
 
 ## Views
 
@@ -148,8 +151,8 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   Janitor, Stand-up, Reviews, QA and Library.
 - **Sessions** groups agents by status. Green marks working agents, amber marks agents that need you and gray marks resting agents. Task bars count completed checklist items. When only context usage is available it has its own label. Searching and status filters work together. Its "New agent"
   button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
-  a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
-  of the providers that are ready and enabled; and the first prompt. Create starts the agent in
+  enter an optional agent name and open **Customize character** to choose gender, avatar and color.
+  Choose a workspace, provider and model, then enter the first prompt. Create starts the agent in
   that workspace (not in a new one for its folder), closes the form and opens the agent's session
   as a tab. The workspaces and providers are read when the form opens, not when the office does; a
   provider still loading after five seconds is left out of the choices.
@@ -158,7 +161,7 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   first provider's default model when that choice is gone. A failure shows its reason with
   everything typed kept. Whether the form is open, the workspace, provider and model chosen and
   the prompt typed are the surface's, as the Chat box is: another tab, Back and a dismissed phone
-  sheet keep them while the office is mounted, and a create clears the prompt. A new project folder,
+  sheet keep them while the office is mounted, and a successful creation clears the name, character and prompt. A new project folder,
   a new worktree, attachments and modes
   stay in the app's own screen.
 - **Activity** is a feed derived on the client from the office's state, kept in memory for this
@@ -203,7 +206,7 @@ titles for the banner. It receives its language, its dictionary and the daily-li
 writes scene state to the app origin's `localStorage` under keys that start with `office-`:
 which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
 the host's setting overwrites at each start), that the tour was seen (`office-tips`), and the
-clip's shape and music choice (`office-clip-shape`, `office-clip-music`), the duty roster, drill and farewell history. It reads
+clip's shape and music choice (`office-clip-shape`, `office-clip-music`), the cups in the pantry's sink (`office-duty`), drill and farewell history. It reads
 `office-autocam`.
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
@@ -267,8 +270,7 @@ prompt.
 
 Opening the stand-up rings the bell on the meeting table: everyone the scene counts as free walks
 there and says what they are on. A click on the bell does the same and also starts the stand-up
-notes writer; opening the stand-up writes nothing. A "Stand-up notes" label on the meeting room's
-screen opens the notes card.
+notes writer; opening the stand-up writes nothing. Click or tap the meeting room’s **Sprint review** screen to read the stand-up notes. Its **Stand-up notes** label also opens the reader from the keyboard.
 
 From 08:00 to 21:00 by the device's clock an agent at rest does not stay asleep at its desk: after
 30 to 90 seconds there it gets up for a game of pool, foosball or the games TV with another resting
@@ -278,6 +280,10 @@ rest the gaps are 10 to 20 minutes. The games are my-office's; the office's plan
 (`vendor/my-office/src/office/paseo-leisure.js`) only starts them, and starts nothing at night,
 during a gathering or with reduced motion. After 21:00 an agent that has rested 30 minutes walks
 home, its rest counted from the host's last change of the agent.
+
+When an idle agent heads home at the end of its shift, Office archives its Paseo session.
+An agent out for evening drinks can still return to work. Office archives it when it finishes the trip home.
+Archived conversations keep their history and stay off the floor when Office reopens.
 
 The viewing device’s date selects decorations when the scene starts. Halloween runs from 20 October through 1 November, Christmas from 12 through 31 December, and Lunar New Year from 14 days before through seven days after its date in Vietnam’s calendar. The upstream table covers 2026 through 2033. These dates apply in both hemispheres.
 
@@ -396,6 +402,52 @@ the user's posts arrive as a user prompt. A post naming an agent that has not ru
 delivered after that agent's first turn or the next post that names it. Pending mention
 notifications are held in memory.
 
+## The duty board
+
+The pantry's duty board is kept on the host. You choose its duties: up to 12, each with a name (up
+to 40 characters), the weekdays it is due and, if an agent should do it, instructions (up to 2,000
+characters). A host starts with the four pantry chores, Monday to Friday, without instructions. The
+list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`). A file the office
+cannot read, or one written by a newer version, is moved aside to `duties.json.corrupt-<time>` and
+the list starts again from the four chores; your old list is in that file.
+
+At 8:00 in the notes' time zone ("Time zone", the host's when empty or not a zone the host knows)
+each duty due that day is posted as a task on the board `duty`, a host-wide board like the lobby's.
+The run also takes the duties finished on earlier days off the board. When the office starts, and
+when you save the list, a duty due today that has no post yet is posted at once if it is past 8:00.
+A duty still open or claimed when its day ends is owed: it stays on the board and is not posted
+again. An owed duty finished today counts for today, so it is not posted again until its next day.
+Removing a duty takes its open post off the board, and a claimed one stays until it is done. A new
+name or new instructions change today's open post.
+
+A duty with instructions goes to an idle agent as a lobby to-do does, under the same rules: one
+task or duty at a time per agent, the wake limits, **Wake agents** and **Agent tools**. Its prompt
+starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
+completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
+a duty with `office_update`. An agent finishes or reopens only a duty it holds; from the duty board
+you mark any. Nobody posts to the duty board, not even from the office. A duty is never addressed
+to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
+
+A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor
+finish it. On the 3D floor a free person acts it out during that chore's hours, and the view tells
+the host, which records it as done by that agent. When two devices both act it out, the first to
+report wins. With no 3D office open during those hours, it stays open and is owed.
+
+A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
+lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
+It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
+Reopen (so a duty an agent that has gone still holds can be handed out again), and the list with
+each duty's name, instructions and day buttons, saved whole. Unticking today's day on a duty takes
+its open post of today off the board when you save; a claimed one stays until it is done, as for a
+removed duty. The scene is told each duty's name, its chore, its holder's title cut to 24 characters
+and its state, never its instructions (`worldDuties` in `client/world/adapter.ts`). The board and
+its tooltip show them, and the scene keeps no rota of its own. Until the host has sent its list (an
+older host has none) nothing offers the duty board, and the scene keeps upstream's rota and its
+note. The four starting duties keep the cups, bin, plants and tables chores. For a duty you add, the
+person walks to the board and back. The person of an agent that holds a duty acts its chore out
+once. HR posts the day's list in the chat in the morning. The scene's part is `paseo-duty-plan.js`
+and `people/duty.js`.
+
 ## Custom branding
 
 Open **Office settings → Appearance → Branding** to preview the current brand and change the office name, logo URL or mark color for everyone on this host. Each field saves on Enter or when you leave it. Clear a field to restore its host default. Branding appears in the fullscreen header and on the 3D floor. The office name also appears in team chat.
@@ -410,11 +462,15 @@ Each saved value overrides its environment variable. On web, the name and logo c
 
 ## Settings
 
-The office's settings are a screen in its page under Settings > Plugins > Office 3D
-(`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Floor plan", "Notes
-folder", "Time zone", "Stand-up days", "Sound", "3D office language", the tracker fields and "Weather". Three things open it with
-`client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
-settings", and the Attention tab's Settings card.
+The gear in fullscreen opens **Office settings** over the floor. You can also open the plugin’s settings from Paseo settings or the Command Center.
+
+| Section    | Controls                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
+| Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
+| Services   | Jira projects, Sentry organization and projects, and the optional weather service.           |
+
+View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
 ## The host
 
@@ -422,7 +478,13 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
-Linux only: elsewhere the subscription answers `unavailable` and the entry is not shown.
+Local process readings require Linux. On other platforms the Host card is available when Office
+finds a configured SSH-MCP installation.
+
+**Host → SSH** shows the hosts provided by SSH-MCP. Select a host to see its readings in detail.
+Load is the one-minute load average relative to the number of cores, so it can exceed 100%.
+The disk gauge shows the fullest reported mount. Office reads these metrics while the SSH tab is
+open. If Office finds no installed SSH-MCP configuration, the card shows the local reading on its own.
 
 An agent has left something running when it has been idle for 30 minutes with a port open, or when
 it is closed or archived and processes of it remain: the daemon collects an idle runtime after an
@@ -497,16 +559,14 @@ archives the writer. A writer that fails, is stopped or closed, or ends without 
 it is and stays named, with an "Open the writer" button that opens its session in the office's
 column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
-notes card: a month's file as Markdown at its newest entry, read only. A list line that is only a
-link to one of the file's own headers, such as the Contents' `- [18 November 2026](#18-november-2026)`,
-scrolls the card to that entry; the app's Markdown would hand the link to its file opener. The
+notes reader at the month’s newest entry. Select a date to read that entry, or use the month arrows to browse earlier files. The entry strip also includes the file’s introduction and Contents when present. Contents links open their entries. The
 server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
 ## Schedules
 
-The office runs two schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
-on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, and the
-incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
+The office runs three schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
+on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, the duty board
+at 08:00 every day in the same zone, and the incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
@@ -516,6 +576,9 @@ office sets them from its settings each time it starts and at each save, and sto
   it. The plugin's log says when a run is waiting.
 - A notes run that could only start on a later day than it was due is dropped, so no entry is
   written for the wrong day.
+- The duty board's run needs no Paseo API: it posts at once, and only handing a duty to an idle
+  agent waits for the API. When the office starts, today's duties not yet posted are posted;
+  an earlier day's are not.
 
 ## Incidents
 
@@ -620,7 +683,7 @@ the workspace, where it is in the changes to review. The office installs and rem
 
 ## Data
 
-The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`,
+The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.json`, `chat.json`,
 `notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger) and `lift.json` (the build last serviced). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
@@ -630,7 +693,7 @@ refuses a document that holds `undefined`, and the device then keeps nothing.
 
 ## Staff and daily life
 
-The indoor scenes cover packed lunches at the microwave, duty rosters, tea, the accountant, rounds,
+The indoor scenes cover packed lunches at the microwave, the duty board, tea, the accountant, rounds,
 HR, farewells, interns, reception and delivery staff, the altar, lift servicing, the post and the
 quarterly fire drill. They run on the office clock. During the 12:30–13:30 desk nap, the lively
 floor pauses new activities. Street outings are separate.
@@ -649,8 +712,8 @@ remaining and a sticker containing its short build ID and the servicing timestam
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | HR                     | Stand-up, birthday, trophy, promotion, farewell and its photo caption, drill notice and report, duty roster |
 | Receptionist           | Parcel, lift back in service, altar                                                                         |
-| Named agent            | Stairs, goodbye, parcel acknowledgement, apology for a missed chore                                         |
-| Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break, chore complaint                         |
+| Named agent            | Stairs, goodbye, parcel acknowledgement                                                                     |
+| Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break                                          |
 
 For most agent lines, reception can speak when nobody is resting. Chat photos are omitted.
 

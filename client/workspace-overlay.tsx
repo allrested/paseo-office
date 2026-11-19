@@ -87,11 +87,12 @@ export function WorkspaceOverlay(props: WorkspaceOverlayProps) {
   const { title, onClose, onBoard, styles, children } = props;
   const url = frameUrl(props);
   const inHeader = useFullscreenDialog();
-  const [office, setOffice] = useState(false);
+  // A new request from Sessions should show the requested workbench, even in the same room.
+  const [officeRequest, setOfficeRequest] = useState<object | null>(null);
   const [visited, setVisited] = useState(false);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const blocked = url !== null && url === failedUrl;
-  const showOffice = !url || office || blocked;
+  const [failedRequest, setFailedRequest] = useState<object | null>(null);
+  const blocked = failedRequest === props.dockRequest;
+  const showOffice = !url || officeRequest === props.dockRequest || blocked;
   const change = useCallback(
     (next: boolean) => {
       if (!next) onClose();
@@ -100,16 +101,16 @@ export function WorkspaceOverlay(props: WorkspaceOverlayProps) {
   );
   const openOffice = useCallback(() => {
     setVisited(true);
-    setOffice(true);
-  }, []);
+    setOfficeRequest(props.dockRequest);
+  }, [props.dockRequest]);
   const openWorkbench = useCallback(() => {
-    setOffice(false);
-    setFailedUrl(null);
+    setOfficeRequest(null);
+    setFailedRequest(null);
   }, []);
   const failed = useCallback(() => {
-    setFailedUrl(url);
+    setFailedRequest(props.dockRequest);
     setVisited(true);
-  }, [url]);
+  }, [props.dockRequest]);
   const loaded = useCallback(
     (event: SyntheticEvent<HTMLIFrameElement>) => {
       const doc = event.currentTarget.contentDocument;

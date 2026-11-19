@@ -1,7 +1,12 @@
 import { expect, test } from "vitest";
-import type { Post } from "../shared/contracts.js";
+import type { Duty, Post } from "../shared/contracts.js";
 import { EMPTY_BOARDS, type BoardStore, type BoardsFile } from "./board-store.js";
-import { createBoardService, trimBoard, type BoardService } from "./board-service.js";
+import {
+  createBoardService,
+  trimBoard,
+  type BoardService,
+  type BoardServicePorts,
+} from "./board-service.js";
 import { createFakeClock, settle, type FakeClock } from "./fake-clock.js";
 
 const T0 = Date.parse("2026-11-11T09:00:00.000Z");
@@ -50,6 +55,7 @@ interface Harness {
 interface Listeners {
   onBoard?: (board: string, posts: readonly Post[]) => void;
   onBoardRemoved?: (board: string) => void;
+  refuse?: BoardServicePorts["refuse"];
 }
 
 type WorkspaceOf = (agentId: string) => Promise<string | null>;
@@ -72,6 +78,7 @@ function build(
       listeners.onBoard ??
       ((board, posts) => events.push(`board ${board} ${posts.map((item) => item.id).join(",")}`)),
     onBoardRemoved: listeners.onBoardRemoved ?? ((board) => events.push(`removed ${board}`)),
+    ...(listeners.refuse ? { refuse: listeners.refuse } : {}),
     workspaceOf,
   });
   return { service, store, clock, events };
@@ -495,6 +502,126 @@ test("a listener that throws is logged and the change still stands", async () =>
   ]);
 });
 
+function dutyPost(seq: number, id: string, day: string, fields: Partial<Post> = {}): Post {
+  return post(seq, { board: "duty", kind: "task", state: "open", duty: { id, day }, ...fields });
+}
+
+const CUPS: Duty = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" };
+const BUILD: Duty = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
+/** The board's day of an instant, in UTC for these tests. */
+const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
+
+test("the day's sync posts each due duty once, keyed by duty and day", async () => {
+  const { service, store, events } = await harness();
+  const plan = { duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD], dayOf };
+  await service.syncDuties(plan);
+  expect(service.postsOf("duty")).toMatchObject([
+    {
+      id: "p1",
+      text: "Cups",
+      state: "open",
+      author: "user",
+      duty: { id: "cups", day: "2026-11-11" },
+    },
+    { id: "p2", text: "Build\n\nRun the build", duty: { id: "build", day: "2026-11-11" } },
+  ]);
+  expect(events).toEqual(["board duty p1,p2"]);
+  await service.syncDuties(plan);
+  await service.update({ id: "p1", action: "done", actor: "user" });
+  await service.syncDuties(plan);
+  expect(service.postsOf("duty")).toHaveLength(2);
+  expect(store.saved).toHaveLength(2);
+});
+
+test("an open or claimed duty of an earlier day is owed: no second post; done ones of earlier days go", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-10", { text: "Cups" }),
+      dutyPost(2, "build", "2026-11-10", { state: "claimed", claimedBy: "a" }),
+      dutyPost(3, "cups", "2026-11-09", { state: "done", updatedAt: "2026-11-09T10:00:00.000Z" }),
+      dutyPost(4, "build", "2026-11-11", { state: "done" }),
+    ]),
+  );
+  await service.syncDuties({
+    duties: [CUPS, BUILD],
+    day: "2026-11-11",
+    due: [CUPS, BUILD],
+    dayOf,
+  });
+  expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2", "p4"]);
+  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-12", due: [], dayOf });
+  expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2"]);
+});
+
+test("a duty that leaves the list takes its open post; an edit changes its open post's text", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-11"),
+      dutyPost(2, "build", "2026-11-11", { text: "Build\n\nRun the build" }),
+      dutyPost(3, "gone", "2026-11-11", { state: "claimed", claimedBy: "a" }),
+      dutyPost(4, "gone2", "2026-11-11"),
+    ]),
+  );
+  const edited = { ...BUILD, name: "Build it", instructions: "Run the full build" };
+  await service.syncDuties({ duties: [edited], day: "2026-11-11", due: [], dayOf });
+  const posts = service.postsOf("duty");
+  expect(posts.map((item) => item.id)).toEqual(["p3", "p2"]);
+  expect(posts[1]).toMatchObject({ text: "Build it\n\nRun the full build", seq: 5 });
+});
+
+test("a pretend duty acted out is done by that agent; the first report wins", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-11"),
+      lobbyTask(2),
+      dutyPost(3, "build", "2026-11-11", { state: "claimed", claimedBy: "b" }),
+    ]),
+  );
+  expect(await service.actDuty("p1", "a")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "a" },
+  });
+  expect(await service.actDuty("p1", "b")).toMatchObject({ ok: true, post: { claimedBy: "a" } });
+  expect(await service.actDuty("p2", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p2: it is not a duty",
+  });
+  expect(await service.actDuty("p3", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p3: claimed by Bob",
+  });
+  expect(await service.actDuty("p9", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p9: no such post",
+  });
+});
+
+test("a refusal port stops an update before the state rules, and pickup claims duty posts too", async () => {
+  const { service } = await harness(
+    file([dutyPost(1, "cups", "2026-11-11"), dutyPost(2, "build", "2026-11-11"), lobbyTask(3)]),
+    {
+      refuse: (item, input) =>
+        item.duty?.id === "cups" && input.action === "claim" ? "it is a pretend duty" : null,
+    },
+  );
+  expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toEqual({
+    ok: false,
+    error: "Unable to claim p1: it is a pretend duty",
+  });
+  expect(await service.claimLobbyTask("p1", "a", 1)).toBeNull();
+  const claim = await service.claimLobbyTask("p2", "a", 2);
+  expect(claim).toMatchObject({ id: "p2", state: "claimed", claimedBy: "a" });
+  // One at a time: an agent holding a duty is handed no lobby task.
+  expect(await service.claimLobbyTask("p3", "a", 3)).toBeNull();
+  if (!claim) throw new Error("expected a claim");
+  await service.releaseLobbyTask(claim);
+  expect(service.postsOf("duty")[1]).toMatchObject({ state: "open", duty: { id: "build" } });
+  const again = await service.claimLobbyTask("p2", "a", service.postsOf("duty")[1]?.seq ?? 0);
+  if (!again) throw new Error("expected a second claim");
+  await service.finishLobbyClaim(again);
+  expect(service.postsOf("duty")[1]).toMatchObject({ state: "done", duty: { id: "build" } });
+});
+
 const ROOMS = new Map([
   ["a", "w1"],
   ["b", "w2"],
@@ -572,6 +699,30 @@ test("a room task claimed the normal way gets no copy", async () => {
   const claimed = await service.update({ id: "p1", action: "claim", actor: "b" });
   expect(claimed.ok && claimed.post).not.toHaveProperty("link");
   expect(Object.keys(service.boards())).toEqual(["w1"]);
+});
+
+test("a duty is not a lobby to-do: its claim, its finish and a start put no copy on a board", async () => {
+  const held = dutyPost(2, "build", "2026-11-11", { state: "claimed", claimedBy: "b" });
+  const { service, store } = await harness(
+    file([dutyPost(1, "cups", "2026-11-11"), held]),
+    undefined,
+    roomOf,
+  );
+  expect(store.saved).toHaveLength(0);
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  expect(claim).toMatchObject({ id: "p1", state: "claimed", claimedBy: "a" });
+  expect(claim).not.toHaveProperty("link");
+  if (!claim) throw new Error("expected a claim");
+  await service.finishLobbyClaim(claim);
+  expect(await service.update({ id: "p2", action: "done", actor: "b" })).toMatchObject({
+    ok: true,
+    post: { state: "done" },
+  });
+  expect(Object.keys(service.boards())).toEqual(["duty"]);
+  expect(service.postsOf("duty").map((item) => [item.id, item.state, item.link])).toEqual([
+    ["p1", "done", undefined],
+    ["p2", "done", undefined],
+  ]);
 });
 
 test("the automatic pickup's claim makes the copy and keeps its assignment fields", async () => {

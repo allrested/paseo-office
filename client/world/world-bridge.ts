@@ -124,6 +124,7 @@ export function createWorldBridge(
     select: sender("select"),
     focusProject: sender("focusProject"),
     setBoardRows: sender("setBoardRows"),
+    setDuties: sender("setDuties"),
     photoRelease: sender("photoRelease"),
     setClaudeVersion: sender("setClaudeVersion"),
     setTenure: sender("setTenure"),

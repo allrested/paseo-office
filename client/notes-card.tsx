@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Pressable,
-  Text,
-  View,
-  type LayoutChangeEvent,
-  type ScrollView as NativeScrollView,
-} from "react-native";
-import { Markdown, ScrollView } from "@getpaseo/plugin/client/ui";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, Text, View, type ViewStyle } from "react-native";
+import { Icon, Markdown, ScrollView } from "@getpaseo/plugin/client/ui";
 import { OfficeModal as Modal } from "./office-modal.js";
 import type { z } from "zod";
 import type { NotesState, notesReadRpc } from "../shared/contracts.js";
@@ -75,25 +69,39 @@ function MonthBar({ month, onAsk, styles }: MonthBarProps) {
     if (next !== null) onAsk(next);
   }, [next, onAsk]);
   return (
-    <View style={styles.sheetActions}>
-      <Text accessibilityRole="header" style={styles.standupHeading}>
+    <View style={styles.notesMonthBar}>
+      <Text accessibilityRole="header" style={styles.panelHeading}>
         {monthTitle(month.month)}
       </Text>
       <View style={styles.actions}>
-        <ActionButton
-          label="Previous month"
-          pendingLabel="Previous month"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+          disabled={!previous}
+          aria-disabled={!previous}
           onPress={showPrevious}
-          disabled={previous === null}
-          styles={styles}
-        />
-        <ActionButton
-          label="Next month"
-          pendingLabel="Next month"
+          style={styles.sidebarButton}
+        >
+          <Icon
+            name="ChevronLeft"
+            size={18}
+            color={previous ? styles.iconColor : styles.placeholderColor}
+          />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+          disabled={!next}
+          aria-disabled={!next}
           onPress={showNext}
-          disabled={next === null}
-          styles={styles}
-        />
+          style={styles.sidebarButton}
+        >
+          <Icon
+            name="ChevronRight"
+            size={18}
+            color={next ? styles.iconColor : styles.placeholderColor}
+          />
+        </Pressable>
       </View>
     </View>
   );
@@ -133,75 +141,94 @@ function Piece({ piece, onJump, styles }: PieceProps) {
   );
 }
 
-interface SectionProps {
+function sectionTitle(section: NotesSection) {
+  const first = section.pieces[0];
+  return (
+    (first?.kind === "markdown" && first.text.match(/^## ([^\n]+)/)?.[1]?.trim()) || "Overview"
+  );
+}
+
+function EntryTab({
+  section,
+  selected,
+  onSelect,
+  styles,
+}: {
   section: NotesSection;
-  index: number;
-  onPlaced(index: number, y: number): void;
-  onJump(anchor: string): void;
+  selected: boolean;
+  onSelect(section: NotesSection): void;
   styles: OfficeStyles;
-}
-
-/** An entry, or the text before the first: Markdown, and its links to other entries. */
-function Section({ section, index, onPlaced, onJump, styles }: SectionProps) {
-  const placed = useCallback(
-    (event: LayoutChangeEvent) => onPlaced(index, event.nativeEvent.layout.y),
-    [index, onPlaced],
-  );
+}) {
+  const title = sectionTitle(section);
+  const select = useCallback(() => onSelect(section), [section, onSelect]);
+  const state = useMemo(() => ({ selected }), [selected]);
   return (
-    <View onLayout={placed}>
-      {section.pieces.map((piece, at) => (
-        // A section's pieces are its text in order and never move, so their place is their key.
-        // oxlint-disable-next-line react/no-array-index-key
-        <Piece key={at} piece={piece} onJump={onJump} styles={styles} />
-      ))}
-    </View>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityLabel={title}
+      accessibilityState={state}
+      aria-selected={selected}
+      onPress={select}
+      style={selected ? styles.sidebarButtonActive : styles.workspaceAction}
+    >
+      <Text style={styles.sidebarButtonText}>
+        {title.replace(/^(\d{1,2}) ([A-Za-z]{3})[a-z]* \d{4}$/, "$1 $2")}
+      </Text>
+    </Pressable>
   );
 }
 
-interface NotesTextProps {
-  /** The read the text came from: each read is brought to its newest entry once. */
-  load: NotesMonth;
-  text: string;
-  styles: OfficeStyles;
-}
-
-/** The month's file as Markdown, scrolled to its newest entry; a Contents link scrolls to its entry. */
-function NotesText({ load, text, styles }: NotesTextProps) {
+const strip: ViewStyle = { flexGrow: 0, flexShrink: 0 };
+function NotesText({ text, styles }: { text: string; styles: OfficeStyles }) {
   const sections = useMemo(() => splitSections(text), [text]);
-  const scroller = useRef<NativeScrollView>(null);
-  // Where each entry starts in the scroller, by its anchor, as last laid out.
-  const tops = useRef(new Map<string, number>());
-  // Once per read: a later layout leaves the reader where they scrolled.
-  const scrolledFor = useRef<NotesMonth | null>(null);
-  const placed = useCallback(
-    (index: number, y: number) => {
-      const anchor = sections[index]?.anchor ?? null;
-      if (anchor !== null) tops.current.set(anchor, y);
-      if (index !== sections.length - 1 || scrolledFor.current === load) return;
-      scrolledFor.current = load;
-      scroller.current?.scrollTo({ y, animated: false });
-    },
-    [sections, load],
+  // Undefined follows the newest entry when the writer finishes. A chosen entry stays selected.
+  const [choice, setChoice] = useState<number>();
+  const current = sections[choice ?? sections.length - 1] ?? sections[sections.length - 1];
+  const select = useCallback(
+    (section: NotesSection) => setChoice(sections.indexOf(section)),
+    [sections],
   );
-  const jump = useCallback((anchor: string) => {
-    const y = tops.current.get(anchor);
-    if (y !== undefined) scroller.current?.scrollTo({ y, animated: true });
-  }, []);
+  const jump = useCallback(
+    (anchor: string) => setChoice(sections.findIndex((section) => section.anchor === anchor)),
+    [sections],
+  );
+  if (!current) return null;
   return (
-    <ScrollView ref={scroller} style={styles.notesScroll}>
-      {sections.map((section, index) => (
-        <Section
-          // The sections are the text in order and never move, so their place is their key.
-          // oxlint-disable-next-line react/no-array-index-key
-          key={index}
-          section={section}
-          index={index}
-          onPlaced={placed}
-          onJump={jump}
-          styles={styles}
-        />
-      ))}
-    </ScrollView>
+    <>
+      {sections.length > 1 && (
+        <ScrollView
+          horizontal
+          style={strip}
+          contentContainerStyle={styles.notesDateStrip}
+          accessibilityLabel="Note entries"
+          accessibilityRole="tablist"
+          showsHorizontalScrollIndicator
+        >
+          {Array.from({ length: sections.length }, (_, offset) => {
+            const index = sections.length - 1 - offset;
+            const section = sections[index]!;
+            return (
+              <EntryTab
+                key={`${index}-${section.anchor ?? "intro"}`}
+                section={section}
+                selected={section === current}
+                onSelect={select}
+                styles={styles}
+              />
+            );
+          })}
+        </ScrollView>
+      )}
+      <ScrollView key={current.anchor ?? "preamble"} style={styles.notesScroll}>
+        <View style={styles.notesPaper}>
+          {current.pieces.map((piece, index) => (
+            // A section's Markdown and link runs keep their order.
+            // oxlint-disable-next-line react/no-array-index-key
+            <Piece key={index} piece={piece} onJump={jump} styles={styles} />
+          ))}
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
@@ -230,7 +257,7 @@ function NotesBody({ shown, styles }: NotesBodyProps) {
   if (month.text === null) {
     return <Text style={styles.muted}>No notes for {monthTitle(month.month)}.</Text>;
   }
-  return <NotesText key={month.month} load={month} text={month.text} styles={styles} />;
+  return <NotesText key={month.month} text={month.text} styles={styles} />;
 }
 
 export interface NotesCardProps {
