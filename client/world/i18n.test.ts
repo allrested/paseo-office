@@ -50,7 +50,8 @@ test("partial languages fall back, fill host slots and strip decorative emoji", 
 
 test("the port's overrides take precedence in each language", () => {
   const vars = { n: 2, label: "x", key: "K", title: "T" };
-  const lines = () => Object.keys(OURS).map((k) => t(k, vars));
+  const lines = () =>
+    Object.keys(OURS).map((k) => (Array.isArray(OURS[k]) ? t(k, vars, "list") : t(k, vars)));
   const expected = lines();
   for (const [language, dict] of [
     ["vi", vi],

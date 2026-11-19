@@ -1275,6 +1275,7 @@ function useFullscreenPanels(
   column: ColumnState,
   sheet: ColumnSheetState,
   select: (id: string | null) => void,
+  selectFromStrip: (id: string) => void,
 ) {
   const showRail =
     active && !compact && surfaceWidth >= SESSION_RAIL_WIDTH + COLUMN_MIN + FLOOR_MIN;
@@ -1294,6 +1295,7 @@ function useFullscreenPanels(
     showRail,
     link,
     selectAgent,
+    selectFromStrip: active ? openSession : selectFromStrip,
     width: showRail ? surfaceWidth - SESSION_RAIL_WIDTH : surfaceWidth,
     column: useMemo(
       () =>
@@ -1401,6 +1403,7 @@ export function OfficeSurface(
     column,
     sheet,
     setSelectedId,
+    selectFromStrip,
   );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
@@ -1491,7 +1494,7 @@ export function OfficeSurface(
     model,
     cards,
     chat: office.chat,
-    onSelect: full.active ? openSession : selectFromStrip,
+    onSelect: panels.selectFromStrip,
     onLeave: sheet.closeSheet,
     styles,
   });
