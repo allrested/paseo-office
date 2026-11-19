@@ -365,6 +365,8 @@ export function createOfficePlugin(
     incidentsSchedule.fail(message);
     hub.setNotes({ ...writer.state(), scheduleError: notesSchedule.error() });
     pushIncidents();
+    // The duty board's zone is then the host's, so its 8:00 run still comes.
+    void duties.settingsChanged();
   }
   async function followSettings(
     state: PluginSettingsState<typeof officeHostSettings.schema>,

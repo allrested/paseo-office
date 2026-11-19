@@ -508,6 +508,8 @@ test("settings that are not ready are logged, and both schedules' cards show why
   await settle();
   const message = "The office's settings cannot be read: notesFolder: Required";
   expect(logs).toContain(`[office] ${message}`);
+  // The duty board's zone is then the host's: its 8:00 run still comes.
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
   const events: { type: string; state?: { notes?: unknown; incidents?: unknown } }[] = [];
   const leaving = new AbortController();
   const done = recorded.handlers.get("office.state")?.({}, {
