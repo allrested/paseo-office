@@ -76,6 +76,7 @@ describe("the embedded scene", () => {
       expect(script).toContain(`people.${line}.invite`);
     }
     // The scene with three.js r160; a jump means a module the port leaves out came back in.
+    // (Measured 1,144,567 after the camera extras.)
     expect(script.length).toBeGreaterThan(1_000_000);
     expect(script.length).toBeLessThan(1_200_000);
     // Node's globals would throw in the page: upstream's build flag was the one use.
@@ -95,6 +96,40 @@ describe("the embedded scene", () => {
     expect(photo).toMatch(/office-\$\{/);
     expect(photo).not.toContain("my-office-");
     expect(bundle).toContain("ph-shoot");
+  });
+
+  it("bundles the camera extras: the tour, the clip, and the automatic camera", () => {
+    const read = (name: string) =>
+      readFileSync(new URL(`../vendor/my-office/src/${name}`, import.meta.url), "utf8");
+    const tips = read("office/ui/tips.js");
+    const timelapse = read("office/ui/timelapse.js");
+    const music = read("office/ui/clip-music.js");
+    const photo = read("office/ui/photo.js");
+    const words = read("i18n/index.js");
+    const bundle = WORLD_SCRIPT;
+
+    // The tour: no bell card, the person card in Paseo's words, once per device.
+    expect(tips).toContain("PASEO:");
+    expect(tips).not.toContain("key: 'bell'");
+    expect(words).toContain("'tips.person.text'");
+    expect(bundle).toContain("office-tips");
+    expect(bundle).toContain("Each person is an agent");
+    // The clip: the file is named for the office, the music waits for Sound, the choices are kept on the device.
+    expect(timelapse).toContain("office-clip-");
+    expect(timelapse).not.toContain("my-office-clip-");
+    expect(music).toMatch(/if \(!sfx\?\.on\) return null;/);
+    expect(bundle).toContain("office-clip-music");
+    expect(bundle).toContain("ph-clipset");
+    // The clip's cover is not hidden by photo mode's rule.
+    expect(bundle).toContain(":not(.clip-cover)");
+    // Photo mode's day and night go back with it, and a clip keeps it open.
+    expect(photo).toContain("setTimeMode('auto')");
+    expect(photo).toContain("if (state.clip) return;");
+    expect(bundle).toContain("data-ph-time");
+    // The automatic camera and its switch.
+    expect(bundle).toContain("office-autocam");
+    // The scene still makes no network call of its own: nothing the new files add calls out.
+    expect(bundle).not.toMatch(/\bfetch\(["'`]https?:/);
   });
 
   it("bundles upstream's first-person walk, with the street cut", () => {
