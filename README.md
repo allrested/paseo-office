@@ -10,11 +10,11 @@ my-office's.
 
 ## What it does
 
-- The optional street outside has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
-
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
+- The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
+- The optional street outside has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
   on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
@@ -23,6 +23,9 @@ my-office's.
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
   starts an agent: a workspace, a provider and model, and a first prompt.
+- Select **Full screen** beside the view switch to work inside the office. On a wide screen,
+  Sessions sits on the left, the floor in the center, and activity or the open conversation
+  on the right. You can reply and answer permission requests while the floor stays open.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
@@ -93,7 +96,9 @@ and Thai also use English for the port’s custom lines.
 - The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
   and the lift’s servicing time. It receives no file names, commands or prompts and makes no
   network calls. It sends chat moments with a name or count, and reports farewells and promotions.
-- With the street enabled, the device receives the bundled Kenney Car Kit (CC0).
+- With the street enabled, the device receives the bundled Kenney Car Kit (CC0). While a street
+  is open, the host checks local Git tags and the installed Claude CLI version. New tags can
+  trigger the photo booth. The pickleball scene uses check results already available to Paseo.
 - English travels with the scene. For each other language the host sends one dictionary on request
   to the device that chose it. The device keeps those words for the life of the page.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
