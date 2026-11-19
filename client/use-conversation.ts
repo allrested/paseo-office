@@ -135,13 +135,18 @@ export function useConversation(agentId: string): Conversation {
         error: failureText("read the conversation", failure),
       }));
     };
-    const readLatest = async () => {
+    // `keepLive` keeps the live pieces held past the page's last entry: what came while the page was
+    // read, or after a restored subscription. A replacement starts a new epoch, whose numbers are
+    // not the held ones', so it keeps none.
+    const readLatest = async (keepLive: boolean) => {
       const page = checked((await timeline.refetch({ direction: "tail", ...PAGE })) as Page);
       if (!alive) return;
       generation += 1;
+      const fromTail = fromPage(page);
+      const pageEnd = fromTail.length === 0 ? -1 : fromTail[fromTail.length - 1]!.end;
       commit((s) => ({
         ...s,
-        held: fromPage(page),
+        held: keepLive ? fromTail.concat(s.held.filter((h) => h.seq > pageEnd)) : fromTail,
         status: "ready",
         error: null,
         cursor: page.startCursor,
@@ -150,12 +155,13 @@ export function useConversation(agentId: string): Conversation {
         earlierFailed: false,
       }));
     };
-    const reread = () => void readLatest().catch(fail);
+    const reread = (keepLive: boolean) => void readLatest(keepLive).catch(fail);
 
     const subscription = timeline.subscribe((event) => {
       if (!alive) return;
       const kind = (event as { event?: { type?: string } }).event?.type;
-      if (kind === "replacement" || kind === "subscription_restored") return reread();
+      if (kind === "replacement") return reread(false);
+      if (kind === "subscription_restored") return reread(true);
       if (kind === "error") return fail((event as { event: { error: string } }).event.error);
       const piece = liveItem(event);
       if (piece)
@@ -177,7 +183,7 @@ export function useConversation(agentId: string): Conversation {
           );
           if (!alive || asked !== generation) return;
           // The cursor no longer matches the history: what the page holds is not what comes before.
-          if (page.staleCursor) return reread();
+          if (page.staleCursor) return reread(false);
           commit((s) => ({
             ...s,
             held: fromPage(page).concat(s.held),
@@ -192,7 +198,7 @@ export function useConversation(agentId: string): Conversation {
       })();
     };
 
-    subscription.ready.then(readLatest).catch(fail);
+    subscription.ready.then(() => readLatest(true)).catch(fail);
     return () => {
       alive = false;
       earlierRef.current = null;

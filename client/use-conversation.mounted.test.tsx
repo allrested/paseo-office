@@ -173,6 +173,28 @@ test("a live piece inside a merged page entry's range is not added again", async
   expect(texts()).toEqual(["Hi", "Hello!"]);
 });
 
+test("a live piece that came while the latest page was read stays when it is past the page's end", async () => {
+  await mount();
+  await push(live(3, you("three")));
+  await push(live(2, you("two, in the page")));
+  await answer(0, page([entry(1, you("One")), entry(2, you("Two"))]));
+  expect(texts()).toEqual(["One", "Two", "three"]);
+});
+
+test("a read after a restored subscription keeps what is live past the page; a replacement keeps nothing", async () => {
+  await mount();
+  await answer(0, page([entry(1, you("One"))]));
+  await push(live(2, you("two")));
+  await push(live(4, you("four")));
+  await push({ agentId: "a1", subscriptionId: "s", event: { type: "subscription_restored" } });
+  await answer(1, page([entry(1, you("One")), entry(2, you("Two")), entry(3, you("Three"))]));
+  expect(texts()).toEqual(["One", "Two", "Three", "four"]);
+
+  await push({ agentId: "a1", event: { type: "replacement", epoch: "e2" } });
+  await answer(2, page([entry(1, you("Fresh"))]));
+  expect(texts()).toEqual(["Fresh"]);
+});
+
 test("a tool call's live updates are one row, as it is after a reopen", async () => {
   const call = (status: "running" | "completed"): AgentTimelineItem =>
     ({
