@@ -67,8 +67,9 @@ export interface Hub {
   /** The stand-up notes writer's state; the same state again sends nothing. */
   setNotes(notes: NotesState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
-  setWeather(weather: WeatherState): void;
   setIncidents(incidents: IncidentsState): void;
+  /** A changed sky or service status is sent to every subscriber. */
+  setWeather(weather: WeatherState): void;
   /**
    * The conversation each snapshot carries from now on; null removes it. Every subscriber gets a
    * fresh snapshot.

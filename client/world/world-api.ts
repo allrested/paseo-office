@@ -5,9 +5,10 @@ import type { PluginTheme } from "@getpaseo/plugin";
  * vendor/my-office/src/office/paseo-entry.js, which sets `PaseoOfficeWorld` on its window.
  */
 
-/** A person in the office, in the shape the vendored scene reads. */
+/** The host can send a resolved sky or let the scene follow its own seasonal decorations. */
 export type WorldWeather = import("../../shared/contracts.js").WeatherScene;
 
+/** A person in the office, in the shape the vendored scene reads. */
 export interface WorldSession {
   id: string;
   name: string;
@@ -204,8 +205,9 @@ export interface WorldApi {
    * rings starts the alarm: 25 s of red, a fail bubble over everyone at work and the siren. Several
    * that ring at once ring once.
    */
-  setWeather?(weather: WorldWeather): void;
   setIncidents?(incidents: readonly WorldIncident[]): void;
+  /** The weather outside. Older scene versions omit this method. */
+  setWeather?(weather: WorldWeather): void;
   /**
    * The device's Sound switch. On plays the scene's sounds once a press has started audio; off, and
    * where the frame never lets audio start, plays none. The scene starts off. Absent on a page built

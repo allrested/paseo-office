@@ -232,6 +232,8 @@ export const IncidentsStateSchema = z.object({
   /** Why the check's schedule could not follow the settings; null once it does. */
   scheduleError: z.string().nullable(),
 });
+export type IncidentsState = z.output<typeof IncidentsStateSchema>;
+
 /** What the 3D scene is told of the weather. `season` leaves the weather to the scene's own season. */
 export const WeatherSceneSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("none") }),
@@ -257,8 +259,6 @@ export const WeatherStateSchema = z.object({
   readAt: z.number().nullable(),
 });
 export type WeatherState = z.output<typeof WeatherStateSchema>;
-
-export type IncidentsState = z.output<typeof IncidentsStateSchema>;
 
 /** The most characters of one chat message the office takes. */
 export const CHAT_TEXT_MAX = 600;

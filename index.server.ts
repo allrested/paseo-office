@@ -238,8 +238,6 @@ export function createOfficePlugin(
   incidents
     .start()
     .catch((error: unknown) => log(`[office] incidents load failed: ${errorMessage(error)}`));
-  // One service for the office's life, made as the server starts. Its file is read first; until
-  // then the chat call waits, and a snapshot has no chat.
   // The weather: read from the user's address only while an office is open, on its own timers.
   const weather = createWeatherService({
     clock: deps.clock,
@@ -248,6 +246,8 @@ export function createOfficePlugin(
     log,
   });
   const stopWatchingWeather = hub.watch((view) => weather.officeOpen(view !== null));
+  // One service for the office's life, made as the server starts. Its file is read first; until
+  // then the chat call waits, and a snapshot has no chat.
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
   async function startChat(): Promise<void> {

@@ -479,7 +479,6 @@ const api = {
     // With every incident dismissed, the red ends at the next frame rather than after its 25 s.
     if (open.length === 0) state.incidentUntil = 0;
   },
-  /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
   /**
    * The weather outside, from the host: `{ kind: 'none' }` draws none, `{ kind: 'season' }` the weather of the
    * scene's own season (paseo-weather-plan.js), `{ kind: 'reading', code, temp, cloud }` a WMO weather code, a
@@ -493,6 +492,7 @@ const api = {
     weatherKey = key;
     drawWeather(weatherToDraw(scene, SEASON));
   },
+  /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
   setLimits(list) { limits = Array.isArray(list) ? list : []; },
 };
 

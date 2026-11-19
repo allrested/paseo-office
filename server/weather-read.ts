@@ -33,7 +33,21 @@ export interface WeatherReaderOptions {
   maxBytes?: number;
 }
 
-/** A failed request's own text can hold the address: only its code is safe to say. */
+// Node and undici attach transport codes to the cause. Only these fixed labels can enter
+// the shared snapshot or plugin log, even if a fetch implementation supplies other text.
+const NETWORK_ERRORS = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
+
+/** A failed request's message may contain the service address. */
 function unreachable(error: unknown, timeoutMs: number): WeatherProblem {
   if (error instanceof Error && error.name === "TimeoutError") {
     return new WeatherProblem(`The weather service did not answer in ${timeoutMs / 1000} s`);
@@ -42,7 +56,7 @@ function unreachable(error: unknown, timeoutMs: number): WeatherProblem {
   const code =
     cause instanceof Error && "code" in cause && typeof cause.code === "string" ? cause.code : null;
   return new WeatherProblem(
-    code === null
+    code === null || !NETWORK_ERRORS.has(code)
       ? "The weather service could not be reached"
       : `The weather service could not be reached: ${code}`,
   );
