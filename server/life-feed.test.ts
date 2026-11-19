@@ -133,3 +133,11 @@ test("workspaces sharing a name retain the first repository age to arrive", asyn
   await feed.settled();
   expect(feed.snapshot().born.api).toBe("2020-01-01");
 });
+
+test("a turn with the office closed resolves its team from the hook", async () => {
+  const d = deps();
+  const feed = createLifeFeed(d);
+  feed.view(null);
+  await feed.turnEnded("unseen", async () => "api");
+  expect(d.tenure.touch).toHaveBeenCalledWith("api", expect.objectContaining({ turn: true }));
+});

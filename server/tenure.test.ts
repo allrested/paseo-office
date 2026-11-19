@@ -98,3 +98,10 @@ test("no more than 300 teams are kept, the most lately at work", () => {
   expect(t.get("t0")).toBeNull();
   expect(t.get("t304")).not.toBeNull();
 });
+
+test("first census keeps turns finished before the office was opened", () => {
+  const ledger = createTenure({ store: memory(), now: () => 10 * DAY });
+  ledger.touch("api", { at: 9 * DAY, turn: true });
+  ledger.seed([{ name: "api", first: 3 * DAY, daysSeen: 2 }]);
+  expect(ledger.get("api")).toMatchObject({ first: 3 * DAY, pre: true, turns: 1, days: 2 });
+});
