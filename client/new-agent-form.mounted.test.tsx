@@ -492,6 +492,57 @@ test("without a ready provider the form says there is none to start on", async (
   expect(container.textContent).toContain("No provider is available.");
 });
 
+test("providers that are all still loading say so and can be read again", async () => {
+  host.waitTimesOut = true;
+  host.providers = {
+    entries: [{ provider: "codex", status: "loading", enabled: true, label: "Codex", models: [] }],
+  };
+  await openForm();
+  expect(container.textContent).toContain("Providers are still starting.");
+  expect(container.textContent).not.toContain("No provider is available.");
+  host.waitTimesOut = false;
+  host.pages = [WORKSPACE_PAGE];
+  host.providers = PROVIDERS;
+  await press("Try again");
+  await settle();
+  await settle();
+  expect(host.providerCalls).toBe(2);
+  expect(container.textContent).not.toContain("still starting");
+  expect(selected("Claude")).toBe("true");
+});
+
+test("a remembered provider that is still loading stays chosen, and Create names the problem until it is ready", async () => {
+  host.waitTimesOut = true;
+  host.device = {
+    status: "ready",
+    values: { threeD: true, rungIncidents: {}, lastAgent: { provider: "codex", model: "gpt" } },
+    revision: "r1",
+  };
+  host.providers = {
+    entries: [
+      PROVIDERS.entries[0],
+      { provider: "codex", status: "loading", enabled: true, label: "Codex", models: [] },
+    ],
+  };
+  await openForm();
+  expect(selected("Codex (Starting)")).toBe("true");
+  expect(selected("Claude")).toBe("false");
+  await fillForm();
+  expect(container.textContent).toContain("Codex is still starting.");
+  expect(labelled("Create").getAttribute("aria-disabled")).toBe("true");
+
+  host.waitTimesOut = false;
+  host.pages = [WORKSPACE_PAGE];
+  host.providers = PROVIDERS;
+  await press("Try again");
+  await settle();
+  await settle();
+  expect(selected("Codex")).toBe("true");
+  expect(selected("GPT")).toBe("true");
+  expect(container.textContent).not.toContain("still starting");
+  expect(labelled("Create").getAttribute("aria-disabled")).not.toBe("true");
+});
+
 test("a provider with no models says so, is not selectable and never becomes the choice", async () => {
   host.providers = {
     entries: [

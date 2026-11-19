@@ -44,10 +44,21 @@ export interface LastAgent {
   model: string;
 }
 
+/** A provider that is enabled but still loading: not yet offered, and not gone. */
+export interface StartingProvider {
+  id: string;
+  label: string;
+}
+
 /** Why Create is not offered yet; null when the form can be sent. */
-export function newAgentProblem(choice: NewAgentChoice): string | null {
+export function newAgentProblem(
+  choice: NewAgentChoice,
+  starting: readonly StartingProvider[] = [],
+): string | null {
   if (choice.workspaceId === null) return "Choose a workspace.";
   if (choice.provider === null) return "Choose a provider.";
+  const slow = starting.find((entry) => entry.id === choice.provider);
+  if (slow !== undefined) return `${slow.label} is still starting.`;
   if (choice.model === null) return "Choose a model.";
   if (choice.prompt.trim() === "") return "Write the first prompt.";
   return null;
@@ -90,14 +101,20 @@ function defaultModel(models: readonly ModelOption[]): string | null {
 /**
  * The provider and model to start with: the last choice if it is still offered, else the first
  * provider that has a model and its default model. A provider with no model is never the start.
+ * A last choice that is still loading is kept rather than replaced.
  */
 export function startingAgent(
   providers: readonly ProviderOption[],
   last: LastAgent | null,
+  starting: readonly StartingProvider[] = [],
 ): { provider: string | null; model: string | null } {
   const kept = providers.find((entry) => entry.id === last?.provider);
   if (kept !== undefined && kept.models.some((model) => model.id === last?.model)) {
     return { provider: kept.id, model: last?.model ?? null };
+  }
+  // A remembered provider that is only still loading stays the choice: Create names the wait.
+  if (last !== null && starting.some((entry) => entry.id === last.provider)) {
+    return { provider: last.provider, model: last.model };
   }
   const first = providers.find((entry) => entry.models.length > 0);
   if (first === undefined) return { provider: null, model: null };
@@ -117,6 +134,13 @@ export function providerOptions(entries: readonly ProviderSnapshotEntry[]): Prov
       label: entry.label ?? entry.provider,
       models: (entry.models ?? []).filter((model) => model.isSelectable !== false).map(modelOption),
     }));
+}
+
+/** The enabled providers the snapshot shows still loading. */
+export function providersStarting(entries: readonly ProviderSnapshotEntry[]): StartingProvider[] {
+  return entries
+    .filter((entry) => entry.status === "loading" && entry.enabled)
+    .map((entry) => ({ id: entry.provider, label: entry.label ?? entry.provider }));
 }
 
 /** The workspaces an agent can start in: not being archived, each with the folder it runs in. */

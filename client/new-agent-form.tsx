@@ -96,6 +96,23 @@ function ErrorBody({ message, onRetry, styles }: ErrorBodyProps) {
   );
 }
 
+/** Every provider is still loading: not an empty host, so the form waits and can read again. */
+function StartingBody({ onRetry, styles }: Omit<ErrorBodyProps, "message">) {
+  return (
+    <View style={styles.sheetField}>
+      <Text style={styles.muted}>Providers are still starting.</Text>
+      <View style={styles.actions}>
+        <ActionButton
+          label="Try again"
+          pendingLabel="Trying..."
+          onPress={onRetry}
+          styles={styles}
+        />
+      </View>
+    </View>
+  );
+}
+
 interface ReadyBodyProps {
   agent: ReturnType<typeof useNewAgent>;
   choice: NewAgentChoice;
@@ -110,7 +127,8 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
   const chooseModel = useCallback((model: string) => change({ model }), [change]);
   const setPrompt = useCallback((prompt: string) => change({ prompt }), [change]);
   const submit = useCallback(async () => onCreated(await create()), [create, onCreated]);
-  const problem = newAgentProblem(choice);
+  const problem = newAgentProblem(choice, agent.starting);
+  const waiting = agent.starting.some((entry) => entry.id === choice.provider);
   const models = agent.providers.find((entry) => entry.id === choice.provider)?.models ?? [];
   return (
     <>
@@ -129,6 +147,18 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
               value={entry.id}
               label={entry.models.length === 0 ? `${entry.label} (No models)` : entry.label}
               disabled={entry.models.length === 0}
+              on={entry.id === choice.provider}
+              toggle={false}
+              onPress={chooseProvider}
+              styles={styles}
+            />
+          ))}
+          {agent.starting.map((entry) => (
+            <Pill<string>
+              key={entry.id}
+              value={entry.id}
+              label={`${entry.label} (Starting)`}
+              disabled
               on={entry.id === choice.provider}
               toggle={false}
               onPress={chooseProvider}
@@ -175,6 +205,14 @@ function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps)
           primary
           styles={styles}
         />
+        {waiting ? (
+          <ActionButton
+            label="Try again"
+            pendingLabel="Trying..."
+            onPress={agent.retry}
+            styles={styles}
+          />
+        ) : null}
       </View>
     </>
   );
@@ -186,8 +224,10 @@ function FormBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps) 
   if (agent.status === "error") {
     return <ErrorBody message={agent.error} onRetry={agent.retry} styles={styles} />;
   }
-  if (agent.providers.length === 0)
+  if (agent.providers.length === 0) {
+    if (agent.starting.length > 0) return <StartingBody onRetry={agent.retry} styles={styles} />;
     return <Text style={styles.muted}>No provider is available.</Text>;
+  }
   return (
     <ReadyBody
       agent={agent}

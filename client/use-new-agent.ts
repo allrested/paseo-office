@@ -5,11 +5,13 @@ import { failureText } from "./action-button.js";
 import {
   newAgentProblem,
   providerOptions,
+  providersStarting,
   startingAgent,
   workspaceOptions,
   type LastAgent,
   type NewAgentChoice,
   type ProviderOption,
+  type StartingProvider,
   type WorkspaceOption,
 } from "./new-agent-model.js";
 
@@ -22,9 +24,11 @@ interface Loaded {
   error: string | null;
   workspaces: WorkspaceOption[];
   providers: ProviderOption[];
+  /** Providers the snapshot shows still loading: not offered, but not missing either. */
+  starting: StartingProvider[];
 }
 
-const LOADING: Loaded = { status: "loading", error: null, workspaces: [], providers: [] };
+const LOADING: Loaded = { status: "loading", error: null, workspaces: [], providers: [], starting: [] };
 
 /** The form waits this long for the providers to finish loading; the SDK's own wait is a minute. */
 const PROVIDERS_WAIT_MS = 5000;
@@ -84,7 +88,8 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
       ([workspaces, snapshot]) => {
         if (!current) return undefined;
         const providers = providerOptions(snapshot.entries);
-        setLoaded({ status: "ready", error: null, workspaces, providers });
+        const starting = providersStarting(snapshot.entries);
+        setLoaded({ status: "ready", error: null, workspaces, providers, starting });
         return undefined;
       },
       (failure: unknown) => {
@@ -104,13 +109,16 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
   // The device's last choice decides the start, so a start waits for the setting to be read.
   const last = device.status === "ready" ? (device.values.lastAgent ?? null) : null;
   const settingRead = device.status !== "loading";
-  const { providers } = loaded;
+  const { providers, starting } = loaded;
   const chosen = providers.find((entry) => entry.id === choice.provider);
-  const stillOffered = chosen?.models.some((model) => model.id === choice.model) === true;
+  const chosenModelOffered = chosen?.models.some((model) => model.id === choice.model) === true;
+  // A chosen provider that is only still loading is kept, not moved to another.
+  const stillOffered =
+    chosenModelOffered || starting.some((entry) => entry.id === choice.provider);
   useEffect(() => {
     if (loaded.status !== "ready" || !settingRead || stillOffered) return;
-    change(startingAgent(providers, last));
-  }, [loaded.status, settingRead, stillOffered, providers, last, change]);
+    change(startingAgent(providers, last, starting));
+  }, [loaded.status, settingRead, stillOffered, providers, starting, last, change]);
 
   // A remembered workspace the host no longer lists is no choice.
   const { workspaceId } = choice;
@@ -134,7 +142,7 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
   const revision = device.status === "ready" ? device.revision : null;
   const values = device.status === "ready" ? device.values : null;
   const create = useCallback(async (): Promise<string> => {
-    const problem = newAgentProblem(choice);
+    const problem = newAgentProblem(choice, loaded.starting);
     const workspace = loaded.workspaces.find((entry) => entry.id === choice.workspaceId);
     if (problem !== null || workspace === undefined)
       throw new Error(problem ?? "Choose a workspace.");
@@ -150,6 +158,6 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
       await save({ ...values, lastAgent }, revision);
     }
     return handle.id;
-  }, [paseo, choice, loaded.workspaces, save, revision, values]);
+  }, [paseo, choice, loaded.workspaces, loaded.starting, save, revision, values]);
   return { ...loaded, retry, chooseProvider, create };
 }

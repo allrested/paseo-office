@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   newAgentProblem,
   providerOptions,
+  providersStarting,
   startingAgent,
   workspaceGroups,
   workspaceOptions,
@@ -144,4 +145,39 @@ test("workspaces become options with the folder an agent starts in", () => {
     { id: "w", name: "main", projectId: "p", projectName: "Acme", directory: "/src/acme" },
     { id: "wt", name: "main", projectId: "p", projectName: "Acme", directory: "/src/acme-wt" },
   ]);
+});
+
+const SLOW = [{ id: "codex", label: "Codex" }];
+
+test("providersStarting lists the enabled providers that are still loading, by id and label", () => {
+  const entry = (provider: string, status: string, enabled = true) =>
+    ({ provider, status, enabled, label: provider.toUpperCase() }) as never;
+  expect(
+    providersStarting([
+      entry("a", "loading"),
+      entry("b", "ready"),
+      entry("c", "error"),
+      entry("d", "loading", false),
+    ]),
+  ).toEqual([{ id: "a", label: "A" }]);
+});
+
+test("a provider that is still starting is named as the problem once the workspace is chosen", () => {
+  expect(newAgentProblem({ ...COMPLETE, provider: "codex", model: "gpt" }, SLOW)).toBe(
+    "Codex is still starting.",
+  );
+  expect(newAgentProblem(COMPLETE, SLOW)).toBeNull();
+});
+
+test("a remembered provider that is still loading stays the start, with its model", () => {
+  const ready = PROVIDERS.filter((entry) => entry.id !== "codex");
+  expect(startingAgent(ready, { provider: "codex", model: "gpt" }, SLOW)).toEqual({
+    provider: "codex",
+    model: "gpt",
+  });
+  // A remembered provider that is neither offered nor loading is still moved off.
+  expect(startingAgent(ready, { provider: "gone", model: "x" }, SLOW)).toEqual({
+    provider: "claude",
+    model: "opus",
+  });
 });
