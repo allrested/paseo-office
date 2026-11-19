@@ -80,7 +80,8 @@ while the daemon was down is not made up.
 
 The column, agent cards, settings, team chat (including @Director), whiteboard rows and host
 notifications stay in English. Thai and Indonesian use the English karaoke songs. Vietnamese
-and Thai also use English for the port’s custom lines.
+and Thai also use English for the port’s custom lines. The sound-unavailable message and
+photo lighting group title are English in every language.
 
 ## What it reads and where it sends it
 
@@ -89,7 +90,7 @@ and Thai also use English for the port’s custom lines.
 - The 3D scene is told who is there and what kind of thing each does, never a file name, a command
   or a prompt. The scene makes no network call.
 - English travels with the scene. For each other language the host sends one dictionary on request
-  to the device that chose it. The device keeps those words for the life of the page.
+  to the device that chose it (about 75–119 KB). The device keeps those words for the life of the page.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and

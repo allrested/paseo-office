@@ -94,7 +94,8 @@ works on every `.js` under `my-office/src/` and `../shared/upstream/`, and puts
 the swap would change nothing in it. It changed these, and nothing else in them:
 
 - `../shared/upstream/chat.js`
-- `src/i18n/locales/en/fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`
+- Under `src/i18n/locales/en/` and `vi/`: `fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`
+- Under `src/i18n/locales/th/`: the same files, with `people-a.js` and `people-b.js` holding the dialogue
 - `src/office/people/chibi-rig.js`, `src/office/people/look.js`
 - `src/office/world/props/tv-games.js`
 - `src/office/interact/first-person.js`, which is also changed by hand (above)
