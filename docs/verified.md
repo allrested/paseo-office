@@ -19,13 +19,13 @@ and no error.
 
 ## Seen at 1280 px
 
-- Settings, Plugins lists "Office" with its description. Its icon is a letter, in the Plugins list
+- Settings, Plugins lists "Office 3D" with its description. Its icon is a letter, in the Plugins list
   and on the plugin's own page: Paseo's app takes a tile's icon from the plugin's listing in
   Paseo's plugin registry, never from an installed plugin's manifest, so a plugin installed by Git
   shows a letter.
 - The plugin's page opens from that row and has the settings: Wake agents, Agent tools, the notes
   folder, the time zone and the Jira and Sentry fields. The 3D, 2D and List switch is on it.
-- The Office item is in the sidebar and opens the office.
+- The Office 3D item is in the sidebar and opens the office.
 - The 3D floor draws, with the Director's room and the Stand-up notes board.
 - The 2D floor and the List show. The List has the Lobby with its board.
 - The column's four tabs open: Attention (one card, the host's memory), Sessions, Activity and

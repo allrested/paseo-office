@@ -266,7 +266,7 @@ holds every wake until it is turned back on; wakes that wait are not kept across
 
 ## Settings
 
-The office's settings are a screen in its page under Settings > Plugins > Office
+The office's settings are a screen in its page under Settings > Plugins > Office 3D
 (`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Notes folder", "Time
 zone", "Stand-up days" and the tracker fields. Three things open it with
 `client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
