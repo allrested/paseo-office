@@ -806,7 +806,7 @@ function openOffice(recorded: Recorded, context: PluginHandlerContext) {
   };
 }
 
-test("a chat send posts your message to an open office and the snapshot carries the chat", async () => {
+test("a group message and its no-session reply reach both the open office and the next snapshot", async () => {
   const { recorded, context, stop } = setup(async () => ON);
   await settle();
   const first = openOffice(recorded, context);
@@ -820,13 +820,24 @@ test("a chat send posts your message to an open office and the snapshot carries 
   const chat = recorded.handlers.get("office.chat.request");
   expect(await chat?.({ op: "send", text: "hello" }, context)).toEqual({ ok: true });
   expect(first.events.filter((event) => event.type === "chat")).toMatchObject([
-    { type: "chat", change: { op: "add", message: { from: "me", text: "hello" } } },
+    { type: "chat", change: { op: "add", message: { from: "me", text: "hello", tag: "group" } } },
+    {
+      type: "chat",
+      change: {
+        op: "add",
+        message: { from: "__director", tag: "delivery", reply: { text: "hello" } },
+      },
+    },
   ]);
 
   const second = openOffice(recorded, context);
   await settle();
   expect(second.events.at(-1)?.state?.chat).toMatchObject({
-    messages: [{ kind: "sys" }, { from: "me", text: "hello" }],
+    messages: [
+      { kind: "sys" },
+      { from: "me", text: "hello" },
+      { from: "__director", tag: "delivery", reply: { text: "hello" } },
+    ],
   });
   await first.leave();
   await second.leave();
@@ -853,14 +864,14 @@ test("a turn that ends answers the chat message that named its agent, as a reply
   const chat = recorded.handlers.get("office.chat.request");
   expect(await chat?.({ op: "send", text: "@Mjd hi" }, context)).toEqual({ ok: true });
   await settle();
+  const mine = chatAdds(office.events).find((message) => message.from === "me");
   expect(sent).toEqual([
     {
       agentId: "a1",
       text: "Team chat message from you: @Mjd hi",
-      options: { activeTurnBehavior: "steer" },
+      options: { activeTurnBehavior: "steer", messageId: `office-chat-${mine!.id}` },
     },
   ]);
-  const mine = chatAdds(office.events).find((message) => message.from === "me");
 
   directory.timelines.set("a1", [
     { turnId: "t1", item: { type: "user_message", text: "Team chat message from you: @Mjd hi" } },

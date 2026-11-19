@@ -1,3 +1,4 @@
+import type { Appearance } from "../shared/appearance.js";
 import {
   Fragment,
   memo,
@@ -437,6 +438,7 @@ function useRecallable(message: ChatMessage): boolean {
 }
 
 interface ChatRowProps {
+  appearance?: Appearance;
   message: ChatMessage;
   onFloor: boolean;
   /** A touch screen, where nothing hovers. */
@@ -452,6 +454,7 @@ interface ChatRowProps {
  * actions show on hover and focus on the web, and always on a touch screen.
  */
 const ChatRow = memo(function ChatRow({
+  appearance,
   message,
   onFloor,
   always,
@@ -461,7 +464,7 @@ const ChatRow = memo(function ChatRow({
   styles,
 }: ChatRowProps) {
   const mine = isYours(message);
-  const avatar = avatarOf(message);
+  const avatar = avatarOf(message, appearance);
   const time = timeLabel(message.at, Date.now());
   const recallable = useRecallable(message);
   const [hovered, setHovered] = useState(false);
@@ -539,7 +542,7 @@ interface MessagesProps {
   emptyLabel: string;
   firstUnread?: string;
   /** The agents on the floor. */
-  agents: ReadonlyMap<string, unknown>;
+  agents: ReadonlyMap<string, { appearance?: Appearance }>;
   problem: string | null;
   always: boolean;
   link: OfficeLink;
@@ -586,6 +589,7 @@ function Messages({
         </Text>
       ) : (
         <ChatRow
+          appearance={message.from ? agents.get(message.from)?.appearance : undefined}
           message={message}
           onFloor={message.from !== undefined && agents.has(message.from)}
           always={always}
@@ -806,6 +810,7 @@ export function ChatPanel({
           id: row.agent.id,
           name: agentTitle(row.agent),
           room: room.name,
+          appearance: row.agent.appearance,
           status: memberStatuses[tabOf(row)],
         })),
       ),

@@ -28,6 +28,7 @@ my-office's.
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
   starts an agent: a workspace, a provider and model, and a first prompt.
+- Open an agent’s session and select the pencil (**Customize agent**) to set its Office display name, avatar and color. Clear the name, select **Initials** and **Auto**, then save to restore the defaults.
 - Select **Full screen** beside the view switch to work inside the office. On a wide screen,
   Sessions sits on the left, the floor in the center, and activity or the open conversation
   on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.
@@ -120,10 +121,12 @@ photo lighting group title are English in every language.
   Anyone who can open the settings page can see it there.
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
-- The stand-up notes writer, a wake, a duty and a chat `@` send the board's text, a duty's
-  instructions, the chat message and the notes' prompt to the host's own agents, and so to
-  whichever provider runs them.
-- It stores boards, the duty list, the chat, the stand-up notes' state and incidents under the host's Paseo home,
+- The stand-up notes writer, agent wakes and a duty with instructions send prompts to the host's
+  agents and their providers. In team chat, **Whole group** can send your message and up to six
+  recent group or scene chat lines to one available session for a conversational reply. **To**, an
+  `@mention`, or a reply to a session sends your message to the session you address.
+- It stores boards, the duty list, the chat, the stand-up notes' state and incidents under the
+  host's Paseo home,
   in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
 
 ## Based on

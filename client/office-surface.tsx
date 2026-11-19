@@ -57,6 +57,7 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
+import { SceneChoices } from "./scene-picker.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -77,7 +78,7 @@ import {
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
 import { OfficeDialogs, OfficeModal } from "./office-modal.js";
-import { FullscreenSettings, SceneChoices, useOfficeSettingsDialog } from "./office-settings.js";
+import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
@@ -94,6 +95,7 @@ import { FullscreenHeader, type SidebarControls } from "./fullscreen-header.js";
 import { useColumn, type ColumnState } from "./use-column.js";
 import { LibraryCard } from "./library-card.js";
 import { NotesCard } from "./notes-card.js";
+import { leaveFullscreenAfter, lockEscape, pageUsesEscape, unlockEscape } from "./world/escape.js";
 import { todayZone } from "./notes-text.js";
 import { QaCard } from "./qa-card.js";
 import { ReviewCard } from "./review-card.js";
@@ -1448,9 +1450,23 @@ function useFullscreen(props: OfficeSurfaceProps, launcher: SidebarLauncher | un
       const active = Object.is(document.fullscreenElement, root.current);
       if (active) setExpandedInPage(false);
       setFullscreen(active);
+      // The scene's Escape (getting up from an activity, leaving walk-in) is the browser's own
+      // while fullscreen: hold it for the page, and give it back with fullscreen.
+      if (active) lockEscape(navigator);
+      else unlockEscape(navigator);
+    };
+    // With Escape held, a press nothing used leaves fullscreen as it did before.
+    const pressed = (event: KeyboardEvent) => {
+      if (!Object.is(document.fullscreenElement, root.current)) return;
+      leaveFullscreenAfter(event, pageUsesEscape(document), document);
     };
     document.addEventListener("fullscreenchange", changed);
-    return () => document.removeEventListener("fullscreenchange", changed);
+    document.addEventListener("keydown", pressed, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", changed);
+      document.removeEventListener("keydown", pressed, true);
+      unlockEscape(navigator);
+    };
   }, [canFullscreen]);
   // A sidebar press on a retained screen must not activate a hidden floor.
   const launch = useCallback(() => {
@@ -1663,8 +1679,12 @@ function SceneDialog({
   choice: ReturnType<typeof useOfficeScene>;
   styles: OfficeStyles;
 }) {
+  const icon = useMemo(
+    () => <Icon name="Mountain" size={18} color={styles.workspaceAccent} />,
+    [styles.workspaceAccent],
+  );
   return (
-    <OfficeModal title="Scene" open={open} onOpenChange={setOpen}>
+    <OfficeModal title="Scene" icon={icon} open={open} onOpenChange={setOpen}>
       <OfficeModal.Content>
         <SceneChoices choice={choice} styles={styles} />
       </OfficeModal.Content>

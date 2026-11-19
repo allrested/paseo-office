@@ -34,7 +34,7 @@ export const clockHooks = {};
 export const lunchHooks = {};
 const viaClock = (kind, w, then) => (clockHooks[kind] ? clockHooks[kind](w, then) : then());
 export function hash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-export const colorOf = (s) => (s.desk >= 0 ? PALETTE[s.desk] : PALETTE[hash(s.name) % PALETTE.length]);
+export const colorOf = (s) => s.shirt || (s.desk >= 0 ? PALETTE[s.desk] : PALETTE[hash(s.name) % PALETTE.length]);
 // What to call a session on screen: the chat's title (your rename, else Claude's), else its short name.
 // The short name stays the identity: looks, colours and the timeline are keyed by it.
 export const dn = (s) => (s ? s.title || s.name : '');
@@ -67,7 +67,7 @@ export function updateZs(dt) {
     if (z.life <= 0) { scene.remove(z.s); z.s.material.dispose(); zs.splice(i, 1); }
   }
 }
-function lookOf(s) { const h = hash(s.name); return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
+export function lookOf(s) { const h = hash(s.name); return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: s.appearance?.avatar || ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
 export const workers = new Map();   // session id -> Worker
 export const npcs = [];             // people who aren't sessions: the director on the company floor
 export const subs = new Map();      // subagent id -> Worker

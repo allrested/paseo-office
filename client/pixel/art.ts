@@ -1,3 +1,5 @@
+import { COLORS, SHIRTS, type Appearance } from "../../shared/appearance.js";
+export { SHIRTS } from "../../shared/appearance.js";
 // The 2D office's pictures. Small ones are written as grids, a letter per pixel; wide furniture
 // is painted with rectangles into a grid first. Everything is compiled once per tone set.
 import { CLEAR, compileSprite, type Sprite } from "./sprite.js";
@@ -130,21 +132,6 @@ export const HAIRS = [
   { hair: "#8F3030", shade: "#742222" },
   { hair: "#70707C", shade: "#585863" },
 ] as const;
-/**
- * Shirts, and the bar on a person's name tag. Each has a luminance of 0.2, the narrow band that
- * is 3.2:1 on the day floor and on the night floor alike.
- */
-export const SHIRTS = [
-  { shirt: "#DA494E", shade: "#B63D41" },
-  { shirt: "#B76724", shade: "#98561E" },
-  { shirt: "#2A8D58", shade: "#237549" },
-  { shirt: "#208892", shade: "#1B7179" },
-  { shirt: "#3D7AD8", shade: "#3366B4" },
-  { shirt: "#8265E8", shade: "#6C55C1" },
-  { shirt: "#C15499", shade: "#A1467F" },
-  { shirt: "#8C7C2D", shade: "#746625" },
-] as const;
-
 export interface Look {
   skin: number;
   hair: number;
@@ -152,15 +139,23 @@ export interface Look {
 }
 
 /** A stable look from an id: the same agent looks the same on every device. */
-export function lookOf(id: string): Look {
+function lookHash(id: string) {
   let hash = 2166136261;
   for (let index = 0; index < id.length; index += 1) {
     hash = Math.imul(hash ^ id.charCodeAt(index), 16777619) >>> 0;
   }
+  return hash;
+}
+export function lookOf(id: string, appearance?: Appearance): Look {
+  const seed = lookHash(id);
+  const hash = appearance?.avatar ? lookHash(appearance.avatar) : seed;
   return {
     skin: hash % SKINS.length,
     hair: (hash >>> 4) % HAIRS.length,
-    shirt: (hash >>> 9) % SHIRTS.length,
+    shirt:
+      appearance?.color === undefined
+        ? (seed >>> 9) % SHIRTS.length
+        : COLORS.indexOf(appearance.color),
   };
 }
 

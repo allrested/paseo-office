@@ -1,3 +1,4 @@
+import { AVATARS, shirtColor, type Appearance } from "../shared/appearance.js";
 import { CHAT_TEXT_MAX, type ChatMessage } from "../shared/contracts.js";
 import { agentTitle, type OfficeModel } from "../shared/model.js";
 import { REACTIONS } from "../shared/upstream/chat-engine.js";
@@ -126,18 +127,28 @@ function initialsOf(name: string): string {
 }
 
 /** Null for a system line and for yours. An agent's colour is its shirt on the floor. */
-export function avatarOf(message: ChatMessage): { initials: string; color: string } | null {
+export function avatarOf(
+  message: ChatMessage,
+  appearance?: Appearance,
+): { initials: string; color: string } | null {
   if (message.kind === "sys" || message.from === undefined || isYours(message)) return null;
   const name = message.name ?? message.from;
-  return memberAvatar(message.from, name);
+  return memberAvatar(message.from, name, appearance);
 }
 
-export function memberAvatar(id: string, name: string): { initials: string; color: string } {
+export function memberAvatar(
+  id: string,
+  name: string,
+  appearance?: Appearance,
+): { initials: string; color: string } {
   if (id === DIRECTOR) {
     return { initials: [...name].slice(0, 1).join("").toUpperCase(), color: DIRECTOR_COLOR };
   }
   const shirt = SHIRTS[lookOf(id).shirt] ?? SHIRTS[0];
-  return { initials: initialsOf(name), color: shirt.shirt };
+  return {
+    initials: appearance?.avatar ? AVATARS[appearance.avatar] : initialsOf(name),
+    color: shirtColor(appearance) ?? shirt.shirt,
+  };
 }
 
 export function pollRows(
@@ -188,6 +199,7 @@ export function mentionAt(text: string): Mention | null {
 }
 
 export interface MentionOption {
+  appearance?: Appearance;
   id: string;
   name: string;
   room: string;

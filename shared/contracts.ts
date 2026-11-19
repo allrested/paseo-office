@@ -1,3 +1,4 @@
+import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { z } from "zod";
@@ -49,6 +50,7 @@ export const OfficeAgentSchema = z.object({
   createdAt: z.string(),
   /** Absent for a provider that reports no context window, and before an agent's first turn. */
   context: AgentContextSchema.optional(),
+  appearance: AppearanceSchema.optional(),
   /** A sub-agent's number among its parent's, as the office stored it on the agent. */
   number: z.number().int().positive().optional(),
   /** On a parent: the number its next sub-agent gets. */
@@ -362,6 +364,8 @@ export const ChatMessageSchema = z.object({
   poll: ChatPollSchema.nullable().optional(),
   remind: ChatRemindSchema.nullable().optional(),
   reply: ChatReplySchema.nullable().optional(),
+  /** Routing of a plain group exchange or delivery notice. Older messages have no tag. */
+  tag: z.string().optional().catch(undefined),
   /** Emoji → who reacted with it. */
   reacts: z.record(z.string(), z.array(z.string())),
   recalled: z.boolean().optional(),

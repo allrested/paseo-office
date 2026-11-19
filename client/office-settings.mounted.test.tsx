@@ -141,6 +141,27 @@ test("the screen holds the switches, the fields and the view", async () => {
   expect(labelled("List view")?.getAttribute("aria-selected")).toBe("true");
 });
 
+test("section changes reveal the matching controls and keep the notes field mounted", async () => {
+  await mount();
+  const section = (name: string) =>
+    container.querySelector<HTMLElement>(`[role="button"][aria-label="${name}"]`)!;
+  const visible = (node: HTMLElement | null) => {
+    for (let el = node; el; el = el.parentElement)
+      if (getComputedStyle(el).display === "none") return false;
+    return node !== null;
+  };
+  const folder = labelled("Notes folder");
+  expect(section("Appearance").getAttribute("aria-pressed")).toBe("true");
+  expect(visible(labelled("Outdoor scene"))).toBe(true);
+  expect(visible(folder)).toBe(false);
+  await act(async () => section("Automation").click());
+  expect(visible(folder)).toBe(true);
+  await act(async () => section("Services").click());
+  expect(visible(labelled("Jira projects"))).toBe(true);
+  expect(visible(folder)).toBe(false);
+  expect(labelled("Notes folder")).toBe(folder);
+});
+
 test("a view chosen here is saved on the device", async () => {
   await mount();
   await act(async () => labelled("2D view")?.click());

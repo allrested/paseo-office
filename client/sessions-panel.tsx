@@ -1,3 +1,4 @@
+import { AVATARS, shirtColor } from "../shared/appearance.js";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import type { ChecklistProgress } from "../shared/contracts.js";
@@ -81,6 +82,11 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
     accent = ui.error;
     detailColor = ui.errorText;
   }
+  const borderColor = shirtColor(agent.appearance);
+  const avatarStyle = useMemo(
+    () => [ui.avatar, borderColor && { borderColor, borderWidth: 2 }],
+    [ui.avatar, borderColor],
+  );
   const clockStyle = useMemo(
     () => [ui.clock, detailColor, tone === "running" && ui.workingClock],
     [ui, tone, detailColor],
@@ -105,8 +111,12 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
         {({ pressed }) => (
           <>
             {(pressed || hovered) && <View style={styles.pressedFill} />}
-            <View style={ui.avatar}>
-              <Text style={ui.initials}>{avatarInitials(title)}</Text>
+            <View style={avatarStyle}>
+              <Text style={ui.initials}>
+                {agent.appearance?.avatar
+                  ? AVATARS[agent.appearance.avatar]
+                  : avatarInitials(title)}
+              </Text>
               <View style={ui.badge}>
                 <View style={styles.dot[tone]} />
               </View>

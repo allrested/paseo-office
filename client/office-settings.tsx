@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { OfficeModal } from "./office-modal.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
+import { settingsLayout } from "./settings-sections.js";
 import { LanguageSetting } from "./language-switch.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
@@ -11,13 +12,7 @@ import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
 import { useOfficeScene } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
-import {
-  OFFICE_SCENES,
-  OFFICE_LIGHTING,
-  type OfficeScene,
-  type OfficeLighting,
-} from "../shared/settings.js";
-import { SegmentPill } from "./segment-pill.js";
+import { SceneChoices } from "./scene-picker.js";
 import { ViewSwitch } from "./view-switch.js";
 
 export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
@@ -53,23 +48,27 @@ interface FieldsProps {
 }
 
 function OfficeSettingsFields({ office, styles, actions, view, street, sound }: FieldsProps) {
+  const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   return (
-    <View style={styles.header}>
-      <HostSwitches
-        wake={office.loaded && live ? office.state.wake : null}
-        actions={actions}
-        styles={styles}
-        deviceProblem={
-          deviceProblemOf(view.unsaved, sound.unsaved) ??
-          (street.unsaved ? "Unable to save the scene on this device." : null)
-        }
-        scheduleError={office.state.notes?.scheduleError ?? null}
-        weather={office.state.weather}
-        incidents={office.state.incidents}
-      >
-        <>
+    <HostSwitches
+      language={language}
+      wake={office.loaded && live ? office.state.wake : null}
+      actions={actions}
+      styles={styles}
+      deviceProblem={
+        deviceProblemOf(view.unsaved, sound.unsaved) ??
+        (street.unsaved ? "Unable to save the scene on this device." : null)
+      }
+      scheduleError={office.state.notes?.scheduleError ?? null}
+      weather={office.state.weather}
+      incidents={office.state.incidents}
+    >
+      <>
+        <SceneChoices choice={street} styles={styles} />
+        <View style={settingsLayout.strip}>
+          <Text style={styles.sheetLabel}>Office view</Text>
           <ViewSwitch
             options={view.options}
             value={view.choice}
@@ -77,11 +76,9 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
             styles={styles}
           />
           <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
-          <SceneChoices choice={street} styles={styles} />
-        </>
-      </HostSwitches>
-      <LanguageSetting styles={styles} />
-    </View>
+        </View>
+      </>
+    </HostSwitches>
   );
 }
 
@@ -94,8 +91,8 @@ export function FullscreenSettings({
   onClose(): void;
 }) {
   return (
-    <OfficeModal title="Office settings" open={open} onOpenChange={onClose}>
-      <OfficeModal.Content>
+    <OfficeModal title="Office settings" size="settings" open={open} onOpenChange={onClose}>
+      <OfficeModal.Content scrollable={false} contentContainerStyle={settingsLayout.flush}>
         <OfficeSettingsFields {...fields} />
       </OfficeModal.Content>
     </OfficeModal>
@@ -110,57 +107,4 @@ export function useOfficeSettingsDialog(fullscreen: boolean, nativeSettings?: ()
     if (!fullscreen) close();
   }, [fullscreen, close]);
   return { open: fullscreen && open, show: fullscreen ? show : nativeSettings, close };
-}
-
-const SCENE_NAMES: Record<OfficeScene, string> = {
-  plain: "Plain",
-  city: "City",
-  countryside: "Countryside",
-  beach: "Beach",
-};
-const LIGHT_NAMES: Record<OfficeLighting, string> = {
-  auto: "App theme",
-  day: "Day",
-  night: "Night",
-};
-
-export function SceneChoices({
-  choice,
-  styles,
-}: {
-  choice: ReturnType<typeof useOfficeScene>;
-  styles: OfficeStyles;
-}) {
-  return (
-    <View style={styles.headerField}>
-      <Text style={styles.sheetLabel}>Outdoor scene</Text>
-      <View role="group" aria-label="Outdoor scene" style={styles.notesDays}>
-        {OFFICE_SCENES.map((value) => (
-          <SegmentPill
-            key={value}
-            value={value}
-            name={SCENE_NAMES[value]}
-            on={choice.scene.on === value}
-            disabled={choice.scene.on === null}
-            onPress={choice.scene.set}
-            styles={styles}
-          />
-        ))}
-      </View>
-      <Text style={styles.sheetLabel}>Lighting</Text>
-      <View role="group" aria-label="Lighting" style={styles.notesDays}>
-        {OFFICE_LIGHTING.map((value) => (
-          <SegmentPill
-            key={value}
-            value={value}
-            name={LIGHT_NAMES[value]}
-            on={choice.lighting.on === value}
-            disabled={choice.lighting.on === null}
-            onPress={choice.lighting.set}
-            styles={styles}
-          />
-        ))}
-      </View>
-    </View>
-  );
 }

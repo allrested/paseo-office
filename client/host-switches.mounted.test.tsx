@@ -72,7 +72,7 @@ vi.mock("@getpaseo/plugin/client", () => ({
 
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { TextInput } = await import("react-native");
-  return { TextInput };
+  return { TextInput, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

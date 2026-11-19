@@ -329,7 +329,7 @@ test("the To picker targets one session by id and can switch back to the whole g
   await press("Send");
   expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Check permissions", to: FIX.id });
   await press("To: Fix login");
-  await press("Whole group, Send to the group chat");
+  await press("Whole group, Ask an available session");
   await type("Thanks everyone!");
   await press("Send");
   expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Thanks everyone!" });

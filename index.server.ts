@@ -591,7 +591,10 @@ export function createOfficePlugin(
         office.turnEnded(agent.id);
         if (outcome.kind === "completed" && turnId !== null) {
           await office
-            .checkCompletion(agent.id, () => chatPorts.lastAnswer(agent.id, turnId))
+            .checkCompletion(
+              agent.id,
+              async () => (await chatPorts.readTurn(agent.id, turnId)).text,
+            )
             .catch((error: unknown) =>
               log(`[office] lobby completion check failed: ${errorMessage(error)}`),
             );

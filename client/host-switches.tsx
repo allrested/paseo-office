@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
+import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
@@ -70,6 +71,7 @@ export interface HostSwitchesProps {
   incidents: TrackerState | undefined;
   /** The device's own switch: last in the row, so on a phone it wraps to the line above the view. */
   weather?: import("../shared/contracts.js").WeatherState | undefined;
+  language?: ReactNode;
   children?: ReactNode;
 }
 
@@ -87,6 +89,7 @@ export function HostSwitches({
   scheduleError,
   incidents,
   weather,
+  language,
   children,
 }: HostSwitchesProps) {
   const settings = useSettings(officeHostSettings);
@@ -175,82 +178,106 @@ export function HostSwitches({
     wakeProblem,
     settings.status === "error" ? failureText("Read the office settings", settings.error) : null,
     saveProblem("Agent tools"),
-    deviceProblem,
   ].filter((problem): problem is string => problem !== null);
   return (
-    <>
-      <View style={styles.headerControls}>
-        <LabeledSwitch
-          label="Wake agents"
-          note={summary}
-          value={wantedWakes ?? wakesOn}
-          onChange={toggleWakes}
-          styles={styles}
-        />
-        <LabeledSwitch
-          label="Agent tools"
-          value={wantedTools ?? stored?.agentTools ?? null}
-          onChange={toggleTools}
-          styles={styles}
-        />
-        {children}
-      </View>
-      <View style={styles.headerFields}>
-        <FloorPlanRow
-          value={storedPlan(stored)}
-          onSave={savePlan}
-          problem={saveProblem(FLOOR_PLAN_LABEL)}
-          styles={styles}
-        />
-      </View>
-      <View style={styles.headerFields}>
-        <SettingField
-          label="Notes folder"
-          hint="Where the stand-up notes are written. Empty turns them off."
-          value={stored?.notesFolder ?? null}
-          onSave={saveFolder}
-          problem={saveProblem("Notes folder")}
-          styles={styles}
-        />
-        <SettingField
-          label="Time zone"
-          hint="For the 8:00 run. Empty uses this host's."
-          value={stored?.notesTimeZone ?? null}
-          onSave={saveTimeZone}
-          problem={timeZoneProblem}
-          styles={styles}
-        />
-        <NotesDays
-          value={stored?.notesDays ?? null}
-          onSave={saveDays}
-          problem={saveProblem(NOTES_DAYS_LABEL)}
-          styles={styles}
-        />
-      </View>
-      <TrackerFields
-        values={stored}
-        incidents={incidents}
-        change={change}
-        saveProblem={saveProblem}
-        styles={styles}
-      />
-      <WeatherFields
-        values={stored}
-        weather={weather}
-        change={change}
-        saveProblem={saveProblem}
-        styles={styles}
-      />
-      {problems.length > 0 ? (
-        <View style={styles.headerProblems}>
-          {problems.map((problem) => (
-            <Text key={problem} accessibilityRole="alert" style={styles.actionError}>
-              {problem}
+    <SettingsSections
+      styles={styles}
+      appearance={
+        <>
+          {children}
+          <View style={styles.headerFields}>
+            <FloorPlanRow
+              value={storedPlan(stored)}
+              onSave={savePlan}
+              problem={saveProblem(FLOOR_PLAN_LABEL)}
+              styles={styles}
+            />
+          </View>
+          <View style={styles.headerFields}>{language}</View>
+          {deviceProblem && (
+            <Text accessibilityRole="alert" style={styles.actionError}>
+              {deviceProblem}
             </Text>
-          ))}
-        </View>
-      ) : null}
-    </>
+          )}
+        </>
+      }
+      automation={
+        <>
+          <View style={settingsLayout.block}>
+            <Text style={styles.sheetLabel}>Agents</Text>
+            <View style={settingsLayout.strip}>
+              <LabeledSwitch
+                label="Wake agents"
+                note={summary}
+                value={wantedWakes ?? wakesOn}
+                onChange={toggleWakes}
+                styles={styles}
+              />
+              <LabeledSwitch
+                label="Agent tools"
+                value={wantedTools ?? stored?.agentTools ?? null}
+                onChange={toggleTools}
+                styles={styles}
+              />
+            </View>
+          </View>
+          <Text style={styles.sheetLabel}>Stand-up schedule</Text>
+          <View style={styles.headerFields}>
+            <SettingField
+              label="Notes folder"
+              hint="Where the stand-up notes are written. Empty turns them off."
+              value={stored?.notesFolder ?? null}
+              onSave={saveFolder}
+              problem={saveProblem("Notes folder")}
+              styles={styles}
+            />
+            <SettingField
+              label="Time zone"
+              hint="For the 8:00 run. Empty uses this host's."
+              value={stored?.notesTimeZone ?? null}
+              onSave={saveTimeZone}
+              problem={timeZoneProblem}
+              styles={styles}
+            />
+            <NotesDays
+              value={stored?.notesDays ?? null}
+              onSave={saveDays}
+              problem={saveProblem(NOTES_DAYS_LABEL)}
+              styles={styles}
+            />
+          </View>
+          {problems.length > 0 ? (
+            <View style={styles.headerProblems}>
+              {problems.map((problem) => (
+                <Text key={problem} accessibilityRole="alert" style={styles.actionError}>
+                  {problem}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </>
+      }
+      services={
+        <>
+          <Text style={styles.sheetLabel}>Issue trackers</Text>
+          <TrackerFields
+            values={stored}
+            incidents={incidents}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
+          <Text style={styles.sheetLabel}>Weather service</Text>
+          <WeatherFields
+            values={stored}
+            weather={weather}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
+        </>
+      }
+    />
   );
 }
 
