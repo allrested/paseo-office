@@ -137,6 +137,18 @@ test("a free figure acts out a pretend duty of the host's board, which is told i
   ]);
 });
 
+test("an owed duty of the host's board is acted out with no apology: nobody complained of it", () => {
+  const w = seat("a1", "Planner");
+  const said: string[] = [];
+  w.say = (_kind: string, text: string) => said.push(text);
+  // (its own post id: the page remembers what it acted out today)
+  host.duties = [{ ...pretend, id: "p9", chore: "plants", owed: true }];
+  lookOnce();
+  expect(host.dutyDone).toHaveBeenCalledWith("p9", "a1");
+  expect(said).not.toEqual([]);
+  expect(said.join(" ")).not.toMatch(/yesterday/i);
+});
+
 test("an agent's duty is acted out by its holder's figure, and nothing is reported", () => {
   seat("a1", "Planner");
   const holder = seat("a2", "Builder");

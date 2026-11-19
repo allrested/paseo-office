@@ -76,7 +76,7 @@ function start(chore, w, owed, given = null) {   // PASEO: `given`, a duty of th
   w.station = 'duty'; w.restAt = Infinity; w.hush(); w.anim = 'wake';
   later(reduceMotion ? 0.3 : 1.4, () => {
     if (!alive(J)) return;
-    w.anim = 'idle'; if (chore !== 'board') say(w, owed ? 'owe' : `${chore}Go`);
+    w.anim = 'idle'; if (chore !== 'board') say(w, owed && !given ? 'owe' : `${chore}Go`);   // PASEO: a 'board' duty says nothing; an owed duty of the host's, nobody complained of, gets no apology
     J.stage = 'go';
     ({ cups, trash, plants, table, board })[chore](J);
   });
