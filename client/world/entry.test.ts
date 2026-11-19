@@ -851,4 +851,6 @@ test("the host's duties replace the scene's rota, and a pretend duty acted out i
   expect(pageHost.duties).toEqual(list);
   pageHost.dutyDone("p1", "a1");
   expect(done).toHaveBeenCalledWith("p1", "a1");
+  pageHost.dutyDone("p1", "x".repeat(300));
+  expect(done).toHaveBeenLastCalledWith("p1", "x".repeat(80));
 });

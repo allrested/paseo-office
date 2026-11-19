@@ -545,3 +545,20 @@ test("on the duty board an agent finishes or reopens only a duty it holds; the o
   });
   await office.stop();
 });
+
+test("a duty acted out names an agent of the office; an unknown one is refused", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS]);
+  await office.syncDuties({ duties: [CUPS], day: TODAY, due: [CUPS], dayOf });
+  expect(await office.actDuty("p1", "nobody")).toEqual({
+    ok: false,
+    error: "Unable to record p1: no agent nobody",
+  });
+  // A start of an id names the agent, as everywhere on the boards.
+  expect(await office.actDuty("p1", "bo")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "b" },
+  });
+  await office.stop();
+});

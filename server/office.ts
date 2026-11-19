@@ -253,7 +253,11 @@ export function createOffice(deps: OfficeDeps): Office {
       if (post !== undefined && instructed(post)) {
         return { ok: false, error: `Unable to record ${id}: an agent is handed this duty` };
       }
-      return service.actDuty(id, agentId);
+      // The 3D office's word is not taken for who it was: the agent must be one of the office's.
+      const agent = await deps.agents.resolve(agentId);
+      if (agent === null)
+        return { ok: false, error: `Unable to record ${id}: no agent ${agentId}` };
+      return service.actDuty(id, agent);
     },
     turnEnded(agentId) {
       queue?.turnEnded(agentId);

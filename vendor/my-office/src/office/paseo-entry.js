@@ -317,7 +317,7 @@ const api = {
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
     host.dutyBoard = typeof options.onDuties === 'function' ? () => options.onDuties() : null;
-    host.dutyDone = typeof options.onDutyDone === 'function' ? (id, agentId) => options.onDutyDone(id, agentId) : () => {};
+    host.dutyDone = typeof options.onDutyDone === 'function' ? (id, agentId) => options.onDutyDone(id, String(agentId ?? '').slice(0, 80)) : () => {};
     // Only completed farewells and promotions are writes to the tenure ledger.
     host.tenure = typeof options.onTenure === 'function'
       ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }

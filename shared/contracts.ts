@@ -712,7 +712,7 @@ export const dutiesSaveRpc = defineRpc({
  */
 export const dutyActedRpc = defineRpc({
   name: "office.duty.acted.request",
-  input: z.object({ id: z.string().min(1), agentId: z.string().min(1) }),
+  input: z.object({ id: z.string().min(1), agentId: z.string().min(1).max(80) }),
   output: PostResultSchema,
 });
 
