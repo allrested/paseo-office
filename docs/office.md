@@ -241,9 +241,12 @@ on. A probe (`paseo-sound.js`) finds out whether the frame allows audio at all. 
 real press only (not for Escape or a bare modifier key, and not while the page has no user
 activation), and makes and closes a context of its own. A page with no Web Audio is "not
 available" at once, for good: the button is dimmed, says "Sound is not available here", and does
-nothing. A press after which no context ran makes the button the same, and turns the scene's sound
-off; the next press tries again, and once a context runs the button can be used again. It then
-shows off until it is pressed, whatever the setting says.
+nothing. A press after which no context ran makes the button the same, and holds the scene's sound
+off without changing the setting; the next press tries again. Once a context runs the button can be
+used again and the scene follows the setting with no further press: on if the setting is on. A
+press on the button itself while audio is held off waits for the probe that press started: if audio
+then starts, the press turns sound on as any press on it does; if not, it says "This app does not
+let the office play sound."
 
 Karaoke follows the switch, because it reads `sfx.on`, and so does the incidents' siren. Every
 saver of the device's document (the view, the incidents rung, the Sound switch) writes it whole,

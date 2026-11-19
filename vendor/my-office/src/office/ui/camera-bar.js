@@ -13,7 +13,7 @@ import { focusTarget } from '../core/loop.js';
 import { exitFp, floorBounds, fp } from '../interact/first-person.js';
 import { closeSession } from './session-drawer.js';
 import { host } from '../paseo-host.js';
-import { available, sound } from '../paseo-sound.js';
+import { available, sound, whenProbed } from '../paseo-sound.js';
 
 /** The floor's plinth past its walkable bounds, the foot of the plinth and the top of the walls. */
 const PLINTH = 1.5, FOOT = -1.3, WALL = 3.4;
@@ -268,7 +268,9 @@ export function setup() {
   });
   document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
   // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite,
-  // inside the press, which is what lets the page's audio start. Where audio cannot start it says so and does nothing.
+  // inside the press, which is what lets the page's audio start. Where audio is blocked, the press's own probe (it hears
+  // the pointerup or key before this click) may yet start it: the press waits for it, turns sound on if it did, and
+  // says it cannot only if it did not. With no Web Audio it says so at once.
   const soundButton = $('btn-sound'), soundIcon = $('sound-ico');
   soundIcon.style.display = 'inline-grid';
   const showSound = () => {
@@ -280,8 +282,8 @@ export function setup() {
     soundIcon.replaceChildren(speaker(sound.on));
   };
   soundButton.addEventListener('click', () => {
-    if (!available()) { host.toast('This app does not let the office play sound.'); return; }
-    sound.request(!sound.on);
+    if (available()) { sound.request(!sound.on); return; }
+    whenProbed(() => { if (available()) sound.request(true); else host.toast('This app does not let the office play sound.'); });
   });
   sound.subscribe(showSound);
   showSound();

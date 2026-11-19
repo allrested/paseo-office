@@ -233,7 +233,10 @@ Seen at 1280 px:
   first context report "suspended" and never resume. Escape and Shift made no probe. The first
   press on the floor made the button dimmed with "Sound is not available here" and turned the
   scene's sound off; a second press probed again, the context ran, and the button could be used:
-  it showed off, though the setting was still on, until it was pressed, and then on.
+  it showed off, though the setting was still on, until it was pressed, and then on. Fixed after
+  this look, to be seen again: the scene now keeps the setting through a block and turns sound on
+  by itself once a press starts audio, and a press on the button whose own probe starts audio
+  turns sound on instead of saying it is unavailable.
 - The autoplay rule could not be made stricter: the browser starts with the kit's own flags, and a
   context made without a press ran. A frame that refuses audio was made with the script above
   instead.

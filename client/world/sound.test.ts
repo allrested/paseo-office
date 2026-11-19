@@ -224,3 +224,62 @@ test("stop() during a probe in flight leaves the state and the listeners alone w
   window.dispatchEvent(new Event("pointerup"));
   expect(made.contexts).toBe(1);
 });
+
+test("the host's on is kept through a block: once a later press makes audio ready, sound comes on by itself", async () => {
+  install("hangs");
+  const m = await fresh();
+  stop = m.watchAudio(window, 1500);
+  m.sound.request = vi.fn();
+  m.setOn(true);
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(m.sound.audio).toBe("blocked");
+  expect(m.sound.on).toBe(false);
+  install("runs");
+  window.dispatchEvent(new Event("pointerup"));
+  await settle();
+  expect(m.sound.audio).toBe("ready");
+  expect(m.sound.on).toBe(true);
+  // The probe asks the host for nothing: the stored setting is the host's.
+  expect(m.sound.request).not.toHaveBeenCalled();
+});
+
+test("the host's off is kept too: audio becoming ready does not turn sound on", async () => {
+  install("hangs");
+  const m = await fresh();
+  stop = m.watchAudio(window, 1500);
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(1600);
+  install("runs");
+  window.dispatchEvent(new Event("pointerup"));
+  await settle();
+  expect(m.sound.audio).toBe("ready");
+  expect(m.sound.on).toBe(false);
+});
+
+test("whenProbed waits for the probe in flight, and runs at once when none is", async () => {
+  install("hangs");
+  const m = await fresh();
+  stop = m.watchAudio(window, 1500);
+  const heard: string[] = [];
+  m.whenProbed(() => heard.push(`idle:${m.sound.audio}`));
+  window.dispatchEvent(new Event("pointerup"));
+  m.whenProbed(() => heard.push(`after:${m.sound.audio}`));
+  expect(heard).toEqual(["idle:idle"]);
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(heard).toEqual(["idle:idle", "after:blocked"]);
+});
+
+test("stop() drops what waits on the probe in flight", async () => {
+  install("hangs");
+  const m = await fresh();
+  const stopWatching = m.watchAudio(window, 1500);
+  const waiter = vi.fn();
+  window.dispatchEvent(new Event("pointerup"));
+  m.whenProbed(waiter);
+  stopWatching();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(waiter).not.toHaveBeenCalled();
+  m.whenProbed(waiter);
+  expect(waiter).toHaveBeenCalledTimes(1);
+});

@@ -5,12 +5,12 @@
 const listeners = new Set();
 
 export const sound = {
-  /** Whether sounds play: the person's choice, and false wherever audio cannot start. */
+  /** Whether sounds play: what was last asked for (setOn), while audio can start; false wherever it cannot. */
   on: false,
   /**
    * 'idle' until a press has tried to start audio, then 'ready'. 'unsupported': the page has no Web Audio, known at
-   * once. 'blocked': a press did not start a context (a frame that never lets audio start). Neither changes until
-   * the page is loaded again.
+   * once, and final. 'blocked': the last press did not start a context; the next activating press tries again, so it
+   * can still turn 'ready'. 'ready' is final.
    */
   audio: 'idle',
   /** Set by paseo-entry.js: the button asks for the switch to be `next`. */
@@ -29,19 +29,37 @@ const emit = () => {
 /** Whether a press can start audio here, as far as is known. */
 export const available = () => sound.audio !== 'blocked' && sound.audio !== 'unsupported';
 
-/** The switch, from the host or a press. Only `true` turns it on, and where audio cannot start it stays off. */
-export function setOn(on) {
-  const next = on === true && available();
+/** What was last asked for, by the host or a press: kept while audio cannot start, so it applies once it can. */
+let wanted = false;
+
+/** `sound.on` from what was asked and whether audio can start; listeners hear a change only. */
+function apply() {
+  const next = wanted && available();
   if (sound.on === next) return;
   sound.on = next;
   emit();
 }
 
+/** The switch, from the host or a press. Only `true` turns it on, and where audio cannot start it stays off. */
+export function setOn(on) {
+  wanted = on === true;
+  apply();
+}
+
 function setAudio(audio) {
   if (sound.audio === audio) return;
   sound.audio = audio;
-  if (!available()) sound.on = false;
+  sound.on = wanted && available();
   emit();
+}
+
+/** Run once the probe in flight settles; null while none is. */
+let waiting = null;
+
+/** Runs `done` once the probe in flight has settled `sound.audio`, or at once when none is in flight. */
+export function whenProbed(done) {
+  if (waiting) waiting.push(done);
+  else done();
 }
 
 const QUIET_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Fn', 'OS']);
@@ -52,8 +70,9 @@ const QUIET_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Me
  * not, or a key; not Escape or a bare modifier, and not while `navigator.userActivation` says there is none) makes a
  * context of its own, asks it to run, and says 'ready' if it runs and 'blocked' if it throws, rejects or has not run
  * within `timeoutMs`. The context is closed after. 'ready' is final and stops listening; 'blocked' is not: the next
- * activating press probes again, so a slow start or a frame that gains audio later is not lost until a reload.
- * Returns the function that stops listening and drops a probe in flight (no state change after it).
+ * activating press probes again, so a slow start or a frame that gains audio later is not lost until a reload, and
+ * the switch then follows what was last asked for (setOn) with no new ask. Returns the function that stops listening
+ * and drops a probe in flight (no state change after it, and what waits on it in `whenProbed` is not run).
  */
 export function watchAudio(win = window, timeoutMs = 1500) {
   const contextOf = () => win.AudioContext || win.webkitAudioContext;
@@ -86,6 +105,7 @@ export function watchAudio(win = window, timeoutMs = 1500) {
       return;
     }
     probing = true;
+    waiting = [];
     let settled = false;
     let timer;
     const finish = () => {
@@ -93,9 +113,12 @@ export function watchAudio(win = window, timeoutMs = 1500) {
       settled = true;
       probing = false;
       clearTimeout(timer);
+      const then = waiting;
+      waiting = null;
       if (!stopped) {
         setAudio(context.state === 'running' ? 'ready' : 'blocked');
         if (sound.audio === 'ready') stop();
+        for (const done of then) done();
       }
       try {
         Promise.resolve(context.close()).catch(() => {});

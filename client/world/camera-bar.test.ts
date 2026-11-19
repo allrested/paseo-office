@@ -52,7 +52,7 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
 import { build, goView, setView, setup } from "../../vendor/my-office/src/office/ui/camera-bar.js";
 
 // @ts-expect-error vendored JavaScript has no declarations
-import { setOn, sound } from "../../vendor/my-office/src/office/paseo-sound.js";
+import { setOn, sound, watchAudio } from "../../vendor/my-office/src/office/paseo-sound.js";
 
 const { camera, controls, fpCam } =
   // @ts-expect-error vendored JavaScript has no declarations
@@ -211,6 +211,79 @@ test("where audio cannot start the button says so, is disabled, and a press says
   click("#btn-sound");
   expect(asked).toEqual([]);
   expect(h.toast).toHaveBeenCalledWith("This app does not let the office play sound.");
+});
+
+/** A page whose audio context runs when asked (`runs`) or never does. */
+function audio(runs: boolean): void {
+  Object.assign(window, {
+    AudioContext: class {
+      state = "suspended";
+      resume() {
+        if (!runs) return new Promise(() => undefined);
+        this.state = "running";
+        return Promise.resolve();
+      }
+      close() {
+        return Promise.resolve();
+      }
+    },
+  });
+}
+
+/** A press on the Sound button as a browser delivers it: pointerup (which the probe hears), then click. */
+function pressSound(): void {
+  page("btn-sound").dispatchEvent(new Event("pointerup", { bubbles: true }));
+  click("#btn-sound");
+}
+
+/** The probe left blocked by one press whose context never ran; returns what stops the probe. */
+async function blockedAudio(): Promise<() => void> {
+  audio(false);
+  const stopWatching = watchAudio(window, 1500);
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(sound.audio).toBe("blocked");
+  return stopWatching;
+}
+
+test("a press while audio is blocked whose own probe starts audio turns sound on, and does not say it is unavailable", async () => {
+  open();
+  const stopWatching = await blockedAudio();
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => {
+    asked.push(next);
+    setOn(next);
+  };
+  try {
+    audio(true);
+    pressSound();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(asked).toEqual([true]);
+    expect(sound.on).toBe(true);
+    expect(page("btn-sound").getAttribute("aria-pressed")).toBe("true");
+    expect(h.toast).not.toHaveBeenCalled();
+  } finally {
+    stopWatching();
+    delete (window as unknown as Record<string, unknown>).AudioContext;
+  }
+});
+
+test("a press while audio is blocked whose own probe ends blocked says so once it has, and asks for nothing", async () => {
+  open();
+  const stopWatching = await blockedAudio();
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => asked.push(next);
+  try {
+    pressSound();
+    expect(h.toast).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(asked).toEqual([]);
+    expect(h.toast).toHaveBeenCalledTimes(1);
+    expect(h.toast).toHaveBeenCalledWith("This app does not let the office play sound.");
+  } finally {
+    stopWatching();
+    delete (window as unknown as Record<string, unknown>).AudioContext;
+  }
 });
 
 test("the disabled button is drawn dimmed, and its hover does not light it", () => {

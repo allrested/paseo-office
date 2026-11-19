@@ -78,7 +78,7 @@ copy, and `MANIFEST.json` keeps upstream's sha256. `npm run test:scripts` runs t
 One file is taken trimmed. Its path stays in the import tool's `DENY`, so it never writes it
 and only checks that it exports what the kept modules import (which is why `MANIFEST.json` lists
 it under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry.js` runs its
-`setup` where upstream's start-up order has them, just before the loop.
+`setup` where upstream's start-up order has it, just before the loop.
 
 - `src/office/life/incidents.js`: upstream's alarm, `startIncident`, `updateIncident` and `setup`:
   a red light over the floor and a red stage for 25 s, a fail bubble over each person at work, and
