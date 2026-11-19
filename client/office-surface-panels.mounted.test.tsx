@@ -14,6 +14,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ChatMessage, OfficeAgent, OfficeEvent } from "../shared/contracts.js";
 import { buildOfficeModel } from "../shared/model.js";
 import { officeHostSettings, officeDeviceSettings } from "../shared/settings.js";
+import { feedStore } from "./activity-feed.js";
 import { markChatSeen, resetChatSeen } from "./chat-seen.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 
@@ -23,6 +24,33 @@ let view: "3d" | "2d" | "list";
 let subscriptionStatus: "live" | "error" | "closed";
 /** The office's events, once its subscription is drawn. */
 let deliver: ((event: OfficeEvent) => void) | null;
+
+// One object for every render, as the host's SDK object is. An agent's timeline holds one line.
+const sdk = vi.hoisted(() => ({
+  agents: {
+    ref: () => ({
+      send: async () => undefined,
+      respondToPermission: async () => undefined,
+      cancel: async () => undefined,
+      timeline: {
+        subscribe: () => Object.assign(() => undefined, { ready: Promise.resolve() }),
+        refetch: async () => ({
+          entries: [
+            {
+              seqStart: 1,
+              seqEnd: 1,
+              item: { type: "assistant_message", text: "Reading the ledger" },
+            },
+          ],
+          startCursor: { epoch: "e1", seq: 1 },
+          hasOlder: false,
+          staleCursor: false,
+          error: null,
+        }),
+      },
+    }),
+  },
+}));
 
 const DEVICE: SettingsState<typeof officeDeviceSettings.schema> = {
   status: "ready",
@@ -43,7 +71,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
       return { ...DEVICE, values: { ...DEVICE.values, view } };
     }
     if (settings.id === "office-column") {
-      return { ...DEVICE, values: { width: 360, collapsed: false } };
+      return { ...DEVICE, values: { width: 360, collapsed: columnCollapsed } };
     }
     return { ...DEVICE, values: officeHostSettings.schema.parse({}) };
   },
@@ -61,15 +89,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   useRpc: () => async () => {
     throw new Error("The header asks for nothing");
   },
-  usePaseo: () => ({
-    agents: {
-      ref: () => ({
-        send: async () => undefined,
-        respondToPermission: async () => undefined,
-        cancel: async () => undefined,
-      }),
-    },
-  }),
+  usePaseo: () => sdk,
 }));
 
 vi.mock("@getpaseo/plugin/client/ui", async () => {
@@ -129,6 +149,12 @@ const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as 
 let settingsWay: boolean;
 /** How many times the surface asked for the office's settings screen. */
 let settingsOpened: number;
+/** False on an app with no navigation: the surface gets none. */
+let withNavigation: boolean;
+/** The agents the app was asked to open in their workspace. */
+let opened: string[];
+/** What the device holds of the column. */
+let columnCollapsed: boolean;
 /** True for the phone's layout, as the app mounts it narrow; false for the wide one. */
 let compact: boolean;
 let container: HTMLElement;
@@ -142,7 +168,14 @@ async function mount(): Promise<void> {
     host: { id: "host", label: "Host" },
     params: {},
     ...(settingsWay ? { onOpenSettings: () => void (settingsOpened += 1) } : {}),
-    navigation: { openAgent: () => undefined, openWorkspace: () => undefined },
+    ...(withNavigation
+      ? {
+          navigation: {
+            openAgent: ({ agentId }: { agentId: string }) => void opened.push(agentId),
+            openWorkspace: () => undefined,
+          },
+        }
+      : {}),
   } as unknown as PluginScreenProps;
   await act(async () => root.render(createElement(OfficeSurface, props)));
 }
@@ -184,6 +217,10 @@ beforeEach(() => {
   deliver = null;
   settingsWay = true;
   settingsOpened = 0;
+  withNavigation = true;
+  opened = [];
+  columnCollapsed = false;
+  feedStore.reset();
   compact = true;
   // The test browser's AccessibilityInfo gives no subscription to remove; the 2D floor asks.
   vi.spyOn(AccessibilityInfo, "addEventListener").mockReturnValue({
@@ -543,4 +580,192 @@ test("Attention says why while the subscription is in error or closed", async ()
     );
     expect(alerts).toHaveLength(2);
   }
+});
+
+// "Open session" stays in the office: the session is a tab of the column, or the sheet's view.
+
+async function seeAda(extra: Partial<OfficeAgent> = {}): Promise<void> {
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: { ...OFFICE_WITH_ONE_AGENT, agents: [{ ...ADA, ...extra }] },
+    }),
+  );
+}
+
+/** The first control of that name; the list view of the floor draws the agent's rows too. */
+async function pressFirst(label: string): Promise<void> {
+  const button = container.querySelector<HTMLElement>(`[aria-label^="${label}"]`);
+  if (!button) throw new Error(`Nothing is labelled "${label}"`);
+  await act(async () => button.click());
+}
+
+/** The agent's card: a press on a row opens it. */
+const adaCard = () => container.querySelector('section[aria-label="Ada"]');
+const sessionTab = () => container.querySelector<HTMLElement>('[role="tab"][aria-label="Ada"]');
+const sheet = () => container.querySelector('[data-testid="office-column-sheet"]');
+
+test("the card's Open session opens a tab in the wide column, chosen, and does not leave", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  expect(adaCard()).not.toBeNull();
+
+  await press("Open session");
+
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+  expect(container.textContent).toContain("Reading the ledger");
+  expect(opened).toEqual([]);
+  expect(adaCard()).toBeNull();
+});
+
+test("a collapsed column opens when a session opens", async () => {
+  compact = false;
+  columnCollapsed = true;
+  await mount();
+  await seeAda();
+  expect(labelled("Collapse the column")).toBeNull();
+  await pressFirst("Ada");
+  await press("Open session");
+
+  expect(labelled("Collapse the column")).not.toBeNull();
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+});
+
+test("the card's Open session works with no navigation, and the panel has no Open in workspace", async () => {
+  compact = false;
+  withNavigation = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+
+  expect(sessionTab()).not.toBeNull();
+  expect(container.textContent).toContain("Reading the ledger");
+  expect(labelled("Open in workspace")).toBeNull();
+});
+
+test("the panel's Open in workspace asks the app once", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await press("Open in workspace");
+
+  expect(opened).toEqual(["ada"]);
+});
+
+test("the List's Open session for a plan opens the tab", async () => {
+  compact = false;
+  view = "list";
+  await mount();
+  await seeAda({ permissions: [{ id: "p1", kind: "plan", title: "Ship it?" }] });
+  await pressFirst("Open session");
+
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+  expect(opened).toEqual([]);
+});
+
+test("an Activity card's Open session opens the tab", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await seeAda({ status: "running", permissions: [{ id: "p2", kind: "tool", title: "Run ls" }] });
+  await pressTab("Activity");
+  await pressFirst("Open session");
+
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+});
+
+test("an agent that leaves keeps its tab, which says so; Close removes it", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+
+  expect(container.querySelector('[role="tab"][aria-label^="Agent "]')).not.toBeNull();
+  expect(container.textContent).toContain("This agent has left the office.");
+
+  const close = container.querySelector<HTMLElement>('[aria-label^="Close Agent "]');
+  if (!close) throw new Error("The tab has no Close");
+  await act(async () => close.click());
+  expect(container.querySelector('[role="tab"][aria-label^="Agent "]')).toBeNull();
+});
+
+test("a phone's Open session shows the session in the sheet", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+
+  expect(sheet()?.textContent).toContain("Reading the ledger");
+  expect(labelled("Back to Sessions")).not.toBeNull();
+  expect(opened).toEqual([]);
+});
+
+/** The phone's bar: Sessions, with its count of open sessions when it has one. */
+async function pressBarSessions(): Promise<void> {
+  await act(async () =>
+    container
+      .querySelector<HTMLElement>(
+        '[role="tablist"][aria-label="Office column"] [role="tab"][aria-label^="Sessions"]',
+      )
+      ?.click(),
+  );
+}
+
+test("a dismissed sheet keeps the session: reopened from Sessions it is the same one", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  expect(sheet()?.textContent).toContain("Reading the ledger");
+
+  // The scrim closes the sheet and leaves the session open.
+  await press("Close the column");
+  expect(sheet()).toBeNull();
+  expect(labelled("Sessions, 1 open")).not.toBeNull();
+
+  await pressBarSessions();
+  expect(sheet()).not.toBeNull();
+  const row = [...(sheet()?.querySelectorAll<HTMLElement>('[role="button"]') ?? [])].find(
+    (button) => button.getAttribute("aria-label")?.startsWith("Ada"),
+  );
+  if (!row) throw new Error("The sheet has no row for the agent");
+  await act(async () => row.click());
+  await press("Open session");
+
+  expect(sheet()?.textContent).toContain("Reading the ledger");
+  expect(labelled("Sessions, 1 open")).not.toBeNull();
+  expect(container.textContent).not.toContain("Sessions, 2 open");
+});
+
+test("Back in the sheet shows Sessions and keeps the session open", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await press("Back to Sessions");
+
+  expect(sheet()?.textContent).not.toContain("Reading the ledger");
+  expect(labelled("Sessions, 1 open")).not.toBeNull();
+});
+
+test("Close in the sheet's header removes the session", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await press("Close Ada");
+
+  expect(labelled("Sessions, 1 open")).toBeNull();
+  expect(sheet()?.textContent).not.toContain("Reading the ledger");
 });

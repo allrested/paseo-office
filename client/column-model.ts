@@ -66,11 +66,3 @@ export function showTab(tabs: SessionTabs, tab: ColumnTab): SessionTabs {
   if (tabs.view.kind === "tab" && tabs.view.tab === tab) return tabs;
   return { open: tabs.open, view: { kind: "tab", tab } };
 }
-
-/** Drops sessions whose agent is gone from `known`; the view moves as `closeSession` moves it. */
-export function keepKnown(tabs: SessionTabs, known: ReadonlySet<string>): SessionTabs {
-  return tabs.open.reduce(
-    (current, agentId) => (known.has(agentId) ? current : closeSession(current, agentId)),
-    tabs,
-  );
-}

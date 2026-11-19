@@ -26,3 +26,4 @@ export const LOADING = "Loading...";
 export const NOTHING_SAID = "Nothing said yet.";
 export const EARLIER_FAILED = "Unable to read earlier messages. Try again.";
 export const ANSWER_IN_WORKSPACE = "Answer this in the workspace.";
+export const CANNOT_ANSWER_HERE = "This cannot be answered here.";

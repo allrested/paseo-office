@@ -83,7 +83,6 @@ function Harness(props: Partial<SessionPanelProps>) {
     room: "Acme shop",
     actions: { send, respond, cancel },
     styles,
-    theme: THEME,
     layout,
     onOpenWorkspace,
     onClose,
@@ -235,13 +234,26 @@ test("a pending permission is answered above the composer, with the request's id
   expect(respond).toHaveBeenLastCalledWith("a1", "p1", false);
 });
 
-test("a plan or a question cannot be answered here: the panel says where", async () => {
-  await draw({
-    agent: { ...AGENT, permissions: [{ id: "p2", kind: "plan", title: "Plan ready" }] },
-  });
+const PLAN = {
+  id: "p2",
+  kind: "plan" as const,
+  title: "Plan ready",
+  detail: "Move the ledger to the new table",
+};
+
+test("a plan or a question cannot be answered here: the panel says where, with its detail", async () => {
+  await draw({ agent: { ...AGENT, permissions: [PLAN] } });
   expect(maybe("Approve")).toBeNull();
   expect(container.textContent).toContain("Plan ready");
+  expect(container.textContent).toContain("Move the ledger to the new table");
   expect(container.textContent).toContain("Answer this in the workspace.");
+});
+
+test("with no way to the workspace the request says it cannot be answered here", async () => {
+  await draw({ agent: { ...AGENT, permissions: [PLAN] }, onOpenWorkspace: undefined });
+  expect(container.textContent).toContain("Plan ready");
+  expect(container.textContent).not.toContain("Answer this in the workspace.");
+  expect(container.textContent).toContain("This cannot be answered here.");
 });
 
 test("Send sends the trimmed text and clears the box; empty text sends nothing", async () => {
@@ -298,6 +310,17 @@ test("with a keyboard Enter sends and Shift+Enter does not", async () => {
   await key("Enter");
   expect(send).toHaveBeenCalledWith("a1", "hello");
   expect(box().value).toBe("");
+});
+
+test("two Enter presses while a send is pending make one call", async () => {
+  let finish: () => void = () => undefined;
+  send.mockImplementationOnce(() => new Promise<void>((done) => void (finish = done)));
+  await draw();
+  await type("hello");
+  await key("Enter");
+  await key("Enter");
+  expect(send).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
 });
 
 test("on a touch screen Enter is a new line and the Send button sends", async () => {

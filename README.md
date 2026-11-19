@@ -13,7 +13,8 @@ my-office's.
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing.
 - Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
-  Activity, and a team Chat where an `@` prompts an agent.
+  Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
+  the column, with its conversation, a reply box, permission answers and Stop.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
@@ -53,11 +54,11 @@ The settings are in Settings > Plugins > Office. The gear over the floor opens t
 
 ## What works where
 
-| Where                    | What you get                                                                                                                                    |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop app and browsers | The 3D floor, the 2D floor and the list                                                                                                         |
-| The store phone app      | The 2D floor and the list: its plugin frame runs no script                                                                                      |
-| Stock Paseo 0.16         | Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on the agent card, and the Host card does not close an idle agent's runtime |
+| Where                    | What you get                                                                                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop app and browsers | The 3D floor, the 2D floor and the list                                                                                                                                                |
+| The store phone app      | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
+| Stock Paseo 0.16         | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
 

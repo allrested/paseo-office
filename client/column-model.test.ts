@@ -6,7 +6,6 @@ import {
   clampColumn,
   closeSession,
   countLabel,
-  keepKnown,
   openSession,
   showTab,
 } from "./column-model.js";
@@ -98,13 +97,4 @@ test("showing the tab already shown returns the same tabs", () => {
   const shown = showTab(openSession(NO_SESSIONS, "a"), "chat");
   expect(showTab(shown, "chat")).toBe(shown);
   expect(showTab(NO_SESSIONS, "sessions")).toBe(NO_SESSIONS);
-});
-
-test("a session whose agent is gone is dropped", () => {
-  const two = openSession(openSession(NO_SESSIONS, "a"), "b");
-  expect(keepKnown(two, new Set(["a"]))).toEqual({
-    open: ["a"],
-    view: view("a"),
-  });
-  expect(keepKnown(two, new Set(["a", "b"]))).toBe(two);
 });

@@ -72,9 +72,11 @@ and answers a tool, mode or other permission; a plan or a question says to answe
 session. Stop ends the running turn, and is offered only on a host whose SDK has an agent's
 `cancel()` (`shared/host-extras.ts`); stock Paseo 0.16 does not.
 
-On an app with a side area for plugin screens (`navigation.showBeside`, which stock Paseo 0.16
-does not have), the session opens beside the floor. Elsewhere it opens in its workspace
-(`client/beside.ts`).
+"Open session" shows the session in the office's column (see below) in every app, and the card
+closes as it does. Every way in (the card, an Activity card, the List's "Answer in the session",
+the 3D office's walk-in) calls the surface's one `openSession`. Leaving for the agent's workspace
+is the session panel's own "Open in workspace", drawn only where the app gives the plugin
+`navigation`.
 
 ## Views
 
@@ -112,6 +114,17 @@ the tabs. On a compact layout the floor fills the page, a bar of the tabs sits u
 opens the column as a sheet over the floor (`client/column-sheet.tsx`); Close, a press above the
 sheet and Escape close it. Width and collapsed are the `office-column` device setting, kept apart
 from `office-device` because that one is saved whole.
+
+An open session is a tab after the four, with the agent's status dot and title and a button to
+close it (`client/session-panel.tsx`, `client/use-conversation.ts`). A tab shows the
+conversation (your messages and the agent's replies as text, a tool call as one line, never the
+reasoning), the requests waiting on the agent with Approve and Deny, a reply box, and Stop while
+a turn runs on a host that can stop one. A plan or a question is answered in the workspace.
+Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
+there. A tab leaves only when it is closed: an agent that leaves the office keeps its tab,
+which says so. On a compact layout the sheet shows the session with a Back to Sessions button;
+dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
+Open sessions and the chosen tab last while the office is mounted, not across a reload.
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
   something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,

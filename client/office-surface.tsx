@@ -33,7 +33,7 @@ import { ActivityPanel, loadProblem } from "./activity-panel.js";
 import { AgentCard } from "./agent-card.js";
 import { sheetLeavesFirstOn } from "./agent-picker-text.js";
 import { AttentionStrip, type StripCard } from "./attention-strip.js";
-import { openSessionWith, resourcesOpener } from "./beside.js";
+import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
@@ -60,6 +60,7 @@ import {
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
+import { SessionPane, sessionTabsOf, type SessionContext } from "./session-pane.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { SessionsPanel } from "./sessions-panel.js";
@@ -829,6 +830,26 @@ function ColumnPanel({ tab, attention, draft, ...panel }: ColumnPanelSwitchProps
   return <ChatPanel {...panel} draft={draft} />;
 }
 
+interface ColumnViewPanelProps extends Omit<ColumnPanelSwitchProps, "tab"> {
+  view: ColumnView;
+  session: SessionContext;
+}
+
+/** The chosen view's panel: a tab's, or an open session's. */
+function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
+  if (view.kind === "session") {
+    return (
+      <SessionPane
+        agentId={view.agentId}
+        context={session}
+        styles={panel.styles}
+        layout={panel.layout}
+      />
+    );
+  }
+  return <ColumnPanel tab={view.tab} {...panel} />;
+}
+
 /** What is typed in the Chat tab's box: the surface's, so a tab switch or a closed sheet keeps it. */
 function useChatDraft(): ChatDraft {
   const [text, setText] = useState("");
@@ -906,63 +927,96 @@ function useColumnContent({
 }
 
 /**
- * The phone's sheet: the tab it shows, and the link its panels use. A row press must not leave
- * the agent's card under the sheet, so the sheet closes first.
+ * The phone's sheet. Whether it is open is its own: the column's view says what it shows, so
+ * dismissing the sheet leaves an open session open. A row press must not leave the agent's card
+ * under the sheet, so the sheet closes first; a session opens in the sheet.
  */
-function useColumnSheet(link: OfficeLink) {
-  const [sheetTab, setSheetTab] = useState<ColumnTab | null>(null);
-  const closeSheet = useCallback(() => setSheetTab(null), []);
+function useColumnSheet(column: ColumnState, compact: boolean, select: (agentId: string) => void) {
+  const [open, setOpen] = useState(false);
+  const closeSheet = useCallback(() => setOpen(false), []);
+  const { show, openSession: openInColumn } = column;
+  const openTab = useCallback(
+    (tab: ColumnTab) => {
+      show(tab);
+      setOpen(true);
+    },
+    [show],
+  );
+  const openSession = useCallback(
+    (agentId: string) => {
+      openInColumn(agentId);
+      if (compact) setOpen(true);
+    },
+    [openInColumn, compact],
+  );
+  const link = useMemo((): OfficeLink => ({ select, openSession }), [select, openSession]);
   const sheetLink = useMemo(
     (): OfficeLink => ({
       select: (agentId) => {
-        setSheetTab(null);
-        link.select(agentId);
+        setOpen(false);
+        select(agentId);
       },
-      openSession: (agentId) => {
-        setSheetTab(null);
-        link.openSession(agentId);
-      },
+      openSession,
     }),
-    [link],
+    [select, openSession],
   );
-  const sheetView = useMemo(
-    (): ColumnView | null => (sheetTab === null ? null : { kind: "tab", tab: sheetTab }),
-    [sheetTab],
-  );
-  return { sheetTab, sheetView, setSheetTab, closeSheet, sheetLink };
+  const sheetView = open ? column.view : null;
+  return { sheetView, openTab, closeSheet, openSession, link, sheetLink };
 }
 
 type ColumnSheetState = ReturnType<typeof useColumnSheet>;
-
-/** The sheet and the column hold no session tab until a way in opens one. */
-const NO_SESSION_TABS: readonly ColumnSession[] = [];
-const noop = (): void => undefined;
 
 interface PhoneSheetProps extends Omit<ColumnPanelProps, "link"> {
   compact: boolean;
   draft: ChatDraft;
   sheet: ColumnSheetState;
+  column: ColumnState;
+  sessions: readonly ColumnSession[];
+  session: SessionContext;
   color: string;
   attention: ReactNode;
 }
 
-/** On a compact surface, the open tab's sheet over the floor; nothing on a wide one. */
-function PhoneSheet({ compact, sheet, color, attention, ...panel }: PhoneSheetProps) {
+/** On a compact surface, the open view's sheet over the floor; nothing on a wide one. */
+function PhoneSheet({
+  compact,
+  sheet,
+  column,
+  sessions,
+  session,
+  color,
+  attention,
+  ...panel
+}: PhoneSheetProps) {
+  const view = sheet.sheetView;
+  const { show, closeSession } = column;
+  const shown = view?.kind === "session" ? view.agentId : null;
+  const back = useCallback(() => show("sessions"), [show]);
+  const closeShown = useCallback(() => {
+    if (shown !== null) closeSession(shown);
+  }, [shown, closeSession]);
   if (!compact) return null;
+  const title = sessions.find((each) => each.agentId === shown)?.title ?? null;
   return (
     <ColumnSheet
-      open={sheet.sheetView}
-      sessionTitle={null}
+      open={view}
+      sessionTitle={title}
       color={color}
       iconSize={20}
       platform={panel.layout.platform}
       onClose={sheet.closeSheet}
-      onBack={noop}
-      onCloseSession={noop}
+      onBack={back}
+      onCloseSession={closeShown}
       styles={panel.styles}
     >
-      {sheet.sheetTab === null ? null : (
-        <ColumnPanel tab={sheet.sheetTab} attention={attention} {...panel} link={sheet.sheetLink} />
+      {view === null ? null : (
+        <ColumnViewPanel
+          view={view}
+          session={session}
+          attention={attention}
+          {...panel}
+          link={sheet.sheetLink}
+        />
       )}
     </ColumnSheet>
   );
@@ -971,22 +1025,23 @@ function PhoneSheet({ compact, sheet, color, attention, ...panel }: PhoneSheetPr
 interface PhoneBarProps {
   compact: boolean;
   sheet: ColumnSheetState;
+  sessions: readonly ColumnSession[];
   badges: ColumnBadges;
   color: string;
   styles: OfficeStyles;
 }
 
 /** On a compact surface, the column's tabs as a bar under the floor; nothing on a wide one. */
-function PhoneBar({ compact, sheet, badges, color, styles }: PhoneBarProps) {
+function PhoneBar({ compact, sheet, sessions, badges, color, styles }: PhoneBarProps) {
   if (!compact) return null;
   return (
     <ColumnBar
       open={sheet.sheetView}
-      sessions={NO_SESSION_TABS}
+      sessions={sessions}
       badges={badges}
       color={color}
       iconSize={20}
-      onOpen={sheet.setSheetTab}
+      onOpen={sheet.openTab}
       onClose={sheet.closeSheet}
       styles={styles}
     />
@@ -994,6 +1049,8 @@ function PhoneBar({ compact, sheet, badges, color, styles }: PhoneBarProps) {
 }
 
 interface WideColumnProps extends ColumnPanelProps {
+  sessions: readonly ColumnSession[];
+  session: SessionContext;
   compact: boolean;
   draft: ChatDraft;
   onDragging(dragging: boolean): void;
@@ -1008,6 +1065,8 @@ interface WideColumnProps extends ColumnPanelProps {
 
 /** On a wide surface, the column beside the floor; nothing on a compact one. */
 function WideColumn({
+  sessions,
+  session,
   compact,
   column,
   surfaceWidth,
@@ -1020,12 +1079,10 @@ function WideColumn({
   ...panel
 }: WideColumnProps) {
   if (compact) return null;
-  // A session's panel is drawn once a way in opens one; until then Sessions stands in.
-  const tab = column.view.kind === "tab" ? column.view.tab : "sessions";
   return (
     <OfficeColumn
       column={column}
-      sessions={NO_SESSION_TABS}
+      sessions={sessions}
       touch={touch}
       surfaceWidth={surfaceWidth}
       badges={badges}
@@ -1034,7 +1091,7 @@ function WideColumn({
       onDragging={onDragging}
       styles={panel.styles}
     >
-      <ColumnPanel tab={tab} attention={attention} {...panel} />
+      <ColumnViewPanel view={column.view} session={session} attention={attention} {...panel} />
     </OfficeColumn>
   );
 }
@@ -1171,17 +1228,15 @@ export function OfficeSurface(
     setSelectedId(agentId);
     setFocusRequest((previous) => nextFocusRequest(previous, agentId));
   }, []);
-  const openSession = useCallback(
-    (agentId: string) => openSessionWith(navigation, agentId),
-    [navigation],
-  );
+  // Every way in to a session ends in the column: its tab, or the phone's sheet.
+  const sheet = useColumnSheet(column, compact, setSelectedId);
+  const { openSession, link } = sheet;
   const openResources = useMemo(
     () => resourcesOpener(navigation, openMachine),
     [navigation, openMachine],
   );
   // The panels of the column reach this surface through the link: a row press opens the card, as
   // a List row does, and "Open session" shows the session.
-  const link = useMemo((): OfficeLink => ({ select: setSelectedId, openSession }), [openSession]);
   const retryScene = useCallback(() => setSceneProblem(null), []);
   // Choosing a view asks for 3D anew, so an old failure does not stand in its way.
   const { choose } = viewChoice;
@@ -1242,7 +1297,6 @@ export function OfficeSurface(
       library.entry,
     ],
   );
-  const sheet = useColumnSheet(link);
   const draft = useChatDraft();
   const { badges, attention } = useColumnContent({
     live,
@@ -1259,6 +1313,15 @@ export function OfficeSurface(
   // The panels size their controls for the surface they are in, not only for the device.
   const panelLayout = useMemo(() => ({ ...layout, compact }), [layout, compact]);
   const panel = { office, styles, theme, layout: panelLayout, attention, draft };
+  const sessions = useMemo(
+    () => sessionTabsOf(column.sessions, model.agents),
+    [column.sessions, model.agents],
+  );
+  const { closeSession } = column;
+  const session = useMemo(
+    (): SessionContext => ({ model, actions, navigation, closeSession }),
+    [model, actions, navigation, closeSession],
+  );
   const color = theme.colors.foreground;
   // One tree in both layouts, so a flip between them does not draw the floor again: compact adds
   // the sheet in the floor's box and the bar under the row, wide adds the column beside the floor.
@@ -1293,7 +1356,7 @@ export function OfficeSurface(
             actions={actions}
             name={name}
             onSelectAgent={setSelectedId}
-            onOpenSession={navigation ? openSession : undefined}
+            onOpenSession={openSession}
             onOpenBoard={board.open}
             machine={machine}
             onOpenMachine={openMachine}
@@ -1308,9 +1371,19 @@ export function OfficeSurface(
             onSceneProblem={setSceneProblem}
             platform={layout.platform}
           />
-          <PhoneSheet compact={compact} sheet={sheet} color={color} {...panel} />
+          <PhoneSheet
+            compact={compact}
+            sheet={sheet}
+            column={column}
+            sessions={sessions}
+            session={session}
+            color={color}
+            {...panel}
+          />
         </View>
         <WideColumn
+          sessions={sessions}
+          session={session}
           compact={compact}
           column={column}
           surfaceWidth={surfaceWidth}
@@ -1323,12 +1396,19 @@ export function OfficeSurface(
           {...panel}
         />
       </View>
-      <PhoneBar compact={compact} sheet={sheet} badges={badges} color={color} styles={styles} />
+      <PhoneBar
+        compact={compact}
+        sheet={sheet}
+        sessions={sessions}
+        badges={badges}
+        color={color}
+        styles={styles}
+      />
       <AgentCard
         agent={selected}
         activity={selectedActivity}
         actions={actions}
-        navigation={navigation}
+        onOpenSession={openSession}
         styles={styles}
         onClose={closeCard}
       />

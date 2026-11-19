@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
-import { openSessionWith, resourcesOpener, showBesideOf, type BesideTarget } from "./beside.js";
+import { resourcesOpener, showBesideOf, type BesideTarget } from "./beside.js";
 
 type Navigation = NonNullable<PluginSurfaceProps["navigation"]>;
 
@@ -30,33 +30,6 @@ function fakeNavigation(answer: boolean | null): FakeNavigation {
   };
   return { navigation, shown, opened };
 }
-
-test("a session shown beside the floor does not leave the office", () => {
-  const fake = fakeNavigation(true);
-  const beside = openSessionWith(fake.navigation, "a1");
-  expect(beside).toBe(true);
-  expect(fake.shown).toEqual([{ kind: "agent", agentId: "a1" }]);
-  expect(fake.opened).toEqual([]);
-});
-
-test("a session the side area cannot show opens in its workspace", () => {
-  const fake = fakeNavigation(false);
-  const beside = openSessionWith(fake.navigation, "a1");
-  expect(beside).toBe(false);
-  expect(fake.shown).toEqual([{ kind: "agent", agentId: "a1" }]);
-  expect(fake.opened).toEqual(["a1"]);
-});
-
-test("an app without a side area opens the session in its workspace", () => {
-  const fake = fakeNavigation(null);
-  const beside = openSessionWith(fake.navigation, "a1");
-  expect(beside).toBe(false);
-  expect(fake.opened).toEqual(["a1"]);
-});
-
-test("without navigation a session opens nowhere", () => {
-  expect(openSessionWith(undefined, "a1")).toBe(false);
-});
 
 test("an app without a side area leaves the wall screen to the Host card", () => {
   let machineOpened = 0;

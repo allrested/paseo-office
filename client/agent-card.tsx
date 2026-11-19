@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { Modal, TextInput } from "@getpaseo/plugin/client/ui";
 import type { AgentStatus, OfficeAgent } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { reasonLabel } from "./attention-strip.js";
-import { openSessionWith } from "./beside.js";
 import { contextLine } from "./context-text.js";
 import {
   agentMeta,
@@ -17,8 +15,6 @@ import {
 import { PermissionActions } from "./permission-actions.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
-
-type Navigation = PluginScreenProps["navigation"];
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   initializing: "Starting",
@@ -71,7 +67,8 @@ interface AgentCardBodyProps {
   agent: OfficeAgent;
   activity: string | null;
   actions: AgentActions;
-  navigation: Navigation;
+  /** Shows the agent's session in the office; the card leaves as it does. */
+  onOpenSession(agentId: string): void;
   styles: OfficeStyles;
   onClose(): void;
 }
@@ -80,16 +77,16 @@ function AgentCardBody({
   agent,
   activity,
   actions,
-  navigation,
+  onOpenSession,
   styles,
   onClose,
 }: AgentCardBodyProps) {
   const [text, setText] = useState("");
-  // Beside the floor the card stays open: it is the office's own sheet, and the user closes it.
-  // A session opened in its workspace leaves the office, and the card goes with it.
+  // The session opens in the column or the phone's sheet, which the card would cover.
   const openSession = useCallback(() => {
-    if (!openSessionWith(navigation, agent.id)) onClose();
-  }, [navigation, agent.id, onClose]);
+    onOpenSession(agent.id);
+    onClose();
+  }, [onOpenSession, agent.id, onClose]);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -146,33 +143,24 @@ function AgentCardBody({
           styles={styles}
         />
       ))}
-      {navigation || canStop ? (
-        <View style={styles.sheetActions}>
-          <View style={styles.actions}>
-            {navigation ? (
-              <ActionButton
-                label="Open session"
-                pendingLabel="Opening..."
-                onPress={openSession}
-                styles={styles}
-              />
-            ) : null}
-            {canStop ? (
-              <ActionButton
-                label="Stop"
-                pendingLabel="Stopping..."
-                onPress={stop}
-                styles={styles}
-              />
-            ) : null}
-          </View>
-          {stopError ? (
-            <Text accessibilityRole="alert" style={styles.actionError}>
-              {stopError}
-            </Text>
+      <View style={styles.sheetActions}>
+        <View style={styles.actions}>
+          <ActionButton
+            label="Open session"
+            pendingLabel="Opening..."
+            onPress={openSession}
+            styles={styles}
+          />
+          {canStop ? (
+            <ActionButton label="Stop" pendingLabel="Stopping..." onPress={stop} styles={styles} />
           ) : null}
         </View>
-      ) : null}
+        {stopError ? (
+          <Text accessibilityRole="alert" style={styles.actionError}>
+            {stopError}
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.sheetField}>
         <Text style={styles.sheetLabel}>Send a prompt</Text>
         <TextInput
@@ -201,7 +189,8 @@ export interface AgentCardProps {
   agent: OfficeAgent | null;
   activity: string | null;
   actions: AgentActions;
-  navigation: Navigation;
+  /** Shows the agent's session in the office; the card leaves as it does. */
+  onOpenSession(agentId: string): void;
   styles: OfficeStyles;
   onClose(): void;
 }
@@ -211,7 +200,7 @@ export function AgentCard({
   agent,
   activity,
   actions,
-  navigation,
+  onOpenSession,
   styles,
   onClose,
 }: AgentCardProps) {
@@ -230,7 +219,7 @@ export function AgentCard({
             agent={agent}
             activity={activity}
             actions={actions}
-            navigation={navigation}
+            onOpenSession={onOpenSession}
             styles={styles}
             onClose={onClose}
           />

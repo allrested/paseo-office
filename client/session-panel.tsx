@@ -5,7 +5,6 @@ import {
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from "react-native";
-import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
@@ -19,6 +18,7 @@ import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
 import {
   ANSWER_IN_WORKSPACE,
+  CANNOT_ANSWER_HERE,
   EARLIER_FAILED,
   GONE_LINE,
   LOADING,
@@ -39,7 +39,6 @@ export interface SessionPanelProps {
   room: string | null;
   actions: AgentActions;
   styles: OfficeStyles;
-  theme: PluginTheme;
   layout: PluginSurfaceProps["layout"];
   /** Leaves the office for the agent's workspace; absent where the host cannot. */
   onOpenWorkspace: (() => void) | undefined;
@@ -172,11 +171,13 @@ function Rows({ conversation, name, styles }: RowsProps): ReactNode {
 interface AsksProps {
   agent: OfficeAgent;
   actions: AgentActions;
+  /** Whether the panel can send the user to the agent's workspace. */
+  canOpenWorkspace: boolean;
   styles: OfficeStyles;
 }
 
 /** The requests waiting on the agent: Approve and Deny where the office can answer. */
-function Asks({ agent, actions, styles }: AsksProps) {
+function Asks({ agent, actions, canOpenWorkspace, styles }: AsksProps) {
   return agent.permissions.map((permission) =>
     answerableInOffice(permission.kind) ? (
       <PermissionActions
@@ -189,7 +190,14 @@ function Asks({ agent, actions, styles }: AsksProps) {
     ) : (
       <View key={permission.id} style={styles.permission}>
         <Text style={styles.permissionTitle}>{permission.title}</Text>
-        <Text style={styles.muted}>{ANSWER_IN_WORKSPACE}</Text>
+        {permission.detail === undefined ? null : (
+          <Text style={styles.permissionDetail} numberOfLines={4}>
+            {permission.detail}
+          </Text>
+        )}
+        <Text style={styles.muted}>
+          {canOpenWorkspace ? ANSWER_IN_WORKSPACE : CANNOT_ANSWER_HERE}
+        </Text>
       </View>
     ),
   );
@@ -305,7 +313,12 @@ export function SessionPanel({
       </ScrollView>
       {agent === null ? null : (
         <>
-          <Asks agent={agent} actions={actions} styles={styles} />
+          <Asks
+            agent={agent}
+            actions={actions}
+            canOpenWorkspace={onOpenWorkspace !== undefined}
+            styles={styles}
+          />
           <Composer agent={agent} actions={actions} touchScreen={touchScreen} styles={styles} />
         </>
       )}
