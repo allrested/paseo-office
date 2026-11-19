@@ -32,7 +32,12 @@ export function areasOf(language) {
 }
 
 export const isPair = (value) =>
-  typeof value === "object" && value !== null && !Array.isArray(value) && "other" in value;
+  typeof value === "object" &&
+  value !== null &&
+  typeof value.other === "string" &&
+  Object.keys(value).every(
+    (key) => key === "other" || (key === "one" && typeof value.one === "string"),
+  );
 
 /** Every leaf as [dotted path, value], upstream's rule: a { one, other } pair and a list are one leaf. */
 export function leaves(object, prefix = "") {
