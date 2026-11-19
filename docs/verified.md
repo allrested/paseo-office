@@ -29,6 +29,10 @@ A ninth look, on 2026-11-19, was of the camera extras (see "Camera extras"): the
 automatic camera, photo mode's light and the clip. It was installed by Git, with three to nine
 agents of the Mock provider in a workspace.
 
+A tenth look, on 2026-11-19, was of the staff and daily-life scenes (see "Staff and daily life,
+indoors"). It was installed by Git, with three to five agents of the Mock provider in one to three
+workspaces.
+
 ## Install
 
 `paseo plugin install file://<path to the clone>` cloned the repository, compiled the plugin and
@@ -441,42 +445,94 @@ Seen and left: a Mock agent that waits from its first moment is a newcomer, so t
 try showed no glide; and a clip runs on the page's clock, so in this slow browser a Stop pressed
 by the look's script, seconds late, found the clip already saved.
 
+## Staff and daily life, indoors
+
+The first looks were at commit `640fc4a870e2322ac49017e08d046dff457862ad`, at 1280 and at 390 px,
+and the last at `d5df6cc5c4a880cb0a6c8d96eb91cc5759432964`, which holds the fix the first ones led
+to; all were installed by Git on the same stock 0.16.2, and `paseo plugin ls` showed `office`
+`running`, from git, at the commit, with no error in its log. The scene's script was 1,261,700
+characters. The browser's clock was at 11:00 to 11:30 on a Thursday. The console held no error or
+warning from the plugin in any run; the scene's frame made no request, and the page none to an
+`/api/` path. Every staff scene's `setup()` ran: the floor drew and the scene's problem note
+did not show.
+
+- The lift: the plugin's server had started 82 seconds before the page opened, and the page was
+  told 98 of the servicing's 180 seconds were left. Up close, on a second build of the scene (a
+  local commit made for the look, which changed nothing else): a technician in blue at the lift's
+  panel, a yellow barrier and a cone in front of the doors; near the end of the five minutes the
+  barrier was gone and the technician stood in the car; then the doors were shut and he was gone.
+  The page was told a total of 300 seconds, `newBuild`, and a sticker with a seven-character
+  build id. At 390 px the barrier showed at the floor's left edge.
+- The team chat: "Receptionist: The courier's here with Acme search's parcel" and, from that
+  agent, "Coming down" (with Open session); after the second build's servicing, "Receptionist:
+  Service done, the lift's running again", which my-office says after a new build only. The lunch
+  poll came from an agent. Each line came once.
+- Reception sat at her desk. A courier came: the frame's text had "Bazaarly courier", the made-up
+  name, and no real courier's name was anywhere in the frame's document.
+- A repository's first day: the page was told `born` for each team, the day of the kit's one
+  commit, so `git log` ran in the plugin's process and the workspaces' folders reached the
+  server on 0.16.2.
+- The tenure list. The first look found the team that was there before the plugin started listed
+  as an intern: the directory tells its agents and its workspaces in two steps, and the list was
+  seeded on the first, with nobody. Fixed in `d5df6cc`. On a fresh daemon after the fix, the two
+  teams there when the office first opened were kept as permanent (`"pre": true` in
+  `tenure.json`, nothing listed to the page), and a third workspace made afterwards came to the
+  page as `intern: true`. The list is seeded when the directory first opens, which is when the
+  office is first opened or an agent first opens or ends a turn.
+- A reload at 390 px: the scene started again, both teams' plates stood, and the page was told
+  the same again.
+- A resting agent was counted in the dining room, outside 12:30 to 13:30: the lively floor still
+  starts things.
+- The scene had written `office-duty` to the origin's `localStorage`, beside the keys of
+  earlier looks.
+- What an agent cost: the stock Mock provider's usage holds tokens and the context window and no
+  cost, and nothing in the CLI sets one, so the accountant's screen had nothing to show.
+
 ## Not seen, and why
 
-| What                                                                            | Why                                                                                                                                                     |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The phone app's 3D view on a change of floor plan                               | Only a browser was used. To check on a phone: "Loading", then the other plan, with no error, twice running                                              |
-| Memory after several changes of floor plan                                      | The look's browser cannot report it                                                                                                                     |
-| A cozy room's resting agents at the fish and the arcade, and going home         | Needs a day: rest from 08:00 to 21:00, and the walk home after 21:00                                                                                    |
-| A floor plan saved on one device seen on another                                | One browser was used. The setting is the host's, so another device reads it when its office opens                                                       |
-| A clip made in the desktop app itself                                           | Only a browser was used: the codecs the app offers and its download are the owner's to see                                                              |
-| That a clip plays, with music (Sound on) and without                            | No player on the look's machine; only the file's first bytes were read. No clip was made with Sound on                                                  |
-| How smooth a clip is                                                            | Software WebGL: few frames in 15 seconds                                                                                                                |
-| The glide for a real provider's permission request                              | The Mock provider's plan approval stood in for it                                                                                                       |
-| A theme change that lets go of a held Day or Night                              | Stock Paseo's web app replaces the plugin's screen on a theme change, so the scene restarts. Unit tests cover the rule                                  |
-| The tour ended by Escape, by Walk in or by Photo mode                           | Unit tests only; Done and Skip were pressed                                                                                                             |
-| A view pressed during a glide, a glide with a card open or `office-autocam` off | Unit tests only                                                                                                                                         |
-| The wall clock's click and tooltip                                              | Unit tests only: a 3D prop cannot be aimed at from a script                                                                                             |
-| The camera extras in the phone app                                              | Only a browser was used. There: no tour, no Photo mode and no clip with a script frame, and the glide                                                   |
-| The card for an agent                                                           | The fourth look had Mock agents at desks; no card was opened                                                                                            |
-| A resting agent's tag on the 3D floor                                           | Shown only while it walks, is hovered or chosen; none of these done                                                                                     |
-| The view choice kept across a reload                                            | The fourth look read the key after each press, not after a reload                                                                                       |
-| The names in text read at 390 px                                                | The text was gathered at 1280 px only                                                                                                                   |
-| The office's tools inside an agent's session                                    | No agent session. The page shows Agent tools on, nothing more                                                                                           |
-| A stand-up run and the notes it writes                                          | The 8:00 run did not come due, and the bell was not pressed                                                                                             |
-| An incidents check                                                              | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
-| The gear at 390 px                                                              | A click on it timed out with the sheet open. It was not tried again                                                                                     |
-| The phone app                                                                   | Only a browser was used                                                                                                                                 |
-| A session's tab, its conversation and a reply                                   | No session was opened; the first three looks had no agent                                                                                               |
-| A permission answered, and Stop on a session                                    | Not tried; the fourth look's waiting plan approval was left alone                                                                                       |
-| An agent created from the form                                                  | Create was not pressed: it would start a real provider session                                                                                          |
-| The session tab row scrolling when it is full                                   | Needs several session tabs, so agents                                                                                                                   |
-| The agent card's Stop and the Host card close                                   | 0.16.2 lacks `cancel()` and `closeRuntime()`; see the README                                                                                            |
-| Sound heard at all, on the desktop app and a browser                            | No sound card here; the owner's to check on the host after the update                                                                                   |
-| The phone's script frame and sound                                              | Whether the first tap starts audio, whether the button reads "not available", and whether an incident's siren is heard: the owner's, on the Android app |
-| The second tap on a real touch screen                                           | Seen only with the browser's touch emulation; the owner's, on a phone                                                                                   |
-| Karaoke singing at the lounge's TV with Sound on                                | Needs the walk (W A S D) to the TV; the owner's                                                                                                         |
-| iOS and its ring switch                                                         | No iOS device; unknown                                                                                                                                  |
-| An incident's siren with Sound on and off                                       | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
-| Sound's note with reduced motion, in photo mode, and read by a screen reader    | Not tried                                                                                                                                               |
-| A refused full screen and my-office's game and karaoke lines in the note        | Not tried                                                                                                                                               |
+| What                                                                                            | Why                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The staff scenes in the phone app                                                               | Only a browser was used. There: the scene starts, the lift's servicing plays, chat lines arrive; memory and frame rate with 15 more scenes              |
+| Real costs on the accountant's screen                                                           | The Mock provider reports no cost. A provider that does fills the screen                                                                                |
+| The intern's lanyard and desk plate, the courier's label, the lift's sticker                    | Too small to judge in a shot of this browser. The page was told who the intern is and the sticker's build                                               |
+| A farewell, and an intern made permanent                                                        | They need 30 quiet days, and 20 turns on two days. The ledger's unit tests stand in                                                                     |
+| HR's cake for the month's birthdays                                                             | The last Friday of the month at 15:30. The look proved only that the repository's first day arrives                                                     |
+| The fire drill, the altar's days, the midday nap, Friday's tea, the swapped days off            | Each needs its day or hour: 15:00 on a quarter's first working day, the lunar 1st and 15th, 12:30, a Friday, a swapped day                              |
+| Lunch at the microwaves, the duty roster's chores, the director's rounds, HR meeting a newcomer | None came due in the minutes each look lasted, or none was looked for                                                                                   |
+| The stairs' grumble in the chat                                                                 | Nobody arrived while the lift was being serviced                                                                                                        |
+| The staff scenes on the cozy room                                                               | Not looked at. All but the nap are for the company floor and guard on it                                                                                |
+| The phone app's 3D view on a change of floor plan                                               | Only a browser was used. To check on a phone: "Loading", then the other plan, with no error, twice running                                              |
+| Memory after several changes of floor plan                                                      | The look's browser cannot report it                                                                                                                     |
+| A cozy room's resting agents at the fish and the arcade, and going home                         | Needs a day: rest from 08:00 to 21:00, and the walk home after 21:00                                                                                    |
+| A floor plan saved on one device seen on another                                                | One browser was used. The setting is the host's, so another device reads it when its office opens                                                       |
+| A clip made in the desktop app itself                                                           | Only a browser was used: the codecs the app offers and its download are the owner's to see                                                              |
+| That a clip plays, with music (Sound on) and without                                            | No player on the look's machine; only the file's first bytes were read. No clip was made with Sound on                                                  |
+| How smooth a clip is                                                                            | Software WebGL: few frames in 15 seconds                                                                                                                |
+| The glide for a real provider's permission request                                              | The Mock provider's plan approval stood in for it                                                                                                       |
+| A theme change that lets go of a held Day or Night                                              | Stock Paseo's web app replaces the plugin's screen on a theme change, so the scene restarts. Unit tests cover the rule                                  |
+| The tour ended by Escape, by Walk in or by Photo mode                                           | Unit tests only; Done and Skip were pressed                                                                                                             |
+| A view pressed during a glide, a glide with a card open or `office-autocam` off                 | Unit tests only                                                                                                                                         |
+| The wall clock's click and tooltip                                                              | Unit tests only: a 3D prop cannot be aimed at from a script                                                                                             |
+| The camera extras in the phone app                                                              | Only a browser was used. There: no tour, no Photo mode and no clip with a script frame, and the glide                                                   |
+| The card for an agent                                                                           | The fourth look had Mock agents at desks; no card was opened                                                                                            |
+| A resting agent's tag on the 3D floor                                                           | Shown only while it walks, is hovered or chosen; none of these done                                                                                     |
+| The view choice kept across a reload                                                            | The fourth look read the key after each press, not after a reload                                                                                       |
+| The names in text read at 390 px                                                                | The text was gathered at 1280 px only                                                                                                                   |
+| The office's tools inside an agent's session                                                    | No agent session. The page shows Agent tools on, nothing more                                                                                           |
+| A stand-up run and the notes it writes                                                          | The 8:00 run did not come due, and the bell was not pressed                                                                                             |
+| An incidents check                                                                              | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
+| The gear at 390 px                                                                              | A click on it timed out with the sheet open. It was not tried again                                                                                     |
+| The phone app                                                                                   | Only a browser was used                                                                                                                                 |
+| A session's tab, its conversation and a reply                                                   | No session was opened; the first three looks had no agent                                                                                               |
+| A permission answered, and Stop on a session                                                    | Not tried; the fourth look's waiting plan approval was left alone                                                                                       |
+| An agent created from the form                                                                  | Create was not pressed: it would start a real provider session                                                                                          |
+| The session tab row scrolling when it is full                                                   | Needs several session tabs, so agents                                                                                                                   |
+| The agent card's Stop and the Host card close                                                   | 0.16.2 lacks `cancel()` and `closeRuntime()`; see the README                                                                                            |
+| Sound heard at all, on the desktop app and a browser                                            | No sound card here; the owner's to check on the host after the update                                                                                   |
+| The phone's script frame and sound                                                              | Whether the first tap starts audio, whether the button reads "not available", and whether an incident's siren is heard: the owner's, on the Android app |
+| The second tap on a real touch screen                                                           | Seen only with the browser's touch emulation; the owner's, on a phone                                                                                   |
+| Karaoke singing at the lounge's TV with Sound on                                                | Needs the walk (W A S D) to the TV; the owner's                                                                                                         |
+| iOS and its ring switch                                                                         | No iOS device; unknown                                                                                                                                  |
+| An incident's siren with Sound on and off                                                       | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
+| Sound's note with reduced motion, in photo mode, and read by a screen reader                    | Not tried                                                                                                                                               |
+| A refused full screen and my-office's game and karaoke lines in the note                        | Not tried                                                                                                                                               |
