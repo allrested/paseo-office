@@ -155,9 +155,10 @@ function interact() {
   if (w.meshes && w.id === 'door' && street()) { toStreet(); return; }   // the lift (or the door): down to the street
   if (w === cat) { petCat(); return; }
   if (w.meshes) { activateProp(w); return; }
-  if (!w.sub && w.anim === 'sleep' && w.rouse()) { fp.nearAsleep = null; return; }   // asleep: wake them (the session opens by clicking)
-  // PASEO: a person's session opens beside the floor (ui/session-drawer.js's opts.open); the walk stays on.
-  if (w.sub) { if (w.parent) openSession(w.parent.id, { open: true }); } else openSession(w.id, { open: true });
+  if (!w.sub && w.anim === 'sleep' && w.rouse()) fp.nearAsleep = null;
+  // Paseo sessions have their own workspace. A scene-only helper belongs to its parent's session.
+  const id = sessions.has(w.id) ? w.id : w.parent?.id;
+  if (id) openSession(id, { open: true });
 }
 const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"]');
 export function fpUpdate(dt) {
@@ -239,7 +240,7 @@ export function setup() {
   $('fp-near').addEventListener('click', interact);
   document.addEventListener('keydown', (e) => {
     if (!fp.on || typing(e) || e.metaKey || e.ctrlKey) return;
-    if (e.code === 'KeyE') { interact(); return; }
+    if (e.code === 'KeyE') { if (!e.repeat) interact(); return; }
     if (e.code === 'KeyV') { fp.third = !fp.third; showAvatar(); return; }
     if (/^(Key[WASD]|Arrow(Up|Down|Left|Right)|Shift(Left|Right))$/.test(e.code)) { fp.keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); }
   });

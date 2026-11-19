@@ -25,7 +25,7 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onSelectBoard: vi.fn(),
       onOpenMachine: vi.fn(),
       onOpenResources: undefined,
-      onOpenSession: undefined,
+      onOpenAgentWorkspace: undefined,
       onOpenLibrary: vi.fn(),
       onOpenNotes: vi.fn(),
       onOpenIncidents: vi.fn(),
@@ -72,7 +72,7 @@ test("onOpen and onResources are given only where Paseo can open them", () => {
   const openSession = vi.fn();
   const openResources = vi.fn();
   const focus = vi.fn();
-  const now = latest({ onOpenSession: openSession, onOpenResources: openResources });
+  const now = latest({ onOpenAgentWorkspace: openSession, onOpenResources: openResources });
   const given = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   given.onOpen?.("a1");
   given.onResources?.();

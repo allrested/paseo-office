@@ -175,9 +175,7 @@ export interface WorldStartOptions {
   /** The label over the meeting room's screen was chosen. Absent: the scene shows no label. */
   onNotes?(): void;
   /**
-   * A person's session was asked for: E by them while walking in. The surface always supplies it
-   * and it opens the session in the office's column, as the card's "Open session" does. Absent
-   * only in a caller with no session to open; the scene then chooses the person, as a click does.
+   * Walk-in requests the person's workspace. Without a workspace handler the scene selects the person.
    */
   onOpen?(agentId: string): void;
   /** The incidents' banner was chosen. */

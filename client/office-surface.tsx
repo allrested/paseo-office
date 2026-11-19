@@ -654,6 +654,7 @@ interface SurfaceBodyProps {
   /** Null from the 3D office, when the chosen person is tapped again. */
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace(agentId: string): void;
   onOpenBoard(roomId: string): void;
   machine: Machine | null;
   onOpenMachine(): void;
@@ -694,6 +695,7 @@ function SurfaceBody({
   name,
   onSelectAgent,
   onOpenSession,
+  onOpenAgentWorkspace,
   onOpenBoard,
   machine,
   onOpenMachine,
@@ -749,7 +751,7 @@ function SurfaceBody({
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
-        onOpenSession={onOpenSession}
+        onOpenAgentWorkspace={onOpenAgentWorkspace}
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
@@ -1949,6 +1951,7 @@ export function OfficeSurface(
             name={name}
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
+            onOpenAgentWorkspace={showAgentWorkspace}
             onOpenBoard={board.open}
             machine={machine}
             onOpenMachine={openMachine}
