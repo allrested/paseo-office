@@ -80,7 +80,10 @@ test("an agent in the lobby belongs to no team", () => {
   feed.view(view([agent("a2", { workspaceId: null, status: "running" })]));
   feed.turnEnded("a2");
   expect(d.tenure.touch).not.toHaveBeenCalled();
-  expect(d.tenure.seed).toHaveBeenCalledWith([]);
+  // The workspace is seeded as it stands, and the lobby's agent adds nothing to it.
+  expect(d.tenure.seed).toHaveBeenCalledWith([
+    { name: "api", first: Date.parse("2026-11-19T12:00:00Z"), daysSeen: 1 },
+  ]);
 });
 
 test("a farewell or an official write goes to the ledger with whether the team is here", () => {
@@ -160,4 +163,32 @@ test("how lately a listed team worked is not news: the scenes read who is due, a
   d.tenure.list.mockReturnValueOnce(listed(3, { ready: true }));
   feed.view({ ...view(), folders: {} });
   expect(d.emit).toHaveBeenCalledTimes(2);
+});
+
+test("the ledger is seeded once the directory has said both its agents and its workspaces, not before", () => {
+  const d = deps();
+  const feed = createLifeFeed(d);
+  // The directory tells its agents and its workspaces in two steps.
+  feed.view({ agents: [agent("a1")], workspaces: [], folders: {} });
+  feed.view({ agents: [], workspaces: view().workspaces, folders: {} });
+  expect(d.tenure.seed).not.toHaveBeenCalled();
+  expect(d.tenure.touch).not.toHaveBeenCalled();
+  feed.view(view());
+  expect(d.tenure.seed).toHaveBeenCalledTimes(1);
+});
+
+test("a workspace with nobody in it when the ledger starts is seeded too: it is not new to the office", () => {
+  const d = deps();
+  createLifeFeed(d).view({
+    agents: [agent("a1")],
+    workspaces: [
+      { id: "w1", name: "api", projectName: "shop" },
+      { id: "w2", name: "web", projectName: "shop" },
+    ],
+    folders: {},
+  });
+  expect(d.tenure.seed).toHaveBeenCalledWith([
+    { name: "api", first: Date.parse("2026-10-01T12:00:00Z"), daysSeen: 2 },
+    { name: "web", first: Date.parse("2026-11-19T12:00:00Z"), daysSeen: 1 },
+  ]);
 });

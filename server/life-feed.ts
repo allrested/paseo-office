@@ -88,16 +88,21 @@ export function createLifeFeed(deps: LifeFeedDeps): LifeFeed {
     deps.emit(now);
   }
 
+  // Every workspace there when the ledger starts is permanent, with or without anybody in it now;
+  // its agents say how long it has been at work.
   function seed(view: DirectoryView): void {
+    const today = dayOf(deps.now());
     const teams = new Map<string, { first: number; days: Set<string> }>();
+    for (const workspace of view.workspaces) {
+      teams.set(workspace.name, { first: deps.now(), days: new Set([today]) });
+    }
     for (const agent of open(view)) {
       const team = teamOf(view, agent);
+      const seen = team === null ? undefined : teams.get(team);
       const created = at(agent.createdAt);
-      if (team === null || !Number.isFinite(created)) continue;
-      const seen = teams.get(team) ?? { first: created, days: new Set([dayOf(deps.now())]) };
+      if (seen === undefined || !Number.isFinite(created)) continue;
       seen.first = Math.min(seen.first, created);
       seen.days.add(dayOf(created));
-      teams.set(team, seen);
     }
     const list: SeedTeam[] = [...teams].map(([name, seen]) => ({
       name,
@@ -129,7 +134,10 @@ export function createLifeFeed(deps: LifeFeedDeps): LifeFeed {
     view(view) {
       last = view;
       if (view === null) return;
-      if (!deps.tenure.seeded()) seed(view);
+      // The directory says its agents and its workspaces in two steps: a ledger seeded from the
+      // first alone would hold nobody, and every team would then come in as an intern.
+      const whole = view.agents.length > 0 && view.workspaces.length > 0;
+      if (!deps.tenure.seeded() && whole) seed(view);
       const working = new Set(
         open(view)
           .filter((agent) => agent.status !== "idle")
