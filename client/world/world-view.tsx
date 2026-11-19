@@ -63,11 +63,9 @@ export interface WorldViewProps {
    */
   onOpenResources: (() => void) | undefined;
   /**
-   * E by a person while walking in: the agent card's "Open session". The surface always supplies
-   * it, and it opens the session in the office's column, as the card does. Read when the office
-   * starts.
+   * Walk-in interaction opens the agent’s workspace over the floor. Read at scene start.
    */
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   /** A tap on the library: its chip or the bookshelf. */
   onOpenLibrary(): void;
   /** A tap on the label over the meeting room's screen. */
@@ -119,7 +117,7 @@ function WorldScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
   meeting,
@@ -148,7 +146,7 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
@@ -171,7 +169,7 @@ function WorldScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
@@ -193,7 +191,7 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,

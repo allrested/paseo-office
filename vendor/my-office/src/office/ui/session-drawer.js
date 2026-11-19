@@ -16,7 +16,7 @@ let before = null;
  */
 export function openSession(id, opts = {}) {
   if (!sessions.has(id)) return;
-  // PASEO: walking in (interact/first-person.js) opens the session beside the floor and stays where it is.
+  // Walk-in opens the workspace overlay without changing the scene selection or camera.
   if (opts.open && host.open) { host.open(id); return; }
   const same = state.selectedId === id;
   if (!state.selectedId && focusTarget) before = { target: focusTarget.clone(), zoom: state.zoomGoal ?? camera.zoom };

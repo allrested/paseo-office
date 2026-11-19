@@ -78,8 +78,7 @@ turn, and is offered only on a host whose SDK has an agent's
 `cancel()` (`shared/host-extras.ts`); stock Paseo 0.16 does not.
 
 "Open session" shows the session in the office's column (see below) in every app, and the card
-closes as it does. Every way in (the card, an Activity card, the List's "Open session",
-the 3D office's walk-in) calls the surface's one `openSession`. **Open in workspace** opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
+closes as it does. In walk-in mode, face an agent and press **E** or tap the on-screen prompt to open their workspace. The same action wakes a sleeping character. **Open in workspace** also opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
 
 ## Views
 
