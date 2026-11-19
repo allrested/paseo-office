@@ -5,8 +5,7 @@ import { useToast } from "@getpaseo/plugin/client/ui";
 import { notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { failureText } from "../action-button.js";
-import { boardRoom, isDarkTheme } from "./adapter.js";
-import { PLAN } from "./use-world-feed.js";
+import { boardRoom, isDarkTheme, type WorldPlan } from "./adapter.js";
 import type { WorldBrand, WorldStartOptions } from "./world-api.js";
 import { sharedWorldLoader } from "./world-loader.js";
 
@@ -36,12 +35,12 @@ export interface WorldLatest {
  */
 export function worldStartOptions(
   latest: { readonly current: WorldLatest },
-  extras: { focus(): void; brand: WorldBrand; photo?: false },
+  extras: { focus(): void; brand: WorldBrand; plan: WorldPlan; photo?: false },
 ): WorldStartOptions {
   const { focus } = extras;
   const { colors } = latest.current.theme;
   return {
-    plan: PLAN,
+    plan: extras.plan,
     dark: isDarkTheme(colors),
     colors,
     brand: extras.brand,

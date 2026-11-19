@@ -6,7 +6,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { OfficeModel } from "../../shared/model.js";
+import type { OfficeAgent } from "../../shared/contracts.js";
+import { buildOfficeModel, type OfficeModel } from "../../shared/model.js";
 import { useWorldFeed, type WorldFeedInput } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 
@@ -36,6 +37,7 @@ function input(overrides: Partial<WorldFeedInput> = {}): WorldFeedInput {
     meeting: false,
     incidents: undefined,
     sound: null,
+    plan: "pro",
     ...overrides,
   };
 }
@@ -141,4 +143,50 @@ test("the Sound switch is sent once it is read, again when it changes, and never
     "setSound:[false]",
     "setSound:[true]",
   ]);
+});
+
+/** `count` agents at rest in one workspace. */
+function crowd(count: number): OfficeModel {
+  const agents: OfficeAgent[] = Array.from({ length: count }, (_, index) => ({
+    id: String(index + 1),
+    title: `Agent ${index + 1}`,
+    provider: "claude",
+    model: null,
+    status: "idle",
+    workspaceId: "w1",
+    parentAgentId: null,
+    permissions: [],
+    createdAt: `2026-11-16T00:00:${String(index + 1).padStart(2, "0")}Z`,
+  }));
+  return buildOfficeModel({
+    agents,
+    workspaces: [{ id: "w1", name: "shop-api", projectName: "shop" }],
+    activity: {},
+    doing: {},
+    boards: {},
+    wake: { paused: false, queued: {} },
+  });
+}
+
+/** How many people a scene was told to seat when it started. */
+function seated(calls: string[]): number {
+  const first = calls.find((call) => call.startsWith("setSessions:")) ?? "";
+  return (JSON.parse(first.slice("setSessions:".length)) as unknown[][])[0].length;
+}
+
+test("the plan's desks decide who is seated, and the note says who has none", async () => {
+  // Ten agents: more than the cozy room's nine desks, fewer than the company floor's twelve.
+  const company = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={company.api} feed={input({ model: crowd(10), plan: "pro" })} />),
+  );
+  expect(seated(company.calls)).toBe(10);
+  expect(note).toBeNull();
+
+  const cozy = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={cozy.api} feed={input({ model: crowd(10), plan: "cozy" })} />),
+  );
+  expect(seated(cozy.calls)).toBe(9);
+  expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
 });

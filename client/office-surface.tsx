@@ -92,6 +92,7 @@ import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js"
 import { ViewSwitch } from "./view-switch.js";
 import { hasWebGL2 } from "./web-env.web.js";
 import { hasScriptFrame } from "./world/script-frame-kit.js";
+import { useFloorPlan } from "./world/use-floor-plan.js";
 import { WorldView } from "./world/world-view.js";
 import { WorldViewNative } from "./world/world-view-native.js";
 
@@ -649,6 +650,7 @@ function SurfaceBody({
   platform,
   sound,
 }: SurfaceBodyProps) {
+  const plan = useFloorPlan();
   if (office.subscription.status === "error") {
     const { message } = office.subscription.error;
     return (
@@ -675,6 +677,7 @@ function SurfaceBody({
         model={model}
         theme={theme}
         styles={styles}
+        plan={plan}
         focusRoomId={focusRoomId}
         focusRequest={focusRequest}
         selectedAgentId={selectedAgentId}

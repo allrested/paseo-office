@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { worldBrand } from "./adapter.js";
+import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { createWorldBridge, type WorldBridge } from "./world-bridge.js";
 import { bridgePageScript } from "./world-bridge-page.js";
+import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
@@ -17,6 +18,8 @@ import type { WorldViewProps } from "./world-view.js";
 
 const noFocus = () => undefined;
 
+type WorldViewNativeSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+
 /**
  * The office in 3D where there is no DOM to open a frame in: a ScriptFrame of the kit runs the
  * scene's script, and a bridge gives this view the scene's API over messages. The surface renders
@@ -26,10 +29,11 @@ const noFocus = () => undefined;
  * `focusApp` has nothing to do here: a page of a WebView does not take the app's keys. Photo mode is
  * off, since a WebView cannot keep a download.
  */
-export function WorldViewNative({
+function WorldViewNativeScene({
   model,
   theme,
   styles,
+  plan,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -46,7 +50,7 @@ export function WorldViewNative({
   onOpenIncidents,
   onProblem,
   sound,
-}: WorldViewProps) {
+}: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
   const latest = useRef<WorldLatest>({
@@ -101,7 +105,12 @@ export function WorldViewNative({
     bridge.current = made;
     try {
       made.api.start(
-        worldStartOptions(latest, { focus: noFocus, brand: worldBrand(null), photo: false }),
+        worldStartOptions(latest, {
+          focus: noFocus,
+          brand: worldBrand(null),
+          photo: false,
+          plan,
+        }),
       );
     } catch (error) {
       latest.current.onProblem(messageOf(error));
@@ -113,7 +122,7 @@ export function WorldViewNative({
       bridge.current = null;
       setApi(null);
     };
-  }, [page]);
+  }, [page, plan]);
 
   const { note } = useWorldFeed(api, {
     model,
@@ -125,6 +134,7 @@ export function WorldViewNative({
     meeting,
     incidents,
     sound: sound.on,
+    plan,
   });
 
   const onMessage = useCallback((text: string) => bridge.current?.receive(text), []);
@@ -149,4 +159,13 @@ export function WorldViewNative({
       ) : null}
     </View>
   );
+}
+
+/**
+ * The office in 3D on the phone's script frame, on the host's plan. A changed plan unmounts the
+ * `ScriptFrame` and mounts a new one: the scene's page starts once.
+ */
+export function WorldViewNative({ plan, ...rest }: WorldViewProps) {
+  if (plan === null) return <WorldLoading styles={rest.styles} />;
+  return <WorldViewNativeScene key={plan} plan={plan} {...rest} />;
 }

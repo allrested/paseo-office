@@ -9,6 +9,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
+import type { WorldPlan } from "./adapter.js";
 import { WorldViewNative } from "./world-view-native.js";
 
 const h = vi.hoisted(() => ({
@@ -74,6 +75,7 @@ async function mount(overrides: Partial<Parameters<typeof WorldViewNative>[0]> =
     model: MODEL,
     theme: THEME,
     styles: STYLES,
+    plan: "pro" as WorldPlan | null,
     focusRoomId: null,
     focusRequest: null,
     selectedAgentId: null,
@@ -165,4 +167,21 @@ test("closing the view tells the page to stop", async () => {
 test("the start names the Sound callback to the page", async () => {
   await mount();
   expect((calls()[0].args[0] as { callbacks: string[] }).callbacks).toContain("onSound");
+});
+
+test("with no plan yet nothing is posted", async () => {
+  await mount({ plan: null });
+  expect(h.posted).toEqual([]);
+  expect(h.props).toBeNull();
+});
+
+test("a changed plan stops the page and starts a new one on the new plan", async () => {
+  await mount({ plan: "pro" });
+  h.posted = [];
+  await mount({ plan: "cozy" });
+  const names = calls().map((message) => message.call);
+  expect(names[0]).toBe("stop");
+  const start = calls().find((message) => message.call === "start");
+  expect(start?.args[0]).toMatchObject({ plan: "cozy" });
+  expect(names.filter((name) => name === "start")).toHaveLength(1);
 });

@@ -10,12 +10,16 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent } from "../../shared/contracts.js";
 import { buildOfficeModel, type OfficeModel } from "../../shared/model.js";
 import { useOfficeStyles, type OfficeStyles } from "../styles.js";
+import type { WorldPlan } from "./adapter.js";
 import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { WorldView } from "./world-view.js";
 
 const frame = vi.hoisted(() => ({
   focusApp: vi.fn(),
   started: null as WorldStartOptions | null,
+  /** Every start, in order, and how many frames were taken out. */
+  starts: [] as WorldStartOptions[],
+  disposed: 0,
   // useSyncExternalStore wants the same snapshot back while nothing changed.
   loaded: { status: "ready", script: "" },
 }));
@@ -46,12 +50,18 @@ vi.mock("./world-frame.web.js", () => ({
         if (key === "start") {
           return (options: WorldStartOptions) => {
             frame.started = options;
+            frame.starts.push(options);
           };
         }
         return () => undefined;
       },
     });
-    return { api: Promise.resolve(api), dispose: () => undefined };
+    return {
+      api: Promise.resolve(api),
+      dispose: () => {
+        frame.disposed += 1;
+      },
+    };
   },
 }));
 
@@ -85,6 +95,8 @@ let root: Root;
 beforeEach(() => {
   frame.focusApp.mockClear();
   frame.started = null;
+  frame.starts = [];
+  frame.disposed = 0;
   // jsdom lays nothing out: the view starts the office only in a container with a size.
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
@@ -99,38 +111,68 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function office(
+  plan: WorldPlan | null,
+  onSelectAgent: (id: string | null) => void = ignore,
+  model: OfficeModel = MODEL,
+) {
+  return (
+    <WorldView
+      plan={plan}
+      model={model}
+      theme={THEME}
+      styles={STYLES}
+      focusRoomId={null}
+      focusRequest={null}
+      selectedAgentId={null}
+      onSelectAgent={onSelectAgent}
+      onSelectBoard={ignore}
+      machine={null}
+      onOpenMachine={ignore}
+      onOpenResources={undefined}
+      onOpenSession={undefined}
+      onOpenLibrary={ignore}
+      onOpenNotes={ignore}
+      meeting={false}
+      incidents={undefined}
+      onOpenIncidents={ignore}
+      onProblem={ignore}
+      sound={SOUND}
+    />
+  );
+}
+
 async function startedOffice(
   onSelectAgent: (id: string | null) => void,
   model: OfficeModel = MODEL,
 ): Promise<WorldStartOptions> {
-  await act(async () =>
-    root.render(
-      <WorldView
-        model={model}
-        theme={THEME}
-        styles={STYLES}
-        focusRoomId={null}
-        focusRequest={null}
-        selectedAgentId={null}
-        onSelectAgent={onSelectAgent}
-        onSelectBoard={ignore}
-        machine={null}
-        onOpenMachine={ignore}
-        onOpenResources={undefined}
-        onOpenSession={undefined}
-        onOpenLibrary={ignore}
-        onOpenNotes={ignore}
-        meeting={false}
-        incidents={undefined}
-        onOpenIncidents={ignore}
-        onProblem={ignore}
-        sound={SOUND}
-      />,
-    ),
-  );
+  await act(async () => root.render(office("pro", onSelectAgent, model)));
   if (frame.started === null) throw new Error("the office did not start");
   return frame.started;
 }
+
+test("with no plan yet nothing starts, and the view says it is loading", async () => {
+  await act(async () => root.render(office(null)));
+  expect(frame.starts).toHaveLength(0);
+  expect(container.textContent).toContain("Loading the 3D view...");
+});
+
+test("the scene starts on the plan it is given", async () => {
+  await act(async () => root.render(office("cozy")));
+  expect(frame.starts.map((options) => options.plan)).toEqual(["cozy"]);
+});
+
+test("a changed plan takes the frame out and starts the scene again on the new plan", async () => {
+  await act(async () => root.render(office("pro")));
+  expect(frame.disposed).toBe(0);
+  await act(async () => root.render(office("cozy")));
+  expect(frame.disposed).toBe(1);
+  expect(frame.starts.map((options) => options.plan)).toEqual(["pro", "cozy"]);
+  // The same plan again is no restart.
+  await act(async () => root.render(office("cozy")));
+  expect(frame.starts).toHaveLength(2);
+  expect(frame.disposed).toBe(1);
+});
 
 test("a person chosen in the scene opens their card and takes the keyboard with it", async () => {
   const onSelectAgent = vi.fn();

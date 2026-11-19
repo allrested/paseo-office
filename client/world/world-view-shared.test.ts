@@ -42,7 +42,7 @@ const BRAND = { name: "Paseo", logoUrl: null };
 test("a person chosen takes the keyboard; a card closed leaves it", () => {
   const focus = vi.fn();
   const now = latest();
-  const options = worldStartOptions(now, { focus, brand: BRAND });
+  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
   options.onSelect(null);
   expect(focus).not.toHaveBeenCalled();
   options.onSelect("a1");
@@ -54,20 +54,20 @@ test("a person chosen takes the keyboard; a card closed leaves it", () => {
 test("the bell opens nothing of Paseo's, so the keyboard stays in the office", () => {
   const focus = vi.fn();
   const now = latest();
-  worldStartOptions(now, { focus, brand: BRAND }).onBell?.();
+  worldStartOptions(now, { focus, brand: BRAND, plan: "pro" }).onBell?.();
   expect(now.current.onBell).toHaveBeenCalledTimes(1);
   expect(focus).not.toHaveBeenCalled();
 });
 
 test("onOpen and onResources are given only where Paseo can open them", () => {
-  const without = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND });
+  const without = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
   expect("onOpen" in without).toBe(false);
   expect("onResources" in without).toBe(false);
   const openSession = vi.fn();
   const openResources = vi.fn();
   const focus = vi.fn();
   const now = latest({ onOpenSession: openSession, onOpenResources: openResources });
-  const given = worldStartOptions(now, { focus, brand: BRAND });
+  const given = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
   given.onOpen?.("a1");
   given.onResources?.();
   expect(openSession).toHaveBeenCalledWith("a1");
@@ -76,7 +76,7 @@ test("onOpen and onResources are given only where Paseo can open them", () => {
 });
 
 test("the plan, the brand and the colours are the scene's start", () => {
-  const options = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND });
+  const options = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
   expect({ plan: options.plan, brand: options.brand, dark: typeof options.dark }).toEqual({
     plan: "pro",
     brand: BRAND,
@@ -84,15 +84,25 @@ test("the plan, the brand and the colours are the scene's start", () => {
   });
 });
 
+test("the scene is started with the plan it is given", () => {
+  const cozy = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "cozy" });
+  expect(cozy.plan).toBe("cozy");
+});
+
 test("photo is passed through only when the caller says it", () => {
-  const web = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND });
-  const native = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, photo: false });
+  const web = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
+  const native = worldStartOptions(latest(), {
+    focus: vi.fn(),
+    brand: BRAND,
+    plan: "pro",
+    photo: false,
+  });
   expect([web.photo, native.photo]).toEqual([undefined, false]);
 });
 
 test("a problem the scene reports goes to the latest handler", () => {
   const now = latest();
-  const options = worldStartOptions(now, { focus: vi.fn(), brand: BRAND });
+  const options = worldStartOptions(now, { focus: vi.fn(), brand: BRAND, plan: "pro" });
   const later = vi.fn();
   now.current = { ...now.current, onProblem: later };
   options.onProblem("the graphics context was lost");
@@ -102,7 +112,7 @@ test("a problem the scene reports goes to the latest handler", () => {
 test("a press on the scene's Sound button goes to the latest handler, and keeps no focus from the app", () => {
   const now = latest();
   const focus = vi.fn();
-  const options = worldStartOptions(now, { focus, brand: BRAND });
+  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
   const later = vi.fn();
   now.current = { ...now.current, onSound: later };
   options.onSound?.(true);

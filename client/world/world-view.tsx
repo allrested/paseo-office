@@ -6,11 +6,12 @@ import type { FocusRequest } from "../focus-request.js";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
-import { worldBrand } from "./adapter.js";
+import { worldBrand, type WorldPlan } from "./adapter.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
 import { focusApp, openWorldFrame } from "./world-frame.web.js";
+import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
@@ -23,6 +24,8 @@ export interface WorldViewProps {
   model: OfficeModel;
   theme: PluginTheme;
   styles: OfficeStyles;
+  /** The floor plan to draw; null until the host has said, and then nothing starts. A new plan is a new scene. */
+  plan: WorldPlan | null;
   /** The workspace tab's room; the view starts on its team's desks. */
   focusRoomId: string | null;
   focusRequest: FocusRequest | null;
@@ -69,18 +72,21 @@ export interface WorldViewProps {
   sound: SoundSwitch;
 }
 
+type WorldSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+
 /**
- * The office in 3D. Web only: office-surface.tsx renders it in a browser with WebGL2 where 3D is
+ * The office in 3D on one plan. Web only: office-surface.tsx renders it in a browser with WebGL2 where 3D is
  * the chosen view. The plugin bundle is evaluated on every platform, so the container and the
  * frame are reached in effects and nothing here touches the DOM when the module loads.
  *
  * Reporting a problem makes the surface take this view away, and that removes the frame: on
- * unmount, on another view chosen and after a lost context alike.
+ * unmount, on another view chosen, on another plan and after a lost context alike.
  */
-export function WorldView({
+function WorldScene({
   model,
   theme,
   styles,
+  plan,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -97,7 +103,7 @@ export function WorldView({
   onOpenIncidents,
   onProblem,
   sound,
-}: WorldViewProps) {
+}: WorldSceneProps) {
   const containerId = useId();
   const onBell = useStandupBell();
   const [sized, setSized] = useState(false);
@@ -184,6 +190,7 @@ export function WorldView({
             focus: focusApp,
             // Read when the office starts: a page's brand does not change while the page lives.
             brand: worldBrand(readBrand()),
+            plan,
           }),
         );
       } catch (error) {
@@ -200,7 +207,7 @@ export function WorldView({
       setApi(null);
       frame.dispose();
     };
-  }, [script, sized, containerId]);
+  }, [script, sized, containerId, plan]);
 
   const { note } = useWorldFeed(api, {
     model,
@@ -212,6 +219,7 @@ export function WorldView({
     meeting,
     incidents,
     sound: sound.on,
+    plan,
   });
   return (
     <View id={containerId} style={styles.scene}>
@@ -223,4 +231,13 @@ export function WorldView({
       ) : null}
     </View>
   );
+}
+
+/**
+ * The office in 3D, on the host's plan. A scene page starts once, so each plan is a scene of its
+ * own: a changed plan takes the frame out and opens a new one.
+ */
+export function WorldView({ plan, ...rest }: WorldViewProps) {
+  if (plan === null) return <WorldLoading styles={rest.styles} />;
+  return <WorldScene key={plan} plan={plan} {...rest} />;
 }

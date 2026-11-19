@@ -21,9 +21,6 @@ import {
 import { useIncidentAlarm } from "./use-incident-alarm.js";
 import type { WorldApi } from "./world-api.js";
 
-/** The floor everyone works on. The other plan, one open room, has fewer desks. */
-export const PLAN: WorldPlan = "pro";
-
 export interface WorldFeedInput {
   model: OfficeModel;
   theme: PluginTheme;
@@ -39,6 +36,8 @@ export interface WorldFeedInput {
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
   sound: boolean | null;
+  /** The floor plan the scene was started on: its desks seat the people. */
+  plan: WorldPlan;
 }
 
 /**
@@ -60,6 +59,7 @@ export function useWorldFeed(
     meeting,
     incidents,
     sound,
+    plan,
   }: WorldFeedInput,
 ): { note: string | null } {
   // (a ref for useIncidentAlarm's RefObject; the [api] effect below must stay the first effect)
@@ -84,7 +84,7 @@ export function useWorldFeed(
     if (sound !== null) world.current?.setSound?.(sound);
   }, [sound, api]);
 
-  const people = useMemo(() => worldPeople(model, PLAN_DESKS[PLAN]), [model]);
+  const people = useMemo(() => worldPeople(model, PLAN_DESKS[plan]), [model, plan]);
   useEffect(() => {
     const scene = world.current;
     if (scene === null) return;
