@@ -267,8 +267,7 @@ prompt.
 
 Opening the stand-up rings the bell on the meeting table: everyone the scene counts as free walks
 there and says what they are on. A click on the bell does the same and also starts the stand-up
-notes writer; opening the stand-up writes nothing. A "Stand-up notes" label on the meeting room's
-screen opens the notes card.
+notes writer; opening the stand-up writes nothing. Click or tap the meeting room’s **Sprint review** screen to read the stand-up notes. Its **Stand-up notes** label also opens the reader from the keyboard.
 
 From 08:00 to 21:00 by the device's clock an agent at rest does not stay asleep at its desk: after
 30 to 90 seconds there it gets up for a game of pool, foosball or the games TV with another resting
@@ -497,9 +496,7 @@ archives the writer. A writer that fails, is stopped or closed, or ends without 
 it is and stays named, with an "Open the writer" button that opens its session in the office's
 column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
-notes card: a month's file as Markdown at its newest entry, read only. A list line that is only a
-link to one of the file's own headers, such as the Contents' `- [18 November 2026](#18-november-2026)`,
-scrolls the card to that entry; the app's Markdown would hand the link to its file opener. The
+notes reader at the month’s newest entry. Select a date to read that entry, or use the month arrows to browse earlier files. The entry strip also includes the file’s introduction and Contents when present. Contents links open their entries. The
 server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
 ## Schedules

@@ -137,8 +137,9 @@ function buildProFloor() {
       const bars = [0.42, 0.58, 0.51, 0.74, 0.66, 0.88]; bars.forEach((v, i) => { g.fillStyle = i === 5 ? '#D97757' : '#3F7CC4'; g.fillRect(60 + i * 88, 320 - v * 180, 52, v * 180); });
       g.fillStyle = '#C9CED6'; g.fillRect(44, 322, w - 88, 3);
     });
-    put(scene, rbox(2.7, 1.55, 0.07, '#15181E', 0.03), 0.2, 1.75, -7.95);
-    put(scene, new THREE.Mesh(new THREE.PlaneGeometry(2.56, 1.42), new THREE.MeshBasicMaterial({ map: slide })), 0.2, 1.75, -7.91); }
+    const frame = put(scene, rbox(2.7, 1.55, 0.07, '#15181E', 0.03), 0.2, 1.75, -7.95);
+    const face = put(scene, new THREE.Mesh(new THREE.PlaneGeometry(2.56, 1.42), new THREE.MeshBasicMaterial({ map: slide })), 0.2, 1.75, -7.91);
+    PRO_FX.notesScreen = [frame, face]; }
 
   /* library: reading chairs facing the room, a shelf and a ladder */
   armchair(5.6, -4.1, 0, '#7A4E3A'); armchair(6.9, -4.1, 0, '#3D5A80');
