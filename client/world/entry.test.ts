@@ -11,6 +11,8 @@ import { openWorldFrame } from "./world-frame.web.js";
 
 const h = vi.hoisted(() => ({
   weather: vi.fn(),
+  photoRelease: vi.fn(),
+  lookForUpgrade: vi.fn(),
   setTenure: vi.fn(),
   setLiftService: vi.fn(),
   onCommit: vi.fn(),
@@ -43,6 +45,12 @@ vi.mock("../../vendor/my-office/src/office/life/post.js", () => ({
   onCommit: h.onCommit,
   onPush: h.onPush,
   postAction: h.postAction,
+}));
+vi.mock("../../vendor/my-office/src/office/people/photobooth.js", () => ({
+  photoRelease: h.photoRelease,
+}));
+vi.mock("../../vendor/my-office/src/office/people/outings.js", () => ({
+  lookForUpgrade: h.lookForUpgrade,
 }));
 vi.mock("../../vendor/my-office/src/office/people/farewell.js", () => ({ setTenure: h.setTenure }));
 vi.mock("../../vendor/my-office/src/office/life/lift-service.js", () => ({
@@ -173,6 +181,8 @@ interface World {
   setSessions(list: object[]): void;
   event(e: { sess: string; type: string }): void;
   setIncidents(list: object[]): void;
+  photoRelease(tag: string): void;
+  setClaudeVersion(reading: { version: string; at: number } | null): void;
   setTenure(data: object): void;
   setLiftService(data: object): void;
   setMachine(machine: object | null): void;
@@ -747,4 +757,16 @@ test("commit and push events feed the office post", () => {
   world.event({ sess: "post", type: "push" });
   expect(h.onCommit).toHaveBeenCalled();
   expect(h.onPush).toHaveBeenCalled();
+});
+
+test("the street entry delivers the tag to the photo booth and the CLI reading to outings", async () => {
+  await startPage({ street: { kit: null } });
+  const street = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { host: streetHost } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  street.photoRelease("v2.4.0");
+  street.setClaudeVersion({ version: "2.2.0", at: 123 });
+  expect(h.photoRelease).toHaveBeenCalledWith("v2.4.0");
+  expect(streetHost.claudeVersion()).toEqual({ version: "2.2.0", at: 123 });
+  expect(h.lookForUpgrade).toHaveBeenCalled();
 });

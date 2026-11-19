@@ -693,3 +693,17 @@ export const worldWordsRpc = defineRpc({
   input: z.object({ language: z.enum(WORDS_LANGUAGES) }),
   output: z.string(),
 });
+
+const StreetEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("release"), tag: z.string().min(1) }),
+  z.object({
+    type: z.literal("claude"),
+    reading: z.object({ version: z.string(), at: z.number() }).nullable(),
+  }),
+]);
+export type StreetEvent = z.output<typeof StreetEventSchema>;
+export const streetSubscription = defineSubscription({
+  name: "office.street.events",
+  input: z.object({}),
+  event: StreetEventSchema,
+});

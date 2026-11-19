@@ -632,3 +632,24 @@ it("sends spending without requiring context and includes the repository's first
   expect(sessions[1]?.usage).toBeUndefined();
   expect(sessions[1]?.git).toEqual({ repo: "landing" });
 });
+
+it.each([
+  ["failure", "red"],
+  ["success", "green"],
+  ["pending", undefined],
+  ["none", undefined],
+] as const)("maps the workspace's %s forge checks to the seated agent", (checks, ci) => {
+  const state = office([agent("1")]);
+  state.workspaces[0]!.pullRequest = {
+    checks,
+    state: "open",
+    number: 1,
+    url: "",
+    base: null,
+    title: "PR",
+    review: null,
+    runs: [],
+    conflicts: false,
+  };
+  expect(worldPeople(buildOfficeModel(state), 12).sessions[0]?.git.ci).toBe(ci);
+});

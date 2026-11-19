@@ -7,6 +7,7 @@ import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
+import { StreetEvents } from "./street-events.js";
 import { useStreetStart } from "./use-street-kit.js";
 import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
@@ -257,6 +258,7 @@ function WorldScene({
   const note = feedNote ?? words.note;
   return (
     <View id={containerId} style={styles.scene}>
+      {api && street ? <StreetEvents api={api} /> : null}
       {api === null ? <Text style={styles.sceneStatus}>Loading the 3D view...</Text> : null}
       {api !== null && note !== null ? (
         <View style={styles.sceneNote}>

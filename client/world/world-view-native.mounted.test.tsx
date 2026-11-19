@@ -29,8 +29,16 @@ const h = vi.hoisted(() => ({
   loaded: { status: "ready", script: "SCENE_SCRIPT" },
 }));
 
+let receiveStreet: (event: import("../../shared/contracts.js").StreetEvent) => void;
 vi.mock("@getpaseo/plugin/client", () => ({
   useRpc: () => async () => "car models",
+  useSubscription: (
+    _contract: unknown,
+    _input: unknown,
+    onEvent: (event: import("../../shared/contracts.js").StreetEvent) => void,
+  ) => {
+    receiveStreet = onEvent;
+  },
   useSettings: () => ({ status: "loading" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({ useToast: () => ({ error: () => undefined }) }));
@@ -208,6 +216,12 @@ test("starts a new phone frame with the car kit after the street is enabled", as
   await mount({ streetOn: true });
   const started = calls().find((m) => m.call === "start");
   expect(started?.args[0]).toMatchObject({ street: { kit: "car models" } });
+  receiveStreet({ type: "release", tag: "v3.8.4" });
+  receiveStreet({ type: "claude", reading: { version: "2.2.0", at: 123 } });
+  expect(calls().slice(-2)).toEqual([
+    { call: "photoRelease", args: ["v3.8.4"] },
+    { call: "setClaudeVersion", args: [{ version: "2.2.0", at: 123 }] },
+  ]);
 });
 
 test("the phone waits for words and remounts its frame in each chosen language", async () => {

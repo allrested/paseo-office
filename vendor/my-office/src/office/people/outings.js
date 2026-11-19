@@ -549,11 +549,14 @@ export function updateOutings() {
    Giới Di Động to "lên đời", once per version per page (the chat line is posted once, by the Mac's page) ---------- */
 let upgradeDue = '', coffeeDay = '', teaDay = '', checkinDay = '', congDay = '';
 const SEEN = 'office-claude-version';
-async function lookForUpgrade() {
+let lastUpgrade = '';
+export function lookForUpgrade() {
+  if (STATIC || !host.street || new URLSearchParams(location.search).has('demo')) return;
   const r = host.claudeVersion?.();
   if (!r?.version || !r.at || Date.now() - r.at > 6 * 3600e3) return;   // (the first one seen, or long ago: no news)
   let seen = ''; try { seen = localStorage.getItem(SEEN) || ''; } catch { /* storage blocked */ }
-  if (seen === r.version) return;
+  if (seen === r.version || lastUpgrade === r.version) return;
+  lastUpgrade = r.version;
   try { localStorage.setItem(SEEN, r.version); } catch { /* storage blocked */ }
   upgrade(r.version);
 }
@@ -598,5 +601,4 @@ export const outing = () => (run ? { kind: run.kind, stage: run.stage, id: run.w
 export function setup() {
   streetHooks.home = goHome;
   streetHooks.arrive = arrive;
-  if (host.street && host.claudeVersion && !STATIC && !new URLSearchParams(location.search).has('demo')) { setTimeout(lookForUpgrade, 20e3); setInterval(lookForUpgrade, 3 * 60e3); }
 }

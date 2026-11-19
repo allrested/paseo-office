@@ -29,6 +29,8 @@ import { SIGN, drawSign } from './paseo-sign.js';
 import { followHostFocus } from './paseo-focus.js';
 import { ringWithEveryone, updateLeisure } from './paseo-leisure.js';
 import { everyFrame } from './ui/activity.js';
+import { lookForUpgrade } from './people/outings.js';
+import { photoRelease } from './people/photobooth.js';
 import { setTenure } from './people/farewell.js';
 import { setLiftService } from './life/lift-service.js';
 import { dropSub, sessions, spawnSub, subAct, subs, workers } from './people/workers.js';
@@ -504,6 +506,8 @@ const api = {
     drawWeather(weatherToDraw(scene, SEASON));
   },
   /** The tenure list: { days, choices, projects: [{ name, last, days, turns, due, farewell, back, intern, ready, official }] }. */
+  photoRelease(tag) { if (started && !stopped && host.street) photoRelease(tag); },
+  setClaudeVersion(reading) { if (!started || stopped || !host.street) return; host.claudeReading = reading; lookForUpgrade(); },
   setTenure(data) { if (!started || stopped || !data) return; setTenure(data); },
   /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
   setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
