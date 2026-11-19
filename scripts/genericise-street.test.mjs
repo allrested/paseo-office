@@ -171,5 +171,10 @@ describe("genericise-street", () => {
       assert.equal(run("--files", file).status, 0);
       assert.equal(readFileSync(file, "utf8"), once);
     });
+
+    it("--check passes over every vendored file of this repository", () => {
+      const result = run("--check");
+      assert.equal(result.status, 0, result.stderr);
+    });
   });
 });

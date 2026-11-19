@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // The page markup (src/components/office), one group per component. The office's code fills most of it in later.
 export default {
   meta: {
@@ -48,7 +49,7 @@ export default {
     proTitle: "A whole company floor: director's office, meeting room, library, dining room, restroom, and Dev desks grouped by project",
     characters: 'Characters',
     toy: 'A · Toy',
-    pixar: 'B · Pixar',
+    cartoon: 'B · Cartoon',
     time: 'Time of day',
     auto: 'Auto',
     day: 'Day',
@@ -204,7 +205,7 @@ export default {
   clip: {
     button: 'Clip 15 s',
     buttonTitle: 'A 15-second video of the office, from morning to evening, to share',
-    shapeTitle: 'Clip shape: square for a feed, vertical 9:16 for Reels, TikTok and Shorts',
+    shapeTitle: 'Clip shape: square for a feed, vertical 9:16 for short-video apps',
     square: 'Square 1:1',
     tall: 'Vertical 9:16',
     music: 'Music',

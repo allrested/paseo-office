@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { leftIn } from "../scripts/genericise-street.mjs";
 import { WORLD_SCRIPT } from "./world.generated.js";
 import { embeddedWorldScript } from "./world-script.js";
 
@@ -118,5 +119,9 @@ describe("the embedded scene", () => {
     // was one of the sounds left out.
     expect(script).toContain("office-sound");
     expect(script).not.toContain("mixue");
+  });
+
+  it("names no real shop, app or product: the names are made-up ones", () => {
+    expect(leftIn(WORLD_SCRIPT)).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // Video games on the lounge TV (world/props/game-tv.js; people/gaming.js plays them): football, a split-screen racer
 // and a rooftop fighter, drawn as pixel art on a small 2D canvas and played by two players: people resting in the
 // office, a computer player (game.ai) or you in first person. step() takes both players' sticks and buttons; anything
@@ -348,7 +349,7 @@ function football(o) {
       box(g, '#FFFFFF', s ? P1 : P0 - 1, MID - GOAL / 2 - 1, 2, 2); box(g, '#FFFFFF', s ? P1 : P0 - 1, MID + GOAL / 2, 2, 2);
     }
     box(g, '#10161E', 0, 208, TV_W, 8);   // the LED boards
-    const ad = 'MY OFFICE  +  PHO 24  +  CLAUDE CODE  +  BANH MI  +  ', aw = ad.length * 4, off = Math.floor(G.t * 18) % aw;
+    const ad = 'MY OFFICE  +  PHO NGON  +  CLAUDE CODE  +  BANH MI  +  ', aw = ad.length * 4, off = Math.floor(G.t * 18) % aw;
     for (let x = -off; x < TV_W; x += aw) text(g, ad, x, 210, '#F2A65A', 1, 'l', null);
     for (const it of [...men, ball].sort((a, b) => a.y - b.y)) if (it === ball) drawBall(g); else drawMan(g, it);
     box(g, '#0B0E14', 0, 0, TV_W, 13);   // the scoreboard and the clock
@@ -410,7 +411,7 @@ function carBack(g, x, y, k, col, boost = false, t = 0, steer = 0) {
     for (const px of [0.24, 0.68]) { box(g, '#FF7A2E', X + w * px, y - h * 0.18, w * 0.08, h * (0.2 + f * 0.12)); box(g, '#FFE66D', X + w * (px + 0.015), y - h * 0.16, w * 0.05, h * (0.1 + f * 0.08)); }
   }
 }
-// a motorbike from behind: Grab green, Be yellow, a delivery box, a conical hat
+// a motorbike from behind: Ridely green, Buzz yellow, a delivery box, a conical hat
 function bike(g, x, y, k, kind) {
   const w = 230 * k, h = 520 * k;
   if (h < 3) return;
@@ -419,11 +420,11 @@ function bike(g, x, y, k, kind) {
   box(g, '#16171B', x - w * 0.12, y - h * 0.34, w * 0.24, h * 0.34);
   box(g, '#E34B3F', x - w * 0.12, y - h * 0.4, w * 0.24, h * 0.05);
   box(g, '#3A3D44', x - w * 0.3, y - h * 0.5, w * 0.6, h * 0.12);
-  box(g, { grab: '#00A859', be: '#F6C51B', box: '#2B6CB0', nonla: '#8C6A4E' }[kind], X + w * 0.12, Y + h * 0.26, w * 0.76, h * 0.32);
+  box(g, { ridely: '#00A859', buzz: '#F6C51B', box: '#2B6CB0', nonla: '#8C6A4E' }[kind], X + w * 0.12, Y + h * 0.26, w * 0.76, h * 0.32);
   if (kind === 'box') box(g, '#E8742A', X + w * 0.04, Y + h * 0.3, w * 0.92, h * 0.26);
   box(g, '#2A2A2E', X + w * 0.2, Y + h * 0.56, w * 0.2, h * 0.14); box(g, '#2A2A2E', X + w * 0.6, Y + h * 0.56, w * 0.2, h * 0.14);
   if (kind === 'nonla') { box(g, '#2A1E16', X + w * 0.3, Y + h * 0.12, w * 0.4, h * 0.16); poly(g, '#E9DCA8', X - w * 0.2, Y + h * 0.18, X + w * 1.2, Y + h * 0.18, x, Y - h * 0.1); }
-  else box(g, { grab: '#00A859', be: '#F6C51B', box: '#F2F2F2' }[kind], X + w * 0.24, Y, w * 0.52, h * 0.26);   // a helmet
+  else box(g, { ridely: '#00A859', buzz: '#F6C51B', box: '#F2F2F2' }[kind], X + w * 0.24, Y, w * 0.52, h * 0.26);   // a helmet
 }
 // the roadside: palms, trees, signs, the start gantry; k: pixels per world unit, road: the road's half width in pixels
 function deco(g, sp, x, y, k, road) {
@@ -475,7 +476,7 @@ function racing(o) {
     d: i < 2 ? -SEG * 5 : -SEG * 1.5, x: i % 2 ? 0.45 : -0.45, speed: 0, nitro: 1, lap: -1, done: 0, spin: 0, cd: 0, shake: 0,
     pos: i < 2 ? 3 + i : i - 1, top: i < 2 ? 1 : [0.92, 0.95][i - 2], sky: 0, steer: 0, boost: false, nos: false, passAt: 0 }));
   const bikes = Array.from({ length: 14 }, (_, k) => ({ d: (k + 0.4 + R() * 0.3) * LEN / 14, x: [-0.62, 0.05, 0.6][k % 3] + (R() - 0.5) * 0.15,
-    speed: VMAX * (0.26 + R() * 0.1), kind: ['grab', 'nonla', 'box', 'be'][k % 4] }));
+    speed: VMAX * (0.26 + R() * 0.1), kind: ['ridely', 'nonla', 'box', 'buzz'][k % 4] }));
   let phase = 'count', phaseT = 3.4, closeSaid = false, podium = [];
   function crash(c, keep, spin) {
     if (c.cd > 0) return;

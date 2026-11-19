@@ -1,6 +1,7 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // Office characters, two looks on one rig:
 //   toy   (A) designer-toy chibi, ~2 heads: big round head, low wide-set bean eyes, stubby legs, chunky sneakers, matte vinyl.
-//   pixar (B) stylised chibi, ~2.6 heads: cheek/chin volume, layered eyes with a lash line, thick brows, sculpted hair, fabric sheen.
+//   cartoon (B) stylised chibi, ~2.6 heads: cheek/chin volume, layered eyes with a lash line, thick brows, sculpted hair, fabric sheen.
 // Rig: root -> legs (hip -> knee -> shoe) and spine (pivots at the hips, leans) -> torso, arms (shoulder -> elbow -> hand), head.
 // Arms reach targets with two-bone IK, so typing, sipping and thinking land on the desk, mouth and chin for either look.
 import * as THREE from '../../../three/three.module.min.js';
@@ -8,16 +9,16 @@ import { RoundedBoxGeometry } from '../../../three/addons/geometries/RoundedBoxG
 import { mergeVertices, mergeGeometries } from '../../../three/addons/utils/BufferGeometryUtils.js';
 import { t as tr } from '../../i18n/index.js';
 
-// The two looks' names, translated when read (LOOKS.toy, LOOKS.pixar).
+// The two looks' names, translated when read (LOOKS.toy, LOOKS.cartoon).
 export const LOOKS = Object.defineProperties({}, {
   toy: { enumerable: true, get: () => tr('people.looks.toy') },
-  pixar: { enumerable: true, get: () => tr('people.looks.pixar') },
+  cartoon: { enumerable: true, get: () => tr('people.looks.cartoon') },
 });
 const DIMS = {
   toy: { hipY: 0.44, hipX: 0.112, thigh: 0.17, shin: 0.17, legR: 0.105, shoeR: 0.13,
     torso: [[0, -0.06], [0.23, -0.06], [0.25, 0.02], [0.256, 0.16], [0.242, 0.29], [0.205, 0.38], [0.13, 0.45], [0, 0.46]],
     shX: 0.215, shY: 0.37, upper: 0.17, fore: 0.15, armR: 0.068, handR: 0.068, neck: 0.03, R: 0.44, sx: 1.06, sy: 0.96, sz: 1.0 },
-  pixar: { hipY: 0.58, hipX: 0.108, thigh: 0.24, shin: 0.24, legR: 0.1, shoeR: 0.12,
+  cartoon: { hipY: 0.58, hipX: 0.108, thigh: 0.24, shin: 0.24, legR: 0.1, shoeR: 0.12,
     torso: [[0, -0.06], [0.205, -0.06], [0.222, 0.04], [0.205, 0.17], [0.214, 0.3], [0.238, 0.42], [0.236, 0.49], [0.19, 0.55], [0.1, 0.585], [0, 0.59]],
     shX: 0.236, shY: 0.49, upper: 0.2, fore: 0.18, armR: 0.064, handR: 0.062, neck: 0.075, R: 0.33, sx: 1.0, sy: 1.02, sz: 0.98 },
 };
@@ -87,7 +88,7 @@ function sweep(points, radius, segs = 24, radial = 12) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
-// Hairline per style: [front, side, back] angles from the crown (pixar look; the toy look drops the fringe lower).
+// Hairline per style: [front, side, back] angles from the crown (cartoon look; the toy look drops the fringe lower).
 const HAIR = {
   bob: { line: [1.12, 1.98, 2.15], locks: 10 },
   plain: { line: [1.1, 1.6, 1.95], locks: 9, sweep: 0.16, phase: 0.3 },
@@ -98,7 +99,7 @@ const HAIR = {
 };
 
 export function makeChibi(cfg = {}, scale = 1) {
-  const look = DIMS[cfg.look] ? cfg.look : 'pixar', D = DIMS[look], toy = look === 'toy', R = D.R;
+  const look = DIMS[cfg.look] ? cfg.look : 'cartoon', D = DIMS[look], toy = look === 'toy', R = D.R;
   const root = new THREE.Group(); root.scale.setScalar(scale);
   const seed = [...String(cfg.name || cfg.shirt || 'x')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
   const skinC = cfg.skin || SKINS[seed % SKINS.length], shirtC = cfg.shirt || '#5F8FD8', hairC = cfg.hair || '#3B2618';
@@ -187,7 +188,7 @@ export function makeChibi(cfg = {}, scale = 1) {
 
   /* head */
   const head = new THREE.Group(); head.position.y = D.headY; spine.add(head); P.head = head;
-  // Sculpted skull: cheeks fill out below the eyes and the front of the lower face pushes forward; the pixar look
+  // Sculpted skull: cheeks fill out below the eyes and the front of the lower face pushes forward; the cartoon look
   // also tapers into a soft chin. surf() returns the face depth at (x, y) on that same shape.
   const cheek = toy ? 0.1 : 0.06, front = toy ? 0.07 : 0.06, chin = toy ? 0.05 : 0.2;
   const shapeX = (t) => { const lo = Math.max(0, -t); return 1 + cheek * Math.sin(Math.PI * Math.min(1, lo * 1.4)) - chin * lo ** 3; };
@@ -352,9 +353,9 @@ export function makeChibi(cfg = {}, scale = 1) {
   add(cup, new THREE.CylinderGeometry(0.007, 0.007, 0.13, 6), plainMat('#2E8B57'), 0.012, 0.15, 0).rotation.z = -0.15;
   const band = add(cup, new THREE.CylinderGeometry(0.0525, 0.049, 0.035, 16), plainMat('#E21F26', { roughness: 0.9 }), 0, 0, 0);
   cup.visible = false; P.cup = cup; P.cupBand = band;
-  // the stores' own takeaways (outings.js picks one by the chain), held like the drink: Circle K's mì ly (the lid peeled
-  // back, chopsticks in, steaming), GS25's tokbokki (red rice cakes, a fish-cake skewer), 7-Eleven's onigiri and bánh
-  // bao, Ministop's soft-serve and fried chicken
+  // the stores' own takeaways (outings.js picks one by the chain), held like the drink: Corner Kiosk's mì ly (the lid peeled
+  // back, chopsticks in, steaming), Mart 24's tokbokki (red rice cakes, a fish-cake skewer), Daily Stop's onigiri and bánh
+  // bao, Minute Mart's soft-serve and fried chicken
   P.held = { cup };
   const hold = (k) => { const g = new THREE.Group(); g.position.set(0, -0.02, D.handR * 0.9); g.visible = false; P.armR.hand.add(g); P.held[k] = g; return g; };
   const stick = plainMat('#D9B98A', { roughness: 0.8 }), paper = plainMat('#FBF8F1', { roughness: 0.75 });
@@ -461,14 +462,14 @@ export function makeChibi(cfg = {}, scale = 1) {
     add(lunch, new THREE.BoxGeometry(0.214, 0.01, 0.134), plainMat('#C9CED6', { roughness: 0.35, metalness: 0.4 }), 0, -0.072, 0);
     add(lunch, new THREE.TorusGeometry(0.045, 0.009, 6, 12, Math.PI), m, 0, -0.068, 0); }
   lunch.visible = false; P.lunchbag = lunch;
-  // the team's lunch from the GrabFood rider: a white carrier bag, the boxes' lids showing, hanging from the left hand
+  // the team's lunch from the Ridely Food rider: a white carrier bag, the boxes' lids showing, hanging from the left hand
   const bag = new THREE.Group(); bag.position.set(0, -0.02, 0); P.armL.hand.add(bag);
   const bagM = plainMat('#F4F3EE', { roughness: 0.75 });
   add(bag, new THREE.BoxGeometry(0.27, 0.22, 0.15), bagM, 0, -0.19, 0);
   add(bag, new THREE.BoxGeometry(0.24, 0.025, 0.13), plainMat('#FFFFFF', { roughness: 0.5 }), 0, -0.07, 0);
   for (const x of [-0.07, 0.07]) add(bag, new THREE.TorusGeometry(0.045, 0.008, 6, 12, Math.PI), bagM, x, -0.075, 0);
   bag.visible = false; P.bag = bag;
-  // going home past WinMart+ or Bách Hóa Xanh: a plastic bag, the shop's colour on it, greens and a carrot sticking out
+  // going home past Greenway Market or Green Basket: a plastic bag, the shop's colour on it, greens and a carrot sticking out
   const groc = new THREE.Group(); groc.position.set(0, -0.02, 0); P.armL.hand.add(groc);
   const plastic = plainMat('#F6F6F2', { roughness: 0.45 });
   add(groc, new THREE.BoxGeometry(0.22, 0.19, 0.13), plastic, 0, -0.18, 0);

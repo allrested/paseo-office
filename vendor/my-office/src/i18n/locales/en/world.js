@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // The 3D world: text painted on screens, signs and plaques (drawn once when the scene is built, or redrawn on a timer),
 // the backdrops, and the renderer's own messages.
 export default {
@@ -58,7 +59,7 @@ export default {
     sign1: 'CẢNH SÁT GIAO THÔNG',
     sign2: 'ĐANG LÀM NHIỆM VỤ',
     chat: 'Traffic police checkpoint outside the door, everyone. Helmets on when you leave 🪖',
-    chatAlc: 'Alcohol checkpoint outside the door tonight. Had a drink? Take a Grab home 🍻🚫',
+    chatAlc: 'Alcohol checkpoint outside the door tonight. Had a drink? Take a Ridely home 🍻🚫',
     fp: 'Watch the traffic police',
     whereOn: 'Checkpoint in front of the office · {from}–{to}',
     whereOff: 'On patrol round the office',
@@ -200,7 +201,7 @@ export default {
       yes: ['I’m in!', 'Count me in 🙋', 'Save me a seat', 'Ok, the Ba Khía place'],
       cheers: 'Một hai ba dô 🍻',
       noDrive: 'If you’ve had a drink, don’t drive 🚕',
-      grab: 'Grab’s on its way',
+      ridely: 'Ridely’s on its way',
     },
     where: {
       coming: 'Off to {name}',
@@ -208,7 +209,7 @@ export default {
       work: 'Back from the bar to the office',
       home: 'Home by {how}',
     },
-    how: { grab: 'GrabBike', xsm: 'Xanh SM Bike', taxi: 'Xanh SM taxi', bike: 'scooter' },
+    how: { ridely: 'Ridely Bike', aqua: 'Aqua Ride Bike', taxi: 'Aqua Ride taxi', bike: 'scooter' },
     card: {
       office: 'The office’s table',
       noOffice: 'No one from the office tonight yet.',

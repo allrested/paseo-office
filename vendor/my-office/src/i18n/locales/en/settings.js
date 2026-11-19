@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 export default {
   language: 'Language',
   switchingLang: 'Switching language…',
@@ -24,7 +25,7 @@ export default {
   },
   looks: {
     toy: { sub: 'Round and glossy, like a vinyl figure' },
-    pixar: { sub: 'Big eyes and layered hair, like an animated film' },
+    cartoon: { sub: 'Big eyes and layered hair, like an animated film' },
   },
   lookNote: 'Every person in the office changes at once, including you in Walk in mode.',
   qSub: { auto: 'Steps down if slow', low: 'Light, saves battery', medium: 'Balanced', high: 'Sharpest, soft shadows' },

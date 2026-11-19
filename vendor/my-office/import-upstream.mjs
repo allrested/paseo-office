@@ -7,12 +7,16 @@
 // It copies the scene modules reached from upstream's start-up list, minus the parts Paseo does
 // not take (DENY), and the three.js files they import. It never writes a stand-in (a file at a
 // DENY path) and never overwrites a file that carries a "PASEO:" note; it lists both instead.
+// A scene or chat file is written with the real names of shops, apps and products swapped for
+// made-up ones (scripts/genericise-street.mjs); a file whose only note is that script's is
+// written like any other.
 // The team chat's engine and its English words go to the plugin's shared/upstream/ instead (CHAT).
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { NOTE as NAMES_NOTE, named } from "../../scripts/genericise-street.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -165,11 +169,14 @@ const commit = execFileSync("git", ["-C", FROM, "rev-parse", "HEAD"], { encoding
 const version = JSON.parse(readFileSync(path.join(FROM, "package.json"), "utf8")).version;
 
 const report = { written: 0, same: 0, keptLocal: [], missingStandIns: [] };
-function put(file, text) {
+/** Only the names script's note: the file is upstream's with the names swapped, and nothing else. */
+const namesOnly = (text) => text.startsWith(NAMES_NOTE) && !text.includes("PASEO:", NAMES_NOTE.length);
+function put(file, upstreamText, { names = false } = {}) {
+  const text = names ? named(upstreamText) : upstreamText;
   if (existsSync(file)) {
     const current = readFileSync(file, "utf8");
     if (current === text) { report.same += 1; return; }
-    if (current.includes("PASEO:")) { report.keptLocal.push(posix(path.relative(HERE, file))); return; }
+    if (current.includes("PASEO:") && !namesOnly(current)) { report.keptLocal.push(posix(path.relative(HERE, file))); return; }
   }
   report.written += 1;
   if (CHECK) return;
@@ -177,9 +184,9 @@ function put(file, text) {
   writeFileSync(file, text);
 }
 
-for (const [rel, text] of taken) put(outOf(rel), rewrite(text, outOf(rel)));
+for (const [rel, text] of taken) put(outOf(rel), rewrite(text, outOf(rel)), { names: true });
 for (const [rel, text] of addons) put(path.join(HERE, "three", rel), rewrite(text, path.join(HERE, "three", rel)));
-for (const [rel, text] of chatTaken) put(chatOut(CHAT.get(rel)), text);
+for (const [rel, text] of chatTaken) put(chatOut(CHAT.get(rel)), text, { names: true });
 if (!CHECK) {
   mkdirSync(path.join(HERE, "three"), { recursive: true });
   writeFileSync(path.join(HERE, "three/three.module.min.js"), threeBuild);

@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // First person: walk the office as your own character, and (with the city outside) down the lift and out on the street:
 // the pavements, the zebras (the traffic stops for you), the shops, the bánh mì cart.
 import * as THREE from '../../../three/three.module.min.js';
@@ -89,7 +90,7 @@ function toOffice(now = false) {
 const vnd = (k) => `${(k * 1000).toLocaleString('vi-VN')}đ`;
 const itemName = (it) => tr(`fp.items.${it.id}`);
 function shopLabel(o) {
-  if (o.kind === 'seat') return tr(o.label || 'fp.sit');   // (a shop's own words for its seat: Cộng's low stool)
+  if (o.kind === 'seat') return tr(o.label || 'fp.sit');   // (a shop's own words for its seat: Olive Cafe's low stool)
   if (o.kind !== 'pay') return tr('fp.take', { item: itemName(o.item), price: vnd(o.item.price) });
   if (fp.basket.length) return tr('fp.pay', { n: fp.basket.length, total: vnd(fp.basket.reduce((a, it) => a + it.price, 0)) });
   return o.item ? tr('fp.order', { item: itemName(o.item), price: vnd(o.item.price) }) : tr('fp.payEmpty');

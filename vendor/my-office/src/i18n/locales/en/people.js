@@ -1,3 +1,4 @@
+// PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
 // What the characters say and are called (people/*.js): subagents arriving and reporting, the director handing out work,
 // lunch and coffee, and the sleepy lines when you click someone who is resting. Speech bubbles: keep them short.
 export default {
@@ -116,30 +117,30 @@ export default {
     home: 'Gone home', toShop: 'Popping out to {shop}', toNight: 'Late-night snack at {shop}', fromShop: 'Back from {shop}', rushing: 'Work came in, hurrying back',
     lunchDown: 'Fetching the lunch', lunchUp: 'Bringing the lunch up', leaving: 'Heading home ({how})', coming: 'On the way in ({how})',
     homeShop: 'Shopping at {shop} on the way home',
-    how: { bike: 'scooter', grab: 'GrabBike', xsm: 'Xanh SM Bike', taxi: 'Xanh SM taxi' },
+    how: { bike: 'scooter', ridely: 'Ridely Bike', aqua: 'Aqua Ride Bike', taxi: 'Aqua Ride taxi' },
     // at the till: what they are getting there
     buy: { cup: 'At {shop}, getting a drink', noodle: 'At {shop}, getting cup noodles', tok: 'At {shop}, having tteokbokki', onigiri: 'At {shop}, getting onigiri',
       bun: 'At {shop}, getting a steamed bun', cone: 'At {shop}, getting ice cream', chicken: 'At {shop}, getting fried chicken', grocery: 'At {shop}, shopping' },
   },
-  // going out (outings.js): the GrabFood rider with the team's lunch, a trip to the convenience store across the street
+  // going out (outings.js): the Ridely Food rider with the team's lunch, a trip to the convenience store across the street
   out: {
     rider: ["The rider's here, I'll get the lunch 🛵", 'Lunch is here! Going down 🍱'],
     thanks: ['Thanks a lot! 👍', 'Cheers, thank you 🙏'],
     lunch: ['Lunch is here, everyone! 🍱', "Food's here, let's eat! 🍱"],
-    // the lunch from the 7-Eleven (Ho Chi Minh City)
-    rider7: ["Lunch from 7-Eleven is here, I'll get it 🍱", 'The 7-Eleven rider is here, going down 🛵'],
-    lunch7: ['7-Eleven lunch is here, everyone! 🍱', "Bento from 7-Eleven, let's eat! 🍱"],
-    lunch7Toast: 'Lunch from 7-Eleven is here, come to the pantry 🍱',
+    // the lunch from the Daily Stop (Ho Chi Minh City)
+    rider7: ["Lunch from Daily Stop is here, I'll get it 🍱", 'The Daily Stop rider is here, going down 🛵'],
+    lunch7: ['Daily Stop lunch is here, everyone! 🍱', "Bento from Daily Stop, let's eat! 🍱"],
+    lunch7Toast: 'Lunch from Daily Stop is here, come to the pantry 🍱',
     // on the way down, by what they will bring back (go), and coming out with it (got)
     morning: { go: ['A phin at {shop} first ☕', 'Can’t start without {shop} ☕'], got: ['Iced milk coffee in hand, up we go ☕', 'Coffee sorted, let’s go ☕'] },
     coffee: { go: ['Off to {shop} to wake up ☕', 'Popping to {shop}, anyone want anything? ☕'], got: ['A cold matcha freeze 🍵', 'Got my {shop}, back to it ☕'] },
     upgrade: { go: ['Claude Code is on {version}: off to {shop} to level up 📱', 'Time to level up 📱'], got: ['Levelled up, back to work 📱', 'Got a charging cable while I was there 🔌'] },
-    treat: { go: ['Off to Mixue, ice cream for everyone 🍦', 'Getting Mixue for the whole team 🍦'], got: ['Ice cream’s here, come and get it 🍦', 'Mixue for everyone, eat it before it melts 🍦'] },
+    treat: { go: ['Off to Frosty Cone, ice cream for everyone 🍦', 'Getting Frosty Cone for the whole team 🍦'], got: ['Ice cream’s here, come and get it 🍦', 'Frosty Cone for everyone, eat it before it melts 🍦'] },
     tea: { go: ['Off to {shop} for a milk tea 🧋', 'Popping to {shop}, want anything? 🧋'], got: ['Milk tea, back to work 🧋', 'Got my {shop}, heading back 🧋'] },
     checkin: { go: ['Off to {shop} for the photo 📸', 'Going to {shop}, picture time 📸'], got: ['Got the shot 📸', 'That queue, but worth it 🧋'] },
     headache: { go: ['My head! Off to {shop} for painkillers 😵', 'Going to {shop} for something for the headache 💊'], got: ['Got the pills, back at it 💊', 'The pharmacist says rest a bit 😅'] },
-    cong: { go: ['Off to Cộng for a coconut coffee 🥥', 'Popping to Cộng, anyone want anything? ☕'], got: ['Coconut coffee, ice cold 🥥', 'Got my Cộng, back to it ☕'] },
-    congWeekend: { go: ['A weekend needs a Cộng coffee ☕', 'Getting a coconut coffee at Cộng first 🥥'], got: ['Coconut coffee: that’ll do for a Saturday 🥥', 'Got my Cộng, back to it ☕'] },
+    olivecafe: { go: ['Off to Olive Cafe for a coconut coffee 🥥', 'Popping to Olive Cafe, anyone want anything? ☕'], got: ['Coconut coffee, ice cold 🥥', 'Got my Olive Cafe, back to it ☕'] },
+    olivecafeWeekend: { go: ['A weekend needs an Olive Cafe coffee ☕', 'Getting a coconut coffee at Olive Cafe first 🥥'], got: ['Coconut coffee: that’ll do for a Saturday 🥥', 'Got my Olive Cafe, back to it ☕'] },
     go: {
       cup: ['Popping down to {shop} for a drink 🥤', 'Off to {shop} for a peach tea 🥤', 'Running to {shop}, want anything? 🛒'],
       noodle: ['Getting cup noodles at {shop} 🍜', "Hungry, I'll make a cup of noodles at {shop} 🍜"],
@@ -201,7 +202,7 @@ export default {
     close: ['Cake, then back to work!'], bye: ['That was good cake 🍰', 'Back to it!'], deploy: ['Shipped! 🎉', "It's live! 👏", 'Nice! 🚀'],
   },
   busy: ['In the middle of something, one sec 🙏', 'Hm? Focusing right now', 'Almost done, hang on 👀'],
-  looks: { toy: 'A · Toy chibi', pixar: 'B · Pixar chibi' },
+  looks: { toy: 'A · Toy chibi', cartoon: 'B · Cartoon chibi' },
   tea: {
     toast: '🧋 Friday 16:00: tea in the pantry, milk tea and bánh tráng trộn!',
     coming: ['Friday tea! 🧋', 'Milk tea? On my way!', 'Bánh tráng trộn! Wait for me!'],
@@ -216,15 +217,15 @@ export default {
     greet: ['Hello!', 'Good to see you!', 'Come on in!'],
     greetMorning: ['Good morning!', 'Early today!'],
     bye: ['Get home safe!', 'See you tomorrow!', 'Take care on the way!'],
-    shipper: 'Shopee courier',
+    shipper: 'Bazaarly courier',
     cleanHi: ['Mopping now, careful, it is slippery!', 'Floor is getting a wash, mind the wet bits.'],
     cleanBin: ['Emptying the bin first.', 'Bin is full, out it goes.'],
     cleanLeave: ['The pantry bin is for whoever is on duty, I just do the floors.', 'Today’s rubbish is the duty rota’s, I only mop.'],
     cleanBye: ['All done, see you tomorrow!', 'Spotless. Good night!'],
     slippery: ['Oops, wet floor, going round.', 'Slippery there, the other way.'],
-    shipperHi: ['Shopee delivery!', 'Shopee parcel, I will leave it at the desk!'],
-    call: ['{name}, a parcel for you!', '{name}, your Shopee parcel is here!'],
-    callDoor: ['{name}, Shopee parcel!', 'Shopee delivery! {name}?'],
+    shipperHi: ['Bazaarly delivery!', 'Bazaarly parcel, I will leave it at the desk!'],
+    call: ['{name}, a parcel for you!', '{name}, your Bazaarly parcel is here!'],
+    callDoor: ['{name}, Bazaarly parcel!', 'Bazaarly delivery! {name}?'],
     coming: ['Coming!', 'That is mine, on my way!'],
     got: ['Thanks!', 'It is here!'],
     unbox: ['Let us see what is inside…', 'Just what I ordered! 📦'],
