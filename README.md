@@ -27,6 +27,9 @@ my-office's.
 - Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
 - Plays my-office's sounds in the 3D floor: off until you turn on Sound in the settings or with the
   speaker button on the floor's toolbar.
+- Takes a photo of the 3D floor, in the app's light or held to day or night for the photo, and on
+  a desktop or in a browser records a 15-second clip of it; a tour of the floor's things shows
+  once on a desktop.
 - Reads the host (on Linux): memory, CPU, and what each agent left running, with a way to clean it
   up.
 
@@ -58,12 +61,13 @@ The settings are in Settings > Plugins > Office 3D. The gear over the floor open
 
 ## What works where
 
-| Where                    | What you get                                                                                                                                                                           |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop app and browsers | The 3D floor, the 2D floor and the list                                                                                                                                                |
-| The store phone app      | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
-| Sound                    | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
-| Stock Paseo 0.16         | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
+| Where                             | What you get                                                                                                                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop app and browsers          | The 3D floor, the 2D floor and the list; Photo mode, clips and the tour                                                                                                                |
+| The phone app with a script frame | The 3D floor without Photo mode, clips and the tour                                                                                                                                    |
+| The store phone app               | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
+| Sound                             | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
+| Stock Paseo 0.16                  | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
 
@@ -77,6 +81,10 @@ while the daemon was down is not made up.
   (a read, an edit, a command, a test run). The kind is worked out on the host.
 - The 3D scene is told who is there and what kind of thing each does, never a file name, a command
   or a prompt. The scene makes no network call.
+- A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
+  scene keeps on the device, under keys that start with `office-`, which team sits where, the
+  plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
+  music choice. The column keeps when this device last had the chat open (`office-chat-seen`).
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
 - The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the

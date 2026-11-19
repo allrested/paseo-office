@@ -100,7 +100,8 @@ frame that runs a script (`client/world/script-frame-kit.ts`); `client/world/wor
 carries the scene's API over messages. The store app's plugin frame runs no script, so it gets the
 2D floor and the list. An app's page finds out whether the phone has WebGL2; with none, and for
 any other failure, the 3D floor gives way to the 2D one under a banner with a way to try again.
-Photo mode is off in an app, since a WebView cannot keep a download.
+Photo mode is off in an app, since a WebView cannot keep a download, and so are clips. The tour is
+off wherever the screen is touch.
 
 The list's bar filters the room cards by tab (All, Needs you, Working, Resting) and by a search
 that `/` focuses on the web. Each row adds its context, its turn's clock or how long it has
@@ -184,9 +185,11 @@ to the app's window.
 
 The scene is told who is there and what kind of thing each does, and the open incidents' keys and
 titles for the banner; never a file name, a command or a prompt. It makes no network call. It
-writes four things to the app origin's `localStorage` under keys that start with `office-`:
-which team sits where, the plants, the graphics level, and the Sound switch (`office-sound`, which
-the host's setting overwrites at each start).
+writes seven things to the app origin's `localStorage` under keys that start with `office-`:
+which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
+the host's setting overwrites at each start), that the tour was seen (`office-tips`), and the
+clip's shape and music choice (`office-clip-shape`, `office-clip-music`). It reads
+`office-autocam`.
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
 pop out to, the ride and delivery apps, the bank, the medicines) are made-up ones, not my-office's
@@ -221,6 +224,33 @@ wall screen opens a Resources screen beside the floor instead, when the host has
 a desk and in its bin is the agent's context, with a flag in it from 85%. When a context falls to
 less than half of what it was, by a compaction or a new conversation, the person carries the paper
 to the shredder.
+
+The camera moves by itself for one thing: a person already in the office whose status becomes
+"waiting for you" has the camera glide to them for 7 seconds, then back. Not while the camera was
+moved in the last 30 seconds, someone walks the floor, a photo is taken or a card is open, and
+anything else that takes the camera (a view, a zoom, a drag) ends the glide. It is on by default.
+There is no setting for it: the `localStorage` key `office-autocam` set to `off` turns it off.
+
+Photo mode's bar holds the light for a photo: Auto follows the app's theme, Day and Night hold
+against it, and leaving photo mode puts the lights back. A theme change that reaches the scene
+lets go too; stock Paseo's web app starts the plugin's whole screen again on a theme change, so
+there the scene simply starts in the new theme (see [verified.md](verified.md)). The wall clock
+does not change the lights, and its tooltip says so.
+
+On a desktop's first visit to the 3D floor a tour shows: six or seven cards, each over the thing
+it is about (the lamp, the switch, the coffee machine, the printer, the cat, a person, Walk in),
+skipping what a floor plan lacks. It shows once per device (`office-tips`; remove the key to see
+it again), ends at Skip, Done, Escape, Walk in or Photo mode, and never shows on a touch screen.
+
+Photo mode's bar also records a clip: "Clip 15 s", in a square or a vertical shape, with Music.
+It is offered on a desktop or in a browser that has a recorder, never on a touch device and never
+where Photo mode is off. The clip is made in the page and saved as a download named
+`office-clip-...`; nothing is sent anywhere. The music is made in the page too, goes into the
+recording and not to the speakers, and is made only while Sound is on: with Sound off the Music
+button is dimmed and the clip is silent. Escape and P do nothing while a clip is made; its own
+Stop ends it and saves nothing. What a clip shows is the scene's own: the floor, the people's
+names and counts of prompts, edits, commands and deploys, never a file name, a command or a
+prompt.
 
 Opening the stand-up rings the bell on the meeting table: everyone the scene counts as free walks
 there and says what they are on. A click on the bell does the same and also starts the stand-up
