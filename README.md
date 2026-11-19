@@ -41,7 +41,8 @@ my-office's.
   a desktop or in a browser records a 15-second clip of it; a tour of the floor's things shows
   once on a desktop.
 - Reads the host (on Linux): memory, CPU, and what each agent left running, with a way to clean it
-  up.
+  up. When SSH-MCP is installed and configured, select **Host → SSH** to see memory, load and
+  disk usage for its remote hosts. This works with Office alone.
 
 [docs/office.md](docs/office.md) says how each part works.
 

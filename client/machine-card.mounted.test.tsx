@@ -9,8 +9,18 @@ import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Machine, MachineAgent } from "../shared/contracts.js";
+import { type SshDiscovery, type SshHost, type SshReading } from "../shared/ssh.js";
+import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { useOfficeStyles } from "./styles.js";
+
+const rpc = vi.hoisted(() => ({
+  discover: vi.fn<() => Promise<SshDiscovery>>(),
+  read: vi.fn<(input: { id: string }) => Promise<SshReading>>(),
+}));
+vi.mock("@getpaseo/plugin/client", () => ({
+  useRpc: ({ name }: { name: string }) => (name === "office.ssh.servers" ? rpc.discover : rpc.read),
+}));
 
 vi.mock("@getpaseo/plugin/client/ui", () => {
   const Modal = (props: { title: string; open: boolean; children: ReactNode }) =>
@@ -62,6 +72,8 @@ let root: Root;
 
 beforeEach(() => {
   cleanUp.mockClear();
+  rpc.discover.mockReset().mockResolvedValue({ servers: [], discoveryIncomplete: false });
+  rpc.read.mockReset().mockResolvedValue({ status: "ok", hosts: [] });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -70,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 
 const cleanUp = vi.fn(async (_agentIds: readonly string[]): Promise<void> => undefined);
@@ -157,4 +170,143 @@ test("bulk cleanup sends only the closed agents on a host unable to close idle r
   if (!clean) throw new Error("No bulk cleanup button for the two closed agents");
   await act(async () => clean.click());
   expect(cleanUp.mock.calls).toEqual([[["gone", "gone2"]]]);
+});
+
+const OFFICE_SERVERS = [
+  { id: "1".repeat(16), name: "Main" },
+  { id: "2".repeat(16), name: "Lab" },
+];
+const REMOTE: SshHost = {
+  name: "build",
+  reachable: true,
+  cores: 2,
+  load1: 2.14,
+  load5: 1,
+  load15: 0,
+  memoryTotalBytes: 1024,
+  memoryUsedBytes: 0,
+  diskMount: "/",
+  diskTotalBytes: 100,
+  diskUsedBytes: 62,
+};
+
+function DiscoveredCard({ machine, open }: { machine: Machine | null; open: boolean }) {
+  const styles = useOfficeStyles(THEME, false, false);
+  const ssh = useSshServers(true);
+  return (
+    <MachineCard
+      ssh={ssh}
+      machine={machine}
+      open={open}
+      cleanUp={cleanUp}
+      styles={styles}
+      onClose={onClose}
+    />
+  );
+}
+async function mountCard(machine: Machine | null, open = true) {
+  await act(async () => root.render(<DiscoveredCard machine={machine} open={open} />));
+}
+async function press(label: string) {
+  const button = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!button) throw new Error(`Missing control: ${label}`);
+  await act(async () => button.click());
+}
+
+test("the local card stays available without SSH configuration", async () => {
+  await mountCard(reading([]));
+  expect(container.querySelector('[role="tablist"]')).toBeNull();
+  expect(container.textContent).toContain("Memory by agent");
+  expect(rpc.read).not.toHaveBeenCalled();
+});
+
+test("only the selected SSH server is polled while its tab and the Host card are open", async () => {
+  vi.useFakeTimers();
+  rpc.discover.mockResolvedValue({ servers: OFFICE_SERVERS, discoveryIncomplete: false });
+  rpc.read.mockResolvedValue({ status: "ok", hosts: [REMOTE] });
+  const machine = reading([]);
+  await mountCard(machine);
+  expect(rpc.read).not.toHaveBeenCalled();
+  await press("SSH");
+  expect(rpc.read.mock.calls).toEqual([[{ id: OFFICE_SERVERS[0].id }]]);
+  expect(container.querySelector('[aria-label="Load: 107% · 2 cores"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Memory: 0% · 0 B"]')).not.toBeNull();
+  expect(container.textContent).toContain("Warning");
+  await press("Details for build");
+  expect(container.textContent).toContain("2.14 / 1.00 / 0.00");
+  expect(container.textContent).toContain("62 B of 100 B");
+  await press("Lab");
+  await act(async () => vi.advanceTimersByTimeAsync(30_000));
+  expect(rpc.read.mock.calls.slice(1)).toEqual([
+    [{ id: OFFICE_SERVERS[1].id }],
+    [{ id: OFFICE_SERVERS[1].id }],
+  ]);
+  await press("This instance");
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
+  expect(rpc.read).toHaveBeenCalledTimes(3);
+  await press("SSH");
+  await mountCard(machine, false);
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
+  expect(rpc.read).toHaveBeenCalledTimes(4);
+  expect(cleanUp).not.toHaveBeenCalled();
+});
+
+test("SSH-only hosts open on remote readings and distinguish unreachable profiles from an empty server", async () => {
+  rpc.discover.mockResolvedValue({ servers: OFFICE_SERVERS, discoveryIncomplete: true });
+  rpc.read.mockResolvedValueOnce({
+    status: "ok",
+    hosts: [{ ...REMOTE, name: "offline", reachable: false }],
+  });
+  await mountCard(null);
+  expect(container.querySelector('[aria-label="SSH"]')?.getAttribute("aria-selected")).toBe("true");
+  expect(container.textContent).toContain("Unreachable");
+  expect(container.querySelector('[aria-label="Details for offline"]')).toBeNull();
+  await press("Lab");
+  expect(container.textContent).toContain("No SSH hosts configured");
+  expect(container.textContent).toContain("Some SSH configurations could not be read");
+  await press("This instance");
+  expect(container.textContent).toContain("Local resource readings are unavailable");
+});
+
+test("a failed SSH read shows an error and keeps This instance usable", async () => {
+  rpc.discover.mockResolvedValue({
+    servers: OFFICE_SERVERS.slice(0, 1),
+    discoveryIncomplete: false,
+  });
+  rpc.read.mockRejectedValue(new Error("connection failed"));
+  await mountCard(reading([]));
+  await press("SSH");
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to read");
+  await press("This instance");
+  expect(container.textContent).toContain("Memory by agent");
+});
+
+test("partial metrics stay unavailable and expanded hosts disclose their known readings", async () => {
+  rpc.discover.mockResolvedValue({
+    servers: OFFICE_SERVERS.slice(0, 1),
+    discoveryIncomplete: false,
+  });
+  rpc.read.mockResolvedValue({
+    status: "ok",
+    hosts: [
+      { ...REMOTE, name: "quiet", load1: 0 },
+      { ...REMOTE, name: "partial", load1: null, diskUsedBytes: null },
+    ],
+  });
+  await mountCard(null);
+  expect(container.textContent).toContain("2 hosts · 1 needs attention");
+  expect(container.querySelector('[aria-label="Load: Unavailable"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Disk: Unavailable"]')).not.toBeNull();
+  const expand = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(
+    (button) => button.textContent === "Expand all",
+  );
+  if (!expand) throw new Error("No Expand all button");
+  await act(async () => expand.click());
+  expect(
+    container.querySelector('[aria-label="Details for quiet"]')?.getAttribute("aria-expanded"),
+  ).toBe("true");
+  expect(
+    container.querySelector('[aria-label="Details for partial"]')?.getAttribute("aria-expanded"),
+  ).toBe("true");
+  expect(container.textContent).toContain("CPU cores · 2");
 });

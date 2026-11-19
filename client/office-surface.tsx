@@ -52,8 +52,10 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
+import { useSshServers } from "./ssh-hosts.js";
+import { OfficeDialogs } from "./office-modal.js";
 import { MachineCard } from "./machine-card.js";
-import { hostNote, namedMachine, type HostNote } from "../shared/machine-text.js";
+import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
   buildOfficeModel,
   orderRoomsForFocus,
@@ -812,12 +814,37 @@ interface ViewControlsProps {
   viewChoice: ViewChoiceState;
   /** The device refused to store a press on the 3D floor's Sound button. */
   soundUnsaved: boolean;
+  machine: Machine | null;
+  onMachine?: () => void;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
   color: string;
   onOpenSettings: (() => void) | undefined;
   styles: OfficeStyles;
+}
+
+function HostResourceButton({
+  machine,
+  onOpen,
+  styles,
+}: {
+  machine: Machine | null;
+  onOpen(): void;
+  styles: OfficeStyles;
+}) {
+  const percent = machine ? memoryPercent(machine) : null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Host resources"
+      onPress={onOpen}
+      style={styles.sidebarButton}
+    >
+      <Icon name="Cpu" size={15} color={String(styles.sidebarButtonText.color)} />
+      <Text style={styles.sidebarButtonText}>{percent === null ? "Host" : `RAM ${percent}%`}</Text>
+    </Pressable>
+  );
 }
 
 /** The view switch and the settings button. */
@@ -828,6 +855,8 @@ function ViewControls({
   floorDrawn,
   viewChoice,
   soundUnsaved,
+  machine,
+  onMachine,
   onChange,
   compact,
   touchScreen,
@@ -849,6 +878,9 @@ function ViewControls({
   );
   const actions = (
     <>
+      {sidebars && onMachine && (
+        <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />
+      )}
       {full.available ? (
         <PanelButton
           label={full.active ? "Exit full screen" : "Full screen"}
@@ -1377,6 +1409,21 @@ function useFullscreenPanels(
   };
 }
 
+function useHostResources(machine: Machine | null, live: boolean) {
+  const [machineOpen, setMachineOpen] = useState(false);
+  const openMachine = useCallback(() => setMachineOpen(true), []);
+  const closeMachine = useCallback(() => setMachineOpen(false), []);
+  const ssh = useSshServers(live && (machineOpen || machine === null));
+  const hasSsh = ssh.servers.length > 0;
+  const hostEntry = useMemo((): StripCard | null => {
+    if (machine) return { title: "Host", note: hostNote(machine), onOpen: openMachine };
+    if (hasSsh)
+      return { title: "Host", note: { text: "SSH hosts", tone: "muted" }, onOpen: openMachine };
+    return null;
+  }, [machine, hasSsh, openMachine]);
+  return { machineOpen: machineOpen && live, openMachine, closeMachine, hostEntry, ssh };
+}
+
 /** One surface for both places: the sidebar screen and a workspace tab. */
 export function OfficeSurface(
   props: OfficeSurfaceProps & {
@@ -1398,9 +1445,6 @@ export function OfficeSurface(
   const actions = useAgentActions();
   const boardActions = useBoardActions();
   const { machine: reading, cleanUp } = useMachine();
-  const [machineOpen, setMachineOpen] = useState(false);
-  const openMachine = useCallback(() => setMachineOpen(true), []);
-  const closeMachine = useCallback(() => setMachineOpen(false), []);
   const tidy = useJanitor();
   const dismissIncidents = useIncidents();
   const [janitorOpen, setJanitorOpen] = useState(false);
@@ -1427,6 +1471,10 @@ export function OfficeSurface(
   const name = useCallback((author: string) => authorName(author, model.agents), [model.agents]);
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
+  const { machineOpen, openMachine, closeMachine, hostEntry, ssh } = useHostResources(
+    machine,
+    live,
+  );
   const board = useBoardSheet(model, live);
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
@@ -1506,11 +1554,6 @@ export function OfficeSurface(
   useEffect(() => {
     if (kept !== selectedId) setSelectedId(kept);
   }, [kept, selectedId]);
-  const hostEntry = useMemo(
-    (): StripCard | null =>
-      machine === null ? null : { title: "Host", note: hostNote(machine), onOpen: openMachine },
-    [machine, openMachine],
-  );
   const contexts = useMemo(
     () => janitorRows(model.agents.values(), model.waitingOn),
     [model.agents, model.waitingOn],
@@ -1591,6 +1634,8 @@ export function OfficeSurface(
       floorDrawn={floorDrawn}
       viewChoice={viewChoice}
       soundUnsaved={sound.unsaved}
+      machine={machine}
+      onMachine={hostEntry?.onOpen}
       onChange={changeView}
       compact={layout.compact}
       touchScreen={touchScreen}
@@ -1696,13 +1741,16 @@ export function OfficeSurface(
         styles={styles}
         onClose={closeCard}
       />
-      <MachineCard
-        machine={live ? machine : null}
-        open={machineOpen}
-        cleanUp={cleanUp}
-        styles={styles}
-        onClose={closeMachine}
-      />
+      <OfficeDialogs fullscreen={full.active} theme={theme} styles={styles}>
+        <MachineCard
+          machine={live ? machine : null}
+          ssh={ssh}
+          open={machineOpen}
+          cleanUp={cleanUp}
+          styles={styles}
+          onClose={closeMachine}
+        />
+      </OfficeDialogs>
       <JanitorCard
         rows={contexts}
         open={janitorOpen && live}

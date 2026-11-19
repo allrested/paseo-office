@@ -85,6 +85,7 @@ export interface OfficeStyles {
   columnSheet: ViewStyle;
   columnSheetHead: ViewStyle;
   columnSheetTitle: TextStyle;
+  dialogBody: ViewStyle;
   /** The row of switches: it wraps on a phone, and every line ends on the trailing rail. */
   headerControls: ViewStyle;
   /** The switches' failures, one line each, under their row. */
@@ -744,6 +745,7 @@ export function useOfficeStyles(
         opacity: 0,
       },
       columnBody: { flex: 1 },
+      dialogBody: { padding: compact ? 16 : 22, gap: 16 },
       columnAttention: { paddingVertical: 8 },
       columnBar: {
         flexDirection: "row",

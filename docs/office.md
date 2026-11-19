@@ -400,7 +400,13 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
-Linux only: elsewhere the subscription answers `unavailable` and the entry is not shown.
+Local process readings require Linux. On other platforms the Host card is available when Office
+finds a configured SSH-MCP installation.
+
+**Host → SSH** shows the hosts provided by SSH-MCP. Select a host to see its readings in detail.
+Load is the one-minute load average relative to the number of cores, so it can exceed 100%.
+The disk gauge shows the fullest reported mount. Office reads these metrics while the SSH tab is
+open. If Office finds no installed SSH-MCP configuration, the card shows the local reading on its own.
 
 An agent has left something running when it has been idle for 30 minutes with a port open, or when
 it is closed or archived and processes of it remain: the daemon collects an idle runtime after an

@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { Text, View, type ViewStyle } from "react-native";
-import { Icon, Modal } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
+import { Icon } from "@getpaseo/plugin/client/ui";
 import type { Machine, MachineAgent } from "../shared/contracts.js";
+import { HostViews, NO_SSH, type SshDiscovery } from "./ssh-hosts.js";
 import { ActionButton } from "./action-button.js";
 import {
   agentLine,
@@ -290,8 +292,9 @@ function MachineBody({ machine, cleanUp, styles }: MachineBodyProps) {
 }
 
 export interface MachineCardProps {
-  /** Null closes the card: the host has no reading (any more). */
+  /** Empty on hosts without local readings. */
   machine: Machine | null;
+  ssh?: SshDiscovery;
   open: boolean;
   cleanUp(agentIds: readonly string[]): Promise<void>;
   styles: OfficeStyles;
@@ -299,7 +302,14 @@ export interface MachineCardProps {
 }
 
 /** The host: its memory, what each agent holds of it, and what was left running. */
-export function MachineCard({ machine, open, cleanUp, styles, onClose }: MachineCardProps) {
+export function MachineCard({
+  machine,
+  ssh = NO_SSH,
+  open,
+  cleanUp,
+  styles,
+  onClose,
+}: MachineCardProps) {
   const change = useCallback(
     (next: boolean) => {
       if (!next) onClose();
@@ -310,10 +320,21 @@ export function MachineCard({ machine, open, cleanUp, styles, onClose }: Machine
     () => <Icon name="Server" size={18} color={styles.host.label.color} />,
     [styles],
   );
+  const visible = open && (machine !== null || ssh.servers.length > 0);
   return (
-    <Modal icon={icon} title="Host" open={open && machine !== null} onOpenChange={change}>
+    <Modal icon={icon} title="Host" open={visible} onOpenChange={change}>
       <Modal.Content>
-        {machine ? <MachineBody machine={machine} cleanUp={cleanUp} styles={styles} /> : null}
+        {visible && (
+          <HostViews discovery={ssh} hasLocal={machine !== null} styles={styles}>
+            {machine ? (
+              <MachineBody machine={machine} cleanUp={cleanUp} styles={styles} />
+            ) : (
+              <Text style={styles.host.note}>
+                Local resource readings are unavailable on this host.
+              </Text>
+            )}
+          </HostViews>
+        )}
       </Modal.Content>
     </Modal>
   );

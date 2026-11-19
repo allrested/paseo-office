@@ -6,6 +6,31 @@ export function hostStyles(colors: PluginTheme["colors"], compact: boolean, touc
   const actionWidth = touch ? 156 : 138;
   return StyleSheet.create({
     body: { gap: 20 },
+    tabs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4 },
+    remoteCard: {
+      gap: 9,
+      padding: compact ? 12 : 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surface1,
+    },
+    remoteHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
+    remoteName: { flex: 1, minWidth: 0, color: colors.foreground, fontSize: 14, fontWeight: "700" },
+    remoteMeter: { flexGrow: 1, flexBasis: 110, minWidth: 0, gap: 3 },
+    details: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 9, gap: 4 },
+    detailsButton: {
+      alignSelf: "flex-end",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      minHeight: touch ? 44 : 28,
+      paddingHorizontal: 6,
+    },
+    ok: { color: colors.foregroundMuted },
+    healthy: { color: colors.statusSuccess },
+    warning: { color: colors.statusWarning },
+    critical: { color: colors.statusDanger },
     meters: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
     meter: {
       flexGrow: 1,
