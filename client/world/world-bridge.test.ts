@@ -125,3 +125,10 @@ test("setSound goes to the page as a call, and the scene's onSound comes back as
   receive(JSON.stringify({ callback: "onSound", args: [true] }));
   expect(onSound).toHaveBeenCalledWith(true);
 });
+
+test("posts a full-sized street kit intact as start data", () => {
+  const kit = "x".repeat(430_000);
+  const { api, posted } = bridge();
+  api.start(options({ street: { kit } }));
+  expect(posted[0].args[0]).toMatchObject({ street: { kit } });
+});

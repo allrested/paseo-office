@@ -220,3 +220,9 @@ test("a device document without sound has it off, and one with it keeps it", asy
   expect(officeDeviceSettings.schema.parse({ threeD: true })).toMatchObject({ sound: false });
   expect(officeDeviceSettings.schema.parse({ sound: true })).toMatchObject({ sound: true });
 });
+
+test("the street is optional and preserves either explicit device choice", () => {
+  expect(officeDeviceSettings.schema.parse({})).not.toHaveProperty("street");
+  for (const street of [false, true])
+    expect(officeDeviceSettings.schema.parse({ street }).street).toBe(street);
+});

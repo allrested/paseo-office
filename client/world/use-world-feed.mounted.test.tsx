@@ -190,3 +190,9 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
 });
+
+test("the active floor explains a failed street kit", async () => {
+  const { api } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input({ streetNote: true })} />));
+  expect(note).toContain("The street's cars could not be loaded.");
+});

@@ -128,6 +128,7 @@ function endNight(S, Q) {
   if (!seated.length) return;
   seated[0].w.say('idle', tr('world.nhau.say.noDrive'));
   chatSay(seated[0].w.id, tr('world.nhau.chat.noDrive'));
+  // PASEO: the lookup follows the made-up ride service key in the locale.
   if (seated[1]) chatSay(seated[1].w.id, tr('world.nhau.chat.ridely'), { delay: 3200 });
   seated.forEach((m, k) => later(2 + k * rand(2, 3.5), () => { if (live(m, 'sit')) callRide(m, S, Q, k); }));
 }
