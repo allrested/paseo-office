@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import path from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -32,15 +33,39 @@ interface Import {
   typeOnly: boolean;
 }
 
+/** Every module a source names: import and export-from declarations, `import()` and `require()`. */
 function importsOf(source: string): Import[] {
   const found: Import[] = [];
-  const statement = /\b(?:import|export)\s+(type\s+)?[^;"']*?\bfrom\s+"([^"]+)"/g;
-  for (const match of source.matchAll(statement)) {
-    found.push({ specifier: match[2], typeOnly: match[1] !== undefined });
-  }
-  for (const match of source.matchAll(/\bimport\s*\(?\s*"([^"]+)"/g)) {
-    found.push({ specifier: match[1], typeOnly: false });
-  }
+  const file = ts.createSourceFile("source.tsx", source, ts.ScriptTarget.Latest, true);
+  const literal = (node: ts.Node | undefined): string | null =>
+    node !== undefined && ts.isStringLiteralLike(node) ? node.text : null;
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      const specifier = literal(node.moduleSpecifier);
+      const typeOnly = node.importClause?.isTypeOnly === true;
+      if (specifier !== null) found.push({ specifier, typeOnly });
+    } else if (ts.isExportDeclaration(node)) {
+      const specifier = literal(node.moduleSpecifier);
+      if (specifier !== null) found.push({ specifier, typeOnly: node.isTypeOnly });
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      const reference = node.moduleReference;
+      const specifier = ts.isExternalModuleReference(reference)
+        ? literal(reference.expression)
+        : null;
+      if (specifier !== null) found.push({ specifier, typeOnly: node.isTypeOnly });
+    } else if (ts.isImportTypeNode(node)) {
+      const specifier = ts.isLiteralTypeNode(node.argument) ? literal(node.argument.literal) : null;
+      if (specifier !== null) found.push({ specifier, typeOnly: true });
+    } else if (ts.isCallExpression(node)) {
+      const call =
+        node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === "require");
+      const specifier = call ? literal(node.arguments[0]) : null;
+      if (specifier !== null) found.push({ specifier, typeOnly: false });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
   return found;
 }
 
@@ -119,5 +144,35 @@ describe("what the plugin imports", () => {
     const runtime = { specifier: "@getpaseo/protocol/agent-types", typeOnly: false };
     expect(importProblem("client", runtime)).not.toBeNull();
     expect(importProblem("client", { ...runtime, typeOnly: true })).toBeNull();
+  });
+
+  it("finds an import by parsing, not by a pattern that an apostrophe or a call form escapes", () => {
+    const source = [
+      'import { a, /* the host\'s type */ b } from "first";',
+      "import {",
+      "  c, // the host's type",
+      '} from "second";',
+      'import type { D } from "third";',
+      'export * from "fourth";',
+      'export type { E } from "fifth";',
+      'const f = require("sixth");',
+      'const g = await import("seventh");',
+      'import eight = require("eighth");',
+      'type H = typeof import("ninth");',
+      "const quoted = 'import x from \"not-an-import\"';",
+      "// import y from \"in-a-comment\"",
+      "const dynamic = import(name);",
+    ].join("\n");
+    expect(importsOf(source)).toEqual([
+      { specifier: "first", typeOnly: false },
+      { specifier: "second", typeOnly: false },
+      { specifier: "third", typeOnly: true },
+      { specifier: "fourth", typeOnly: false },
+      { specifier: "fifth", typeOnly: true },
+      { specifier: "sixth", typeOnly: false },
+      { specifier: "seventh", typeOnly: false },
+      { specifier: "eighth", typeOnly: false },
+      { specifier: "ninth", typeOnly: true },
+    ]);
   });
 });

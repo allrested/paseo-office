@@ -260,7 +260,8 @@ test("a waiting request that a send would deny is said by the box whatever is ty
   const line = () =>
     [...container.querySelectorAll("div, span")].some(
       (element) =>
-        element.children.length === 0 && element.textContent === "Sending denies the request above.",
+        element.children.length === 0 &&
+        element.textContent === "Sending denies the request above.",
     );
   expect(line()).toBe(true);
   await type("Not now");
