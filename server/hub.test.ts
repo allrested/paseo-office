@@ -1153,3 +1153,25 @@ test("a parent whose next cannot be stored gets no new sub-agent number, and bot
   subscriber.controller.abort();
   await subscriber.done;
 });
+
+test("a watcher gets the workspaces' folders, and no subscriber ever does", async () => {
+  const view: DirectoryView = {
+    agents: [agent("a", "idle")],
+    workspaces: [{ id: "w1", name: "api", projectName: "shop" }],
+    folders: { w1: "/work/api" },
+  };
+  const harness = startHarness(view);
+  const seen: (DirectoryView | null)[] = [];
+  harness.hub.watch((next) => seen.push(next));
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  expect(seen).toEqual([view]);
+  harness.directory.emit({ ...view, agents: [agent("a", "running")] });
+  harness.clock.advance(DIRECTORY_FLUSH_MS);
+  await settle();
+  expect(subscriber.events.map((event) => event.type)).toEqual(["snapshot", "agents"]);
+  expect(JSON.stringify(subscriber.events)).not.toContain("/work/api");
+  expect(JSON.stringify(subscriber.events)).not.toContain("folders");
+  subscriber.controller.abort();
+  await subscriber.done;
+});

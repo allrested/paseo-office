@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
-import type {
-  PluginServerContext,
-  PluginSettingsState,
-  PluginTurnOutcome,
+import {
+  execCommand,
+  type PluginServerContext,
+  type PluginSettingsState,
+  type PluginSubscriptionContext,
+  type PluginTurnOutcome,
 } from "@getpaseo/plugin/server";
 import { embeddedWorldScript, type WorldScript } from "./server/world-script.js";
 import { createBoardStore, type BoardStore } from "./server/board-store.js";
@@ -42,6 +45,9 @@ import {
   notesTimeZone,
 } from "./server/notes-schedule.js";
 import { createNotesStore, createNotesWriter, type NotesStore } from "./server/notes-writer.js";
+import { createLifeFeed, type LifeFeed } from "./server/life-feed.js";
+import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
+import { LiftKeptSchema, createLiftService, type LiftKept } from "./server/lift-service.js";
 import { createLocalSchedules, type LocalSchedules } from "./server/local-schedules.js";
 import { createOffice } from "./server/office.js";
 import { createPaseoHolder } from "./server/paseo-holder.js";
@@ -50,11 +56,15 @@ import {
   chatFile,
   hostSkillFolders,
   incidentsFile,
+  liftFile,
   notesWriterFile,
   type SkillFolder,
+  tenureFile,
 } from "./server/paths.js";
+import { readRepoAge } from "./server/repo-age.js";
 import { readScriptLog } from "./server/script-log.js";
 import { readSkills } from "./server/skills.js";
+import { TenureLedgerSchema, createTenure, type TenureLedger } from "./server/tenure.js";
 import { nodeClock, type Clock } from "./server/timers.js";
 import {
   chatRpc,
@@ -63,6 +73,7 @@ import {
   deleteRpc,
   incidentsDismissRpc,
   janitorRpc,
+  lifeSubscription,
   machineSubscription,
   notesReadRpc,
   notesWriteRpc,
@@ -71,8 +82,10 @@ import {
   scriptLogRpc,
   setWakesPausedRpc,
   skillsRpc,
+  tenureRpc,
   updateRpc,
   worldRpc,
+  type LifeEvent,
 } from "./shared/contracts.js";
 import { chatT } from "./shared/chat-words.js";
 import { officeHostSettings } from "./shared/settings.js";
@@ -86,6 +99,10 @@ export interface OfficePluginDeps {
   incidentsStore: IncidentsStore;
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
+  /** How long each team has been in the office (the farewells and the interns). */
+  tenureFile: LifeFile<TenureLedger>;
+  /** The scene's build the lift was last serviced for. */
+  liftFile: LifeFile<LiftKept>;
   /** The daemon's environment: the trackers' tokens are read from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -255,6 +272,52 @@ export function createOfficePlugin(
   const chatReady = startChat().catch((error: unknown) =>
     log(`[office] chat unavailable: ${errorMessage(error)}`),
   );
+  // What the staff scenes read beyond the people, made as the server starts: the lift's servicing
+  // starts now. Each page with the 3D view open hears it now and at each change.
+  const lifeListeners = new Set<PluginSubscriptionContext<LifeEvent>>();
+  const tenureSaves = createSaveQueue(deps.tenureFile, deps.clock, log);
+  let life: LifeFeed | null = null;
+  let stopLifeWatch: (() => void) | null = null;
+  function tellLife(listener: PluginSubscriptionContext<LifeEvent>, event: LifeEvent): void {
+    if (listener.signal.aborted) return;
+    listener
+      .push(event)
+      .catch((error: unknown) => log(`[office] life push failed: ${errorMessage(error)}`));
+  }
+  async function startLife(): Promise<void> {
+    const [ledger, kept, script] = await Promise.all([
+      deps.tenureFile.load(),
+      deps.liftFile.load(),
+      deps.world.read(),
+    ]);
+    const lift = createLiftService({
+      last: kept,
+      save: (data) =>
+        void deps.liftFile
+          .save(data)
+          .catch((error: unknown) => log(`[office] lift save failed: ${errorMessage(error)}`)),
+      build: createHash("sha256").update(script).digest("hex").slice(0, 7),
+      now: deps.clock.now(),
+    });
+    const feed = createLifeFeed({
+      tenure: createTenure({
+        store: { load: () => ledger, save: (data) => tenureSaves.save(data) },
+        now: () => deps.clock.now(),
+      }),
+      age: (folder) => readRepoAge(folder, execCommand),
+      lift,
+      now: () => deps.clock.now(),
+      emit: (snapshot) => {
+        for (const listener of lifeListeners) tellLife(listener, { type: "life", ...snapshot });
+      },
+    });
+    life = feed;
+    stopLifeWatch = hub.watch((view) => feed.view(view));
+    for (const listener of lifeListeners) tellLife(listener, { type: "life", ...feed.snapshot() });
+  }
+  const lifeReady = startLife().catch((error: unknown) =>
+    log(`[office] the staff scenes' data is unavailable: ${errorMessage(error)}`),
+  );
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {
     const message = `The office's settings cannot be read: ${reason}`;
@@ -404,6 +467,30 @@ export function createOfficePlugin(
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
   );
+  // Settles when the subscriber leaves, which closes the subscription.
+  server.handle(lifeSubscription, (_input, context) => {
+    holder.remember(context.paseo);
+    if (context.signal.aborted) return Promise.resolve();
+    lifeListeners.add(context);
+    if (life !== null) tellLife(context, { type: "life", ...life.snapshot() });
+    return new Promise<void>((resolve) => {
+      context.signal.addEventListener(
+        "abort",
+        () => {
+          lifeListeners.delete(context);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+  });
+  server.handle(tenureRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("tenure", async () => {
+      await lifeReady;
+      return life?.write(input) ?? { ok: false };
+    });
+  });
   server.handle(chatRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("chat", async () => {
@@ -446,6 +533,11 @@ export function createOfficePlugin(
         office.turnEnded(agent.id);
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);
+      }
+      try {
+        life?.turnEnded(agent.id);
+      } catch (error) {
+        log(`[office] life turn end failed: ${errorMessage(error)}`);
       }
       try {
         void chat
@@ -508,6 +600,9 @@ export function createOfficePlugin(
     await chatReady;
     stopWatching?.();
     await chat?.stop();
+    await lifeReady;
+    stopLifeWatch?.();
+    await tenureSaves.flush();
     await hub.stop();
   };
 }
@@ -529,6 +624,8 @@ export default function contribute(server: PluginServerContext): () => Promise<v
       now: () => Date.now(),
       log,
     }),
+    tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
+    liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     env: process.env,
     clock: nodeClock,
     log,

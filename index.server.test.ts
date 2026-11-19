@@ -16,6 +16,8 @@ import { createOfficePlugin } from "./index.server.js";
 import { EMPTY_BOARDS, type BoardStore } from "./server/board-store.js";
 import { emptyChat, type ChatData, type ChatStore } from "./server/chat-store.js";
 import { createFakeClock, settle } from "./server/fake-clock.js";
+import type { LifeFile } from "./server/life-store.js";
+import type { LiftKept } from "./server/lift-service.js";
 import type { LocalSchedules, OfficeCadence } from "./server/local-schedules.js";
 import {
   EMPTY_INCIDENTS,
@@ -23,6 +25,7 @@ import {
   type IncidentsStore,
 } from "./server/incidents-store.js";
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
+import type { TenureLedger } from "./server/tenure.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -281,6 +284,16 @@ function memoryIncidentsStore(): IncidentsStore & { kept: IncidentsData } {
   return store;
 }
 
+function memoryLifeFile<T>(): LifeFile<T> {
+  let kept: T | null = null;
+  return {
+    load: async () => structuredClone(kept),
+    save: async (data) => {
+      kept = structuredClone(data);
+    },
+  };
+}
+
 function memoryChatStore(): ChatStore & { kept: ChatData } {
   // Copied on each load and save, as the file is.
   const store = {
@@ -374,6 +387,8 @@ function setup(
     notesStore,
     incidentsStore,
     chatStore,
+    tenureFile: memoryLifeFile<TenureLedger>(),
+    liftFile: memoryLifeFile<LiftKept>(),
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
@@ -740,6 +755,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.set_wakes_paused.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.life",
+    "office.tenure.request",
     "office.chat.request",
   ]);
   expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "incidents"]);
@@ -1386,5 +1403,39 @@ test("a tracker's problem goes once no tracker is on", async () => {
 
   leaving.abort();
   await done;
+  await stop();
+});
+
+test("a page hears the staff scenes' data as it subscribes: the lift is serviced from the start", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  await settle();
+  const events: unknown[] = [];
+  const leaving = new AbortController();
+  const done = recorded.handlers.get("office.life")?.({}, {
+    ...context,
+    signal: leaving.signal,
+    push: async (event: unknown) => void events.push(event),
+  } as never);
+  for (let round = 0; round < 50 && events.length === 0; round += 1) await settle();
+
+  // "the scene" is the fake world's script: its build is a hash of it, and the first start ever
+  // is not a new build.
+  expect(events).toEqual([
+    {
+      type: "life",
+      born: {},
+      tenure: { days: 30, choices: [30], projects: [] },
+      lift: { left: 180_000, total: 180_000, newBuild: false, sticker: null },
+    },
+  ]);
+  leaving.abort();
+  await done;
+  await stop();
+});
+
+test("a tenure write the ledger does not hold is refused", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  const write = recorded.handlers.get("office.tenure.request");
+  expect(await write?.({ op: "official", name: "api" }, context as never)).toEqual({ ok: false });
   await stop();
 });

@@ -599,6 +599,63 @@ export const chatRpc = defineRpc({
   output: ChatResultSchema,
 });
 
+/** The tenure list as the scene's farewell and interns read it (people/farewell.js setTenure). */
+export const WorldTenureSchema = z.object({
+  days: z.number(),
+  choices: z.array(z.number()),
+  projects: z.array(
+    z.object({
+      name: z.string(),
+      last: z.number(),
+      days: z.number(),
+      turns: z.number(),
+      due: z.boolean(),
+      farewell: z.number(),
+      back: z.number(),
+      intern: z.boolean(),
+      ready: z.boolean(),
+      official: z.number(),
+    }),
+  ),
+});
+export type WorldTenure = z.output<typeof WorldTenureSchema>;
+
+/** The lift's servicing as the scene reads it (life/lift-service.js setLiftService). */
+export const WorldLiftServiceSchema = z.object({
+  /** Milliseconds still to go when the server sent it; 0 when done. */
+  left: z.number(),
+  total: z.number(),
+  newBuild: z.boolean(),
+  sticker: z.object({ version: z.string(), at: z.number(), build: z.string() }).nullable(),
+});
+export type WorldLiftService = z.output<typeof WorldLiftServiceSchema>;
+
+/**
+ * What the staff scenes read beyond the people: each team's repository's first day (by the
+ * workspace's name), the tenure list, the lift's servicing. No folder, file name or command.
+ */
+export const LifeEventSchema = z.object({
+  type: z.literal("life"),
+  born: z.record(z.string(), z.string()),
+  tenure: WorldTenureSchema,
+  lift: WorldLiftServiceSchema,
+});
+export type LifeEvent = z.output<typeof LifeEventSchema>;
+
+/** Now, then at each change while someone listens. */
+export const lifeSubscription = defineSubscription({
+  name: "office.life",
+  input: z.object({}),
+  event: LifeEventSchema,
+});
+
+/** A farewell the scene held, or an intern it made permanent: the server's ledger keeps it. */
+export const tenureRpc = defineRpc({
+  name: "office.tenure.request",
+  input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),
+  output: z.object({ ok: z.boolean() }),
+});
+
 /**
  * The script of the page that draws the 3D office: the vendored my-office scene with three.js,
  * one self-contained file. A browser evaluates it in a frame of its own.

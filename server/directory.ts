@@ -124,6 +124,9 @@ export interface DirectoryWorkspaceInput {
   scripts?: readonly DirectoryScriptInput[];
   /** The forge's facts, GitHub's or another's: the field has its first forge's name. */
   githubRuntime?: { pullRequest?: DirectoryPullRequestInput | null } | null;
+  /** The workspace's own checkout, when it has one. */
+  workspaceDirectory?: string;
+  projectRootPath?: string;
 }
 
 // The workspace's ticket, from two metadata keys any plugin or script may write: `tasks.key`, a
@@ -360,6 +363,38 @@ export function applyWorkspaceUpdate(
   const projected = projectWorkspace(update.workspace);
   if (projected) next.set(projected.id, projected);
   else next.delete(update.workspace.id);
+  return next;
+}
+
+/**
+ * The folder git is asked in for the repository's age: the workspace's checkout, else its project's
+ * root. Server only: it never goes into a snapshot.
+ */
+export function folderOf(workspace: DirectoryWorkspaceInput): string | null {
+  if (workspace.archivingAt) return null;
+  return workspace.workspaceDirectory || workspace.projectRootPath || null;
+}
+
+export function foldersFromSnapshot(
+  workspaces: readonly DirectoryWorkspaceInput[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const workspace of workspaces) {
+    const folder = folderOf(workspace);
+    if (folder !== null) map.set(workspace.id, folder);
+  }
+  return map;
+}
+
+export function applyFolderUpdate(
+  folders: ReadonlyMap<string, string>,
+  update: WorkspaceUpdateInput,
+): Map<string, string> {
+  const next = new Map(folders);
+  const id = update.kind === "remove" ? update.id : update.workspace.id;
+  const folder = update.kind === "remove" ? null : folderOf(update.workspace);
+  if (folder === null) next.delete(id);
+  else next.set(id, folder);
   return next;
 }
 

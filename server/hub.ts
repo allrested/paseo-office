@@ -26,6 +26,8 @@ export const DIRECTORY_RESTART_MS = 5000;
 export interface DirectoryView {
   agents: readonly OfficeAgent[];
   workspaces: readonly OfficeWorkspace[];
+  /** Server only, never sent: each workspace's folder, by workspace id. */
+  folders?: Readonly<Record<string, string>>;
 }
 
 export interface HubSubscriber {
@@ -281,6 +283,7 @@ export function createHub(ports: HubPorts): Hub {
     view = {
       agents: named(resets.size === 0 ? next.agents : settled.agents),
       workspaces: next.workspaces,
+      ...(next.folders === undefined ? {} : { folders: next.folders }),
     };
     tell(view);
     // Until the start finished, the first snapshot carries the view.

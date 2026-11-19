@@ -2,7 +2,9 @@ import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
 import {
   agentsFromSnapshot,
   applyAgentUpdate,
+  applyFolderUpdate,
   applyWorkspaceUpdate,
+  foldersFromSnapshot,
   sortAgents,
   sortWorkspaces,
   workspacesFromSnapshot,
@@ -47,11 +49,13 @@ export async function openPaseoDirectory(
   }
   let agents = new Map<string, OfficeAgent>();
   let workspaces = new Map<string, OfficeWorkspace>();
+  let folders = new Map<string, string>();
   function emit(): void {
     try {
       onChange({
         agents: newestAgents(agents.values()),
         workspaces: sortWorkspaces(workspaces.values()),
+        folders: Object.fromEntries(folders),
       });
     } catch (error) {
       log(`[office] directory change failed: ${errorMessage(error)}`);
@@ -83,11 +87,13 @@ export async function openPaseoDirectory(
   const stopWorkspaces = workspaceList.subscription.subscribe({
     snapshot: (snapshot) => {
       workspaces = workspacesFromSnapshot(snapshot.entries);
+      folders = foldersFromSnapshot(snapshot.entries);
       emit();
     },
     update: (message) => {
       if (message.type !== "workspace_update") return;
       workspaces = applyWorkspaceUpdate(workspaces, message.payload);
+      folders = applyFolderUpdate(folders, message.payload);
       emit();
     },
     error: (error) => end("workspaces", error),
