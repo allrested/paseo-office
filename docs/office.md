@@ -246,12 +246,14 @@ context ran makes the button the same, and holds the scene's sound off without c
 the next press tries again. Once a context runs the button can be used again and the scene follows
 the setting with no further press: on if the setting is on. A press on the button itself while audio
 is held off waits for the probe that press started: if audio then starts, the press turns sound on
-as any press on it does; if not, it says "This app does not let the office play sound." A mouse
-press on the speaker icon itself is lost when that press's probe ends, so it does nothing (see
-[verified.md](verified.md)). The host gives the scene no toast, so the scene shows such a line
-itself: a note over the floor's toolbar, read out politely by a screen reader, for four seconds, a
-new one replacing it (a refused full screen, and my-office's own lines from its games and karaoke,
-show the same way).
+as any press on it does; if not, it says "This app does not let the office play sound." A press on
+the button means what the button showed when the press arrived: the probe that press starts may
+turn the scene's sound on before the button hears of the press, and the press must not then turn it
+off again. The speaker's drawing takes no presses itself, so a press on it is a press on the button
+even when the probe redraws it meanwhile. The scene shows such a line itself, on the floor and not
+as a toast of the app: a note over the floor's toolbar, read out politely by a screen reader, for
+four seconds, a new one replacing it (a refused full screen, and my-office's own lines from its
+games and karaoke, show the same way).
 
 A Sound save the device refuses is said where the switch was used: under the settings page's
 switches, or in the floor's view corner, where the view switch's own refusal shows (that one first

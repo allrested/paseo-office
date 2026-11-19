@@ -19,7 +19,8 @@ provider in a workspace.
 
 A fifth look, on 2026-11-19, was of the sounds (see "Sound"). It was installed by Git, with three
 agents of the Mock provider in a workspace. A sixth, the same day, was a second look at the sounds
-after the fixes the fifth one led to.
+after the fixes the fifth one led to, and a seventh a third look, after the two fixes the sixth led
+to.
 
 ## Install
 
@@ -174,14 +175,15 @@ which come from the screenshots.
 
 ## Sound
 
-Sound was looked at twice. The first look was at commit `d98d46a19a055f43c38689b672a3cb851d0725bf`,
-then at `8d6399e`, which brought the toolbar's buttons closer at 520 px and narrower. It found five
-things, which were fixed. The second look was at `7d11e772cb3a0488f7bd9d67738107f330e4a985`, with
-those fixes. Each was installed by Git on the same stock 0.16.2. `paseo plugin ls` showed each
-`running`, from git, at its commit, and the log held `Loading plugin` and `Plugin ready`, about
-three seconds apart, and no error. A scratch folder was the workspace "Acme shop", with three Mock
-agents. The browser console held no error or warning from the plugin, at either width, in either
-look.
+Sound was looked at three times. The first look was at commit
+`d98d46a19a055f43c38689b672a3cb851d0725bf`, then at `8d6399e`, which brought the toolbar's buttons
+closer at 520 px and narrower. It found five things, which were fixed. The second look was at
+`7d11e772cb3a0488f7bd9d67738107f330e4a985`, with those fixes, and found two more. The third, at
+`16b3757e`, was of those two only, at 1280 px. Each was installed by Git on the same stock 0.16.2.
+`paseo plugin ls` showed each `running`, from git, at its commit, and the log held `Loading plugin`
+and `Plugin ready`, about three seconds apart, and no error. A scratch folder was the workspace
+"Acme shop", with three Mock agents. The browser console held no error or warning from the plugin,
+at either width, in any look.
 
 The browser has no sound card anyone can hear, so "audible" was not checked. What was checked is
 that the scene makes and starts Web Audio nodes while Sound is on and not while it is off: before
@@ -287,6 +289,8 @@ written before the page loaded where a case needs it on or off.
 
 #### Found in the second look
 
+The first two were fixed and looked at again: see "The third look". The third stands.
+
 - A mouse press on the speaker icon in the middle of the Sound button is lost when that press's
   probe ends: the probe redraws the icon between the press and the click, and the browser then
   sends no click. Seen twice. At 390 px with a mouse, the first press on the button in a fresh page
@@ -300,6 +304,26 @@ written before the page loaded where a case needs it on or off.
   itself first, and the click the key makes then asked for the opposite.
 - With a mouse, the button's own tooltip ("Sound is not available here") stays while the pointer is
   on the button, and covers the lower right corner of the note.
+
+### The third look
+
+The third look was at 1280 px with a mouse and a keyboard, with the same counters and refusing
+frames, and a script in the scene's frame that listed each `pointerdown`, `pointerup`, `click`,
+`keydown` and `keyup` with the element it reached.
+
+- The first press in a fresh page, on the middle of the Sound button (Sound stored off): the
+  element under the pointer was the button, not its drawing, and the button got `pointerdown`,
+  `pointerup` and `click`. The button showed on and the stored document said `sound: true`.
+- A press on the middle of the button while audio is held off (Sound stored off, the first probe
+  made to fail, so the button was dimmed): the same three events reached the button, it showed on,
+  the stored document said `sound: true`, and no note showed.
+- Space on the focused button with Sound stored on and the first probe made to fail (the button
+  dimmed, the stored document `sound: true`): after Space the button showed on and the stored
+  document still said `sound: true`; no note showed. A second Space turned it off, and the stored
+  document said `sound: false`.
+
+Not looked at again in the third look: 390 px, a touch screen, Enter in place of Space, and the
+tooltip over the note.
 
 ## Not seen, and why
 
