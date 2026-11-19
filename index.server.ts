@@ -311,6 +311,7 @@ export function createOfficePlugin(
   async function startChat(): Promise<void> {
     const service = await createChatService({
       store: deps.chatStore,
+      lobbyPosts: office.lobbyPosts,
       clock: deps.clock,
       tr: chatT,
       ...chatPorts,

@@ -44,6 +44,7 @@ export interface OfficeDeps {
 export interface Office {
   /** Settles once boards.json is loaded; never rejects (a failure is logged). */
   ready: Promise<void>;
+  lobbyPosts(): readonly Post[] | null;
   tools: AgentToolDefinition[];
   noteAgent(agent: ToolAgent): void;
   post(input: { board: string; kind: PostKind; text: string; to?: string }): Promise<PostResult>;
@@ -159,6 +160,7 @@ export function createOffice(deps: OfficeDeps): Office {
 
   return {
     ready,
+    lobbyPosts: () => (queue === null ? null : service.postsOf("lobby")),
     tools: officeTools({
       service,
       resolveAgent: (id) => deps.agents.resolve(id),

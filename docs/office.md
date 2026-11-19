@@ -162,7 +162,7 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   app run. It fills only while an office surface is open.
 - **Chat** is my-office's team chat engine, running on the office's server
   (`server/chat-service.ts`, with the engine in `shared/upstream/`). An `@` to an agent prompts it
-  and posts its answer. In fullscreen, **Team chat** floats over the floor. Open **To** and
+  and posts its answer. Replying to a session’s message also sends the follow-up to that session. Ask “What is done?” in the group to see completed lobby tasks, or “What is left?” for unfinished tasks. The Director reads the current board and includes task IDs. In fullscreen, **Team chat** floats over the floor. Open **To** and
   choose a session to send it a prompt. On the web you can attach up to four images to that
   prompt. The shared chat shows the image count and the session’s reply. The image files go
   to the chosen session. Use the toolbar to mention someone, send a sticker or create a poll.

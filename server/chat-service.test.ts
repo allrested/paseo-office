@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { ChatChange, ChatImage, ChatMessage, OfficeAgent } from "../shared/contracts.js";
+import type { ChatChange, ChatImage, ChatMessage, OfficeAgent, Post } from "../shared/contracts.js";
 import { chatT } from "../shared/chat-words.js";
 import {
   CHAT_CLOCK_MS,
@@ -60,7 +60,7 @@ function deferred() {
   return { promise, finish };
 }
 
-async function harness(options: { at?: number; store?: ChatStore } = {}) {
+async function harness(options: { at?: number; store?: ChatStore; posts?: Post[] } = {}) {
   const clock = createFakeClock(options.at ?? MORNING);
   const sent: [string, string][] = [];
   const attachments: ChatImage[][] = [];
@@ -88,6 +88,7 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
     store,
     clock,
     tr: chatT,
+    lobbyPosts: () => options.posts ?? [],
     send: async (id, prompt, images) => {
       if (failure.hold) {
         const wait = deferred();
@@ -133,7 +134,6 @@ const said = (h: Harness, name: string): string[] =>
 const mine = (h: Harness): ChatMessage[] => messages(h).filter((message) => message.from === "me");
 const typing = (h: Harness): string[] => h.service.snapshot().typing;
 const WORK = (key: string): string[] => chatT(`chat.work.${key}`, null, "list");
-const REST = chatT("chat.reply.statusRest", null, "list");
 /** Upstream's lines for `key` with their `{name}` parts filled, as the engine says them. */
 const filled = (lines: string[], vars: Record<string, string>): string[] =>
   lines.map((line) => line.replace(/\{(\w+)\}/g, (part, name: string) => vars[name] ?? part));
@@ -211,23 +211,56 @@ test("a new conversation starts with upstream's first line and says so to nobody
   expect(h.changes).toEqual([]);
 });
 
-test("an @mention is answered with what the agent is on, from the team of the last view", async () => {
-  const h = await harness();
-  h.service.view(
-    view(agent("a1", "Alice", { status: "running" }), agent("a2", "Bea", { status: "running" })),
-  );
-  h.service.view(view(agent("a1", "Alice"), agent("a2", "Bea", { status: "running" })));
-  await send(h, "@Alice what are you on?");
-  h.clock.advance(10_000);
-  const [question] = mine(h);
-  const last = messages(h).at(-1);
-  expect(last).toMatchObject({
-    from: "a1",
-    name: "Alice",
-    reply: { id: question?.id, name: "Boss", text: "@Alice what are you on?" },
+test("completion questions use the lobby board and never schedule a simulated reply", async () => {
+  const post: Post = {
+    id: "p1",
+    seq: 1,
+    kind: "task",
+    board: "lobby",
+    author: "user",
+    state: "done",
+    text: "Fix the export",
+    createdAt: "",
+    updatedAt: "",
+  };
+  const h = await harness({
+    posts: [post, { ...post, id: "p2", state: "claimed", text: "Still working" }],
   });
-  expect(REST).toContain(last?.text);
-  expect(said(h, "Bea")).toEqual([]);
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "what is done?");
+  h.clock.advance(10_000);
+  expect(said(h, "Director")).toEqual(["1 lobby task marked done.\np1 — Fix the export"]);
+  expect(said(h, "Alice")).toEqual([]);
+  expect(h.sent).toEqual([]);
+});
+
+test("empty board and unrelated questions get honest answers without starting a session", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "@Director what's done?");
+  await send(h, "What happened at the meeting?");
+  h.clock.advance(10_000);
+  expect(said(h, "Director")).toEqual([
+    "No lobby tasks are marked done.",
+    "For a session-specific answer, @mention the session or reply to its message.",
+  ]);
+  expect(h.changes.filter((change) => change.op === "act")).toEqual([]);
+  expect(h.sent).toEqual([]);
+});
+
+test("mentions and replies to an agent wait for that session's actual answer", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "@Alice what is done?");
+  h.clock.advance(10_000);
+  expect(said(h, "Alice")).toEqual([]);
+  h.answers.set("a1", "The export is fixed.");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+  h.clock.advance(10_000);
+  const reply = messages(h).at(-1)!;
+  expect(reply.text).toBe("The export is fixed.");
+  await h.service.request({ op: "send", text: "Which export?", replyTo: reply.id });
+  expect(h.sent.at(-1)).toEqual(["a1", PROMPT_PREFIX + "Which export?"]);
 });
 
 test("one message to two agents is two prompts that steer, and both show typing", async () => {
@@ -460,11 +493,10 @@ test("an answer that cannot be read posts nothing, logs, and the agent stops typ
   expect(h.logs).toEqual([expect.stringContaining("timeline gone")]);
   expect(typing(h)).toEqual([]);
   h.clock.advance(10_000);
-  // Only the engine's own line for a turn that ended; no answer.
+  // Report the missing answer without claiming the work is done.
   const after = messages(h).slice(before);
   expect(after).toHaveLength(1);
-  expect(after[0]).toMatchObject({ from: "a1", reply: null });
-  expect(filled(WORK("done"), { task: "Alice" })).toContain(after[0]?.text);
+  expect(after[0]).toMatchObject({ kind: "sys", text: "Could not read the reply from Alice." });
 });
 
 test("a prompt that cannot be sent says so and stops the typing", async () => {
@@ -975,6 +1007,8 @@ test("lines are told to subscribers as changes, and not while the engine is bein
   ]);
 
   h.clock.advance(10_000);
+  h.answers.set("a1", "Hello!");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
   const reply = messages(h).at(-1);
   expect(reply?.from).toBe("a1");
   expect(h.changes).toContainEqual({ op: "add", message: reply });

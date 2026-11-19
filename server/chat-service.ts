@@ -13,6 +13,7 @@ import {
   type ChatSnapshot,
   type OfficeAgent,
   type OfficeWorkspace,
+  type Post,
 } from "../shared/contracts.js";
 import { agentTitle } from "../shared/model.js";
 import {
@@ -40,6 +41,7 @@ const USAGE_LIMIT =
 const NAME_CHAR = /[\p{L}\p{N}_-]/u;
 
 export interface ChatServicePorts {
+  lobbyPosts(): readonly Post[] | null;
   store: ChatStore;
   clock: Clock;
   tr: Translate;
@@ -151,6 +153,57 @@ function memberOf(agent: OfficeAgent, workspaces: readonly OfficeWorkspace[]): C
 function wireOf(message: EngineMessage): ChatMessage | null {
   const parsed = ChatMessageSchema.safeParse(message);
   return parsed.success ? parsed.data : null;
+}
+
+// Only a short social command goes to the scene's simulated conversation.
+const SOCIAL_COMMAND =
+  /^(?:(?:meeting|stand-?up)(?: now| again| at \d{1,2}(?::\d{2})?(?: ?[ap]m)?)?|milk tea|bubble tea|lunch|good job|well done|thanks|thank you|bye|goodbye|họp|trà sữa|tra sua|ăn trưa|cảm ơn|cám ơn|going home)[?!. ]*$/i;
+
+function boardAnswer(text: string, lobbyPosts: ChatServicePorts["lobbyPosts"]): string | null {
+  const question = text
+    .toLowerCase()
+    .replaceAll("’", "'")
+    .replace(/^@director[,:]?\s+/i, "")
+    .replace(/[?.!]+$/, "")
+    .trim();
+  let state: "done" | "claimed" | "open" | "remaining";
+  if (
+    /^(?:(?:what(?:'s| is| was| has been| got)|which tasks (?:are|were)) (?:already )?(?:done|finished|completed)|what (?:did (?:you|we|the team) (?:finish|complete)|have (?:you|we) (?:done|finished|completed)))(?: so far)?$/.test(
+      question,
+    )
+  )
+    state = "done";
+  else if (
+    /^(?:what(?:'s| is) (?:in progress|being worked on)|what are (?:you|we) working on)$/.test(
+      question,
+    )
+  )
+    state = "claimed";
+  else if (/^what(?:'s| is) left(?: to do)?$/.test(question)) state = "remaining";
+  else if (/^what(?:'s| is) (?:still )?open$/.test(question)) state = "open";
+  else return null;
+  const posts = lobbyPosts();
+  if (!posts) return "The lobby board is unavailable right now.";
+  const tasks = posts
+    .filter(
+      (p) => p.kind === "task" && (state === "remaining" ? p.state !== "done" : p.state === state),
+    )
+    .sort((a, b) => b.seq - a.seq);
+  const label = {
+    done: "marked done",
+    claimed: "in progress",
+    open: "open",
+    remaining: "unfinished",
+  }[state];
+  if (!tasks.length) return `No lobby tasks are ${label}.`;
+  const lines = tasks
+    .slice(0, 5)
+    .map((p) => `${p.id} — ${short(p.text.replace(/\s+/g, " "), 120)}`);
+  return [
+    `${tasks.length} lobby task${tasks.length === 1 ? "" : "s"} ${label}.`,
+    ...lines,
+    ...(tasks.length > 5 ? ["Showing the five most recently updated."] : []),
+  ].join("\n");
 }
 
 interface Waiting {
@@ -307,11 +360,12 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     text: string,
     sticker: number | null,
     imageLabel: string,
+    social: boolean,
   ) {
     const captured: EngineMessage[] = [];
     capture = captured;
     try {
-      if (input.to !== undefined) {
+      if (!social) {
         // A directed turn gets the session's actual answer. The engine's group send also
         // schedules simulated replies and interprets words like "meeting" as a scene action.
         const original = input.replyTo && engine.byId(input.replyTo);
@@ -320,7 +374,12 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
             ? {
                 id: original.id,
                 name: original.name ?? tr("chat.you"),
-                text: short(original.text || tr("chat.sticker"), 90),
+                text: short(
+                  original.text ||
+                    original.poll?.q ||
+                    tr(original.kind === "photo" ? "chat.photo" : "chat.sticker"),
+                  90,
+                ),
               }
             : null;
         const posted = imageLabel && input.text?.trim() ? `${text}\n(${imageLabel})` : text;
@@ -334,6 +393,33 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     return captured.find((message) => message.from === "me");
   }
 
+  function recipients(
+    input: Extract<ChatRequest, { op: "send" }>,
+    text: string,
+  ): ChatMember[] | null {
+    if (input.to !== undefined) {
+      const recipient = roster.get(input.to);
+      return recipient ? [recipient] : null;
+    }
+    const team = members();
+    const named = mentionedIds(text, team).flatMap(
+      (id) => team.find((member) => member.id === id) ?? [],
+    );
+    if (named.length || !input.replyTo) return named;
+    const original = engine.byId(input.replyTo);
+    const author = original?.from && !original.recalled ? roster.get(original.from) : undefined;
+    return author ? [author] : [];
+  }
+
+  function answerGroup(text: string, quote: Waiting["reply"]): void {
+    const answer =
+      boardAnswer(text, ports.lobbyPosts) ??
+      (text.endsWith("?")
+        ? "For a session-specific answer, @mention the session or reply to its message."
+        : null);
+    if (answer) engine.say(DIRECTOR, answer, { now: true, long: true, reply: quote });
+  }
+
   function send(input: Extract<ChatRequest, { op: "send" }>): ChatResult {
     const imageLabel = imageCountLabel(input.images);
     if (imageLabel && !input.to) return { ok: false, error: "Choose a session to send images." };
@@ -343,20 +429,17 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     if (sticker !== null && tr("chat.stickers", null, "list")[sticker] === undefined) {
       return { ok: false, error: "There is no such sticker." };
     }
-    const team = members();
-    const recipient = input.to === undefined ? undefined : roster.get(input.to);
-    if (input.to !== undefined && recipient === undefined) {
+    const targets = recipients(input, text);
+    if (!targets)
       return { ok: false, error: "That session has left the office. Choose another recipient." };
-    }
-    const targets = recipient
-      ? [recipient]
-      : mentionedIds(text, team).flatMap((id) => team.find((member) => member.id === id) ?? []);
-    const mine = postMessage(input, text, sticker, imageLabel);
+    const social = !input.replyTo && !targets.length && (SOCIAL_COMMAND.test(text) || !text);
+    const mine = postMessage(input, text, sticker, imageLabel, social);
     if (mine === undefined) return OK;
     const words = text || (sticker === null ? "" : tr("chat.stickers", null, "list")[sticker]);
     const quote = { id: mine.id, name: tr("chat.boss"), text: short(words, 90) };
     // Not awaited: a send that fails is a line in the chat, not an error of this call.
     for (const member of targets) prompt(member, words, quote, input.images);
+    if (!targets.length && !social) answerGroup(text, quote);
     return OK;
   }
 
@@ -425,7 +508,8 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     },
 
     async turnEnded(agent, outcome, turnId) {
-      if (outcome.kind === "completed") engine.onEvent({ type: "stop", sess: agent.id });
+      if (outcome.kind === "completed" && !waiting.has(agent.id))
+        engine.onEvent({ type: "stop", sess: agent.id });
       if (outcome.kind === "failed") {
         engine.onEvent({
           type: "fail",
@@ -442,9 +526,12 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
           const text = await ports.lastAnswer(agent.id, turnId);
           if (text !== null) {
             engine.say(agent.id, clipAnswer(text), { now: true, long: true, reply: newest.reply });
+          } else {
+            engine.system(`No text reply was available from ${newest.member.name}.`);
           }
         }
       } catch (error) {
+        engine.system(`Could not read the reply from ${newest.member.name}.`);
         log(`[office] chat could not read the answer of ${agent.id}: ${errorMessage(error)}`);
       } finally {
         release(agent.id, consumed);
