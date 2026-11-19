@@ -1,3 +1,4 @@
+import { leaveFullscreenAfter, sceneUsesEscape } from "./escape.js";
 import { isWorldApi, type WorldApi } from "./world-api.js";
 
 // Web only. world-view.tsx calls this from an effect, and the surface renders that view only in
@@ -86,6 +87,13 @@ export function openWorldFrame({ container, script, title }: WorldFrameInput): W
           if (doc.body.classList.contains("is-fp")) return;
           if (doc.activeElement === null || doc.activeElement === doc.body) focusApp();
         });
+        // The office holds Escape while fullscreen (escape.ts): a press the scene has no use
+        // for leaves fullscreen. Read in the capture phase, before the scene ends what it was for.
+        doc.addEventListener(
+          "keydown",
+          (event) => leaveFullscreenAfter(event, sceneUsesEscape(doc), document),
+          true,
+        );
         loaded = world;
         resolve(world);
       },
