@@ -45,6 +45,8 @@ import {
   liveScriptLogPorts,
   liveSkillsPorts,
 } from "./server/live-ports.js";
+import { createSshMonitor } from "./server/ssh/monitor.js";
+import { sshReadingRpc, sshServersRpc } from "./shared/ssh.js";
 import { cleanUpAgent } from "./server/machine/cleanup.js";
 import { liveCleanupPorts, liveMachinePorts } from "./server/machine/live-ports.js";
 import { createMachineReader } from "./server/machine/machine.js";
@@ -195,6 +197,7 @@ export function createOfficePlugin(
     timers: deps.clock,
     log,
   });
+  const ssh = createSshMonitor(deps.env, homedir(), deps.machine.procRoot);
   const cleanupPorts = {
     procRoot: deps.machine.procRoot,
     selfPid: deps.machine.selfPid,
@@ -431,6 +434,8 @@ export function createOfficePlugin(
   server.handle(worldRpc, () => guarded("world", () => deps.world.read()));
   server.handle(worldWordsRpc, (input) => guarded("words", () => deps.words.read(input.language)));
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
+  server.handle(sshServersRpc, (_input, context) => ssh.list(context.paseo));
+  server.handle(sshReadingRpc, ({ id }, context) => ssh.read(context.paseo, id));
   server.handle(machineSubscription, (_input, context) => {
     holder.remember(context.paseo);
     return machine.attach(context);
@@ -692,6 +697,7 @@ export function createOfficePlugin(
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
+    await ssh.stop();
     await office.stop();
     // A chat still loading would start its clock after this stop.
     await chatReady;

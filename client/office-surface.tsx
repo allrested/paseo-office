@@ -58,6 +58,7 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
+import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -866,7 +867,7 @@ interface ViewControlsProps {
   toolbarLabels: boolean;
   onTeam(): void;
   machine: Machine | null;
-  onMachine(): void;
+  onMachine?: () => void;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -884,8 +885,7 @@ function HostResourceButton({
   onOpen(): void;
   styles: OfficeStyles;
 }) {
-  if (!machine) return null;
-  const percent = memoryPercent(machine);
+  const percent = machine ? memoryPercent(machine) : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -936,7 +936,9 @@ function ViewControls({
   }, [onChange, viewChoice.options, sidebars]);
   const actions = (
     <>
-      {sidebars && <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />}
+      {sidebars && onMachine && (
+        <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />
+      )}
       {sidebars && (
         <PanelButton
           label="Team chat"
@@ -1664,6 +1666,21 @@ function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void
   return { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard };
 }
 
+function useHostResources(machine: Machine | null, live: boolean) {
+  const [machineOpen, setMachineOpen] = useState(false);
+  const openMachine = useCallback(() => setMachineOpen(true), []);
+  const closeMachine = useCallback(() => setMachineOpen(false), []);
+  const ssh = useSshServers(live && (machineOpen || machine === null));
+  const hasSsh = ssh.servers.length > 0;
+  const hostEntry = useMemo((): StripCard | null => {
+    if (machine) return { title: "Host", note: hostNote(machine), onOpen: openMachine };
+    if (hasSsh)
+      return { title: "Host", note: { text: "SSH hosts", tone: "muted" }, onOpen: openMachine };
+    return null;
+  }, [machine, hasSsh, openMachine]);
+  return { machineOpen: machineOpen && live, openMachine, closeMachine, hostEntry, ssh };
+}
+
 /** One surface for both places: the sidebar screen and a workspace tab. */
 export function OfficeSurface(
   props: OfficeSurfaceProps & {
@@ -1688,9 +1705,6 @@ export function OfficeSurface(
   const actions = useAgentActions();
   const boardActions = useBoardActions();
   const { machine: reading, cleanUp } = useMachine();
-  const [machineOpen, setMachineOpen] = useState(false);
-  const openMachine = useCallback(() => setMachineOpen(true), []);
-  const closeMachine = useCallback(() => setMachineOpen(false), []);
   const tidy = useJanitor();
   const dismissIncidents = useIncidents();
   const [janitorOpen, setJanitorOpen] = useState(false);
@@ -1724,6 +1738,10 @@ export function OfficeSurface(
   const name = useCallback((author: string) => authorName(author, model.agents), [model.agents]);
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
+  const { machineOpen, openMachine, closeMachine, hostEntry, ssh } = useHostResources(
+    machine,
+    live,
+  );
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   // Until the host sends its duty list (an older host has none) nothing offers the duty board.
@@ -1813,11 +1831,6 @@ export function OfficeSurface(
   useEffect(() => {
     if (kept !== selectedId) setSelectedId(kept);
   }, [kept, selectedId]);
-  const hostEntry = useMemo(
-    (): StripCard | null =>
-      machine === null ? null : { title: "Host", note: hostNote(machine), onOpen: openMachine },
-    [machine, openMachine],
-  );
   const contexts = useMemo(
     () => janitorRows(model.agents.values(), model.waitingOn),
     [model.agents, model.waitingOn],
@@ -1927,7 +1940,7 @@ export function OfficeSurface(
       toolbarLabels={surfaceWidth >= 1100}
       onTeam={openTeam}
       machine={machine}
-      onMachine={openMachine}
+      onMachine={hostEntry?.onOpen}
       onChange={changeView}
       compact={layout.compact}
       touchScreen={touchScreen}
@@ -2039,7 +2052,8 @@ export function OfficeSurface(
         onClose={closeCard}
       />
       <MachineCard
-        machine={live ? machine : null}
+        ssh={ssh}
+        machine={machine}
         open={machineOpen}
         cleanUp={cleanUp}
         styles={styles}

@@ -13,6 +13,10 @@ export function paseoHome(env: NodeJS.ProcessEnv, home: string): string {
   return resolve(expandHomeDir(env.PASEO_HOME ?? "~/.paseo", home));
 }
 
+export function claudeConfigFile(env: NodeJS.ProcessEnv, home: string): string {
+  return join(expandHomeDir(env.CLAUDE_CONFIG_DIR || home, home), ".claude.json");
+}
+
 export function officeDir(env: NodeJS.ProcessEnv, home: string): string {
   return join(paseoHome(env, home), "office");
 }

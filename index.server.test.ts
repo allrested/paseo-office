@@ -754,6 +754,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.world.street",
     "office.world.request",
     "office.world.words",
+    "office.ssh.servers",
+    "office.ssh.reading",
     "office.machine",
     "office.machine.cleanup.request",
     "office.janitor.request",
