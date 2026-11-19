@@ -25,6 +25,7 @@ export const settingsLayout = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexWrap: "wrap",
+    alignContent: "center",
     gap: 5,
     paddingHorizontal: 2,
     minHeight: 44,
