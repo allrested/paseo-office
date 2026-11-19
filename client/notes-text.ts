@@ -48,12 +48,81 @@ export function notesLine(
   return "No entry today yet";
 }
 
-/** Splits a month's text before its newest entry: the last "## " header at the start of a line. */
-export function splitNewest(text: string): { before: string; newest: string } {
-  // The Contents list is a "## " header too, but it comes first.
-  let start = 0;
-  for (const header of text.matchAll(/^## /gm)) start = header.index;
-  return { before: text.slice(0, start), newest: text.slice(start) };
+/** A list line of the Contents that links to an entry of the same file. */
+export interface NotesLink {
+  label: string;
+  anchor: string;
+}
+
+/** Markdown, or a run of list lines that each link to an entry of the same file. */
+export type NotesPiece = { kind: "markdown"; text: string } | { kind: "links"; links: NotesLink[] };
+
+/** The text from one "## " header to the next; the text before the first has no anchor. */
+export interface NotesSection {
+  anchor: string | null;
+  pieces: NotesPiece[];
+}
+
+/** GitHub's anchor for a header: lower case, ASCII punctuation but - and _ dropped, each space a -. */
+export function headerAnchor(header: string): string {
+  return header
+    .trim()
+    .toLowerCase()
+    .replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, "")
+    .replace(/\s/g, "-");
+}
+
+/** A list line that is only a link to an anchor: "- [15 November 2026](#15-november-2026)". */
+const LINK_LINE = /^\s*[-*+]\s+\[([^\]]+)\]\(#([^)\s]+)\)\s*$/;
+
+/**
+ * A section's pieces. The host's Markdown hands an anchor link to its file opener, so a list line
+ * that links to an entry of this file becomes a link the card scrolls with; the rest stays Markdown.
+ */
+function piecesOf(text: string, anchors: ReadonlySet<string>): NotesPiece[] {
+  const pieces: NotesPiece[] = [];
+  let markdown = "";
+  let links: NotesLink[] = [];
+  const endMarkdown = () => {
+    if (markdown.trim() !== "") pieces.push({ kind: "markdown", text: markdown });
+    markdown = "";
+  };
+  const endLinks = () => {
+    if (links.length > 0) pieces.push({ kind: "links", links });
+    links = [];
+  };
+  for (const line of text.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
+    const found = LINK_LINE.exec(line);
+    const anchor = found?.[2]?.toLowerCase();
+    if (found?.[1] !== undefined && anchor !== undefined && anchors.has(anchor)) {
+      endMarkdown();
+      links.push({ label: found[1], anchor });
+    } else {
+      endLinks();
+      markdown += line;
+    }
+  }
+  endMarkdown();
+  endLinks();
+  return pieces;
+}
+
+/**
+ * A month's text split at each "## " header at the start of a line: the Contents, then one section
+ * per entry, the newest last. A deeper header is part of its entry.
+ */
+export function splitSections(text: string): NotesSection[] {
+  const starts = [0];
+  for (const header of text.matchAll(/^## /gm)) if (header.index > 0) starts.push(header.index);
+  const parts = starts.map((start, index) => text.slice(start, starts[index + 1]));
+  const headed = parts.map((part) =>
+    part.startsWith("## ") ? headerAnchor(part.slice(3).split("\n", 1)[0] ?? "") : null,
+  );
+  const anchors = new Set(headed.filter((anchor) => anchor !== null));
+  return parts.map((part, index) => ({
+    anchor: headed[index] ?? null,
+    pieces: piecesOf(part, anchors),
+  }));
 }
 
 /** "202611" -> "November 2026". */

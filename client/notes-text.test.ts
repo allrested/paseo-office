@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { NotesState } from "../shared/contracts.js";
-import { monthTitle, notesLine, splitNewest, todayZone } from "./notes-text.js";
+import { headerAnchor, monthTitle, notesLine, splitSections, todayZone } from "./notes-text.js";
 
 const NOW = Date.parse("2026-11-16T09:00:00Z");
 const idle: NotesState = {
@@ -65,19 +65,58 @@ test("every reason the writer gives reads as one sentence", () => {
   );
 });
 
-test("the newest entry starts at the last ## header", () => {
+test("a month splits at each ## header, each with GitHub's anchor for it", () => {
   const text =
     "# T\n\n## Contents\n\n---\n\n## 15 November 2026\n\nA\n\n---\n\n## 16 November 2026\n\nB\n";
-  expect(splitNewest(text).newest.startsWith("## 16 November 2026")).toBe(true);
-  expect(splitNewest(text).before).toBe(
-    "# T\n\n## Contents\n\n---\n\n## 15 November 2026\n\nA\n\n---\n\n",
+  expect(splitSections(text)).toEqual([
+    { anchor: null, pieces: [{ kind: "markdown", text: "# T\n\n" }] },
+    { anchor: "contents", pieces: [{ kind: "markdown", text: "## Contents\n\n---\n\n" }] },
+    {
+      anchor: "15-november-2026",
+      pieces: [{ kind: "markdown", text: "## 15 November 2026\n\nA\n\n---\n\n" }],
+    },
+    {
+      anchor: "16-november-2026",
+      pieces: [{ kind: "markdown", text: "## 16 November 2026\n\nB\n" }],
+    },
+  ]);
+  expect(splitSections("no headers")).toEqual([
+    { anchor: null, pieces: [{ kind: "markdown", text: "no headers" }] },
+  ]);
+  // A deeper header is part of its entry, and a file that starts with an entry has no text before it.
+  expect(splitSections("## 16 November 2026\n\n### Done\n")).toEqual([
+    {
+      anchor: "16-november-2026",
+      pieces: [{ kind: "markdown", text: "## 16 November 2026\n\n### Done\n" }],
+    },
+  ]);
+});
+
+test("an anchor drops punctuation but - and _, and each space is a -", () => {
+  expect(headerAnchor(" Blockers: none (yet), see FP-1242_b ")).toBe(
+    "blockers-none-yet-see-fp-1242_b",
   );
-  expect(splitNewest("no headers").newest).toBe("no headers");
-  expect(splitNewest("no headers").before).toBe("");
-  // A deeper header is part of its entry.
-  expect(splitNewest("## 16 November 2026\n\n### Done\n").newest).toBe(
-    "## 16 November 2026\n\n### Done\n",
-  );
+});
+
+test("list lines that link to the file's own entries become links", () => {
+  const text =
+    "## Contents\n\n- [15 November 2026](#15-november-2026)\n* [16 November 2026](#16-November-2026)\n- [Elsewhere](#nowhere)\n\n---\n\n## 15 November 2026\n\nSee [16](#16-november-2026).\n\n## 16 November 2026\n";
+  const [contents, fifteenth] = splitSections(text);
+  expect(contents?.pieces).toEqual([
+    { kind: "markdown", text: "## Contents\n\n" },
+    {
+      kind: "links",
+      links: [
+        { label: "15 November 2026", anchor: "15-november-2026" },
+        { label: "16 November 2026", anchor: "16-november-2026" },
+      ],
+    },
+    // A link to no entry of the file is left to the Markdown, as is a link inside a sentence.
+    { kind: "markdown", text: "- [Elsewhere](#nowhere)\n\n---\n\n" },
+  ]);
+  expect(fifteenth?.pieces).toEqual([
+    { kind: "markdown", text: "## 15 November 2026\n\nSee [16](#16-november-2026).\n\n" },
+  ]);
 });
 
 test("a month reads as its name and year", () => {

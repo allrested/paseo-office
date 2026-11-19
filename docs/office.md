@@ -365,8 +365,10 @@ archives the writer. A writer that fails, is stopped or closed, or ends without 
 it is and stays named, with an "Open the writer" button that opens its session in the office's
 column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
-notes card: a month's file as Markdown at its newest entry, read only. The server reads only
-`daily-standup-YYYYMM.md` directly in the notes folder.
+notes card: a month's file as Markdown at its newest entry, read only. A list line that is only a
+link to one of the file's own headers, such as the Contents' `- [18 November 2026](#18-november-2026)`,
+scrolls the card to that entry; the app's Markdown would hand the link to its file opener. The
+server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
 ## Schedules
 

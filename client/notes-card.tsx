@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Pressable,
   Text,
   View,
   type LayoutChangeEvent,
@@ -9,7 +10,14 @@ import { Markdown, Modal, ScrollView } from "@getpaseo/plugin/client/ui";
 import type { z } from "zod";
 import type { NotesState, notesReadRpc } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
-import { monthTitle, notesLine, splitNewest } from "./notes-text.js";
+import {
+  monthTitle,
+  notesLine,
+  splitSections,
+  type NotesLink,
+  type NotesPiece,
+  type NotesSection,
+} from "./notes-text.js";
 import type { OfficeStyles } from "./styles.js";
 
 /** A month of the stand-up notes, as the office's server reads it. */
@@ -90,6 +98,65 @@ function MonthBar({ month, onAsk, styles }: MonthBarProps) {
   );
 }
 
+interface LinkRowProps {
+  link: NotesLink;
+  onJump(anchor: string): void;
+  styles: OfficeStyles;
+}
+
+function LinkRow({ link, onJump, styles }: LinkRowProps) {
+  const jump = useCallback(() => onJump(link.anchor), [link.anchor, onJump]);
+  return (
+    <Pressable accessibilityRole="link" onPress={jump} style={styles.notesLinkRow}>
+      <Text style={styles.notesLink}>{link.label}</Text>
+    </Pressable>
+  );
+}
+
+interface PieceProps {
+  piece: NotesPiece;
+  onJump(anchor: string): void;
+  styles: OfficeStyles;
+}
+
+function Piece({ piece, onJump, styles }: PieceProps) {
+  if (piece.kind === "markdown") return <Markdown>{piece.text}</Markdown>;
+  return (
+    <View style={styles.notesLinks}>
+      {piece.links.map((link, row) => (
+        // The Contents may list an entry twice, so a link's place is its key.
+        // oxlint-disable-next-line react/no-array-index-key
+        <LinkRow key={row} link={link} onJump={onJump} styles={styles} />
+      ))}
+    </View>
+  );
+}
+
+interface SectionProps {
+  section: NotesSection;
+  index: number;
+  onPlaced(index: number, y: number): void;
+  onJump(anchor: string): void;
+  styles: OfficeStyles;
+}
+
+/** An entry, or the text before the first: Markdown, and its links to other entries. */
+function Section({ section, index, onPlaced, onJump, styles }: SectionProps) {
+  const placed = useCallback(
+    (event: LayoutChangeEvent) => onPlaced(index, event.nativeEvent.layout.y),
+    [index, onPlaced],
+  );
+  return (
+    <View onLayout={placed}>
+      {section.pieces.map((piece, at) => (
+        // A section's pieces are its text in order and never move, so their place is their key.
+        // oxlint-disable-next-line react/no-array-index-key
+        <Piece key={at} piece={piece} onJump={onJump} styles={styles} />
+      ))}
+    </View>
+  );
+}
+
 interface NotesTextProps {
   /** The read the text came from: each read is brought to its newest entry once. */
   load: NotesMonth;
@@ -97,26 +164,42 @@ interface NotesTextProps {
   styles: OfficeStyles;
 }
 
-/** The month's file as Markdown, scrolled to its newest entry. */
+/** The month's file as Markdown, scrolled to its newest entry; a Contents link scrolls to its entry. */
 function NotesText({ load, text, styles }: NotesTextProps) {
-  const { before, newest } = useMemo(() => splitNewest(text), [text]);
+  const sections = useMemo(() => splitSections(text), [text]);
   const scroller = useRef<NativeScrollView>(null);
+  // Where each entry starts in the scroller, by its anchor, as last laid out.
+  const tops = useRef(new Map<string, number>());
   // Once per read: a later layout leaves the reader where they scrolled.
   const scrolledFor = useRef<NotesMonth | null>(null);
-  const toNewest = useCallback(
-    (event: LayoutChangeEvent) => {
-      if (scrolledFor.current === load) return;
+  const placed = useCallback(
+    (index: number, y: number) => {
+      const anchor = sections[index]?.anchor ?? null;
+      if (anchor !== null) tops.current.set(anchor, y);
+      if (index !== sections.length - 1 || scrolledFor.current === load) return;
       scrolledFor.current = load;
-      scroller.current?.scrollTo({ y: event.nativeEvent.layout.y, animated: false });
+      scroller.current?.scrollTo({ y, animated: false });
     },
-    [load],
+    [sections, load],
   );
+  const jump = useCallback((anchor: string) => {
+    const y = tops.current.get(anchor);
+    if (y !== undefined) scroller.current?.scrollTo({ y, animated: true });
+  }, []);
   return (
     <ScrollView ref={scroller} style={styles.notesScroll}>
-      {before === "" ? null : <Markdown>{before}</Markdown>}
-      <View onLayout={toNewest}>
-        <Markdown>{newest}</Markdown>
-      </View>
+      {sections.map((section, index) => (
+        <Section
+          // The sections are the text in order and never move, so their place is their key.
+          // oxlint-disable-next-line react/no-array-index-key
+          key={index}
+          section={section}
+          index={index}
+          onPlaced={placed}
+          onJump={jump}
+          styles={styles}
+        />
+      ))}
     </ScrollView>
   );
 }

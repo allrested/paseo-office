@@ -144,6 +144,10 @@ export interface OfficeStyles {
   standupPeople: ViewStyle;
   /** The month's notes: the rest of the card's height, scrolled on its own. */
   notesScroll: ViewStyle;
+  /** The Contents' links to the month's entries, as a list. */
+  notesLinks: ViewStyle;
+  notesLinkRow: ViewStyle;
+  notesLink: TextStyle;
   reviewRow: ViewStyle;
   qaTeam: ViewStyle;
   qaGroup: ViewStyle;
@@ -834,6 +838,10 @@ export function useOfficeStyles(
       standupBlocker: { ...base, color: colors.statusWarning },
       standupPeople: { gap: 6 },
       notesScroll: { flex: 1, minHeight: 0 },
+      notesLinks: { paddingBottom: 8 },
+      notesLinkRow: { alignSelf: "flex-start", paddingVertical: touch ? 8 : 2 },
+      // PluginTheme has no link colour: the text's own, underlined.
+      notesLink: { ...base, color: colors.foreground, textDecorationLine: "underline" },
       reviewRow: { gap: 8 },
       qaTeam: { gap: 12 },
       qaGroup: { gap: 10 },
