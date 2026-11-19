@@ -1,3 +1,4 @@
+import { type Appearance, AVATARS, shirtColor } from "../shared/appearance.js";
 import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
@@ -9,6 +10,7 @@ import type { OfficeStyles } from "./styles.js";
 
 type Tool = Extract<ConversationRow, { kind: "tool" }>;
 interface RowProps {
+  appearance?: Appearance;
   row: ConversationRow;
   name: string;
   styles: OfficeStyles;
@@ -62,6 +64,8 @@ function sameRow(before: RowProps, after: RowProps): boolean {
   const [a, b] = [before.row, after.row];
   return (
     before.name === after.name &&
+    before.appearance?.avatar === after.appearance?.avatar &&
+    before.appearance?.color === after.appearance?.color &&
     before.styles === after.styles &&
     a.kind === b.kind &&
     a.key === b.key &&
@@ -72,9 +76,14 @@ function sameRow(before: RowProps, after: RowProps): boolean {
 }
 
 /** Streamed messages update only their own row. Tool lines retain their accessibility labels. */
-const Row = memo(function Row({ row, name, styles }: RowProps) {
+const Row = memo(function Row({ row, name, appearance, styles }: RowProps) {
   const s = styles.transcript;
   const label = rowLabel(row, name);
+  const borderColor = shirtColor(appearance);
+  const avatarStyle = useMemo(
+    () => [s.avatar, borderColor && { borderColor, borderWidth: 2 }],
+    [s.avatar, borderColor],
+  );
   switch (row.kind) {
     case "tool": {
       const status = row.outcome === "failed" ? s.danger : s.warning;
@@ -120,8 +129,10 @@ const Row = memo(function Row({ row, name, styles }: RowProps) {
       return (
         <View accessibilityLabel={label} style={s.assistant}>
           <View style={s.speaker}>
-            <View aria-hidden style={s.avatar}>
-              <Text style={s.initials}>{avatarInitials(name)}</Text>
+            <View aria-hidden style={avatarStyle}>
+              <Text style={s.initials}>
+                {appearance?.avatar ? AVATARS[appearance.avatar] : avatarInitials(name)}
+              </Text>
             </View>
             <Text style={s.name}>{name}</Text>
           </View>
@@ -192,12 +203,14 @@ function displayRows(
 }
 
 export function SessionTranscript({
+  appearance,
   rows,
   steps,
   name,
   styles,
 }: {
   rows: readonly ConversationRow[];
+  appearance?: Appearance;
   steps: boolean;
   name: string;
   styles: OfficeStyles;
@@ -213,7 +226,7 @@ export function SessionTranscript({
         if (Array.isArray(entry) && entry.length > 1)
           return <ToolRun key={entry[0].key} rows={entry} name={name} styles={styles} />;
         const row = Array.isArray(entry) ? entry[0] : entry;
-        return <Row key={row.key} row={row} name={name} styles={styles} />;
+        return <Row appearance={appearance} key={row.key} row={row} name={name} styles={styles} />;
       })}
     </View>
   );

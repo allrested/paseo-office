@@ -1,3 +1,4 @@
+import { AVATARS, shirtColor } from "../shared/appearance.js";
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -22,6 +23,11 @@ export function SessionIdentity({
   const name = agentTitle(agent);
   const context = contextPercent(agent);
   const cost = agent.costUsd === 0 ? "$0.00" : costText(agent.costUsd);
+  const borderColor = shirtColor(agent.appearance);
+  const avatarStyle = useMemo(
+    () => [styles.sessions.identityAvatar, borderColor && { borderColor, borderWidth: 2 }],
+    [styles.sessions.identityAvatar, borderColor],
+  );
   const fill = useMemo(
     () => [styles.sessions.contextGauge, { width: `${context ?? 0}%` as const }],
     [context, styles],
@@ -29,8 +35,10 @@ export function SessionIdentity({
   return (
     <View style={styles.sessions.identity}>
       <View style={styles.sessions.identityLead}>
-        <View style={styles.sessions.identityAvatar} aria-hidden>
-          <Text style={styles.sessions.initials}>{avatarInitials(name)}</Text>
+        <View style={avatarStyle} aria-hidden>
+          <Text style={styles.sessions.initials}>
+            {agent.appearance?.avatar ? AVATARS[agent.appearance.avatar] : avatarInitials(name)}
+          </Text>
           <View style={styles.sessions.badge}>
             <View style={styles.dot[dotTone(agent)]} />
           </View>

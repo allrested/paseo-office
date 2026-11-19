@@ -12,6 +12,7 @@ import {
   type WorkspaceScript,
   type WorkspaceTicket,
 } from "../shared/contracts.js";
+import { APPEARANCE_KEY, AppearanceSchema } from "../shared/appearance.js";
 import { NEXT_KEY, NUMBER_KEY, storedNumber } from "./subagent-names.js";
 
 // PARENT_AGENT_ID_LABEL in packages/protocol/src/agent-labels.ts. Server code may import the
@@ -251,6 +252,7 @@ export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
   const parent = agent.labels?.[PARENT_AGENT_ID_LABEL]?.trim() ?? "";
   const context = contextOf(agent);
   const cost = costOf(agent);
+  const appearance = AppearanceSchema.safeParse(agent.metadata?.[APPEARANCE_KEY]);
   const number = storedNumber(agent.metadata?.[NUMBER_KEY]);
   const next = storedNumber(agent.metadata?.[NEXT_KEY]);
   return {
@@ -273,6 +275,7 @@ export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
     }),
     createdAt: agent.createdAt,
     ...stateTimes(agent, status.data),
+    ...(appearance.success ? { appearance: appearance.data } : {}),
     ...(context === undefined ? {} : { context }),
     ...(number === undefined ? {} : { number }),
     ...(next === undefined ? {} : { next }),

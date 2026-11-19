@@ -72,6 +72,10 @@ export function officeNames(agents: readonly OfficeAgent[]): Map<string, string>
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
   const names = new Map<string, string>();
   const nameOf = (agent: OfficeAgent, seen: Set<string>): string | null => {
+    if (agent.appearance?.name) {
+      names.set(agent.id, agent.appearance.name);
+      return agent.appearance.name;
+    }
     const known = names.get(agent.id);
     if (known !== undefined) return known;
     const parentId = agent.parentAgentId;

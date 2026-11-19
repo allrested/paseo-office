@@ -1,3 +1,4 @@
+import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { z } from "zod";
@@ -49,6 +50,7 @@ export const OfficeAgentSchema = z.object({
   createdAt: z.string(),
   /** Absent for a provider that reports no context window, and before an agent's first turn. */
   context: AgentContextSchema.optional(),
+  appearance: AppearanceSchema.optional(),
   /** A sub-agent's number among its parent's, as the office stored it on the agent. */
   number: z.number().int().positive().optional(),
   /** On a parent: the number its next sub-agent gets. */

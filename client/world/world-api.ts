@@ -1,3 +1,4 @@
+import type { Appearance } from "../../shared/appearance.js";
 import type { OfficeScene } from "../../shared/settings.js";
 import type { WordsLanguage } from "../../shared/scene-language.js";
 import type { LifeEvent } from "../../shared/contracts.js";
@@ -13,6 +14,8 @@ export type WorldWeather = import("../../shared/contracts.js").WeatherScene;
 
 /** A person in the office, in the shape the vendored scene reads. */
 export interface WorldSession {
+  appearance?: Appearance;
+  shirt?: string;
   id: string;
   name: string;
   title: string;

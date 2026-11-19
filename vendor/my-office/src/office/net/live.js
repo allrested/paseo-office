@@ -8,7 +8,7 @@ import { CHAIR_IDLE, DESKS, PODS, UNITS, chairs, unitOfDesk } from '../world/des
 import { canvasTex } from '../scene/blocks.js';
 import { DEPTS } from '../world/layout.js';
 import { DEPT_SIGNS } from '../world/pro/wing.js';
-import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, spawnSub, subs, trimLeaving, workers } from '../people/workers.js';
+import { PALETTE, addWorker, dn, dropSub, hash, lookOf, leaving, leavingIds, sessions, spawnSub, subs, trimLeaving, workers } from '../people/workers.js';
 import { queueUi } from '../ui/activity.js';
 import { closeSession } from '../ui/session-drawer.js';
 import { t as tr } from '../../i18n/index.js';
@@ -92,11 +92,18 @@ export function upsertSession(s, walkIn = true) {
   // (no 3D yet, the 2D list opened first: no desk and nobody at it; core/world-boot.js seats everyone once it is built)
   if (!state.world) { s.desk = -1; sessions.set(s.id, s); queueUi(); return; }
   s.desk = proDesk(s);   // (every layout: the project's area)
-  const had = sessions.has(s.id);
+  const previous = sessions.get(s.id);
+  const had = !!previous;
   sessions.set(s.id, s);
   let w = workers.get(s.id);
   if (!w && !leavingIds.has(s.id)) w = addWorker(s, walkIn && had === false && state.connectedOnce);
   if (w) {
+    if (previous && (previous.shirt !== s.shirt || previous.appearance?.avatar !== s.appearance?.avatar || previous.name !== s.name)) {
+      Object.assign(w.cfg, lookOf(s), { name: s.name });
+      w.tagDot.style.background = w.cfg.shirt;
+      if (s.desk >= 0) chairs[s.desk].color.set(w.cfg.shirt);
+      w.rebuild();
+    }
     w.setName(short(dn(s), 26));
     const live = new Set((s.subs || []).map((x) => x.id));
     for (const [aid, sw] of subs) if (sw.parent === w && !live.has(aid)) dropSub(aid);

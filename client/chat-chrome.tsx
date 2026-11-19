@@ -1,3 +1,4 @@
+import type { Appearance } from "../shared/appearance.js";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
@@ -30,8 +31,18 @@ export function ChatIcon({
   );
 }
 
-function MemberDisc({ id, name, styles }: { id: string; name: string; styles: OfficeStyles }) {
-  const avatar = memberAvatar(id, name);
+function MemberDisc({
+  id,
+  name,
+  appearance,
+  styles,
+}: {
+  appearance?: Appearance;
+  id: string;
+  name: string;
+  styles: OfficeStyles;
+}) {
+  const avatar = memberAvatar(id, name, appearance);
   const style = useMemo(
     () => [styles.messenger.memberAvatar, { backgroundColor: avatar.color }],
     [styles, avatar.color],
@@ -63,7 +74,12 @@ function MemberRow({
       onPress={show}
       style={styles.messenger.choice}
     >
-      <MemberDisc id={member.id} name={member.name} styles={styles} />
+      <MemberDisc
+        id={member.id}
+        appearance={member.appearance}
+        name={member.name}
+        styles={styles}
+      />
       <View style={styles.rowBody}>
         <Text numberOfLines={1} style={styles.chatName}>
           {member.name}
@@ -107,7 +123,13 @@ export function ChatHeader({
         <View style={styles.messenger.group} aria-hidden>
           <MemberDisc id="me" name="You" styles={styles} />
           {members.slice(0, 3).map((member) => (
-            <MemberDisc key={member.id} id={member.id} name={member.name} styles={styles} />
+            <MemberDisc
+              key={member.id}
+              id={member.id}
+              appearance={member.appearance}
+              name={member.name}
+              styles={styles}
+            />
           ))}
         </View>
         <Pressable
@@ -171,7 +193,12 @@ function RecipientRow({
       style={styles.messenger.choice}
     >
       {member ? (
-        <MemberDisc id={member.id} name={member.name} styles={styles} />
+        <MemberDisc
+          id={member.id}
+          appearance={member.appearance}
+          name={member.name}
+          styles={styles}
+        />
       ) : (
         <Icon name="UsersRound" size={18} color={styles.iconColor} />
       )}

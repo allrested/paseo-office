@@ -1,3 +1,4 @@
+import { AppearanceEditor } from "./agent-appearance.js";
 import { useCallback, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import {
   Text,
@@ -78,6 +79,9 @@ function Header({
   SessionPanelProps,
   "agent" | "room" | "onOpenWorkspace" | "onClose" | "hideClose" | "styles"
 >) {
+  const [editing, setEditing] = useState(false);
+  const edit = useCallback(() => setEditing(true), []);
+  const closeEditor = useCallback(() => setEditing(false), []);
   return (
     <View style={styles.sessions.deskHead}>
       <View style={styles.sessions.identityRow}>
@@ -87,6 +91,12 @@ function Header({
           </View>
         ) : (
           <SessionIdentity agent={agent} room={room} styles={styles} />
+        )}
+        {agent && (
+          <SessionButton label="Customize agent" icon="Pencil" onPress={edit} styles={styles} />
+        )}
+        {agent && editing && (
+          <AppearanceEditor key={agent.id} agent={agent} styles={styles} close={closeEditor} />
         )}
         {!hideClose && <SessionButton label="Close" icon="X" onPress={onClose} styles={styles} />}
       </View>
@@ -114,6 +124,7 @@ function Alert({ text, styles }: { text: string; styles: OfficeStyles }) {
 }
 
 interface RowsProps {
+  appearance?: OfficeAgent["appearance"];
   conversation: Conversation;
   steps: boolean;
   name: string;
@@ -121,7 +132,7 @@ interface RowsProps {
 }
 
 /** What the list holds: its state while it has none, else Show earlier and the rows. */
-function Rows({ conversation, steps, name, styles }: RowsProps): ReactNode {
+function Rows({ conversation, steps, name, appearance, styles }: RowsProps): ReactNode {
   const { status, rows } = conversation;
   if (status === "loading") return <Text style={styles.muted}>{LOADING}</Text>;
   if (status === "error") {
@@ -151,7 +162,13 @@ function Rows({ conversation, steps, name, styles }: RowsProps): ReactNode {
           />
         </View>
       ) : null}
-      <SessionTranscript rows={rows} steps={steps} name={name} styles={styles} />
+      <SessionTranscript
+        appearance={appearance}
+        rows={rows}
+        steps={steps}
+        name={name}
+        styles={styles}
+      />
     </>
   );
 }
@@ -336,7 +353,13 @@ export function SessionPanel({
             ))}
           </>
         ) : (
-          <Rows conversation={conversation} steps={tab === "steps"} name={name} styles={styles} />
+          <Rows
+            appearance={agent?.appearance}
+            conversation={conversation}
+            steps={tab === "steps"}
+            name={name}
+            styles={styles}
+          />
         )}
       </ScrollView>
       {agent === null ? null : (

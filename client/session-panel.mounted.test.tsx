@@ -15,6 +15,14 @@ import { useOfficeStyles } from "./styles.js";
 import type { Conversation } from "./use-conversation.js";
 import type { AgentActions } from "./use-agent-actions.js";
 
+const metadataMock = vi.hoisted(() => {
+  const setMetadata = vi.fn(async () => undefined);
+  return { setMetadata, ref: vi.fn(() => ({ setMetadata })) };
+});
+vi.mock("@getpaseo/plugin/client", () => ({
+  usePaseo: () => ({ agents: { ref: metadataMock.ref } }),
+}));
+
 let conversation: Conversation;
 let asked: string[];
 /** The keys of the rows drawn: `rowLabel` runs once each time a row draws. */
@@ -49,7 +57,14 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   );
   const Markdown = ({ children }: { children: string }) =>
     createElement("div", { "data-markdown": "" }, children);
-  return { ScrollView, TextInput, Markdown, Icon: () => null };
+  const Body = ({ children }: { children?: ReactNode }) => createElement("div", null, children);
+  return {
+    Modal: Object.assign(Body, { Content: Body }),
+    ScrollView,
+    TextInput,
+    Markdown,
+    Icon: () => null,
+  };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -488,4 +503,24 @@ test("on a touch screen Enter is a new line and the Send button sends", async ()
   expect(send).not.toHaveBeenCalled();
   await press("Send");
   expect(send).toHaveBeenCalledWith("a1", "hello", { activeTurnBehavior: "steer" });
+});
+
+test("Customize agent saves the chosen profile and can restore the defaults", async () => {
+  await draw({ agent: { ...AGENT, appearance: { name: "Ada" } } });
+  await press("Customize agent");
+  expect((labelled("Office display name") as HTMLInputElement).value).toBe("Ada");
+  await press("headphones");
+  await press("Teal");
+  await press("Save appearance");
+  expect(metadataMock.ref).toHaveBeenCalledWith(AGENT.id);
+  expect(metadataMock.setMetadata).toHaveBeenLastCalledWith({
+    "office.appearance": { name: "Ada", avatar: "headphones", color: "Teal" },
+  });
+  expect(maybe("Office display name")).toBeNull();
+  await draw({ agent: { ...AGENT, appearance: { avatar: "headphones", color: "Teal" } } });
+  await press("Customize agent");
+  await press("Initials");
+  await press("Automatic color");
+  await press("Save appearance");
+  expect(metadataMock.setMetadata).toHaveBeenLastCalledWith({ "office.appearance": null });
 });

@@ -1,3 +1,4 @@
+import { shirtColor } from "../../shared/appearance.js";
 import type { OfficeBrand } from "../brand.js";
 import {
   agentTitle,
@@ -74,6 +75,9 @@ function toSession(
   return {
     id: agent.id,
     name: title,
+    ...(agent.appearance
+      ? { appearance: agent.appearance, shirt: shirtColor(agent.appearance) }
+      : {}),
     title,
     dir: team,
     git: {

@@ -191,6 +191,7 @@ export function restWishes(id: string, { now, rests, sofa }: Leisure): RestPlace
 }
 
 export interface CastMember {
+  appearance?: WorldSession["appearance"];
   id: string;
   name: string;
   standing: Standing;
@@ -235,7 +236,7 @@ export function castOf(
       spot = lines.get(standing.place) ?? 0;
       lines.set(standing.place, spot + 1);
     }
-    return { id: session.id, name: session.name, standing, spot };
+    return { id: session.id, name: session.name, standing, spot, appearance: session.appearance };
   });
 }
 
