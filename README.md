@@ -23,6 +23,7 @@ my-office's.
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
   starts an agent: a workspace, a provider and model, and a first prompt.
+- Set the office name, logo and mark color in **Office settings → Appearance → Branding**. A blank field uses the host default. See the [branding environment variables](docs/office.md#custom-branding).
 - Open an agent’s session and select the pencil (**Customize agent**) to set its Office display name, character gender, avatar and color. Choose **Male** or **Female** to change how the character looks in 2D and 3D, or **Auto** to use its original appearance. Clear the name, select **Initials** and **Auto**, then save to restore the defaults.
 - Select **Full screen** beside the view switch to work inside the office. On a wide screen,
   Sessions sits on the left, the floor in the center, and activity or the open conversation

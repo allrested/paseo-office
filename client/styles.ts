@@ -585,7 +585,13 @@ export function useOfficeStyles(
       workspaceAction: { ...sidebarButton, borderColor: "transparent" },
       workspaceAccent: colors.accent,
       headerBrand: { ...headerTools, marginRight: 8 },
-      brandText: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
+      brandText: {
+        maxWidth: compact ? 100 : 240,
+        flexShrink: 1,
+        color: colors.foreground,
+        fontSize: 16,
+        fontWeight: "700",
+      },
       brandIcon: { color: colors.statusWarning },
       headerModes: {
         borderWidth: 1,

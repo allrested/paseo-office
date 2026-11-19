@@ -1,3 +1,4 @@
+import { BrandingSchema } from "./branding.js";
 import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
@@ -416,6 +417,7 @@ export const ChatResultSchema = z.union([
 export type ChatResult = z.output<typeof ChatResultSchema>;
 
 export const OfficeSnapshotSchema = z.object({
+  brand: BrandingSchema.optional(),
   agents: z.array(OfficeAgentSchema),
   workspaces: z.array(OfficeWorkspaceSchema),
   /** The "doing now" line of each running agent that has one. */

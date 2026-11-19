@@ -396,6 +396,18 @@ the user's posts arrive as a user prompt. A post naming an agent that has not ru
 delivered after that agent's first turn or the next post that names it. Pending mention
 notifications are held in memory.
 
+## Custom branding
+
+Open **Office settings → Appearance → Branding** to preview the current brand and change the office name, logo URL or mark color for everyone on this host. Each field saves on Enter or when you leave it. Clear a field to restore its host default. Branding appears in the fullscreen header and on the 3D floor. The office name also appears in team chat.
+
+| Office setting | Daemon environment variable | Example                                 |
+| -------------- | --------------------------- | --------------------------------------- |
+| Office name    | `PASEO_BRAND_NAME`          | `Acme Studio`                           |
+| Logo URL       | `PASEO_BRAND_LOGO_URL`      | `https://assets.example.org/office.png` |
+| Brand color    | `PASEO_BRAND_COLOR`         | `#e8865f`                               |
+
+Each saved value overrides its environment variable. On web, the name and logo can also come from the Paseo page when both values for that field are empty. Otherwise Office uses its built-in defaults. The mark color tints the built-in icon. Use an HTTPS image URL that clients can reach and enable cross-origin image access on its server so the 3D sign and photos can use it.
+
 ## Settings
 
 The office's settings are a screen in its page under Settings > Plugins > Office 3D

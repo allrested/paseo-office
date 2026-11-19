@@ -1,3 +1,4 @@
+import { brandFields } from "./branding.js";
 import { LANGUAGE_CHOICES } from "./scene-language.js";
 import { defineSettings } from "@getpaseo/plugin";
 import { WEATHER_MODES, MANUAL_CHOICES } from "./weather.js";
@@ -46,6 +47,7 @@ export const FLOOR_PLANS = ["pro", "cozy", "hq"] as const;
 export type FloorPlanChoice = (typeof FLOOR_PLANS)[number];
 
 const HostValuesSchema = z.object({
+  ...brandFields,
   agentTools: z.boolean().default(true),
   notesFolder: z.string().default(""),
   notesTimeZone: z.string().default(""),
@@ -123,7 +125,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 5,
+  version: 6,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadDays)
     .superRefine(({ weatherUrl }, ctx) => {

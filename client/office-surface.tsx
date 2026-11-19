@@ -1,3 +1,4 @@
+import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
   useEffect,
@@ -2118,8 +2119,10 @@ export function OfficeSurface(
     </View>
   );
   return (
-    <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
-      {surface}
-    </OfficeDialogs>
+    <OfficeBrandContext.Provider value={office.state.brand}>
+      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+        {surface}
+      </OfficeDialogs>
+    </OfficeBrandContext.Provider>
   );
 }

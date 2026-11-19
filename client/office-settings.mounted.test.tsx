@@ -141,6 +141,20 @@ test("the screen holds the switches, the fields and the view", async () => {
   expect(labelled("List view")?.getAttribute("aria-selected")).toBe("true");
 });
 
+test("Appearance previews the active host brand and offers individual overrides", async () => {
+  await mount();
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: { ...EMPTY_OFFICE, brand: { name: "North Office", color: "#113355" } },
+    }),
+  );
+  expect(container.textContent).toContain("North Office");
+  for (const field of ["Office name", "Logo URL", "Brand color"]) {
+    expect((labelled(field) as HTMLInputElement).value).toBe("");
+  }
+});
+
 test("section changes reveal the matching controls and keep the notes field mounted", async () => {
   await mount();
   const section = (name: string) =>
