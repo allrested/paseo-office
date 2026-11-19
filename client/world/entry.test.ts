@@ -34,6 +34,8 @@ const h = vi.hoisted(() => ({
   soundAsked: [] as boolean[],
   /** How many times the wall clock's own act ran (upstream's cycleTime). */
   clockCycled: 0,
+  /** How many times the duty board's own act ran (upstream's toast of the day's names). */
+  dutyToasts: 0,
   /** What the camera bar's autoCam() answers: whether the camera may glide now. */
   autoCam: false,
   /** Whom the camera glided to, in order. */
@@ -477,6 +479,16 @@ async function startPage(options: object): Promise<Map<string, Prop>> {
             },
           },
         ],
+        // (upstream's: today's names in a toast, interact/props.js prop('dutyBoard'))
+        [
+          "dutyBoard",
+          {
+            id: "dutyBoard",
+            act: () => {
+              h.dutyToasts += 1;
+            },
+          },
+        ],
       ]),
     };
   });
@@ -801,4 +813,41 @@ test("only a farewell and promotion are sent to the host tenure ledger", async (
     [{ op: "official", name: "x".repeat(200) }],
   ]);
   expect(onLife).toHaveBeenCalledWith("parcel", { id: "a1" });
+});
+
+test("the pantry's duty board opens Paseo's duty board; without one it keeps the scene's own note", async () => {
+  const duties = vi.fn();
+  const props = await startPage({ onDuties: duties });
+  props.get("dutyBoard")?.act();
+  expect(duties).toHaveBeenCalledTimes(1);
+  expect(h.dutyToasts).toBe(0);
+  const own = await startPage({});
+  own.get("dutyBoard")?.act();
+  expect(h.dutyToasts).toBe(1);
+});
+
+test("the host's duties replace the scene's rota, and a pretend duty acted out is reported", async () => {
+  const done = vi.fn();
+  await startPage({ onDutyDone: done });
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { host } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  expect(host.duties).toBeNull();
+  const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld as World & {
+    setDuties(list: unknown): void;
+  };
+  const list = [
+    {
+      id: "p1",
+      name: "Cups",
+      chore: "cups",
+      pretend: true,
+      holder: null,
+      state: "open",
+      owed: false,
+    },
+  ];
+  world.setDuties(list);
+  expect(host.duties).toEqual(list);
+  host.dutyDone("p1", "a1");
+  expect(done).toHaveBeenCalledWith("p1", "a1");
 });
