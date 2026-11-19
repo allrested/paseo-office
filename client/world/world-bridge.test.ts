@@ -112,3 +112,16 @@ test("stop sends its message", () => {
 test("the bridge speaks the contract's version", () => {
   expect(bridge().api.version).toBe(1);
 });
+
+test("setSound goes to the page as a call, and the scene's onSound comes back as a callback", () => {
+  const { api, posted, receive } = bridge();
+  const onSound = vi.fn();
+  api.start(options({ onSound }));
+  api.setSound?.(true);
+  expect(posted.map((m) => m.call)).toEqual(["start", "setSound"]);
+  expect(posted[1]).toEqual({ call: "setSound", args: [true] });
+  const started = posted[0]?.args[0] as { callbacks: string[] };
+  expect(started.callbacks).toContain("onSound");
+  receive(JSON.stringify({ callback: "onSound", args: [true] }));
+  expect(onSound).toHaveBeenCalledWith(true);
+});

@@ -84,6 +84,7 @@ export function createWorldBridge(post: (text: string) => void): WorldBridge {
     meet: sender("meet"),
     gather: sender("gather"),
     setIncidents: sender("setIncidents"),
+    setSound: sender("setSound"),
   };
 
   return {

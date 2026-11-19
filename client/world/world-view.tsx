@@ -5,6 +5,7 @@ import type { IncidentsState, Machine } from "../../shared/contracts.js";
 import type { FocusRequest } from "../focus-request.js";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
+import { useSoundSwitch } from "../use-sound.js";
 import { worldBrand } from "./adapter.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
@@ -93,6 +94,7 @@ export function WorldView({
 }: WorldViewProps) {
   const containerId = useId();
   const onBell = useStandupBell();
+  const sound = useSoundSwitch();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -110,6 +112,7 @@ export function WorldView({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onSound: sound.set,
     onProblem,
   });
   useEffect(() => {
@@ -127,6 +130,7 @@ export function WorldView({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      onSound: sound.set,
       onProblem,
     };
   }, [
@@ -143,6 +147,7 @@ export function WorldView({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    sound.set,
     onProblem,
   ]);
 
@@ -201,6 +206,7 @@ export function WorldView({
     machine,
     meeting,
     incidents,
+    sound: sound.on,
   });
   return (
     <View id={containerId} style={styles.scene}>

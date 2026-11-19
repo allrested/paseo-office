@@ -157,6 +157,11 @@ export interface WorldStartOptions {
   onIncidents?(): void;
   /** A short line the office says once. */
   onToast?(text: string): void;
+  /**
+   * A press on the scene's Sound button: the switch is to be on or off. The host stores it and
+   * answers with `setSound`; the scene has already applied it, since audio starts only inside a press.
+   */
+  onSound?(on: boolean): void;
   /** False hides Photo mode: a WebView cannot keep a download. Absent: Photo mode is offered. */
   photo?: boolean;
 }
@@ -194,6 +199,12 @@ export interface WorldApi {
    * that ring at once ring once.
    */
   setIncidents?(incidents: readonly WorldIncident[]): void;
+  /**
+   * The device's Sound switch. On plays the scene's sounds once a press has started audio; off, and
+   * where the frame never lets audio start, plays none. The scene starts off. Absent on a page built
+   * from before sounds.
+   */
+  setSound?(on: boolean): void;
 }
 
 /** The version of the contract above; the page says which it speaks. */

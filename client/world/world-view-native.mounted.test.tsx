@@ -159,3 +159,8 @@ test("closing the view tells the page to stop", async () => {
   expect(calls().map((message) => message.call)).toEqual(["stop"]);
   root = createRoot(container);
 });
+
+test("the start names the Sound callback to the page", async () => {
+  await mount();
+  expect((calls()[0].args[0] as { callbacks: string[] }).callbacks).toContain("onSound");
+});

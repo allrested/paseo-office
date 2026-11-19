@@ -35,6 +35,7 @@ function input(overrides: Partial<WorldFeedInput> = {}): WorldFeedInput {
     machine: null,
     meeting: false,
     incidents: undefined,
+    sound: null,
     ...overrides,
   };
 }
@@ -126,4 +127,18 @@ test("a request for a person is sent once", async () => {
   await act(async () => root.render(<Probe api={api} feed={input({ focusRequest: request })} />));
   await act(async () => root.render(<Probe api={api} feed={input({ focusRequest: request })} />));
   expect(calls.filter((call) => call === 'select:["a2"]')).toHaveLength(1);
+});
+
+test("the Sound switch is sent once it is read, again when it changes, and never as null", async () => {
+  const { api, calls } = fakeScene();
+  const show = (sound: boolean | null) =>
+    act(async () => root.render(<Probe api={api} feed={input({ sound })} />));
+  await show(null);
+  expect(calls.filter((call) => call.startsWith("setSound"))).toEqual([]);
+  await show(false);
+  await show(true);
+  expect(calls.filter((call) => call.startsWith("setSound"))).toEqual([
+    "setSound:[false]",
+    "setSound:[true]",
+  ]);
 });

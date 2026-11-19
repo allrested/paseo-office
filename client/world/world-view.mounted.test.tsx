@@ -207,3 +207,8 @@ test.each([
   expect(note.left).toBe(probed.viewCorner.right);
   expect(Number(note.top)).toBeGreaterThan(cornerBottom(probed));
 });
+
+test("the start gives the scene a Sound callback", async () => {
+  const options = await startedOffice(ignore);
+  expect(typeof options.onSound).toBe("function");
+});

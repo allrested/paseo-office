@@ -464,7 +464,7 @@ test("the frame's page lets the office go full screen", () => {
   const container = document.createElement("div");
   const frame = openWorldFrame({ container, script: "", title: "Office in 3D" });
 
-  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe("fullscreen");
+  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe("fullscreen; autoplay");
   frame.dispose();
 });
 

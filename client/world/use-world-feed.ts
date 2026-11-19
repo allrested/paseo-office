@@ -37,11 +37,13 @@ export interface WorldFeedInput {
   /** The stand-up is open: the bell on the meeting table rings once. */
   meeting: boolean;
   incidents: IncidentsState | undefined;
+  /** The device's Sound switch; null while it is read: nothing is sent then. */
+  sound: boolean | null;
 }
 
 /**
  * Feeds a started scene: the people, their events, the board, the machine, the incidents, the
- * theme, the selection and the meeting. `api` is null until the scene has started, and again
+ * theme, the Sound switch, the selection and the meeting. `api` is null until the scene has started, and again
  * after it is gone; nothing is sent then. The effects list `api` so the render that starts the
  * scene runs them in the order they are written: the people are seated before the view looks at
  * any. Returns the note about the floor while the scene is up, if any.
@@ -57,6 +59,7 @@ export function useWorldFeed(
     machine,
     meeting,
     incidents,
+    sound,
   }: WorldFeedInput,
 ): { note: string | null } {
   // (a ref for useIncidentAlarm's RefObject; the [api] effect below must stay the first effect)
@@ -76,6 +79,10 @@ export function useWorldFeed(
     if (api === null) return;
     world.current?.setTheme({ dark: isDarkTheme(theme.colors), colors: theme.colors });
   }, [theme, api]);
+
+  useEffect(() => {
+    if (sound !== null) world.current?.setSound?.(sound);
+  }, [sound, api]);
 
   const people = useMemo(() => worldPeople(model, PLAN_DESKS[PLAN]), [model]);
   useEffect(() => {

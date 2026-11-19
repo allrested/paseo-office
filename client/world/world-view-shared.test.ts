@@ -30,6 +30,7 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onOpenNotes: vi.fn(),
       onOpenIncidents: vi.fn(),
       onBell: vi.fn(),
+      onSound: vi.fn(),
       onProblem: vi.fn(),
       ...overrides,
     },
@@ -96,4 +97,15 @@ test("a problem the scene reports goes to the latest handler", () => {
   now.current = { ...now.current, onProblem: later };
   options.onProblem("the graphics context was lost");
   expect(later).toHaveBeenCalledWith("the graphics context was lost");
+});
+
+test("a press on the scene's Sound button goes to the latest handler, and keeps no focus from the app", () => {
+  const now = latest();
+  const focus = vi.fn();
+  const options = worldStartOptions(now, { focus, brand: BRAND });
+  const later = vi.fn();
+  now.current = { ...now.current, onSound: later };
+  options.onSound?.(true);
+  expect(later).toHaveBeenCalledWith(true);
+  expect(focus).not.toHaveBeenCalled();
 });
