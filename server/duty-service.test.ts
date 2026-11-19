@@ -274,6 +274,23 @@ test("unticking today on a duty takes its open post of today off at the save; a 
   ]);
 });
 
+test("a save that names one id twice keeps it once: the second is a new duty", async () => {
+  const { begin, service } = setup();
+  await begin();
+  const cups = { id: "cups", instructions: "", days: [3] };
+  expect(
+    await service.save([
+      { ...cups, name: "Cups" },
+      { ...cups, name: "Cups again" },
+    ]),
+  ).toEqual({ ok: true });
+  const [first, second] = service.list();
+  expect(first).toMatchObject({ id: "cups", name: "Cups", chore: "cups" });
+  expect(second).toMatchObject({ name: "Cups again" });
+  expect(second?.id).not.toBe("cups");
+  expect(second).not.toHaveProperty("chore");
+});
+
 test("a save is checked, keeps ids and chores, names new duties, and posts one due today at once", async () => {
   const { begin, board, service, file, listed, told } = setup({ start: WED_7AM + 2 * HOUR });
   await begin();

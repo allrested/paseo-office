@@ -130,11 +130,16 @@ export interface DutyService {
   error(): string | null;
 }
 
-/** A draft as kept: trimmed, days in order, the id and chore of the duty it edits, or a new id. */
-function keptDuty(draft: DutyDraft, current: readonly Duty[]): Duty {
-  const was = current.find((duty) => duty.id === draft.id);
+/**
+ * A draft as kept: trimmed, days in order, the id and chore of the duty it edits, or a new id. An
+ * id an earlier draft of the save took (`taken`) is a new duty.
+ */
+function keptDuty(draft: DutyDraft, current: readonly Duty[], taken: Set<string>): Duty {
+  const was = taken.has(draft.id ?? "") ? undefined : current.find((duty) => duty.id === draft.id);
+  const id = was?.id ?? `d-${randomUUID().slice(0, 8)}`;
+  taken.add(id);
   return {
-    id: was?.id ?? `d-${randomUUID().slice(0, 8)}`,
+    id,
     name: draft.name.trim(),
     instructions: draft.instructions.trim(),
     days: [...new Set(draft.days)].sort((a, b) => a - b),
@@ -202,7 +207,8 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
             error: `Unable to save the duty list: the kept one could not be read, and a save would replace it (${unreadable})`,
           };
         }
-        const next = drafts.map((draft) => keptDuty(draft, duties));
+        const taken = new Set<string>();
+        const next = drafts.map((draft) => keptDuty(draft, duties, taken));
         try {
           await ports.file.save({ version: 1, duties: next });
         } catch (error) {
