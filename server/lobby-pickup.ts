@@ -45,9 +45,15 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
 
   const active = () => !stopped && ports.enabled();
 
-  /** The lobby's tasks and the duties handed out: what the office hands to idle agents. */
+  /**
+   * The lobby's tasks and the duties handed out: what the office hands to idle agents. A duty
+   * already claimed, or with a delivery under way, stays even once it has lost its instructions,
+   * so its delivery is recovered and its agent is not left holding it unseen.
+   */
   function pickupPosts(): Post[] {
-    return [...service.postsOf(LOBBY), ...service.postsOf(DUTY).filter(ports.instructed)];
+    const handedOut = (post: Post) =>
+      ports.instructed(post) || post.state === "claimed" || Boolean(post.pickupMessageId);
+    return [...service.postsOf(LOBBY), ...service.postsOf(DUTY).filter(handedOut)];
   }
 
   function hasWork(): boolean {

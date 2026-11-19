@@ -562,3 +562,43 @@ test("a duty acted out names an agent of the office; an unknown one is refused",
   });
   await office.stop();
 });
+
+test("a duty that loses its instructions while it is handed out is still delivered, and its agent gets work after it", async () => {
+  const harness = setup();
+  let failNext = true;
+  const office = harness.build({
+    send: async (agentId, prompt) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("the network is down");
+      }
+      harness.prompts.push(`${agentId}: ${prompt}`);
+    },
+  });
+  const { clock, store, prompts } = harness;
+  await office.ready;
+  office.setDuties([BUILD]);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  expect(store.current().posts[0]?.pickupMessageId).toEqual(expect.any(String));
+  // The owner takes the instructions out before the delivery is tried again.
+  const pretend = { ...BUILD, instructions: "" };
+  office.setDuties([pretend]);
+  await office.syncDuties({ duties: [pretend], day: TODAY, due: [], dayOf });
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([expect.stringContaining("b: The office assigned you duty p1")]);
+  expect(store.current().posts[0]).not.toHaveProperty("pickupMessageId");
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  expect(
+    await update?.execute({ id: "p1", action: "done" }, toolContext({ id: "b", title: null })),
+  ).not.toHaveProperty("isError");
+  await office.post({ board: "lobby", kind: "task", text: "Next" });
+  clock.advance(0);
+  await settle();
+  expect(prompts[1]).toContain("b: The office assigned you lobby task");
+  await office.stop();
+});
