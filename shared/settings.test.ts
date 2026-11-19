@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  FLOOR_PLANS,
   JIRA_KEY,
   officeDeviceSettings,
   officeHostSettings,
@@ -27,6 +28,9 @@ async function upgraded(stored: Record<string, unknown>, fromVersion: number): P
 
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 
+/** A document from before the floor plan was a setting draws the company floor, as its scene always did. */
+const COMPANY = { floorPlan: "pro" };
+
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
   expect(await upgraded({ agentTools: false }, 1)).toEqual({
     agentTools: false,
@@ -34,6 +38,7 @@ test("version 1 settings keep their Agent tools choice and have no notes folder"
     notesTimeZone: "",
     notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
+    ...COMPANY,
   });
 });
 
@@ -43,6 +48,7 @@ test("host settings: version 2 values stay and the incident fields take their de
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
+    ...COMPANY,
   });
 });
 
@@ -57,7 +63,40 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryUrl: "https://sentry.acme.dev",
   };
   expect(officeHostSettings.version).toBe(4);
-  expect(await upgraded(stored, 3)).toEqual({ ...stored, notesDays: SUNDAY_TO_THURSDAY });
+  expect(await upgraded(stored, 3)).toEqual({
+    ...stored,
+    notesDays: SUNDAY_TO_THURSDAY,
+    ...COMPANY,
+  });
+});
+
+test("a version 4 document without a floor plan keeps its values and draws the company floor", async () => {
+  const stored = {
+    agentTools: false,
+    notesFolder: "/n",
+    notesTimeZone: "Asia/Riyadh",
+    notesDays: [1, 3],
+    jiraProjects: "SHOP",
+    sentryOrg: "acme",
+    sentryProjects: "web",
+    sentryUrl: "https://sentry.acme.dev",
+  };
+  // An additive field with a default: no version bump.
+  expect(officeHostSettings.version).toBe(4);
+  expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
+});
+
+test("a host with no settings draws the company floor", () => {
+  expect(officeHostSettings.schema.parse({})).toMatchObject({ floorPlan: "pro" });
+});
+
+test("the cozy room is kept, and no other plan is offered yet", async () => {
+  expect(hostIssues({ floorPlan: "cozy" })).toEqual([]);
+  expect(await upgraded({ floorPlan: "cozy" }, 4)).toMatchObject({ floorPlan: "cozy" });
+  // Headquarters comes with piece 6; a name the scene has but this build does not offer is refused.
+  expect(officeHostSettings.schema.safeParse({ floorPlan: "hq" }).success).toBe(false);
+  expect(officeHostSettings.schema.safeParse({ floorPlan: "" }).success).toBe(false);
+  expect(FLOOR_PLANS).toEqual(["pro", "cozy"]);
 });
 
 test("a document with its own days keeps them", async () => {

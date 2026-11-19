@@ -43,6 +43,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       notesFolder,
       notesTimeZone,
       notesDays: [1, 2, 3, 4, 5],
+      floorPlan: "pro",
       jiraProjects: "",
       sentryOrg: "",
       sentryProjects: "",

@@ -106,6 +106,7 @@ beforeEach(() => {
     notesFolder: "",
     notesTimeZone: "Asia/Riyadh",
     notesDays: SUNDAY_TO_THURSDAY,
+    floorPlan: "pro",
     ...NO_TRACKERS,
   };
   container = document.createElement("div");
@@ -160,6 +161,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         notesFolder: "/workspace/notes",
         notesTimeZone: "Asia/Riyadh",
         notesDays: SUNDAY_TO_THURSDAY,
+        floorPlan: "pro",
         ...NO_TRACKERS,
       },
       revision: "r1",
@@ -200,6 +202,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       notesFolder: "",
       notesTimeZone: "Asia/Riyadh",
       notesDays: SUNDAY_TO_THURSDAY,
+      floorPlan: "pro",
       ...NO_TRACKERS,
     },
   ]);

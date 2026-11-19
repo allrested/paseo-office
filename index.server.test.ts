@@ -65,12 +65,12 @@ const NO_TRACKERS = {
 const ON: SettingsState = {
   status: "ready",
   revision: "1",
-  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS },
+  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro" },
 };
 const OFF: SettingsState = {
   status: "ready",
   revision: "2",
-  values: { agentTools: false, ...NO_NOTES, ...NO_TRACKERS },
+  values: { agentTools: false, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro" },
 };
 const OWN_TOOL = defineAgentTool({
   name: "other_tool",
@@ -514,7 +514,14 @@ function notesSettings(
   return {
     status: "ready",
     revision: notesFolder + notesTimeZone + notesDays.join(""),
-    values: { agentTools: true, notesFolder, notesTimeZone, notesDays, ...NO_TRACKERS },
+    values: {
+      agentTools: true,
+      notesFolder,
+      notesTimeZone,
+      notesDays,
+      ...NO_TRACKERS,
+      floorPlan: "pro",
+    },
   };
 }
 
@@ -946,7 +953,13 @@ afterAll(() => rm(NOTES_FOLDER, { recursive: true, force: true }));
 const NOTES: SettingsState = {
   status: "ready",
   revision: "notes",
-  values: { agentTools: true, ...NO_NOTES, notesFolder: NOTES_FOLDER, ...NO_TRACKERS },
+  values: {
+    agentTools: true,
+    ...NO_NOTES,
+    notesFolder: NOTES_FOLDER,
+    ...NO_TRACKERS,
+    floorPlan: "pro",
+  },
 };
 
 /** The writer leaves the day's entry in the notes: the fake clock's day in Asia/Riyadh. */
@@ -1247,7 +1260,7 @@ function jiraVariables(base: string): NodeJS.ProcessEnv {
 const JIRA_ON: SettingsState = {
   status: "ready",
   revision: "jira",
-  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS, jiraProjects: "OPS" },
+  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro", jiraProjects: "OPS" },
 };
 
 test("a due incidents run calls the check; dismiss answers its count", async () => {
