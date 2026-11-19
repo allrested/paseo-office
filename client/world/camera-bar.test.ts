@@ -472,7 +472,8 @@ test("at 520 px and narrower the bar's buttons and groups sit closer, so Walk in
   expect(narrow(520)).toContain(
     '.seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 7px; }',
   );
-  expect(narrow(520)).toContain(".tb-zoom button, .tb-full { width: 30px; }");
+  expect(narrow(520)).toContain(".tb-tools { gap: 0; }");
+  expect(narrow(520)).toContain(".tb-zoom button, .tb-full { width: 28px; }");
 });
 
 test("photo mode's bar keeps upstream's focus ring, its round exit, and drops the hint on a phone", () => {

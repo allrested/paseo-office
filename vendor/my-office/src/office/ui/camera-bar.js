@@ -150,7 +150,7 @@ const STYLE = `
    ran past the right edge at 530 px) */
 @media (max-width: 720px) { .tb-fp span:last-child, .seg-btn > span:last-child { display: none !important; } .tb-fp { padding: 0 11px; } .seg-btn, .seg-btn:hover, .seg-btn[aria-pressed="true"] { padding: 0 10px; } }
 /* (with it, at 390 px with a mouse Walk in still ran 30 px past the right edge: the buttons and the groups sit closer) */
-@media (max-width: 520px) { .toolbar { gap: 4px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 7px; } .tb-zoom button, .tb-full { width: 30px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
+@media (max-width: 520px) { .toolbar { gap: 4px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 7px; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
 body.is-photo .toolbar { display: none; }
 /* Photo mode: the office alone, with one bar to frame and take the picture */
 body.is-photo #stage-wrap > :not(#stage):not(#photo-bar) { display: none !important; }
