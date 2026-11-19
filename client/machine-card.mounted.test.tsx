@@ -16,7 +16,7 @@ vi.mock("@getpaseo/plugin/client/ui", () => {
   const Modal = (props: { title: string; open: boolean; children: ReactNode }) =>
     props.open ? createElement("section", { "aria-label": props.title }, props.children) : null;
   Modal.Content = (props: { children: ReactNode }) => createElement("div", null, props.children);
-  return { Modal };
+  return { Modal, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -61,6 +61,7 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  cleanUp.mockClear();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -71,7 +72,7 @@ afterEach(() => {
   container.remove();
 });
 
-const cleanUp = async () => undefined;
+const cleanUp = vi.fn(async (_agentIds: readonly string[]): Promise<void> => undefined);
 const onClose = () => undefined;
 
 function Card({ machine }: { machine: Machine }) {
@@ -81,14 +82,17 @@ function Card({ machine }: { machine: Machine }) {
 
 async function labels(machine: Machine): Promise<string[]> {
   await act(async () => root.render(<Card machine={machine} />));
-  return [...container.querySelectorAll<HTMLElement>("button")].map((button) =>
-    (button.textContent ?? "").replace(/Closing\.\.\.|Cleaning up\.\.\./g, "").trim(),
+  return [...container.querySelectorAll<HTMLElement>("button[aria-label]")].map(
+    (button) => button.getAttribute("aria-label")!,
   );
 }
 
-test("a host that can close offers Close on an idle agent and Clean up on a forgotten one", async () => {
+test("a host that can close offers Close runtime on an idle agent and Clean up on a forgotten one", async () => {
   for (const can of [true, undefined]) {
-    expect(await labels(reading([IDLE, FORGOTTEN_IDLE], can))).toEqual(["Clean up", "Close"]);
+    expect(await labels(reading([IDLE, FORGOTTEN_IDLE], can))).toEqual([
+      "Clean up",
+      "Close runtime",
+    ]);
   }
 });
 
@@ -119,4 +123,38 @@ test("a host that cannot close offers nothing for an agent in error or still sta
   const failed = agent({ agentId: "err", title: "Broken", status: "error", forgotten: true });
   const starting = agent({ agentId: "init", title: "Starting", status: "initializing" });
   expect(await labels(reading([failed, starting], false))).toEqual([]);
+});
+
+test("missing resource readings and zero usage are distinct", async () => {
+  const machine = reading([]);
+  await labels({ ...machine, memory: null, cpuPercent: null });
+  expect(container.querySelector('[aria-label="Memory: Not read on this host"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="CPU: Not read yet"]')).not.toBeNull();
+
+  await labels({ ...machine, memory: { usedBytes: 0, totalBytes: 1024 }, cpuPercent: 0 });
+  expect(container.querySelector('[aria-label="Memory: 0 B of 1.0 KB (0%)"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="CPU: 0%"]')).not.toBeNull();
+});
+
+test("a zero memory capacity does not produce a percentage", async () => {
+  await labels({ ...reading([]), memory: { usedBytes: 0, totalBytes: 0 } });
+  expect(container.querySelector('[aria-label="Memory: 0 B of 0 B"]')).not.toBeNull();
+});
+
+test("Close runtime targets only the selected idle agent", async () => {
+  const running = agent({ agentId: "busy", status: "running", idleSince: null });
+  expect(await labels(reading([running, IDLE], true))).toEqual(["Close runtime"]);
+  const close = container.querySelector<HTMLElement>('button[aria-label="Close runtime"]');
+  if (!close) throw new Error("No Close runtime button");
+  await act(async () => close.click());
+  expect(cleanUp.mock.calls).toEqual([[["idle"]]]);
+});
+
+test("bulk cleanup sends only the closed agents on a host unable to close idle runtimes", async () => {
+  const second = { ...CLOSED, agentId: "gone2" };
+  await labels(reading([IDLE, CLOSED, FORGOTTEN_IDLE, second], false));
+  const clean = container.querySelector<HTMLElement>('button[aria-label="Clean up all 2"]');
+  if (!clean) throw new Error("No bulk cleanup button for the two closed agents");
+  await act(async () => clean.click());
+  expect(cleanUp.mock.calls).toEqual([[["gone", "gone2"]]]);
 });

@@ -1,0 +1,99 @@
+import { StyleSheet } from "react-native";
+import type { PluginTheme } from "@getpaseo/plugin";
+
+/** The Host card uses the same type and surface colors as the Office rails. */
+export function hostStyles(colors: PluginTheme["colors"], compact: boolean, touch: boolean) {
+  const actionWidth = touch ? 156 : 138;
+  return StyleSheet.create({
+    body: { gap: 20 },
+    meters: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    meter: {
+      flexGrow: 1,
+      flexBasis: 134,
+      minWidth: 0,
+      padding: compact ? 12 : 16,
+      gap: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface1,
+    },
+    metricHead: { flexDirection: "row", alignItems: "center", gap: 7 },
+    label: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: colors.foregroundMuted },
+    reading: {
+      flexGrow: 1,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignContent: "flex-start",
+      alignItems: "baseline",
+      columnGap: 8,
+      rowGap: 0,
+    },
+    percent: {
+      fontSize: compact ? 27 : 32,
+      lineHeight: compact ? 33 : 38,
+      fontWeight: "700",
+      letterSpacing: -1,
+      color: colors.foreground,
+      fontVariant: ["tabular-nums"],
+    },
+    unit: { fontSize: 16, letterSpacing: 0, color: colors.foregroundMuted },
+    note: { fontSize: 12, lineHeight: 17, color: colors.foregroundMuted },
+    track: { height: 5, borderRadius: 3, overflow: "hidden", backgroundColor: colors.surface2 },
+    memoryFill: { backgroundColor: colors.accent },
+    group: { gap: 8 },
+    groupHead: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    title: { fontSize: 15, lineHeight: 20, fontWeight: "700", color: colors.foreground },
+    list: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surface1,
+    },
+    row: {
+      flexDirection: compact ? "column" : "row",
+      alignItems: compact ? "stretch" : "center",
+      paddingHorizontal: compact ? 12 : 14,
+      paddingVertical: compact ? 12 : 10,
+      gap: compact ? 8 : 14,
+    },
+    divider: { borderTopWidth: 1, borderTopColor: colors.border },
+    info: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flexGrow: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    identity: { flex: 1, minWidth: 0, gap: 2 },
+    status: { alignSelf: "flex-start", width: 7, height: 7, marginTop: 7, borderRadius: 4 },
+    name: { fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.foreground },
+    usage: { width: compact ? 64 : 78, alignItems: "flex-end", gap: 5 },
+    bytes: {
+      color: colors.foreground,
+      fontVariant: ["tabular-nums"],
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    share: {
+      width: "100%",
+      height: 3,
+      borderRadius: 2,
+      overflow: "hidden",
+      backgroundColor: colors.surface2,
+    },
+    action: compact
+      ? { alignSelf: "flex-start", marginLeft: 17, maxWidth: "95%" }
+      : { width: actionWidth },
+    emptyAction: compact ? { display: "none" } : { width: actionWidth },
+    footer: { flexDirection: "row", alignItems: "center", gap: 6 },
+    empty: { padding: 14, fontSize: 13, color: colors.foregroundMuted },
+  });
+}

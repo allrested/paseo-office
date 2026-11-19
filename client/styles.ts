@@ -1,3 +1,4 @@
+import { hostStyles } from "./host-styles.js";
 import { sessionStyles } from "./session-styles.js";
 import { useMemo } from "react";
 import { Platform, type TextStyle, type ViewStyle } from "react-native";
@@ -11,6 +12,7 @@ const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
+  host: ReturnType<typeof hostStyles>;
   sessions: ReturnType<typeof sessionStyles>;
   fullscreenHeader: ViewStyle;
   headerTools: ViewStyle;
@@ -143,16 +145,12 @@ export interface OfficeStyles {
   stripReason: Record<AttentionReason, TextStyle>;
   /** The host's note in the strip, in its tone. */
   stripNote: Record<HostTone, TextStyle>;
-  /** The host card: two meters side by side, then groups of agents. */
-  machineMeters: ViewStyle;
-  machineMeter: ViewStyle;
   machineTrack: ViewStyle;
   /** The empty part of a meter: the plain button's grey, as a layer under the fill. */
   machineTrackBase: ViewStyle;
   machineFill: Record<HostTone, ViewStyle>;
   /** A figure: digits of one width, so a column of them lines up. */
   machineValue: TextStyle;
-  machineGroup: ViewStyle;
   machineRow: ViewStyle;
   machineRowHead: ViewStyle;
   machineRowTitle: TextStyle;
@@ -899,8 +897,6 @@ export function useOfficeStyles(
         warning: { ...small, color: colors.statusWarning },
         danger: { ...small, color: colors.statusDanger },
       },
-      machineMeters: { flexDirection: "row", gap: 16 },
-      machineMeter: { flex: 1, minWidth: 0, gap: 4 },
       machineTrack: { height: 4, borderRadius: 2, overflow: "hidden" },
       machineTrackBase: fill,
       // As on the Resources screen: grey while all is well, so a colour means something.
@@ -915,7 +911,6 @@ export function useOfficeStyles(
         color: colors.foreground,
         fontVariant: ["tabular-nums"],
       },
-      machineGroup: { gap: 12 },
       machineRow: { gap: 8 },
       machineRowHead: { flexDirection: "row", alignItems: "baseline", gap: 12 },
       machineRowTitle: { ...base, flex: 1, minWidth: 0, color: colors.foreground },
@@ -1188,6 +1183,7 @@ export function useOfficeStyles(
         pointerEvents: "none",
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
+      host: hostStyles(colors, compact, touch),
       sessions: sessionStyles(colors, touch),
       sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       activityTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 12, gap: 10 },
