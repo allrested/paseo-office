@@ -36,7 +36,10 @@ function isTokenSafe(address: string): boolean {
   return url.protocol === "https:" || local;
 }
 
-/** The floor plans the 3D scene is offered, by the scene's own names. Headquarters ("hq") is not among them yet. */
+/**
+ * The floor plans the 3D scene is offered, by the scene's own names. Headquarters ("hq") is not
+ * among them yet.
+ */
 export const FLOOR_PLANS = ["pro", "cozy"] as const;
 export type FloorPlanChoice = (typeof FLOOR_PLANS)[number];
 

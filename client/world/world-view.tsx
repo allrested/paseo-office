@@ -24,7 +24,10 @@ export interface WorldViewProps {
   model: OfficeModel;
   theme: PluginTheme;
   styles: OfficeStyles;
-  /** The floor plan to draw; null until the host has said, and then nothing starts. A new plan is a new scene. */
+  /**
+   * The floor plan to draw; null until the host has said, and then nothing starts. A new plan is a
+   * new scene.
+   */
   plan: WorldPlan | null;
   /** The workspace tab's room; the view starts on its team's desks. */
   focusRoomId: string | null;
@@ -75,9 +78,9 @@ export interface WorldViewProps {
 type WorldSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
 
 /**
- * The office in 3D on one plan. Web only: office-surface.tsx renders it in a browser with WebGL2 where 3D is
- * the chosen view. The plugin bundle is evaluated on every platform, so the container and the
- * frame are reached in effects and nothing here touches the DOM when the module loads.
+ * The office in 3D on one plan. Web only: office-surface.tsx renders it in a browser with WebGL2
+ * where 3D is the chosen view. The plugin bundle is evaluated on every platform, so the container
+ * and the frame are reached in effects and nothing here touches the DOM when the module loads.
  *
  * Reporting a problem makes the surface take this view away, and that removes the frame: on
  * unmount, on another view chosen, on another plan and after a lost context alike.

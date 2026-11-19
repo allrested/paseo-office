@@ -150,6 +150,7 @@ beforeEach(() => {
   h.env.PRO = true;
   h.stations.coffee = [];
   h.stations.dining = [];
+  h.stations.wc = [];
   h.open = null;
 });
 
@@ -210,10 +211,10 @@ test("a prompt calls someone out of the lively floor's restroom visit straight t
   expect(someone.goHomeAndRest).not.toHaveBeenCalled();
 });
 
-test("on the cozy room nothing opens that needs the sofa, the games, the dining room or the restroom", () => {
-  // Two sofa seats, a dining chair and a stall: on the company floor each opens something.
+test("on the cozy room nothing opens that needs the sofa, the games or the restroom", () => {
+  // Two sofa seats and a stall: on the company floor each opens something.
   h.stations.coffee = [{ by: null }, { by: null }];
-  h.stations.dining = [{ by: null }];
+  h.stations.wc = [{ by: null }];
   person("a");
   expect(openNow()).toMatchObject({
     pool: true,
@@ -225,10 +226,9 @@ test("on the cozy room nothing opens that needs the sofa, the games, the dining 
   });
 
   // Upstream's cozy room: no sofa or games (core/env.js PRO false), and its STATIONS have no
-  // restroom and no dining room (people/navigation.js); COFFEE_Q is [] here on either plan.
+  // restroom (people/navigation.js).
   h.env.PRO = false;
-  delete h.stations.wc;
-  delete h.stations.dining;
+  h.stations.wc = [];
   expect(openNow()).toMatchObject({
     pool: false,
     foosball: false,

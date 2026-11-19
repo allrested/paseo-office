@@ -20,7 +20,9 @@ export function floorPlanOf(settings: PlanSource, last: WorldPlan | null): World
   return last ?? "pro";
 }
 
-/** The plan the 3D view draws, from the host's "Floor plan" setting; null until the host has said. */
+/**
+ * The plan the 3D view draws, from the host's "Floor plan" setting; null until the host has said.
+ */
 export function useFloorPlan(): WorldPlan | null {
   const settings = useSettings(officeHostSettings);
   const [last, setLast] = useState<WorldPlan | null>(null);

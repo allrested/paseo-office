@@ -10,6 +10,7 @@ import type { SettingsState } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { IncidentsState } from "../shared/contracts.js";
 import { officeHostSettings } from "../shared/settings.js";
+import { PLAN_DESKS } from "./world/adapter.js";
 import { stockSave } from "./stock-save.test.js";
 import { HostSwitches } from "./host-switches.js";
 import { useOfficeStyles } from "./styles.js";
@@ -36,6 +37,12 @@ const NO_TRACKERS = {
   sentryProjects: "",
   sentryUrl: "https://sentry.io",
 };
+
+// Desk counts unlike the real table's, so a hint that copied the real numbers would not match.
+vi.mock("./world/adapter.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./world/adapter.js")>()),
+  PLAN_DESKS: { pro: 7, cozy: 5 },
+}));
 
 vi.mock("@getpaseo/plugin/client", () => ({
   useSettings: (): HostSettings => ({
@@ -366,8 +373,8 @@ test("the hint says the plan is for the 3D floor only, and what a change does", 
   const text = planRow().parentElement?.textContent ?? "";
   expect(text).toContain("The 3D floor only");
   expect(text).toContain("2D floor and the List");
-  expect(text).toContain("Company floor has 12 desks");
-  expect(text).toContain("Cozy room 9");
+  expect(text).toContain(`Company floor has ${PLAN_DESKS.pro} desks`);
+  expect(text).toContain(`Cozy room ${PLAN_DESKS.cozy}`);
   expect(text).toContain("starts the 3D view again");
 });
 

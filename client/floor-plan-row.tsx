@@ -3,11 +3,11 @@ import { Text, View } from "react-native";
 import { FLOOR_PLANS, type FloorPlanChoice } from "../shared/settings.js";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
+import { PLAN_DESKS } from "./world/adapter.js";
 
 /** The row's label, and the setting a refused save names. */
 export const FLOOR_PLAN_LABEL = "Floor plan";
-const HINT =
-  "The 3D floor only: the 2D floor and the List are the same on both. Company floor has 12 desks, Cozy room 9. Changing it starts the 3D view again.";
+const HINT = `The 3D floor only: the 2D floor and the List are the same on both. Company floor has ${PLAN_DESKS.pro} desks, Cozy room ${PLAN_DESKS.cozy}. Changing it starts the 3D view again.`;
 const NAMES: Readonly<Record<FloorPlanChoice, string>> = {
   pro: "Company floor",
   cozy: "Cozy room",
