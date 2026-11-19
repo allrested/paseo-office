@@ -644,7 +644,7 @@ For most agent lines, reception can speak when nobody is resting. Chat photos ar
 
 ## The street
 
-Choose **Change outdoor scene** (the mountains button) in 3D or open Office settings. Select **City**, **Countryside**, **Beach** or **Plain**. **Lighting** offers **App theme**, **Day** and **Night**. Countryside with Day lighting gives the green landscape shown in my-office. Choosing a different environment rebuilds the floor; changing the lighting keeps the camera. Each device remembers its choices. Older devices retain their saved street preference as City or Plain. The city supports taking the lift to the pavement in Walk mode.
+Open **Outdoor scene** in Office settings. Select **City**, **Countryside**, **Beach** or **Plain**. **Lighting** offers **App theme**, **Day** and **Night**. Countryside with Day lighting gives the green landscape shown in my-office. Choosing a different environment rebuilds the floor; changing the lighting keeps the camera. Each device remembers its choices. Older devices retain their saved street preference as City or Plain. The city supports taking the lift to the pavement in Walk mode.
 
 The device requests the CC0 car models from `office.world.street` and passes the string to the isolated scene in the `street.kit` start option. A failed request leaves procedural traffic and shops available and shows a floor note. The day’s street activities include shopping trips, the guard, lunch, evening drinks, the photo studio and pickleball. The upstream chain modules and branded artwork are excluded. Plain canvas signs carry the names from `scripts/street-brands.mjs`. See the street section of [the source inventory](../vendor/SOURCES.md) when importing upstream changes.
 

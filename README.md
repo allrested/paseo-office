@@ -14,7 +14,7 @@ my-office's.
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
 - The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
-- Choose **Change outdoor scene** on the 3D toolbar for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
+- Open **Outdoor scene** in Office settings for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
   on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
