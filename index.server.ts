@@ -8,7 +8,13 @@ import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
 import { liftFile, tenureFile } from "./server/paths.js";
-import { lifeSubscription, tenureRpc, type LifeEvent } from "./shared/contracts.js";
+import { createDepartureArchiver } from "./server/home-departure.js";
+import {
+  lifeSubscription,
+  homeDepartureRpc,
+  tenureRpc,
+  type LifeEvent,
+} from "./shared/contracts.js";
 import { embeddedWorldWords, type WorldWords } from "./server/world-words.js";
 import { homedir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
@@ -512,6 +518,13 @@ export function createOfficePlugin(
     });
   });
   server.handle(streetSubscription, (_input, context) => streets.attach(context));
+  const archiveDeparture = createDepartureArchiver(() => hub.read());
+  server.handle(homeDepartureRpc, (input, context) =>
+    guarded("home departure", async () => {
+      holder.remember(context.paseo);
+      return { archived: await archiveDeparture(context.paseo, input.agentId, input.idleSince) };
+    }),
+  );
   server.handle(tenureRpc, async (input, context) => {
     holder.remember(context.paseo);
     return (await lifeReady)?.write(input) ?? { ok: false };

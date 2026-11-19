@@ -89,7 +89,9 @@ function toSession(
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
-    ...(status === "rest" && !stuck && Number.isFinite(idle) ? { doneAt: idle } : {}),
+    ...(status === "rest" && !stuck && Number.isFinite(idle)
+      ? { doneAt: idle, idleSince: agent.idleSince }
+      : {}),
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: [],

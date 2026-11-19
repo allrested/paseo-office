@@ -279,6 +279,10 @@ rest the gaps are 10 to 20 minutes. The games are my-office's; the office's plan
 during a gathering or with reduced motion. After 21:00 an agent that has rested 30 minutes walks
 home, its rest counted from the host's last change of the agent.
 
+When an idle agent heads home at the end of its shift, Office archives its Paseo session.
+An agent out for evening drinks can still return to work. Office archives it when it finishes the trip home.
+Archived conversations keep their history and stay off the floor when Office reopens.
+
 The viewing device’s date selects decorations when the scene starts. Halloween runs from 20 October through 1 November, Christmas from 12 through 31 December, and Lunar New Year from 14 days before through seven days after its date in Vietnam’s calendar. The upstream table covers 2026 through 2033. These dates apply in both hemispheres.
 
 ### Languages

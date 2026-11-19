@@ -19,6 +19,7 @@ import { WorldLoading } from "./world-loading.js";
 import type { GroupPhotoCapture } from "../use-group-photo.js";
 import { messageOf } from "./world-loader.js";
 import {
+  useHomeDeparture,
   useStandupBell,
   useWorldScript,
   worldStartOptions,
@@ -130,6 +131,7 @@ function WorldScene({
   const containerId = useId();
   const onToggleFullscreen = fullscreen?.toggle;
   const onBell = useStandupBell();
+  const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const [sized, setSized] = useState(false);
@@ -150,6 +152,7 @@ function WorldScene({
     onOpenIncidents,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,
@@ -173,6 +176,7 @@ function WorldScene({
       onOpenIncidents,
       onBell,
       onLife,
+      onWentHome,
       onTenure,
       scene,
       night,
@@ -195,6 +199,7 @@ function WorldScene({
     onOpenIncidents,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,
