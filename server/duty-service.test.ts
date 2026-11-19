@@ -218,6 +218,41 @@ test("an owed duty finished today is not posted again the same day, and leaves t
   ]);
 });
 
+test("moving the notes zone west does not post again a duty done today", async () => {
+  const daily = { id: "daily", name: "Daily", instructions: "", days: [0, 1, 2, 3, 4, 5, 6] };
+  const file = { version: 1 as const, duties: [daily] };
+  // Thursday 19 November 2026, 07:00 in Tokyo; Honolulu is 19 hours behind.
+  const thursday = Date.parse("2026-11-18T22:00:00.000Z");
+  const shown = (posts: { state?: string; duty?: { day: string } }[]) =>
+    posts.map((post) => [post.state, post.duty?.day]);
+
+  // Done at 08:30 in Tokyo, Wednesday 13:30 in Honolulu: there it is still Wednesday's day.
+  const west = setup({ start: thursday, zone: "Asia/Tokyo", file });
+  await west.begin();
+  west.clock.advance(HOUR + 30 * 60 * 1000);
+  await settle();
+  await west.board.update({ id: "p1", action: "done", actor: "user" });
+  west.setZone("Pacific/Honolulu");
+  await west.service.settingsChanged();
+  expect(shown(west.board.postsOf("duty"))).toEqual([["done", "2026-11-19"]]);
+
+  // Done at 08:10 in Tokyo; the zone moves at 07:00 on Friday there, noon on Thursday in Honolulu.
+  const later = setup({ start: thursday, zone: "Asia/Tokyo", file });
+  await later.begin();
+  later.clock.advance(HOUR + 10 * 60 * 1000);
+  await settle();
+  await later.board.update({ id: "p1", action: "done", actor: "user" });
+  later.clock.advance(Date.parse("2026-11-19T22:00:00.000Z") - later.clock.now());
+  await settle();
+  later.setZone("Pacific/Honolulu");
+  await later.service.settingsChanged();
+  expect(shown(later.board.postsOf("duty"))).toEqual([["done", "2026-11-19"]]);
+  // Friday 08:00 in Honolulu: Thursday's done duty leaves, and Friday's is posted.
+  later.clock.advance(Date.parse("2026-11-20T18:00:00.000Z") - later.clock.now());
+  await settle();
+  expect(shown(later.board.postsOf("duty"))).toEqual([["open", "2026-11-20"]]);
+});
+
 test("a save is checked, keeps ids and chores, names new duties, and posts one due today at once", async () => {
   const { begin, board, service, file, listed, told } = setup({ start: WED_7AM + 2 * HOUR });
   await begin();
