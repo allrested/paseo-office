@@ -1,8 +1,10 @@
 import type { AgentToolDefinition } from "@getpaseo/plugin/server";
 import {
+  DUTY,
   LOBBY,
   USER_AUTHOR,
   type DeleteResult,
+  type Duty,
   type Post,
   type PostKind,
   type PostResult,
@@ -10,7 +12,7 @@ import {
   type WakeState,
 } from "../shared/contracts.js";
 import { officeTools, type ToolAgent } from "./agent-tools.js";
-import { createBoardService } from "./board-service.js";
+import { createBoardService, type DutySync, type PostUpdate } from "./board-service.js";
 import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
@@ -21,6 +23,8 @@ import { oneLine } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 
 export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+const PRETEND = "it is a pretend duty, which the 3D office acts out";
 
 export interface OfficeAgentPorts {
   lobbyCandidates(): Promise<string[]>;
@@ -56,6 +60,12 @@ export interface Office {
   clearDone(board: string): Promise<DeleteResult>;
   setWakesPaused(paused: boolean): Promise<WakeState>;
   setPickupEnabled(enabled: boolean): void;
+  /** The duty list: a duty with instructions is handed out, one without is pretend. */
+  setDuties(duties: readonly Duty[]): void;
+  /** Brings the duty board up to the list and the day (see BoardService.syncDuties). */
+  syncDuties(plan: DutySync): Promise<void>;
+  /** The 3D office acted out a pretend duty with this agent's figure. */
+  actDuty(id: string, agentId: string): Promise<PostResult>;
   turnEnded(agentId: string): void;
   checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
   agentGone(agentId: string): void;
@@ -79,9 +89,31 @@ export function createOffice(deps: OfficeDeps): Office {
   let pickupEnabled = false;
   let stopped = false;
   let cancelPrune: (() => void) | null = null;
+  let duties: readonly Duty[] = [];
 
   const label = (author: string) =>
     author === USER_AUTHOR ? "the user" : (titles.get(author) ?? author);
+
+  /** A duty post whose duty has instructions; a duty that left the list has none. */
+  function instructed(post: Post): boolean {
+    const duty = duties.find((candidate) => candidate.id === post.duty?.id);
+    return post.board === DUTY && duty !== undefined && duty.instructions.trim() !== "";
+  }
+
+  /**
+   * On the duty board nobody claims a pretend duty: the 3D office acts it out, and the owner ticks
+   * it. An agent finishes or reopens only a duty it holds; the owner's hand marks any.
+   */
+  function refuse(post: Post, input: PostUpdate): string | null {
+    if (post.board !== DUTY) return null;
+    const pretend = !instructed(post);
+    if (input.action === "claim") return pretend ? PRETEND : null;
+    if (input.actor === USER_AUTHOR) return null;
+    if (post.state === "claimed" && post.claimedBy === input.actor) return null;
+    if (pretend) return PRETEND;
+    if (post.state === "done") return "it is done";
+    return post.claimedBy === undefined ? "claim it first" : `claimed by ${label(post.claimedBy)}`;
+  }
 
   const service = createBoardService({
     store: deps.store,
@@ -90,10 +122,11 @@ export function createOffice(deps: OfficeDeps): Office {
     label,
     onBoard: (board, posts) => {
       hub.setBoard(board, posts);
-      if (board === LOBBY) pickup?.refresh();
+      if (board === LOBBY || board === DUTY) pickup?.refresh();
     },
     onBoardRemoved: (board) => hub.removeBoard(board),
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
+    refuse,
   });
 
   function noteAgent(agent: ToolAgent): void {
@@ -143,6 +176,7 @@ export function createOffice(deps: OfficeDeps): Office {
         queue,
         clock,
         enabled: () => pickupEnabled,
+        instructed,
         log,
       });
       pickup.refresh();
@@ -175,6 +209,12 @@ export function createOffice(deps: OfficeDeps): Office {
     noteAgent,
     async post(input) {
       await ready;
+      if (input.board === DUTY) {
+        return {
+          ok: false,
+          error: "Unable to post: the duty board takes its duties from the duty list",
+        };
+      }
       const result = await service.post({ ...input, author: USER_AUTHOR });
       if (result.ok) mentioned(result.post);
       return result;
@@ -202,15 +242,35 @@ export function createOffice(deps: OfficeDeps): Office {
       pickupEnabled = enabled;
       pickup?.refresh();
     },
+    setDuties(next) {
+      duties = [...next];
+      pickup?.refresh();
+    },
+    async syncDuties(plan) {
+      await ready;
+      await service.syncDuties(plan);
+    },
+    async actDuty(id, agentId) {
+      await ready;
+      const post = service.postsOf(DUTY).find((candidate) => candidate.id === id);
+      if (post !== undefined && instructed(post)) {
+        return { ok: false, error: `Unable to record ${id}: an agent is handed this duty` };
+      }
+      // The 3D office's word is not taken for who it was: the agent must be one of the office's.
+      const agent = await deps.agents.resolve(agentId);
+      if (agent === null)
+        return { ok: false, error: `Unable to record ${id}: no agent ${agentId}` };
+      return service.actDuty(id, agent);
+    },
     turnEnded(agentId) {
       queue?.turnEnded(agentId);
       pickup?.refresh();
     },
     async checkCompletion(agentId, lastAnswer) {
       await ready;
-      const claims = service
-        .postsOf(LOBBY)
-        .filter((p) => p.state === "claimed" && p.claimedBy === agentId);
+      const claims = [...service.postsOf(LOBBY), ...service.postsOf(DUTY)].filter(
+        (p) => p.state === "claimed" && p.claimedBy === agentId,
+      );
       if (!claims.length) return;
       const text = await lastAnswer();
       const line = text?.trimEnd().split("\n").at(-1)?.trim();

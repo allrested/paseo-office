@@ -1,3 +1,4 @@
+import { APPEARANCE_KEY, savedAppearance } from "../shared/appearance.js";
 import { useCallback, useEffect, useState } from "react";
 import { usePaseo, useSettings, type PluginPaseoApi } from "@getpaseo/plugin/client";
 import { officeDeviceSettings } from "../shared/settings.js";
@@ -152,10 +153,13 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
     if (problem !== null || workspace === undefined)
       throw new Error(problem ?? "Choose a workspace.");
     const { provider, model } = choice;
+    const profile = savedAppearance(choice.appearance);
     // Through the workspace's handle: a create with only a folder makes a new workspace each time.
     const handle = await paseo.workspaces.ref(workspace.id).agents.create({
       config: { provider: `${provider}/${model}` },
       prompt: choice.prompt.trim(),
+      ...(profile?.name && { title: profile.name }),
+      ...(profile && { metadata: { [APPEARANCE_KEY]: profile } }),
     });
     if (revision !== null && values !== null && provider !== null && model !== null) {
       const lastAgent: LastAgent = { provider, model };

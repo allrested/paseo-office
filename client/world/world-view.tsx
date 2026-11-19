@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useOfficeBrand } from "../office-brand-context.js";
+import { RegisterWorkspaceDock } from "./workspace-dock.js";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
@@ -13,7 +15,7 @@ import { useStreetStart } from "./use-street-kit.js";
 import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi, WorldStartOptions } from "./world-api.js";
-import { readBrand } from "../web-env.web.js";
+
 import { focusApp, openWorldFrame } from "./world-frame.web.js";
 import { WorldLoading } from "./world-loading.js";
 import type { GroupPhotoCapture } from "../use-group-photo.js";
@@ -62,11 +64,9 @@ export interface WorldViewProps {
    */
   onOpenResources: (() => void) | undefined;
   /**
-   * E by a person while walking in: the agent card's "Open session". The surface always supplies
-   * it, and it opens the session in the office's column, as the card does. Read when the office
-   * starts.
+   * Walk-in interaction opens the agent’s workspace over the floor. Read at scene start.
    */
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   /** A tap on the library: its chip or the bookshelf. */
   onOpenLibrary(): void;
   /** A tap on the label over the meeting room's screen. */
@@ -78,6 +78,10 @@ export interface WorldViewProps {
   incidents: IncidentsState | undefined;
   /** A tap on the incidents' banner. */
   onOpenIncidents(): void;
+  /** A tap on the pantry's duty board: the duty board's editor. */
+  onOpenDuties?: () => void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?: (id: string, agentId: string) => void;
   /** The script could not load, the office could not start, or the WebGL context was lost. */
   onProblem(message: string): void;
   /**
@@ -118,22 +122,26 @@ function WorldScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
   meeting,
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldSceneProps) {
+  const registerDock = useContext(RegisterWorkspaceDock);
   const containerId = useId();
   const onToggleFullscreen = fullscreen?.toggle;
   const onBell = useStandupBell();
   const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
+  const brand = useOfficeBrand();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -146,10 +154,12 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
     onWentHome,
@@ -170,10 +180,12 @@ function WorldScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
       onWentHome,
@@ -193,10 +205,12 @@ function WorldScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
     onWentHome,
@@ -235,8 +249,7 @@ function WorldScene({
           worldStartOptions(latest, {
             focus: focusApp,
             onToggleFullscreen,
-            // Read when the office starts: a page's brand does not change while the page lives.
-            brand: worldBrand(readBrand()),
+            brand: worldBrand(brand),
             language: words.language,
             words: words.words,
             plan,
@@ -246,6 +259,11 @@ function WorldScene({
         latest.current.onProblem(messageOf(error));
         return;
       }
+      registerDock?.(
+        container
+          ?.querySelector("iframe")
+          ?.contentDocument?.querySelector<HTMLButtonElement>("#btn-workspace") ?? null,
+      );
       setApi(world);
     }
     frame.api.then(start, (error: unknown) => {
@@ -254,12 +272,15 @@ function WorldScene({
     return () => {
       live = false;
       setApi(null);
+      registerDock?.(null);
       frame.dispose();
     };
   }, [
+    registerDock,
     script,
     sized,
     containerId,
+    brand,
     plan,
     words.status,
     words.language,

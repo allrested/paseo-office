@@ -40,6 +40,7 @@ test("the optional calls and the theme and the board rows go too", () => {
   const { api, posted } = bridge();
   api.setTheme({ dark: true, colors: {} as never });
   api.setBoardRows([]);
+  api.setDuties?.([]);
   api.setIncidents?.([]);
   api.setWeather?.({ kind: "season" });
   api.meet?.();
@@ -47,6 +48,7 @@ test("the optional calls and the theme and the board rows go too", () => {
   expect(posted.map((message) => message.call)).toEqual([
     "setTheme",
     "setBoardRows",
+    "setDuties",
     "setIncidents",
     "setWeather",
     "meet",

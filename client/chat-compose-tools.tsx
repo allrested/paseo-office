@@ -233,6 +233,7 @@ export function ComposeTools({
   onUse,
   openSession,
   onBoard,
+  onDuties,
   onNewAgent,
   onGroupPhoto,
 }: ChatShortcuts & {
@@ -298,6 +299,7 @@ export function ComposeTools({
           onClose={close}
           styles={styles}
           onBoard={onBoard}
+          onDuties={onDuties}
           onNewAgent={onNewAgent}
           onGroupPhoto={onGroupPhoto}
         />

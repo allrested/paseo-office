@@ -13,6 +13,10 @@ export function paseoHome(env: NodeJS.ProcessEnv, home: string): string {
   return resolve(expandHomeDir(env.PASEO_HOME ?? "~/.paseo", home));
 }
 
+export function claudeConfigFile(env: NodeJS.ProcessEnv, home: string): string {
+  return join(expandHomeDir(env.CLAUDE_CONFIG_DIR || home, home), ".claude.json");
+}
+
 export function officeDir(env: NodeJS.ProcessEnv, home: string): string {
   return join(paseoHome(env, home), "office");
 }
@@ -69,4 +73,9 @@ export function liftFile(env: NodeJS.ProcessEnv, home: string) {
 
 export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "tenure.json");
+}
+
+/** The owner's duty list; the day's duties are posts on the duty board in boards.json. */
+export function dutiesFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "duties.json");
 }

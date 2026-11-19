@@ -347,3 +347,33 @@ test("a workspace tab shows its own room first, then the lobby, then the rest", 
     "w2",
   ]);
 });
+
+test("the duty board is no room: the model carries the duty list and the day's duty rows", () => {
+  const duties = {
+    duties: [{ id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const }],
+    day: "2026-11-11",
+  };
+  const model = buildOfficeModel(
+    snapshot({
+      boards: {
+        duty: [
+          post("p1", {
+            board: "duty",
+            kind: "task",
+            state: "open",
+            duty: { id: "cups", day: "2026-11-11" },
+          }),
+        ],
+      },
+      duties,
+    }),
+  );
+  expect(model.rooms.map((room) => room.id)).not.toContain("duty");
+  expect(model.dutyList).toEqual(duties.duties);
+  expect(model.duties.map((row) => [row.post.id, row.duty?.id, row.owed])).toEqual([
+    ["p1", "cups", false],
+  ]);
+  const before = buildOfficeModel(snapshot({}));
+  expect(before.dutyList).toBeNull();
+  expect(before.duties).toEqual([]);
+});

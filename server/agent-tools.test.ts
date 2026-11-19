@@ -222,3 +222,17 @@ test("the three tools are named and their inputs follow the spec", async () => {
   expect(update?.input.safeParse({ id: "p1", action: "close" }).success).toBe(false);
   for (const tool of tools) expect(tool.description.length).toBeLessThan(200);
 });
+
+test("the duty board is read with board: duty, but nobody posts to it from a tool", async () => {
+  const { ports } = await harness();
+  expect(boardFor(ALICE, "duty")).toBe("duty");
+  expect(boardFor(LONER, "duty")).toBe("duty");
+  const [read, post, update] = officeTools(ports);
+  expect(read?.input.safeParse({ board: "duty" }).success).toBe(true);
+  expect(post?.input.safeParse({ kind: "task", text: "x", board: "duty" }).success).toBe(false);
+  expect(read?.description).toContain("duty");
+  expect(update?.description).toContain("duty");
+  expect(runRead(ports, ALICE, { board: "duty" })).toEqual({
+    text: "Board duty: 0 post(s), cursor 0.",
+  });
+});

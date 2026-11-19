@@ -100,6 +100,7 @@ function Harness({ rooms }: { rooms: readonly OfficeRoom[] }) {
       compact={false}
       onSelectAgent={ignore}
       onOpenBoard={ignore}
+      onOpenDuties={ignore}
     />
   );
 }
@@ -160,7 +161,16 @@ async function key(target: Element, name: string): Promise<boolean> {
 }
 
 const BAR = ["All", "3", "Needs you", "1", "Working", "1", "Resting", "1"];
-const LOBBY_CARD = ["Lobby", "Bob", "Error", "claude", "To-do", "No to-dos", "Open board"];
+const LOBBY_CARD = [
+  "Lobby",
+  "Bob",
+  "Error",
+  "claude",
+  "To-do",
+  "No to-dos",
+  "Open board",
+  "Duty board",
+];
 
 test("the tabs show their counts, and a tab leaves out rooms with no match", async () => {
   await mount(OFFICE);

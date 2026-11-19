@@ -1,3 +1,4 @@
+import type { Appearance } from "../shared/appearance.js";
 import type { AgentModelDefinition, ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import type { PluginPaseoApi } from "@getpaseo/plugin/client";
 
@@ -5,6 +6,7 @@ import type { PluginPaseoApi } from "@getpaseo/plugin/client";
 type PaseoWorkspace = Awaited<ReturnType<PluginPaseoApi["workspaces"]["list"]>>["entries"][number];
 
 export interface NewAgentChoice {
+  appearance?: Appearance;
   workspaceId: string | null;
   provider: string | null;
   model: string | null;

@@ -13,6 +13,7 @@ import {
   worldBoardRows,
   worldBrand,
   worldChanges,
+  worldDuties,
   worldMachine,
   worldPeople,
   withRestTimes,
@@ -670,5 +671,95 @@ describe("what the staff scenes read of a person", () => {
     expect(sessions[0]?.usage).toEqual({ ctx: 10, ctxMax: 100 });
     expect(sessions[1]).not.toHaveProperty("usage");
     expect(sessions[0]?.git).toEqual({ repo: "shop-api" });
+  });
+});
+
+describe("the day's duties as the scene's duty board", () => {
+  it("names each duty and who has it, cut short, and never sends instructions", () => {
+    const long = "Refactor the payment reconciliation service end to end";
+    const state: OfficeSnapshot = {
+      ...office([agent("1", { title: long })]),
+      boards: {
+        duty: [
+          {
+            id: "p1",
+            seq: 1,
+            board: "duty",
+            kind: "task",
+            text: "Wash the cups",
+            author: "user",
+            state: "open",
+            duty: { id: "cups", day: "2026-11-17" },
+            createdAt: "2026-11-17T05:00:00.000Z",
+            updatedAt: "2026-11-17T05:00:00.000Z",
+          },
+          {
+            id: "p2",
+            seq: 2,
+            board: "duty",
+            kind: "task",
+            text: "Build\n\nRun the secret build",
+            author: "user",
+            state: "claimed",
+            claimedBy: "1",
+            duty: { id: "build", day: "2026-11-18" },
+            createdAt: "2026-11-18T05:00:00.000Z",
+            updatedAt: "2026-11-18T05:00:00.000Z",
+          },
+          {
+            id: "p3",
+            seq: 3,
+            board: "duty",
+            kind: "task",
+            text: "Gone duty\n\nOld instructions",
+            author: "user",
+            state: "done",
+            claimedBy: "gone-agent-123456789",
+            duty: { id: "gone", day: "2026-11-18" },
+            createdAt: "2026-11-18T05:00:00.000Z",
+            updatedAt: "2026-11-18T05:00:00.000Z",
+          },
+        ],
+      },
+      duties: {
+        duties: [
+          { id: "cups", name: "Wash the cups", instructions: "", days: [1], chore: "cups" },
+          { id: "build", name: "Build", instructions: "Run the secret build", days: [3] },
+        ],
+        day: "2026-11-18",
+      },
+    };
+    const duties = worldDuties(buildOfficeModel(state));
+    expect(duties).toEqual([
+      {
+        id: "p1",
+        name: "Wash the cups",
+        chore: "cups",
+        pretend: true,
+        holder: null,
+        state: "open",
+        owed: true,
+      },
+      {
+        id: "p2",
+        name: "Build",
+        chore: null,
+        pretend: false,
+        holder: { id: "1", name: "Refactor the payment re…" },
+        state: "claimed",
+        owed: false,
+      },
+      {
+        id: "p3",
+        name: "Gone duty",
+        chore: null,
+        pretend: true,
+        holder: { id: "gone-agent-123456789", name: "Agent gone-age" },
+        state: "done",
+        owed: false,
+      },
+    ]);
+    expect(JSON.stringify(duties)).not.toContain("instructions");
+    expect(JSON.stringify(duties)).not.toContain("secret");
   });
 });

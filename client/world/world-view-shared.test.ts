@@ -12,6 +12,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 
 function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } {
@@ -25,7 +27,7 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onSelectBoard: vi.fn(),
       onOpenMachine: vi.fn(),
       onOpenResources: undefined,
-      onOpenSession: undefined,
+      onOpenAgentWorkspace: undefined,
       onOpenLibrary: vi.fn(),
       onOpenNotes: vi.fn(),
       onOpenIncidents: vi.fn(),
@@ -72,7 +74,7 @@ test("onOpen and onResources are given only where Paseo can open them", () => {
   const openSession = vi.fn();
   const openResources = vi.fn();
   const focus = vi.fn();
-  const now = latest({ onOpenSession: openSession, onOpenResources: openResources });
+  const now = latest({ onOpenAgentWorkspace: openSession, onOpenResources: openResources });
   const given = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   given.onOpen?.("a1");
   given.onResources?.();
@@ -181,4 +183,16 @@ test("a tenure write goes to the latest handler, and keeps no focus from the app
   options.onTenure?.({ op: "farewell", name: "api" });
   expect(told).toHaveBeenCalledWith({ op: "farewell", name: "api" });
   expect(focus).not.toHaveBeenCalled();
+});
+
+test("the pantry's board opens the duty board and takes the keyboard; an acted-out duty is reported", () => {
+  const focus = vi.fn();
+  const now = latest({ onOpenDuties: vi.fn(), onDutyActed: vi.fn() });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
+  options.onDuties?.();
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(now.current.onOpenDuties).toHaveBeenCalledTimes(1);
+  options.onDutyDone?.("p4", "a1");
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(now.current.onDutyActed).toHaveBeenCalledWith("p4", "a1");
 });

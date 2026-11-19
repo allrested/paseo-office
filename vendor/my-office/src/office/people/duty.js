@@ -1,3 +1,4 @@
+// PASEO: changed by hand for the host's duty board (each change marked PASEO; see vendor/SOURCES.md).
 // Trực nhật: the pantry's daily chores, a turn each (company floor; the board and the cups at the sink:
 // world/props/duty-board.js; the rota itself: src/shared/duty.js). On each working day the board on the pantry wall
 // names who washes the cups, takes the rubbish out, waters the plants and wipes the pantry's tables, taking turns among
@@ -15,7 +16,7 @@ import { state } from '../core/state.js';
 import { PRO, officeNow, pad2, rand, reduceMotion, replay } from '../core/env.js';
 import { mat } from '../scene/blocks.js';
 import { stairsVisit } from '../world/entrance.js';
-import { SINK, drawBoard, setPile } from '../world/props/duty-board.js';
+import { BOARD_AT, SINK, drawBoard, setPile } from '../world/props/duty-board.js';   // PASEO: BOARD_AT, where the board hangs
 import { spotAt, standBy } from './navigation.js';
 import { free, later, plantSpot, plantsToWater, pour } from './errands.js';
 import { dn, sessions, workers } from './workers.js';
@@ -29,10 +30,18 @@ import { queueUi } from '../ui/activity.js';
 import { CHORES, OWE_FROM, assign, done, due, fresh, pile, roll, saw, washed } from '../../shared/duty.js';
 import { dayKey, dayKind, isWorkday, prevWorkday } from '../../shared/workdays.js';
 import { t as tr } from '../../i18n/index.js';
+// PASEO: the host's duty board (paseo-host.js `duties`, set by setDuties): while the host gives one, the day's duties
+// and who has each are the host's, not this rota's. A free figure acts out a pretend duty and the host is told it is
+// done; an agent's duty is acted out once by its holder's figure. The cups in the sink are still counted here.
+import { host } from '../paseo-host.js';
+import { boardRows, dutyLine, nextJob, tipRows } from '../paseo-duty-plan.js';
 
 const FORCE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('duty');
 const KEY = 'office-duty', TABLES = [[10.4, -4.9], [12.8, -4.9], [10.4, -0.9], [12.8, -0.9]];
 let st = fresh(), loaded = false, checkAt = 0, job = null, SINK_SPOT = null;
+// PASEO: the host's duties this page has acted out, and how many each figure did today; the spot before the board
+let acted = new Set(), counts = new Map(), actedDay = '', BOARD_SPOT = null;
+const hosted = () => Array.isArray(host.duties);
 const minutes = (d = officeNow()) => d.getHours() * 60 + d.getMinutes();
 const hm = (m) => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
 function say(w, key, ms = 4000) { const text = tr(`people.duty.say.${key}`); w.say('idle', text); setTimeout(() => { if (w.lastSay?.text === text) w.hush(); }, ms); }
@@ -61,15 +70,15 @@ const drop = (m) => { if (m) { m.removeFromParent(); m.geometry.dispose(); } };
 
 /* ---------- doing a chore ---------- */
 const alive = (J) => job === J && J.w.chore?.duty === J.chore && !J.w.leaving;
-function start(chore, w, owed) {
-  const J = job = { chore, w, owed, stage: 'up', held: null, left: 0 };
-  w.chore = { duty: chore, where: { ic: chore === 'plants' ? 'sparkle' : 'coffee', text: tr('people.duty.where', { what: tr(`people.duty.chores.${chore}`) }) } };
+function start(chore, w, owed, given = null) {   // PASEO: `given`, a duty of the host's board ('board': no chore of its own)
+  const J = job = { chore, w, owed, stage: 'up', held: null, left: 0, given };   // PASEO: `given` kept on the job
+  w.chore = { duty: chore, where: { ic: chore === 'plants' ? 'sparkle' : 'coffee', text: tr('people.duty.where', { what: given ? given.name : tr(`people.duty.chores.${chore}`) }) } };   // PASEO: a duty of the host's by its own name
   w.station = 'duty'; w.restAt = Infinity; w.hush(); w.anim = 'wake';
   later(reduceMotion ? 0.3 : 1.4, () => {
     if (!alive(J)) return;
-    w.anim = 'idle'; say(w, owed ? 'owe' : `${chore}Go`);
+    w.anim = 'idle'; if (chore !== 'board') say(w, owed && !given ? 'owe' : `${chore}Go`);   // PASEO: a 'board' duty says nothing; an owed duty of the host's, nobody complained of, gets no apology
     J.stage = 'go';
-    ({ cups, trash, plants, table })[chore](J);
+    ({ cups, trash, plants, table, board })[chore](J);   // PASEO: `board`
   });
   queueUi(); show();
 }
@@ -131,11 +140,21 @@ function table(J) {
   };
   next();
 }
+// PASEO: a duty the owner added has no chore of its own: its figure walks to the board, reads it, and goes back
+function board(J) {
+  const w = J.w;
+  w.goTo(BOARD_SPOT, () => {
+    if (!alive(J)) return;
+    w.faceTarget = BOARD_SPOT.face; w.anim = 'tidy';
+    later(reduceMotion ? 0.4 : 2, () => { if (alive(J)) finish(J, null); });
+  });
+}
 // done: ticked on the board, back to the desk and on with whatever is there
 function finish(J, line) {
   const w = J.w;
   st = done(st, J.chore, minutes(), J.owed); save();
-  job = null; say(w, line, 3500); w.anim = 'idle';
+  if (J.given) handBack(J);   // PASEO
+  job = null; if (line) say(w, line, 3500); w.anim = 'idle';   // PASEO: a `board` duty ends with no line
   w.goTo(w.homeSpot(), () => { if (w.chore?.duty === J.chore) w.chore = null; resume(w, false); queueUi(); });
   queueUi(); show();
 }
@@ -149,9 +168,36 @@ function abort(J, why) {
   queueUi(); show();
 }
 
+/* ---------- PASEO: the host's duty board ---------- */
+// acted out: not again on this page; a pretend duty is told to the host, which records it done by this agent
+function handBack(J) {
+  acted.add(J.given.id); counts.set(J.w.id, (counts.get(J.w.id) || 0) + 1);
+  if (J.given.pretend) host.dutyDone(J.given.id, J.w.id);
+}
+// a look with the host's duties: the cups are still counted, and the next duty to act out is the plan's
+function hostLook(list, m, today) {
+  if (actedDay !== today) { acted = new Set(); counts = new Map(); actedDay = today; }
+  if (list.length) { const was = st; st = saw(st, list.map((p) => p.key)); if (st !== was) save(); }
+  // the host's list in the group chat, from HR, once a morning (no grumble: a pretend duty owed is nobody's)
+  if (st.told !== today && list.length && host.duties.length && m >= 480 && m < 600) {
+    st.told = today; save();
+    chatLife('dutyRoster', { list: dutyLine(host.duties, tr('paseo.duty.open')), every: 12 * 3600e3 });
+  }
+  if (job || !list.length || napOn) return;
+  const figures = list.map((p) => ({ id: p.w.id, ready: ready(p.w) }));
+  const next = nextJob({ duties: host.duties, acted, counts, figures, minutes: m, force: FORCE, pile: pile(st, m) });
+  const given = next && host.duties.find((d) => d.id === next.id);
+  if (given) start(given.chore || 'board', workers.get(next.who), given.owed, given);
+}
+
 /* ---------- the board, the sink, the bin: what they show ---------- */
 function show() {
   const d = officeNow(), m = minutes(d), kind = dayKind(d);
+  if (hosted()) {   // PASEO: the host's duties, each with who has it; none due says so
+    drawBoard({ date: dateLabel(d), off: '', rows: boardRows(host.duties, job?.given?.id ?? null), owe: [], none: tr('paseo.duty.none') });
+    setPile(job?.chore === 'cups' && job.stage === 'wash' ? job.left : pile(st, m));
+    return;
+  }
   if (!isWorkday(d)) { drawBoard({ date: dateLabel(d), off: kind, rows: [], owe: [] }); setPile(0); return; }
   const rows = Object.keys(st.who).length ? CHORES.map((c) => ({ chore: c, name: st.names[st.who[c]] || '', at: st.done[c] != null ? hm(st.done[c]) : '', busy: job?.chore === c && !job.owed })) : [];
   drawBoard({ date: dateLabel(d), off: '', rows, owe: st.owe.map((o) => ({ chore: o.chore, name: o.name })) });
@@ -160,19 +206,39 @@ function show() {
 const dateLabel = (d) => `${dayKind(d) === 'makeup' ? `${tr('people.duty.board.makeup')} · ` : ''}${tr('people.duty.board.days', null, 'list')[d.getDay()]} ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
 // the pantry's big bin (people/staff.js): emptied by the rota today; still full from yesterday, spilling over
 function binLevel() {
+  if (hosted()) return hostedBin();   // PASEO
   if (!isWorkday(officeNow())) return null;
   if (job?.chore === 'trash' && job.stage === 'bag') return 0.05;
   if (st.owe.some((o) => o.chore === 'trash')) return 1.25;
   return st.done.trash != null ? 0.05 : null;
 }
 
+// PASEO: with the host's duties the bin is emptied by the duty acted out as the bin, and overflows while it is owed
+function hostedBin() {
+  const bin = host.duties.find((d) => d.chore === 'trash');
+  if (!bin) return null;
+  if (job?.chore === 'trash' && job.stage === 'bag') return 0.05;
+  if (bin.owed && bin.state !== 'done') return 1.25;
+  return st.done.trash != null || bin.state === 'done' ? 0.05 : null;
+}
+
 /** today's rota in a line (the board's tooltip, and a toast when it is tapped) */
 export function dutyText() {
+  if (hosted()) return host.duties.length ? dutyLine(host.duties, tr('paseo.duty.open')) : tr('paseo.duty.none');   // PASEO
   const d = officeNow(), kind = dayKind(d);
   if (!isWorkday(d)) return `${tr(`people.duty.board.${kind}`)}: ${tr('people.duty.board.noDuty')}`;
   if (!Object.keys(st.who).length) return tr('people.duty.board.nobody');
   const list = CHORES.map((c) => `${tr(`people.duty.chores.${c}`)}: ${st.names[st.who[c]] || '—'}${st.done[c] != null ? ' ✓' : ''}`).join(' · ');
   return st.owe.length ? `${list} · ${tr('people.duty.board.owe', { list: st.owe.map((o) => tr(`people.duty.chores.${o.chore}`)).join(', ') })}` : list;
+}
+
+// PASEO: the tooltip as rows, a duty each (interact/props.js draws them); null where a line says it better (no duty
+// today, nobody here). Upstream's own rota gives the same rows, so the tooltip reads the same on a host with no list.
+export function dutyRows() {
+  if (hosted()) return host.duties.length ? tipRows(host.duties) : null;
+  if (!isWorkday(officeNow()) || !Object.keys(st.who).length) return null;
+  const owed = new Set(st.owe.map((o) => o.chore));
+  return CHORES.map((c) => ({ name: tr(`people.duty.chores.${c}`), who: st.names[st.who[c]] || '', state: st.done[c] != null ? 'done' : st.who[c] ? 'held' : 'open', owed: owed.has(c) }));
 }
 
 /* ---------- each frame (a look every two seconds) ---------- */
@@ -186,9 +252,10 @@ export function updateDuty() {
   checkAt = state.sim + 2;
   if (!loaded) load();
   const d = officeNow(), m = minutes(d), today = dayKey(d);
-  if (replay.on || !isWorkday(d)) { show(); return; }
+  if (replay.on || (!hosted() && !isWorkday(d))) { show(); return; }   // PASEO: the host says which days have duties
   if (st.day !== today) { st = roll(st, today, dayKey(prevWorkday(d))); save(); }
   const list = here();
+  if (hosted()) { hostLook(list, m, today); show(); return; }   // PASEO: no rota, no roster, no grumble of the scene's
   if (list.length) {
     const was = st;
     st = saw(assign(st, list), list.map((p) => p.key));
@@ -234,7 +301,8 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
 export function setup() {
   if (!PRO) return;
   SINK_SPOT = spotAt(SINK.x, -6.72, Math.PI, 'PA4');
+  BOARD_SPOT = spotAt(BOARD_AT.x, -6.72, Math.PI, 'PA4');   // PASEO: before the duty board
   bagM = mat('#1E1F23', { roughness: 0.55 }); clothM = mat('#3F7CC4', { roughness: 0.95 });
   binHooks.level = binLevel;
-  binHooks.leave = () => isWorkday(officeNow()) && Object.keys(st.who).length > 0;   // (the cleaner leaves the bin to the rota)
+  binHooks.leave = () => (hosted() ? host.duties.some((d) => d.chore === 'trash') : isWorkday(officeNow()) && Object.keys(st.who).length > 0);   // (the cleaner leaves the bin to the rota) PASEO: or to the host's bin duty
 }

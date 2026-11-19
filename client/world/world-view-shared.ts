@@ -23,10 +23,14 @@ export interface WorldLatest {
   onSelectBoard(roomId: string): void;
   onOpenMachine(): void;
   onOpenResources: (() => void) | undefined;
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   onOpenLibrary(): void;
   onOpenNotes(): void;
   onOpenIncidents(): void;
+  /** The pantry's duty board: the duty board's editor. */
+  onOpenDuties?(): void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?(id: string, agentId: string): void;
   onBell(): void | Promise<void>;
   onWentHome?: WorldStartOptions["onWentHome"];
   onLife?: WorldStartOptions["onLife"];
@@ -98,14 +102,13 @@ export function worldStartOptions(
             latest.current.onOpenResources?.();
           },
         }),
-    // Given only where the office can open a session (the agent card's "Open session"): otherwise
-    // a person under E is chosen, as a click does. The keyboard goes with the session.
-    ...(latest.current.onOpenSession === undefined
+    // Give the workspace the keyboard when the walker interacts with a person.
+    ...(latest.current.onOpenAgentWorkspace === undefined
       ? {}
       : {
           onOpen: (agentId: string) => {
             focus();
-            latest.current.onOpenSession?.(agentId);
+            latest.current.onOpenAgentWorkspace?.(agentId);
           },
         }),
     onWentHome: (id, idleSince) => latest.current.onWentHome?.(id, idleSince),
@@ -121,6 +124,12 @@ export function worldStartOptions(
       focus();
       latest.current.onOpenIncidents();
     },
+    onDuties: () => {
+      focus();
+      latest.current.onOpenDuties?.();
+    },
+    // (nothing of Paseo's opens: the keyboard stays in the office)
+    onDutyDone: (id, agentId) => latest.current.onDutyActed?.(id, agentId),
     onProblem: (message) => latest.current.onProblem(message),
   };
 }

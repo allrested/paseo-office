@@ -64,7 +64,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(5);
+  expect(officeHostSettings.version).toBe(6);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -83,7 +83,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(5);
+  expect(officeHostSettings.version).toBe(6);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 

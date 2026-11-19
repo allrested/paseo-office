@@ -1,3 +1,4 @@
+import { useOfficeBrand } from "../office-brand-context.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
@@ -53,7 +54,7 @@ function WorldViewNativeScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
   onPhotoReady,
@@ -61,6 +62,8 @@ function WorldViewNativeScene({
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldViewNativeSceneProps) {
@@ -69,6 +72,7 @@ function WorldViewNativeScene({
   const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
+  const brand = useOfficeBrand();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -78,10 +82,12 @@ function WorldViewNativeScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
     onWentHome,
@@ -102,10 +108,12 @@ function WorldViewNativeScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
       onWentHome,
@@ -135,7 +143,7 @@ function WorldViewNativeScene({
       made.api.start(
         worldStartOptions(latest, {
           focus: noFocus,
-          brand: worldBrand(null),
+          brand: worldBrand(brand),
           photo: false,
           language: words.language,
           words: words.words,
@@ -152,7 +160,7 @@ function WorldViewNativeScene({
       bridge.current = null;
       setApi(null);
     };
-  }, [page, plan, words.status, words.language, words.words, onPhotoReady]);
+  }, [page, plan, brand, words.status, words.language, words.words, onPhotoReady]);
 
   const { note: feedNote } = useWorldFeed(api, {
     model,

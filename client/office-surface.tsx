@@ -1,3 +1,4 @@
+import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
   useEffect,
@@ -37,6 +38,8 @@ import { sheetLeavesFirstOn } from "./agent-picker-text.js";
 import { AttentionStrip, type StripCard } from "./attention-strip.js";
 import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
+import { DutySheet } from "./duty-sheet.js";
+import { useDutyActions } from "./use-duty-actions.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
 import { TeamChatPreview } from "./team-chat-preview.js";
@@ -55,7 +58,7 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
-import { SceneChoices } from "./scene-picker.js";
+import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -75,7 +78,7 @@ import {
 } from "./session-pane.js";
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
-import { OfficeDialogs, OfficeModal } from "./office-modal.js";
+import { OfficeDialogs } from "./office-modal.js";
 import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
@@ -654,7 +657,15 @@ interface SurfaceBodyProps {
   /** Null from the 3D office, when the chosen person is tapped again. */
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace(agentId: string): void;
   onOpenBoard(roomId: string): void;
+  /**
+   * The duty board's editor: the 3D pantry's board and the List's lobby card open it. Absent while
+   * the host has sent no duty list.
+   */
+  onOpenDuties: (() => void) | undefined;
+  /** The 3D office acted out a pretend duty with this agent's figure. */
+  onDutyActed(id: string, agentId: string): void;
   machine: Machine | null;
   onOpenMachine(): void;
   /** The 3D wall screen's: absent on an app that cannot show Resources beside the floor. */
@@ -694,7 +705,10 @@ function SurfaceBody({
   name,
   onSelectAgent,
   onOpenSession,
+  onOpenAgentWorkspace,
   onOpenBoard,
+  onOpenDuties,
+  onDutyActed,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -746,10 +760,12 @@ function SurfaceBody({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onSelectBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+        onDutyActed={onDutyActed}
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
-        onOpenSession={onOpenSession}
+        onOpenAgentWorkspace={onOpenAgentWorkspace}
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
@@ -796,6 +812,7 @@ function SurfaceBody({
       onSelectAgent={onSelectAgent}
       onOpenSession={onOpenSession}
       onOpenBoard={onOpenBoard}
+      onOpenDuties={onOpenDuties}
     />
   );
 }
@@ -848,10 +865,9 @@ interface ViewControlsProps {
   /** The device refused to store a press on the 3D floor's Sound button. */
   soundUnsaved: boolean;
   toolbarLabels: boolean;
-  onScene(): void;
   onTeam(): void;
   machine: Machine | null;
-  onMachine(): void;
+  onMachine?: () => void;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -869,8 +885,7 @@ function HostResourceButton({
   onOpen(): void;
   styles: OfficeStyles;
 }) {
-  if (!machine) return null;
-  const percent = memoryPercent(machine);
+  const percent = machine ? memoryPercent(machine) : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -893,7 +908,6 @@ function ViewControls({
   viewChoice,
   soundUnsaved,
   toolbarLabels,
-  onScene,
   onTeam,
   machine,
   onMachine,
@@ -922,7 +936,9 @@ function ViewControls({
   }, [onChange, viewChoice.options, sidebars]);
   const actions = (
     <>
-      {sidebars && <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />}
+      {sidebars && onMachine && (
+        <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />
+      )}
       {sidebars && (
         <PanelButton
           label="Team chat"
@@ -933,18 +949,6 @@ function ViewControls({
           count={badges.chat}
           color={color}
           onOpen={onTeam}
-          styles={styles}
-        />
-      )}
-      {viewChoice.choice === "3d" && (
-        <PanelButton
-          label="Change outdoor scene"
-          caption={toolbarLabels ? "Scene" : undefined}
-          icon="Mountain"
-          screenId="scene"
-          size={18}
-          color={color}
-          onOpen={onScene}
           styles={styles}
         />
       )}
@@ -1524,6 +1528,7 @@ function useFullscreenPanels(
   sheet: ColumnSheetState,
   select: (id: string | null) => void,
   selectFromStrip: (id: string) => void,
+  openWorkspace: (agentId: string) => void,
 ) {
   const docked = active && !compact && surfaceWidth > 0;
   const sessionsAvailable = docked && fullscreen;
@@ -1540,9 +1545,13 @@ function useFullscreenPanels(
       }
     : undefined;
   const { openSession } = sheet;
+  // A Sessions row's own button goes straight to the agent's workspace, past its details.
   const link = useMemo(
-    () => (active ? { select: openSession, openSession } : sheet.link),
-    [active, openSession, sheet.link],
+    (): OfficeLink => ({
+      ...(active ? { select: openSession, openSession } : sheet.link),
+      openWorkspace,
+    }),
+    [active, openSession, sheet.link, openWorkspace],
   );
   const selectAgent = useCallback(
     (id: string | null) => {
@@ -1657,28 +1666,19 @@ function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void
   return { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard };
 }
 
-function SceneDialog({
-  open,
-  setOpen,
-  choice,
-  styles,
-}: {
-  open: boolean;
-  setOpen(open: boolean): void;
-  choice: ReturnType<typeof useOfficeScene>;
-  styles: OfficeStyles;
-}) {
-  const icon = useMemo(
-    () => <Icon name="Mountain" size={18} color={styles.workspaceAccent} />,
-    [styles.workspaceAccent],
-  );
-  return (
-    <OfficeModal title="Scene" icon={icon} open={open} onOpenChange={setOpen}>
-      <OfficeModal.Content>
-        <SceneChoices choice={choice} styles={styles} />
-      </OfficeModal.Content>
-    </OfficeModal>
-  );
+function useHostResources(machine: Machine | null, live: boolean) {
+  const [machineOpen, setMachineOpen] = useState(false);
+  const openMachine = useCallback(() => setMachineOpen(true), []);
+  const closeMachine = useCallback(() => setMachineOpen(false), []);
+  const ssh = useSshServers(live && (machineOpen || machine === null));
+  const hasSsh = ssh.servers.length > 0;
+  const hostEntry = useMemo((): StripCard | null => {
+    if (machine) return { title: "Host", note: hostNote(machine), onOpen: openMachine };
+    if (hasSsh)
+      return { title: "Host", note: { text: "SSH hosts", tone: "muted" }, onOpen: openMachine };
+    return null;
+  }, [machine, hasSsh, openMachine]);
+  return { machineOpen: machineOpen && live, openMachine, closeMachine, hostEntry, ssh };
 }
 
 /** One surface for both places: the sidebar screen and a workspace tab. */
@@ -1705,9 +1705,6 @@ export function OfficeSurface(
   const actions = useAgentActions();
   const boardActions = useBoardActions();
   const { machine: reading, cleanUp } = useMachine();
-  const [machineOpen, setMachineOpen] = useState(false);
-  const openMachine = useCallback(() => setMachineOpen(true), []);
-  const closeMachine = useCallback(() => setMachineOpen(false), []);
   const tidy = useJanitor();
   const dismissIncidents = useIncidents();
   const [janitorOpen, setJanitorOpen] = useState(false);
@@ -1720,8 +1717,6 @@ export function OfficeSurface(
     full.integrated || viewChoice.choice === "3d",
     onOpenSettings,
   );
-  const [sceneOpen, setSceneOpen] = useState(false);
-  const chooseScene = useCallback(() => setSceneOpen(true), []);
   const [teamOpen, setTeamOpen] = useState(false);
   const openTeam = useCallback(() => setTeamOpen((value) => !value), []);
   const closeTeam = useCallback(() => setTeamOpen(false), []);
@@ -1743,7 +1738,21 @@ export function OfficeSurface(
   const name = useCallback((author: string) => authorName(author, model.agents), [model.agents]);
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
+  const { machineOpen, openMachine, closeMachine, hostEntry, ssh } = useHostResources(
+    machine,
+    live,
+  );
   const board = useBoardSheet(model, live);
+  const dutyCard = useCardOpening(live);
+  // Until the host sends its duty list (an older host has none) nothing offers the duty board.
+  const openDuties = model.dutyList === null ? undefined : dutyCard.show;
+  const dutyActions = useDutyActions();
+  const { acted } = dutyActions;
+  // A report the host refuses changes nothing: its duty board is what the scene is told next.
+  const dutyActed = useCallback(
+    (id: string, agentId: string) => void acted(id, agentId).catch(() => undefined),
+    [acted],
+  );
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
   const incidentsCard = useCardOpening(live);
@@ -1788,6 +1797,7 @@ export function OfficeSurface(
     sheet,
     setSelectedId,
     selectFromStrip,
+    showAgentWorkspace,
   );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
@@ -1821,11 +1831,6 @@ export function OfficeSurface(
   useEffect(() => {
     if (kept !== selectedId) setSelectedId(kept);
   }, [kept, selectedId]);
-  const hostEntry = useMemo(
-    (): StripCard | null =>
-      machine === null ? null : { title: "Host", note: hostNote(machine), onOpen: openMachine },
-    [machine, openMachine],
-  );
   const contexts = useMemo(
     () => janitorRows(model.agents.values(), model.waitingOn),
     [model.agents, model.waitingOn],
@@ -1904,6 +1909,7 @@ export function OfficeSurface(
     draft,
     newAgent,
     ...chatTasks,
+    onDuties: openDuties,
     onGroupPhoto,
   };
   const sessions = useMemo(
@@ -1932,10 +1938,9 @@ export function OfficeSurface(
       viewChoice={viewChoice}
       soundUnsaved={sound.unsaved}
       toolbarLabels={surfaceWidth >= 1100}
-      onScene={chooseScene}
       onTeam={openTeam}
       machine={machine}
-      onMachine={openMachine}
+      onMachine={hostEntry?.onOpen}
       onChange={changeView}
       compact={layout.compact}
       touchScreen={touchScreen}
@@ -1984,7 +1989,10 @@ export function OfficeSurface(
             name={name}
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
+            onOpenAgentWorkspace={showAgentWorkspace}
             onOpenBoard={board.open}
+            onOpenDuties={openDuties}
+            onDutyActed={dutyActed}
             machine={machine}
             onOpenMachine={openMachine}
             onOpenResources={openResources}
@@ -2044,7 +2052,8 @@ export function OfficeSurface(
         onClose={closeCard}
       />
       <MachineCard
-        machine={live ? machine : null}
+        ssh={ssh}
+        machine={machine}
         open={machineOpen}
         cleanUp={cleanUp}
         styles={styles}
@@ -2128,6 +2137,15 @@ export function OfficeSurface(
         styles={styles}
         onClose={board.close}
       />
+      <DutySheet
+        open={dutyCard.open}
+        list={model.dutyList}
+        rows={model.duties}
+        name={name}
+        actions={dutyActions}
+        styles={styles}
+        onClose={dutyCard.close}
+      />
       {full.integrated && (
         <OfficeMessenger
           open={teamOpen}
@@ -2137,7 +2155,6 @@ export function OfficeSurface(
           onClose={closeTeam}
         />
       )}
-      <SceneDialog open={sceneOpen} setOpen={setSceneOpen} choice={street} styles={styles} />
       <OfficeWorkspace
         selection={workspace}
         hostId={props.host.id}
@@ -2161,8 +2178,10 @@ export function OfficeSurface(
     </View>
   );
   return (
-    <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
-      {surface}
-    </OfficeDialogs>
+    <OfficeBrandContext.Provider value={office.state.brand}>
+      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+        {surface}
+      </OfficeDialogs>
+    </OfficeBrandContext.Provider>
   );
 }

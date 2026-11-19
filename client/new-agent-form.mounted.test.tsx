@@ -20,7 +20,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { TextInput, View } = await import("react-native");
   const ScrollView = (props: { children: ReactNode }) =>
     createElement("div", { "data-scroll": "vertical" }, createElement(View, null, props.children));
-  return { ScrollView, TextInput };
+  return { ScrollView, TextInput, Icon: () => null };
 });
 
 interface Deferred<T> {
@@ -326,6 +326,62 @@ test("only providers that are available are offered, the first with its default 
   expect(selected("Codex")).toBe("true");
   expect(maybe("Opus")).toBeNull();
   expect(selected("GPT")).toBe("true");
+});
+
+test("a long model list shows the current choice and folds after selection", async () => {
+  const provider = PROVIDERS.entries[0]!;
+  host.providers = {
+    entries: [
+      {
+        ...provider,
+        models: ["One", "Two", "Three", "Four"].map((id) => ({
+          provider: "claude",
+          id,
+          label: id,
+          isDefault: id === "One",
+        })),
+      },
+    ],
+  };
+  await openForm();
+  expect(labelled("Choose model").textContent).toContain("One");
+  expect(maybe("Four")).toBeNull();
+  await press("Choose model");
+  await press("Four");
+  expect(labelled("Choose model").textContent).toContain("Four");
+  expect(labelled("Choose model").getAttribute("aria-expanded")).toBe("false");
+});
+
+test("a new agent receives its name and character on creation and the next agent starts fresh", async () => {
+  await openForm();
+  await type("Agent name", "  Nova  ");
+  await press("Customize character");
+  await press("Female");
+  await press("headphones");
+  await press("Teal");
+  host.pages = [WORKSPACE_PAGE];
+  await press("Back");
+  await openForm();
+  expect((labelled("Agent name") as HTMLInputElement).value).toBe("  Nova  ");
+  await fillForm();
+  await press("Create");
+  await settle();
+  expect(host.created).toMatchObject([
+    {
+      title: "Nova",
+      metadata: {
+        "office.appearance": {
+          name: "Nova",
+          gender: "Female",
+          avatar: "headphones",
+          color: "Teal",
+        },
+      },
+    },
+  ]);
+  host.pages = [WORKSPACE_PAGE];
+  await openForm();
+  expect((labelled("Agent name") as HTMLInputElement).value).toBe("");
 });
 
 test("the last choice kept on the device is where the form starts", async () => {

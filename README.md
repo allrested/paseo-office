@@ -1,149 +1,76 @@
-# Office 3D
+# Office 3D for Paseo
 
-A community port of [my-office](https://github.com/khanh020905/my-office) for
-[Paseo](https://github.com/getpaseo/paseo): your agents at their desks, in 3D.
+Office 3D puts your Paseo agents on a shared floor. Each workspace has a room. Pick a desk to see what its agent is doing, open the agent’s workbench over the floor, or leave the office in view while you watch for permission requests.
 
-It is based on my-office by [khanh020905](https://github.com/khanh020905), with the author's
-permission, and is not an official version of it. Report issues with this Paseo plugin in
-[this repository's issue tracker](https://github.com/allrested/paseo-office/issues), not in
-my-office's.
+![Fullscreen Office 3D with the Sessions sidebar, office floor and activity panel](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-office.png)
 
-## What it does
+## Install on a host
 
-- Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
-  is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
-  offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
-- The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
-- Choose **Change outdoor scene** on the 3D toolbar for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
-- Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
-- Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
-  on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
-  none of the three non-English scene languages, so select one explicitly to use it.
-- Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
-  Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
-  the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
-  starts an agent: a workspace, a provider and model, and a first prompt.
-- Open an agent’s session and select the pencil (**Customize agent**) to set its Office display name, character gender, avatar and color. Choose **Male** or **Female** to change how the character looks in 2D and 3D, or **Auto** to use its original appearance. Clear the name, select **Initials** and **Auto**, then save to restore the defaults.
-- Select **Full screen** beside the view switch to work inside the office. On a wide screen,
-  Sessions sits on the left, the floor in the center, and activity or the open conversation
-  on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.
-  Hide both for an edge-to-edge floor, or open a conversation to reply and answer permission requests.
-  Open **Team chat** for group messages, polls and photos of the floor. Choose **To** to give a session work. Choose **Open in workspace** in a session for the real web workbench without leaving Office. Session cards show status, elapsed time, and completed checklist items when the provider supplies them.
-- Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
-  that names an idle agent wakes it. With **Agent tools** and **Wake agents** enabled, available agents also claim unassigned lobby tasks in order.
-- Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
-  agent on the host gets the office's stand-up report and writes a `## DD Month YYYY` entry into
-  `daily-standup-YYYYMM.md` in a folder of notes you choose, following the stand-up notes
-  instructions for that folder, which may sit in its own or a parent folder's `AGENTS.md` or
-  `CLAUDE.md`.
-- Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
-- Plays my-office's sounds in the 3D floor: off until you turn on Sound in the settings or with the
-  speaker button on the floor's toolbar.
-- Takes a photo of the 3D floor, in the app's light or held to day or night for the photo, and on
-  a desktop or in a browser records a 15-second clip of it; a tour of the floor's things shows
-  once on a desktop.
-- Reads the host (on Linux): memory, CPU, and what each agent left running, with a way to clean it
-  up.
+Office 3D requires Paseo **0.16.0 or newer**. The plugin has been tested on stock Paseo 0.16.2.
 
-[docs/office.md](docs/office.md) says how each part works.
+1. In the host’s existing `$PASEO_HOME/config.json` (default `~/.paseo/config.json`), set `"pluginsEnabled": true`. If you changed it on a running daemon, run `paseo daemon reload`.
+2. Install from the repository’s default branch.
 
-## Install
+   ```sh
+   paseo plugin install git:allrested/paseo-office
+   ```
 
-You need Paseo 0.16.0 or newer; the plugin is tested on 0.16.2. Installed plugins must be turned on
-in `config.json` under the host's Paseo home (`$PASEO_HOME/config.json`, by default
-`~/.paseo/config.json`):
+   To install a particular branch or tag, add `--ref <ref>`. The host supplies the SDK and runs the bundled scene directly.
 
-```json
-{ "pluginsEnabled": true }
-```
+3. Open **Office 3D** in the Paseo sidebar. The gear on the floor opens **Office settings**.
 
-The daemon reads that key when it starts. On a running daemon, apply the change with
-`paseo daemon reload` or restart the daemon.
+## Work from the floor
 
-Then install it on the host:
+| What you want to do        | Where to go                                                                                                                                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| See who needs you          | Open **Sessions** for working, waiting and resting agents. A row shows the current activity. A checklist bar shows reported task completion. A bar labeled **Context** shows how much of the agent’s context window is in use.                            |
+| Open an agent’s work       | In fullscreen, click the **↗** beside the session. In **Walk in**, face the agent and press **E** or tap the prompt. On desktop or web, the agent’s workbench opens over the office. Minimize it to revisit the floor or close it to return to your walk. |
+| Reply or approve a request | Select the session row to open its conversation and permission requests. **New agent** lets you choose a workspace, provider and model, set the agent’s appearance and send the first prompt.                                                             |
+| Talk to the team           | Open **Team chat** for group conversation, polls and office photos. Choose **To** or mention a session when you want that agent to act.                                                                                                                   |
+| Give an idle agent a task  | Add a to-do on the **Lobby board**. Turn on **Agent tools** and **Wake agents** for automatic pickup. When an agent claims a task for its workspace, checking it off on either board completes the linked item on both.                                   |
+| Schedule recurring work    | On the pantry **Duty board**, choose the days and add instructions for an agent. Duties with instructions enter the pickup queue at 08:00 on their scheduled days. Duties without instructions are acted out on the floor.                                |
+| Read a stand-up            | Open **Stand-up notes** at the meeting screen to browse entries by date. Set the notes folder, days and time zone to have an agent write scheduled entries.                                                                                               |
 
-```
-paseo plugin install git:allrested/paseo-office
-```
+On wide screens, **Sessions** and **Details** toggle the sidebars independently. Hide both for a full-width floor. [Workspace screenshot](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-workspace.webp) · [Team chat screenshot](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-team-chat.webp)
 
-The host supplies the plugin SDK and `zod`, so installing runs no build and needs no
-`node_modules`.
+## Make the office yours
 
-The settings are in Settings > Plugins > Office 3D. The gear over the floor opens them too.
+In **Office settings → Appearance**, choose Company floor, Cozy room or Headquarters. Choose City for streets and shops, Countryside, Beach or Plain for the backdrop, and App theme, Day or Night for lighting. The scene offers English, Vietnamese, Thai and Indonesian. The Office panels and team chat use English.
 
-## What works where
+Under **Branding**, set the office name, logo URL and mark color. Blank fields inherit their host defaults. To change one agent’s name, character or avatar, open their session and choose **Customize agent**. [Branding environment variables](https://github.com/allrested/paseo-office/blob/main/docs/office.md#custom-branding)
 
-| Where                             | What you get                                                                                                                                                                           |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop app and browsers          | The 3D floor, the 2D floor and the list; Photo mode, clips and the tour                                                                                                                |
-| The phone app with a script frame | The 3D floor without Photo mode, clips and the tour                                                                                                                                    |
-| The store phone app               | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
-| Sound                             | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
-| Outdoor scene and lighting        | City, Countryside, Beach or Plain, with App theme, Day or Night lighting. A first visit starts in City on wide web layouts and Plain on phones.                                        |
-| Stock Paseo 0.16                  | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
+## Platform support
 
-[docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
+| Client                         | Available views and controls                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Paseo Desktop and web browsers | 3D with WebGL 2, 2D and List. Fullscreen workbench, walk-in controls, photos and 15-second clips.                              |
+| Mobile app                     | 2D and List. Mobile builds with a script-capable frame also support 3D. Use Office session controls for replies and approvals. |
+| Stock Paseo 0.16               | Stop and idle-runtime cleanup depend on host SDK support. The stock 0.16 SDK lacks these operations.                           |
 
-The stand-up notes and the incidents check run on the plugin's own timers. After a daemon
-restart, a run waits until the office is opened or an agent opens or ends a turn. A run missed
-while the daemon was down is not made up.
+The Linux Host panel shows memory, CPU and processes. Choose **Host → SSH** for memory, load averages and disk use on hosts configured through SSH-MCP. The floor also reflects reported agent spending, repository birthdays and team tenure. Git tags, pull-request checks and the installed Claude CLI version can trigger city activities. Weather and Jira or Sentry alerts are optional. [Feature guide](https://github.com/allrested/paseo-office/blob/main/docs/office.md) · [Compatibility checks](https://github.com/allrested/paseo-office/blob/main/docs/verified.md)
 
-The column, agent cards, settings, team chat (including @Director), whiteboard rows and host
-notifications stay in English. Thai and Indonesian use the English karaoke songs. Vietnamese
-and Thai also use English for the port’s custom lines. The sound-unavailable message and
-photo lighting group title are English in every language.
+## Data and integrations
 
-## What it reads and where it sends it
+Boards, duties, team chat and stand-up state are stored under `$PASEO_HOME/office/`. View preferences are stored on the device. Clips download to the device. A custom logo is fetched from the image URL you configure.
 
-- It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
-  of activity. On the host it runs Git once per workspace folder to read the first commit date.
-- The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
-  and the lift’s servicing time and build sticker. It receives no file names, commands or prompts and makes no
-  network calls. It sends chat moments with a name or count, and reports farewells and promotions.
-- With the street enabled, the device receives the bundled Kenney Car Kit (CC0). While a street
-  is open, the host checks local Git tags and the installed Claude CLI version. New tags can
-  trigger the photo booth. The pickleball scene uses check results already available to Paseo.
-- English travels with the scene. For each other language the host sends one dictionary on request
-  to the device that chose it (about 82–130 KB). The device keeps those words for the life of the page.
-- A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
-  scene keeps on the device, under keys that start with `office-`, which team sits where, the
-  plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
-  music choice, the duty roster with team members’ names, the fire drill day, and team farewells and returns. The column keeps when this device last had the chat open (`office-chat-seen`).
-- With Settings > Weather > From a service and an address set, the host reads that address while an
-  office is open, at most once in 15 minutes. The request sets only the `Accept` header. The
-  scene receives a weather code, temperature and cloud share. The host stores the address,
-  including any key in its query, in `<PASEO_HOME>/plugin-settings/office/office.json`.
-  Anyone who can open the settings page can see it there.
-- It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
-  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
-- The stand-up notes writer and agent wakes send prompts to the host's agents and their providers.
-  In team chat, **Whole group** can send your message and up to six recent group or scene chat
-  lines to one available session for a conversational reply. **To**, an `@mention`, or a reply
-  to a session sends your message to the session you address.
-- It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
-  in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
+Agent prompts, tool results and scheduled assignments go through the agent’s configured provider. A **Whole group** chat message can go to one available session with up to six recent group or scene messages for context. **To**, mentions and replies address a particular session.
 
-## Based on
+Jira and Sentry use project settings and credentials from the host environment. A configured weather service receives requests while Office is open, at most once every 15 minutes. Its URL is visible in host settings. On stock hosts using fallback timers, scheduled work resumes after daemon restart when Office or an agent activates the plugin. Missed runs are skipped. [Plugin overview](https://github.com/allrested/paseo-office/blob/main/OVERVIEW.md) · [Implementation and storage](https://github.com/allrested/paseo-office/blob/main/docs/office.md)
 
-The 3D scene is my-office at commit
-[`b68228871fe30cd2c759a2c919337a9a9d1f5644`](https://github.com/khanh020905/my-office/tree/b68228871fe30cd2c759a2c919337a9a9d1f5644)
-(v0.6.0), with three.js 0.160.0. [vendor/SOURCES.md](vendor/SOURCES.md) says what is taken, what
-stands in for the rest, and how to take a newer my-office.
+## Development
 
-Upstream supplies the Vietnamese and Thai text, with real brand names replaced. The Indonesian
-text was written for this port in my-office’s locale format.
-
-## Develop
-
-```
-npm install
+```sh
+npm ci
 npm run typecheck
 npm test
-npm run test:scripts   # the scripts under scripts/
+npm run test:scripts
 npm run lint
-npm run build:world    # after any change under vendor/
+npm run format:check
+npm run check:world
 ```
 
-## Licence
+After editing the vendored scene, run `npm run build:world` and commit the regenerated files.
 
-MIT. my-office and three.js keep their own MIT licences; see [LICENSE](LICENSE).
+## Credits and license
+
+This is an independent community port of **my-office** by **khanh020905**, used with the author’s permission. The scene is based on upstream v0.6.0 at `b682288` and uses three.js 0.160.0. Report Paseo-specific issues in this repository. [Upstream project](https://github.com/khanh020905/my-office) · [Vendored sources and credits](https://github.com/allrested/paseo-office/blob/main/vendor/SOURCES.md) · [Issue tracker](https://github.com/allrested/paseo-office/issues) · [MIT license](https://github.com/allrested/paseo-office/blob/main/LICENSE)
