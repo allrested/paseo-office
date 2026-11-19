@@ -70,7 +70,7 @@ function MonthBar({ month, onAsk, styles }: MonthBarProps) {
   }, [next, onAsk]);
   return (
     <View style={styles.notesMonthBar}>
-      <Text accessibilityRole="header" style={styles.notesMonthTitle}>
+      <Text accessibilityRole="header" style={styles.panelHeading}>
         {monthTitle(month.month)}
       </Text>
       <View style={styles.actions}>

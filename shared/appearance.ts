@@ -17,6 +17,16 @@ export const AppearanceSchema = z.object({
   color: z.enum(COLORS).optional(),
 });
 export type Appearance = z.output<typeof AppearanceSchema>;
+/** Omit automatic choices from the persisted Office profile. */
+export function savedAppearance(draft?: Appearance): Appearance | null {
+  const profile: Appearance = {};
+  const name = draft?.name?.trim();
+  if (name) profile.name = name;
+  if (draft?.gender) profile.gender = draft.gender;
+  if (draft?.avatar) profile.avatar = draft.avatar;
+  if (draft?.color) profile.color = draft.color;
+  return Object.keys(profile).length ? profile : null;
+}
 /** Floor colors with a day and night contrast of at least 3.2:1. */
 export const SHIRTS = [
   { shirt: "#DA494E", shade: "#B63D41" },

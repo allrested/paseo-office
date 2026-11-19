@@ -238,7 +238,7 @@ export function SessionsPanel(props: ColumnPanelProps) {
   const created = useCallback(
     (agentId: string) => {
       setOpen(false);
-      change({ prompt: "" });
+      change({ prompt: "", appearance: undefined });
       link.openSession(agentId);
     },
     [link, setOpen, change],
