@@ -74,6 +74,10 @@ export const OURS = {
   'props.karaoke.idle': 'The box is free',
   // the lively floor (paseo-leisure.js): what someone says on the way to a rest of their own
   'paseo.leisure.nap': 'Quick nap',
+  'paseo.lounge.assigned': '{name} is on the way · {action}',
+  'paseo.lounge.noAgent': 'No idle agent is available on the floor.',
+  'paseo.lounge.inProgress': 'An agent is already doing that.',
+  'paseo.lounge.unreachable': 'No agent can reach that spot.',
   'paseo.leisure.fish': 'Feeding the fish',
   'paseo.leisure.arcade': 'One round at the arcade',
   'paseo.leisure.cup': 'Making a coffee',

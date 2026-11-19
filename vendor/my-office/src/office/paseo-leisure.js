@@ -12,8 +12,8 @@ import { STEAM_AT } from './world/furniture/coffee.js';
 import { brewCoffee, feedFish } from './interact/props.js';
 import { STATIONS, standBy, wayTo } from './people/navigation.js';
 import { COFFEE_Q } from './people/breaks.js';
-import { sessions, workers } from './people/workers.js';
-import { asleep, quip } from './people/errands.js';
+import { dn, sessions, workers } from './people/workers.js';
+import { asleep, free, quip } from './people/errands.js';
 import { gatheringNow } from './people/gatherings.js';
 import { bilState, billiards } from './people/billiards.js';
 import { foosState, foosball } from './people/foosball.js';
@@ -57,6 +57,38 @@ function away(w, kind, job, secs = 0) {
   solo.set(w.id, x);
   return x;
 }
+function visitProp(w, kind, target, job, secs = 0) {
+  if (!target) return false;
+  const spot = by(w, target, kind === 'arcade' ? [0, 1] : undefined);
+  if (!spot) return false;
+  away(w, kind, { ...job, spot, look: [target.x, target.z] }, secs);
+  return true;
+}
+
+export function availableInLounge(s) {
+  const w = workers.get(s.id);
+  return w && resting(w, s) && !w.chore && !w.after && !w.onBreak && !w.outing && !w.street && !w.offstage &&
+    !w.wcBusy && !w.liftHold && !w.liftWait && !w.doze && !w.queued && !solo.has(s.id) && (free(w) || asleep(w));
+}
+
+export function requestLoungeAction(kind, target, label, effect) {
+  if (busy(kind)) return tr('paseo.lounge.inProgress');
+  const candidates = [...sessions.values()].filter(availableInLounge);
+  if (!candidates.length) return tr('paseo.lounge.noAgent');
+  for (const s of candidates) {
+    const w = workers.get(s.id);
+    const started = visitProp(w, kind, target, {
+      line: label, anim: kind === 'arcade' ? 'console' : 'tidy', hold: 1.4, linger: 2,
+      arrived: () => { if (!called(sessions.get(s.id), w)) effect(); },
+    });
+    if (started) {
+      plan.started([s.id], kind);
+      return tr('paseo.lounge.assigned', { name: dn(s), action: label });
+    }
+  }
+  return tr('paseo.lounge.unreachable');
+}
+
 const SOLO = {
   nap(w) {
     const seat = sofa().find((s) => !s.by); if (!seat) return false;
@@ -65,14 +97,10 @@ const SOLO = {
     return true;
   },
   fish(w) {
-    const spot = by(w, AQ); if (!spot) return false;
-    away(w, 'fish', { spot, look: [AQ.x, AQ.z], anim: 'tidy', hold: 1.4, linger: 5, line: tr('paseo.leisure.fish'), arrived: () => feedFish() });
-    return true;
+    return visitProp(w, 'fish', AQ, { anim: 'tidy', hold: 1.4, linger: 5, line: tr('paseo.leisure.fish'), arrived: () => feedFish() });
   },
   arcade(w) {
-    const spot = by(w, ARC, [0, 1]); if (!spot) return false;   // (its stick and buttons are on the +z side)
-    away(w, 'arcade', { spot, look: [ARC.x, ARC.z], anim: 'console', line: tr('paseo.leisure.arcade'), arrived: () => { state.arcCoin = state.sim + 3; } }, rand(...LEISURE.arcade));
-    return true;
+    return visitProp(w, 'arcade', ARC, { anim: 'console', line: tr('paseo.leisure.arcade'), arrived: () => { state.arcCoin = state.sim + 3; } }, rand(...LEISURE.arcade));
   },
   // brewed at the machine, then drunk at a dining chair (the second leg starts in updateLeisure)
   cup(w) {

@@ -52,6 +52,10 @@ export default {
   'props.karaoke.idle': 'Bilik karaoke sedang kosong',
   // the lively floor (paseo-leisure.js): what someone says on the way to a rest of their own
   'paseo.leisure.nap': 'Tidur sebentar',
+  'paseo.lounge.assigned': '{name} sedang menuju lokasi · {action}',
+  'paseo.lounge.noAgent': 'Tidak ada agen yang sedang luang di kantor.',
+  'paseo.lounge.inProgress': 'Seorang agen sedang melakukannya.',
+  'paseo.lounge.unreachable': 'Tidak ada agen yang bisa mencapai tempat itu.',
   'paseo.leisure.fish': 'Lagi kasih makan ikan',
   'paseo.leisure.arcade': 'Main satu ronde di arkade',
   'paseo.leisure.cup': 'Lagi bikin kopi',
