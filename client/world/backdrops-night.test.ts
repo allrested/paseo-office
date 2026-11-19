@@ -73,5 +73,10 @@ test("builds the city only when the street is enabled", () => {
   h.host.street = true;
   setup();
   expect(h.buildCity).toHaveBeenCalledTimes(1);
+  expect(state.nightManual).toBe(false);
+  holdNight(true);
   expect(state.nightManual).toBe(true);
+  applyNight(false);
+  expect(state.nightManual).toBe(false);
+  expect(h.setNight).toHaveBeenLastCalledWith(false);
 });

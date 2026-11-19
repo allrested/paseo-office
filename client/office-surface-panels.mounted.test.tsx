@@ -10,7 +10,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { AccessibilityInfo } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps, SettingsState } from "@getpaseo/plugin/client";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import type { ChatMessage, OfficeAgent, OfficeEvent } from "../shared/contracts.js";
 import { buildOfficeModel } from "../shared/model.js";
 import { officeHostSettings, officeDeviceSettings } from "../shared/settings.js";
@@ -210,8 +210,14 @@ let compact: boolean;
 let container: HTMLElement;
 let root: Root;
 
+let OfficeSurface: typeof import("./office-surface.js").OfficeSurface;
+
+// Import after the browser shims are installed, before timing the first interaction.
+beforeAll(async () => {
+  ({ OfficeSurface } = await import("./office-surface.js"));
+});
+
 async function mount(): Promise<void> {
-  const { OfficeSurface } = await import("./office-surface.js");
   const props = {
     theme: THEME,
     layout: { compact, platform: "web" },

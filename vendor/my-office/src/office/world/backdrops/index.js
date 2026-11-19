@@ -24,7 +24,7 @@ export function applySurface() {
 }
 /** Night with Paseo's dark theme, day with the light one: never by the clock. */
 export function applyNight(on) {
-  state.nightManual = host.street;
+  state.nightManual = false;
   setNight(on);
   applySurface();
 }

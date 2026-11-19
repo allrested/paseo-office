@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// The street's stand-ins (people/outings.js, people/guard.js): the scenes taken from my-office import
-// `resting`, `called` and `resume` from them, and read the street as absent.
+// The street-off path in the real outings and guard modules.
 import { expect, test, vi } from "vitest";
 
 vi.mock("../../vendor/my-office/src/office/people/workers.js", () => ({
+  workers: new Map(),
   sessions: new Map([
     ["rest", { status: "rest", bg: [] }],
     ["busy", { status: "work", bg: [] }],
@@ -31,13 +31,13 @@ const person = (id: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-test("there is no street", () => {
+test("without a city the guard and outings stay inactive", () => {
   expect(outings.street()).toBeNull();
-  expect(outings.mainExit({})).toBeNull();
+
   const done = vi.fn();
   outings.walk({}, null, [], done);
   expect(done).toHaveBeenCalledTimes(1);
-  expect(guard.guardPost({})).toBeNull();
+
   expect(guard.marshal.on).toBe(false);
   expect(() => guard.marshal.say("x")).not.toThrow();
   expect(() => outings.updateOutings()).not.toThrow();
@@ -70,4 +70,9 @@ test("resume puts someone back to rest at the desk", () => {
   const busy = { ...person("busy"), say: vi.fn(), hush: vi.fn(), P: { held: {} } };
   outings.resume(busy, false);
   expect(busy.anim).toBe("type");
+});
+
+test("a real stretch of pavement locates the guard post beside the street exit", () => {
+  const exit = { L: { axis: "x" }, a: [0, 0], b: [10, 0], s: 5 };
+  expect(guard.guardPost(exit)).toBeCloseTo(3.1);
 });

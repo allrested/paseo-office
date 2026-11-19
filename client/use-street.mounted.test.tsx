@@ -14,7 +14,11 @@ import type { DeviceSwitch } from "./use-device-switch.js";
 
 type Device = SettingsState<typeof officeDeviceSettings.schema>;
 type Values = Extract<Device, { status: "ready" }>["values"];
-type Stored = { status: "loading" } | { status: "ready"; values: Values; revision: string };
+type Stored =
+  | { status: "error"; error: string }
+  | { status: "invalid"; error: string; revision: string }
+  | { status: "loading" }
+  | { status: "ready"; values: Values; revision: string };
 
 let stored: Stored;
 let saved: { values: Values; revision: string }[];
@@ -144,4 +148,16 @@ test("device defaults respect the available screen", async () => {
     { platform: "ios", compact: true },
   ])
     expect(streetDefault(layout)).toBe(false);
+});
+
+test.each([
+  { status: "error", error: "unavailable" } as const,
+  { status: "invalid", error: "unreadable", revision: "r1" } as const,
+])("the scene can start after a terminal $status reading", async (read) => {
+  stored = read;
+  await mount();
+  expect(current.on).toBe(true);
+  await act(async () => current.set(false));
+  expect(current.on).toBe(false);
+  expect(current.unsaved).toBe(true);
 });

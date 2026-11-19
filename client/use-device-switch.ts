@@ -67,5 +67,10 @@ export function useDeviceSwitch(field: "street" | "sound", fallback: boolean): D
     !tried.stored &&
     tried.value === wanted &&
     tried.revision === stored?.revision;
-  return { on: wanted ?? stored?.values[field] ?? (stored ? fallback : null), unsaved, set };
+  // The floor waits for the street choice before starting. A finished, unreadable
+  // document falls back to the layout default and can still be overridden for this visit.
+  const streetUnreadable =
+    field === "street" && (settings.status === "error" || settings.status === "invalid");
+  const on = wanted ?? stored?.values[field] ?? (stored || streetUnreadable ? fallback : null);
+  return { on, unsaved: unsaved || (wanted !== null && streetUnreadable), set };
 }
