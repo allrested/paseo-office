@@ -90,13 +90,26 @@ test("a host with no settings draws the company floor", () => {
   expect(officeHostSettings.schema.parse({})).toMatchObject({ floorPlan: "pro" });
 });
 
-test("the cozy room is kept, and no other plan is offered yet", async () => {
+test("the cozy room is kept, and only these plans are offered yet", async () => {
   expect(hostIssues({ floorPlan: "cozy" })).toEqual([]);
   expect(await upgraded({ floorPlan: "cozy" }, 4)).toMatchObject({ floorPlan: "cozy" });
-  // Headquarters comes with piece 6; a name the scene has but this build does not offer is refused.
-  expect(officeHostSettings.schema.safeParse({ floorPlan: "hq" }).success).toBe(false);
-  expect(officeHostSettings.schema.safeParse({ floorPlan: "" }).success).toBe(false);
   expect(FLOOR_PLANS).toEqual(["pro", "cozy"]);
+});
+
+test("a plan this build does not know reads as the company floor and the rest is kept", async () => {
+  const stored = {
+    agentTools: false,
+    notesFolder: "/n",
+    notesTimeZone: "Asia/Riyadh",
+    notesDays: [1, 3],
+    jiraProjects: "SHOP",
+    sentryOrg: "acme",
+    sentryProjects: "web",
+    sentryUrl: "https://sentry.acme.dev",
+  };
+  for (const floorPlan of ["hq", "", 3, null]) {
+    expect(await upgraded({ ...stored, floorPlan }, 4)).toEqual({ ...stored, ...COMPANY });
+  }
 });
 
 test("a document with its own days keeps them", async () => {

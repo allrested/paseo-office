@@ -48,7 +48,8 @@ const HostValuesSchema = z.object({
     .array(z.number())
     .default([1, 2, 3, 4, 5])
     .transform((days) => [...days].sort((a, b) => a - b)),
-  floorPlan: z.enum(FLOOR_PLANS).default("pro"),
+  // A plan this build does not know (a later build's, or a hand edit) reads as the company floor.
+  floorPlan: z.enum(FLOOR_PLANS).default("pro").catch("pro"),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
