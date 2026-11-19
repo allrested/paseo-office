@@ -188,3 +188,17 @@ test("without the host's board the scene keeps upstream's rota", () => {
   const kept = JSON.parse(localStorage.getItem("office-duty") ?? "{}");
   expect(Object.keys(kept.who)).toEqual(["cups", "trash", "plants", "table"]);
 });
+
+test("HR posts the host's duties in the morning, once a day", () => {
+  seat("a1", "Planner");
+  host.duties = [{ ...pretend, chore: "plants", state: "done" }];
+  const afternoon = h.now;
+  h.now = new Date(2026, 10, 19, 9, 0);
+  try {
+    lookOnce();
+    lookOnce();
+  } finally {
+    h.now = afternoon;
+  }
+  expect(h.chat).toEqual(["dutyRoster"]);
+});

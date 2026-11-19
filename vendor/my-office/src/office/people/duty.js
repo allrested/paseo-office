@@ -178,6 +178,11 @@ function handBack(J) {
 function hostLook(list, m, today) {
   if (actedDay !== today) { acted = new Set(); counts = new Map(); actedDay = today; }
   if (list.length) { const was = st; st = saw(st, list.map((p) => p.key)); if (st !== was) save(); }
+  // the host's list in the group chat, from HR, once a morning (no grumble: a pretend duty owed is nobody's)
+  if (st.told !== today && list.length && host.duties.length && m >= 480 && m < 600) {
+    st.told = today; save();
+    chatLife('dutyRoster', { list: dutyLine(host.duties, tr('paseo.duty.open')), every: 12 * 3600e3 });
+  }
   if (job || !list.length || napOn) return;
   const figures = list.map((p) => ({ id: p.w.id, ready: ready(p.w) }));
   const next = nextJob({ duties: host.duties, acted, counts, figures, minutes: m, force: FORCE, pile: pile(st, m) });
