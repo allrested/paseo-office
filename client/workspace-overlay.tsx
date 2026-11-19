@@ -14,6 +14,7 @@ import type { OfficeStyles } from "./styles.js";
 import { workspaceOverlayUrl } from "./workspace-overlay-route.web.js";
 
 interface WorkspaceOverlayProps {
+  dockRequest: object;
   hostId: string;
   workspaceId: string | null;
   agentId: string | null;
@@ -159,6 +160,7 @@ export function WorkspaceOverlay(props: WorkspaceOverlayProps) {
       icon={headerIcon}
       open
       size="wide"
+      dockRequest={props.dockRequest}
       onOpenChange={change}
       headerActions={inHeader ? toolbar : undefined}
     >

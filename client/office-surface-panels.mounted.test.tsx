@@ -1187,6 +1187,13 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
       expect(workspace.querySelector("iframe")).toBe(workbench);
       expect(steps.isConnected && steps.getAttribute("aria-pressed") === "true").toBe(true);
       expect(workspace.querySelector('[aria-label="Close"]')).toBeNull();
+      await press("Minimize workspace");
+      expect(workspace.open).toBe(false);
+      expect(workbench?.isConnected).toBe(true);
+      await press("Restore Shop · shop-api");
+      expect(workspace.open).toBe(true);
+      expect(workspace.querySelector("iframe")).toBe(workbench);
+      expect(steps.getAttribute("aria-pressed")).toBe("true");
       await press("Workspace board");
       expect(surface.querySelectorAll("dialog[open]")).toHaveLength(2);
       await press("Close shop-api board");
