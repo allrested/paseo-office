@@ -66,4 +66,3 @@ export function updateWeather(dt) {
   }
   if (wx.flash > 0) { wx.flash -= dt; hemi.intensity = (night ? 0.18 : 0.25) + (wx.flash > 0.22 || (wx.flash > 0.08 && wx.flash < 0.14) ? 3.2 : 0); if (wx.flash <= 0) hemi.intensity = night ? 0.18 : 0.25; }
 }
-

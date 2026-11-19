@@ -182,7 +182,7 @@ const STYLE = `
 @media (max-width: 720px) { .tb-fp span:last-child, .seg-btn > span:last-child { display: none !important; } .tb-fp { padding: 0 11px; } .seg-btn, .seg-btn:hover, .seg-btn[aria-pressed="true"] { padding: 0 10px; } }
 /* (with it, at 390 px with a mouse Walk in still ran 30 px past the right edge: the buttons and the groups sit closer.
    At 390 px the bar's content may be 366 px: views 4 x 28 + 3 x 2 + 6 = 124, zoom 108, tools 90, Walk in 38, 3 gaps of 2) */
-@media (max-width: 520px) { .toolbar { gap: 2px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 6px; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
+@media (max-width: 520px) { .toolbar { gap: 2px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 6px; transition-property: background, color; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
 body.is-photo .toolbar { display: none; }
 /* Photo mode: the office alone, with one bar to frame and take the picture */
 body.is-photo #stage-wrap > :not(#stage):not(#photo-bar):not(.clip-cover) { display: none !important; }
