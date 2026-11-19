@@ -235,21 +235,23 @@ but one shop's tune. They are off until turned on. The switch is the `sound` fie
 The host sends the switch to the scene with `setSound`; the button asks for a change with
 `onSound`, and the host stores it and answers with `setSound`. The page starts off.
 
-A browser lets a page start audio only inside a press, so the scene's audio starts there: a press
-on the button plays at once, and a press anywhere in the scene starts the audio the switch turned
-on. A probe (`paseo-sound.js`) finds out whether the frame allows audio at all. It runs inside a
-real press only (not for Escape or a bare modifier key, and not while the page has no user
-activation), and makes and closes a context of its own. A page with no Web Audio is "not
-available" at once, for good: the button's icon is dimmed, it says "Sound is not available
-here", and does nothing. A press after which no context ran makes the button the same, and holds the scene's sound
-off without changing the setting; the next press tries again. Once a context runs the button can be
-used again and the scene follows the setting with no further press: on if the setting is on. A
-press on the button itself while audio is held off waits for the probe that press started: if audio
-then starts, the press turns sound on as any press on it does; if not, it says "This app does not
-let the office play sound." The host gives the scene no toast, so the scene shows such a line itself:
-a note over the floor's toolbar, read out politely by a screen reader, for four seconds, a new one
-replacing it (a refused full screen, and my-office's own lines from its games and karaoke, show the
-same way).
+A browser lets a page start audio only inside a press, so the scene's audio starts there: a press on
+the button plays at once, and a press anywhere in the scene starts the audio the switch turned on. A
+probe (`paseo-sound.js`) finds out whether the frame allows audio at all. It runs inside a real
+press only (not for Escape or a bare modifier key, and not while the page has no user activation),
+and makes and closes a context of its own. A page with no Web Audio is "not available" at once, for
+good: the button's icon is dimmed, it says "Sound is not available here", and a press on it shows
+the note "This app does not let the office play sound." and changes nothing. A press after which no
+context ran makes the button the same, and holds the scene's sound off without changing the setting;
+the next press tries again. Once a context runs the button can be used again and the scene follows
+the setting with no further press: on if the setting is on. A press on the button itself while audio
+is held off waits for the probe that press started: if audio then starts, the press turns sound on
+as any press on it does; if not, it says "This app does not let the office play sound." A mouse
+press on the speaker icon itself is lost when that press's probe ends, so it does nothing (see
+[verified.md](verified.md)). The host gives the scene no toast, so the scene shows such a line
+itself: a note over the floor's toolbar, read out politely by a screen reader, for four seconds, a
+new one replacing it (a refused full screen, and my-office's own lines from its games and karaoke,
+show the same way).
 
 A Sound save the device refuses is said where the switch was used: under the settings page's
 switches, or in the floor's view corner, where the view switch's own refusal shows (that one first

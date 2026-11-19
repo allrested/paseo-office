@@ -18,8 +18,8 @@ switch and the made-up names"). It was installed by Git, with three agents of th
 provider in a workspace.
 
 A fifth look, on 2026-11-19, was of the sounds (see "Sound"). It was installed by Git, with three
-agents of the Mock provider in a workspace, and it found one fix, which was installed and looked at
-again.
+agents of the Mock provider in a workspace. A sixth, the same day, was a second look at the sounds
+after the fixes the fifth one led to.
 
 ## Install
 
@@ -174,23 +174,28 @@ which come from the screenshots.
 
 ## Sound
 
-The fifth look was at the branch that adds the sounds: first at commit
-`d98d46a19a055f43c38689b672a3cb851d0725bf`, then at `8d6399e`, which brings the toolbar's buttons
-closer at 520 px and narrower (see "The toolbar at 390 px"). Both were installed by Git on the
-same stock 0.16.2; `paseo plugin ls` showed each `running`, from git, at its commit, and the log
-held `Loading plugin` and `Plugin ready`, about three seconds apart, and no error. A scratch folder
-was the workspace "Acme shop", with the three Mock agents of the fourth look.
+Sound was looked at twice. The first look was at commit `d98d46a19a055f43c38689b672a3cb851d0725bf`,
+then at `8d6399e`, which brought the toolbar's buttons closer at 520 px and narrower. It found five
+things, which were fixed. The second look was at `7d11e772cb3a0488f7bd9d67738107f330e4a985`, with
+those fixes. Each was installed by Git on the same stock 0.16.2. `paseo plugin ls` showed each
+`running`, from git, at its commit, and the log held `Loading plugin` and `Plugin ready`, about
+three seconds apart, and no error. A scratch folder was the workspace "Acme shop", with three Mock
+agents. The browser console held no error or warning from the plugin, at either width, in either
+look.
 
 The browser has no sound card anyone can hear, so "audible" was not checked. What was checked is
 that the scene makes and starts Web Audio nodes while Sound is on and not while it is off: before
 the page loaded, a script in every frame wrapped `AudioContext` and its `createOscillator`,
 `createBufferSource` and `start` with counters. In this browser a context made without a press
 runs at once: its autoplay rule is the loosest one, so "audio starts only inside a press" could not
-be told apart from "audio starts" here.
+be told apart from "audio starts" here. The rule could not be made stricter (the browser starts
+with the kit's own flags). Frames that refuse audio were made with scripts instead: one with no
+`AudioContext` or `webkitAudioContext`, and one whose probe's first context (or first two) reports
+"suspended" and never resumes.
 
 The device's setting was read, after each press, from the page's localStorage key
-`@paseo:plugin-device-settings:office/office-device`. The page was opened with fresh storage, so
-the key was absent until the first press.
+`@paseo:plugin-device-settings:office/office-device`. In the first look the page was opened with
+fresh storage, so the key was absent until the first press.
 
 | After                                | The key's value                                                                       |
 | ------------------------------------ | ------------------------------------------------------------------------------------- |
@@ -202,7 +207,9 @@ the key was absent until the first press.
 | Then the settings page's switch, off | `{"version":2,"values":{"threeD":true,"view":"3d","rungIncidents":{},"sound":false}}` |
 
 The same values were read at 390 px after each tap on the toolbar's button and on the settings
-page's switch. "Unable to save" did not show.
+page's switch.
+
+### The first look
 
 Seen at 1280 px:
 
@@ -223,71 +230,100 @@ Seen at 1280 px:
 - A second tab held the settings page while the toolbar's button was pressed in the first. The
   second tab's switch did not follow, after 8 and after about 30 seconds; after a reload of that tab
   it showed the stored value. The settings page opened in the same tab after the press showed it.
-- With no Web Audio in the frame (`AudioContext` and `webkitAudioContext` removed by a script before
-  the scene started), the button was dimmed and crossed out, its label and tooltip "Sound is not
-  available here" (the dimming made the tooltip faint too; fixed after this look, to be seen again:
-  only the icon is dimmed now), and a press on it changed nothing: no stored value, and no toast. The button's
-  toast ("This app does not let the office play sound.") is not shown anywhere: the client gives the
-  scene no `onToast`, so every toast of the scene is dropped (fixed after this look, to be seen
-  again: with no `onToast` the scene now shows the line itself, in a note over the toolbar; and a
-  Sound save the device refuses after a press on the button is now said in the floor's view
-  corner, which was not tried in this look). With Sound then turned on in the
-  settings and the office opened again, the button stayed off and dimmed.
-- A frame whose first press does not start a context was made with a script that made the probe's
-  first context report "suspended" and never resume. Escape and Shift made no probe. The first
-  press on the floor made the button dimmed with "Sound is not available here" and turned the
-  scene's sound off; a second press probed again, the context ran, and the button could be used:
-  it showed off, though the setting was still on, until it was pressed, and then on. Fixed after
-  this look, to be seen again: the scene now keeps the setting through a block and turns sound on
-  by itself once a press starts audio, and a press on the button whose own probe starts audio
-  turns sound on instead of saying it is unavailable.
-- The autoplay rule could not be made stricter: the browser starts with the kit's own flags, and a
-  context made without a press ran. A frame that refuses audio was made with the script above
-  instead.
+- With no Web Audio, the button was dimmed and crossed out, its label and tooltip "Sound is not
+  available here". Escape and Shift made no probe in a frame that refuses audio.
 
-Seen at 390 px (touch, a coarse pointer, as a phone):
+Seen at 390 px (touch, a coarse pointer, as a phone): the toolbar holds Overview, Desks, Meeting
+room, Servers, the zoom, Full screen, Photo mode and the speaker button; Walk in is shown for a
+fine pointer only. A tap on the button turned it on and stored `sound: true`; a tap turned it off.
+The settings page wraps the 3D, 2D and List switch and Sound onto a row under Wake agents and Agent
+tools; the Sound switch is 96 by 44 px.
 
-- The toolbar holds Overview, Desks, Meeting room, Servers, the zoom, Full screen, Photo mode and
-  the speaker button; Walk in is shown for a fine pointer only. The bar ends 19 px inside the
-  frame's right edge. A tap on the button turned it on and stored `sound: true`; a tap turned it
-  off; the second tap also made karaoke's context, as at 1280 px.
-- The settings page wraps the 3D, 2D and List switch and Sound onto a row under Wake agents and
-  Agent tools; the Sound switch is 96 by 44 px.
+What the first look found, each fixed before the second: the dimmed button also dimmed its tooltip;
+the button's "not available" line was never shown, because the client gives the scene no
+`onToast`; after a refused probe was followed by one that ran, the button showed off though the
+setting was on; a press on the button while audio was held off was answered "not available" even
+when its own probe started audio; and with a mouse at 390 px Walk in ran past the frame's right
+edge.
 
-### The toolbar at 390 px
+### The second look
 
-With the button in, the bar no longer fit at 390 px with a mouse. The look's browser at 390 px has
-a touch screen, which hides Walk in, so Walk in was shown by hand to measure it (the bar's sizes do
-not depend on the pointer). At `d98d46a` the bar's content was 400 px wide inside 378 px, and
-Walk in ended 16 px past the frame's right edge. `8d6399e` adds `.tb-tools { gap: 0; }` and
-28 px buttons to the 520 px rule; after it the content is 386 px inside 378 px, and Walk in ends
-2 px past the frame's edge and over the bar's border. It still does not fit, by 8 px. Fixed after
-this look, to be seen again: the 520 px rule now puts 2 px between the groups and 6 px of padding in
-the views, which by the rules makes the content 366 px, the most the bar holds at 390 px.
+The second look used the same counters and the same refusing frames, with the stored setting
+written before the page loaded where a case needs it on or off.
 
-The browser console held no error or warning from the plugin and no Paseo error, at either width.
+- The setting kept through a block (1280 px): with Sound stored on and the first probe made to
+  fail, a press on the floor made the button dimmed with "Sound is not available here". A second
+  press on the floor, whose probe ran, made the button show on by itself, with no press on it; a
+  press on a floor lamp then made one oscillator and started it. The stored document said
+  `sound: true` throughout: the probes did not write it.
+- A press on the button while audio is held off (1280 px): with Sound stored off and the first
+  probe made to fail, a press near the button's edge, whose own probe ran, turned sound on, stored
+  `sound: true`, and showed no "not available" note. With the first two probes made to fail, a
+  press on the button left it dimmed and, about 1.9 s later, showed the note "This app does not let
+  the office play sound."; the stored value stayed off. A press in the middle of the button, on the
+  speaker icon, did not do what the edge did: see "Found in the second look".
+- The scene's note (1280 and 390 px): with no Web Audio, a press on the button showed "This app
+  does not let the office play sound." in a note over the toolbar, light text (13 px, weight 600)
+  on the page's raised surface, 14 px above the toolbar and well under the view switch's corner. At
+  1280 px it was 303 by 40 px; at 390 px (touch) 301 by 40 px, centred, 44 px from each side. It
+  was there 3.0 s after the press and gone by 3.7 s (the time counted from when the press had been
+  sent, which itself takes time in this browser), and a second press replaced it with one note.
+  For the 390 px screenshot the note's timer was held by a script, since a screenshot there takes
+  longer than four seconds.
+- A refused save (390 px, mouse): a script made the page's `localStorage.setItem` throw a quota
+  error for the device setting's key. A press on the floor's Sound button turned it on and the
+  view corner showed, under the 3D, 2D and List switch, "Unable to save the Sound setting on this
+  device. It holds until this screen is closed." The settings page's Sound switch showed the same
+  line under its switches after a tap, and the switch held on. Nothing was stored.
+- The toolbar with a mouse at 390 px: the look's browser at 390 px has a touch screen, and turning
+  its touch emulation off did not make it report a fine pointer, so a script made the scene's own
+  `(pointer: fine)` question answer yes; the scene then showed Walk in itself. The bar's sizes do
+  not depend on the pointer. Measured in CSS pixels against the 390 px frame: the bar from 5 to 385
+  (380 wide), its content 378 wide with nothing to scroll, the buttons 28 px wide (Walk in 38),
+  and the last, Walk in, from 340 to 378: 7 px inside the bar's right edge and 12 px inside the
+  frame's. A view button under the pointer changed none of it. Only 390 px was measured, not 320.
+- The unavailable button's tooltip (1280 px): its icon at 0.45 opacity, the button and its tooltip
+  at full strength, as Photo mode's tooltip.
+
+#### Found in the second look
+
+- A mouse press on the speaker icon in the middle of the Sound button is lost when that press's
+  probe ends: the probe redraws the icon between the press and the click, and the browser then
+  sends no click. Seen twice. At 390 px with a mouse, the first press on the button in a fresh page
+  (no probe yet) gave `pointerdown` and `pointerup` on the icon and no `click`: Sound stayed off and
+  nothing was saved; the second press worked. At 1280 px, with audio held off, a press on the icon
+  whose probe ran left Sound off with no note, and the button usable; the same press 3 px inside
+  the button's corner turned Sound on. A tap on a touch screen was not lost in either look.
+- Space on the focused Sound button (1280 px), with Sound stored on and the first probe made to
+  fail: Sound ended off, the button usable and crossed out, and the stored document said
+  `sound: false`; no note showed. The key's probe ran, so the scene most likely turned sound on by
+  itself first, and the click the key makes then asked for the opposite.
+- With a mouse, the button's own tooltip ("Sound is not available here") stays while the pointer is
+  on the button, and covers the lower right corner of the note.
 
 ## Not seen, and why
 
-| What                                                 | Why                                                                                                                                                     |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The card for an agent                                | The fourth look had Mock agents at desks; no card was opened                                                                                            |
-| A resting agent's tag on the 3D floor                | Shown only while it walks, is hovered or chosen; none of these done                                                                                     |
-| The view choice kept across a reload                 | The fourth look read the key after each press, not after a reload                                                                                       |
-| The names in text read at 390 px                     | The text was gathered at 1280 px only                                                                                                                   |
-| The office's tools inside an agent's session         | No agent session. The page shows Agent tools on, nothing more                                                                                           |
-| A stand-up run and the notes it writes               | The 8:00 run did not come due, and the bell was not pressed                                                                                             |
-| An incidents check                                   | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
-| The gear at 390 px                                   | A click on it timed out with the sheet open. It was not tried again                                                                                     |
-| The phone app                                        | Only a browser was used                                                                                                                                 |
-| A session's tab, its conversation and a reply        | No session was opened; the first three looks had no agent                                                                                               |
-| A permission answered, and Stop on a session         | Not tried; the fourth look's waiting plan approval was left alone                                                                                       |
-| An agent created from the form                       | Create was not pressed: it would start a real provider session                                                                                          |
-| The session tab row scrolling when it is full        | Needs several session tabs, so agents                                                                                                                   |
-| The agent card's Stop and the Host card close        | 0.16.2 lacks `cancel()` and `closeRuntime()`; see the README                                                                                            |
-| Sound heard at all, on the desktop app and a browser | No sound card here; the owner's to check on the host after the update                                                                                   |
-| The phone's script frame and sound                   | Whether the first tap starts audio, whether the button reads "not available", and whether an incident's siren is heard: the owner's, on the Android app |
-| The second tap on a real touch screen                | Seen only with the browser's touch emulation; the owner's, on a phone                                                                                   |
-| Karaoke singing at the lounge's TV with Sound on     | Needs the walk (W A S D) to the TV; the owner's                                                                                                         |
-| iOS and its ring switch                              | No iOS device; unknown                                                                                                                                  |
-| An incident's siren with Sound on and off            | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
+| What                                                                         | Why                                                                                                                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The card for an agent                                                        | The fourth look had Mock agents at desks; no card was opened                                                                                            |
+| A resting agent's tag on the 3D floor                                        | Shown only while it walks, is hovered or chosen; none of these done                                                                                     |
+| The view choice kept across a reload                                         | The fourth look read the key after each press, not after a reload                                                                                       |
+| The names in text read at 390 px                                             | The text was gathered at 1280 px only                                                                                                                   |
+| The office's tools inside an agent's session                                 | No agent session. The page shows Agent tools on, nothing more                                                                                           |
+| A stand-up run and the notes it writes                                       | The 8:00 run did not come due, and the bell was not pressed                                                                                             |
+| An incidents check                                                           | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
+| The gear at 390 px                                                           | A click on it timed out with the sheet open. It was not tried again                                                                                     |
+| The phone app                                                                | Only a browser was used                                                                                                                                 |
+| A session's tab, its conversation and a reply                                | No session was opened; the first three looks had no agent                                                                                               |
+| A permission answered, and Stop on a session                                 | Not tried; the fourth look's waiting plan approval was left alone                                                                                       |
+| An agent created from the form                                               | Create was not pressed: it would start a real provider session                                                                                          |
+| The session tab row scrolling when it is full                                | Needs several session tabs, so agents                                                                                                                   |
+| The agent card's Stop and the Host card close                                | 0.16.2 lacks `cancel()` and `closeRuntime()`; see the README                                                                                            |
+| Sound heard at all, on the desktop app and a browser                         | No sound card here; the owner's to check on the host after the update                                                                                   |
+| The phone's script frame and sound                                           | Whether the first tap starts audio, whether the button reads "not available", and whether an incident's siren is heard: the owner's, on the Android app |
+| The second tap on a real touch screen                                        | Seen only with the browser's touch emulation; the owner's, on a phone                                                                                   |
+| Karaoke singing at the lounge's TV with Sound on                             | Needs the walk (W A S D) to the TV; the owner's                                                                                                         |
+| iOS and its ring switch                                                      | No iOS device; unknown                                                                                                                                  |
+| An incident's siren with Sound on and off                                    | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
+| Sound's note with reduced motion, in photo mode, and read by a screen reader | Not tried                                                                                                                                               |
+| A refused full screen and my-office's game and karaoke lines in the note     | Not tried                                                                                                                                               |
