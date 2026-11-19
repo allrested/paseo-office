@@ -474,6 +474,37 @@ These checks used a local service, date overrides and software WebGL. The live O
 service, a calendar-driven holiday on a real device, audible thunder, screen-reader output and
 phone graphics performance remain host or device checks.
 
+## Languages (piece 9)
+
+Stock Paseo 0.16.2 installed the plugin from Git at `43e551e` in a fresh daemon home.
+Settings > Plugins > Office 3D showed the five language choices with Automatic selected.
+Selecting Tiếng Việt and opening the office set the frame’s HTML language to `vi`. At 1280 px
+the four view labels read “Toàn cảnh”, “Bàn làm việc”, “Phòng họp” and “Máy chủ”. The meeting
+room card read “Phòng họp”, and Walk in opened the “Đang hoá thân” overlay. At 390 px the same
+card and accessible labels were present. The page reported no translation-hook error.
+
+Returning from Settings with Back reopened the office in the saved language. In Thai the meeting
+room card said “ห้องประชุม” and Walk in said “เดินเที่ยวออฟฟิศ”. In Indonesian they said
+“Ruang rapat” and “Berkeliling kantor”. Both widths showed the same meeting-room text and ten
+room chips. Automatic and explicit English both restored “Meeting room” and the English camera controls.
+The browser recorded one words RPC for Thai and one for Indonesian during these changes.
+
+A resize to 390 px exposed a brief toolbar overflow during the padding transition. The stock
+daemon was updated by Git to `cefda59` to check the fix. The browser’s default Linux fonts used
+the same missing-glyph box for different Thai characters. A second browser had Noto Sans Thai
+available through a temporary font configuration. It rendered distinct Thai glyphs. The plugin
+ships no font. For the measurements, the verification browser slowed software WebGL animation
+and paused it after the scene had built its room chips. In all three downloaded languages
+the toolbar controls fit inside the 600 px floor at a 1280 px viewport and between x=15 and
+x=378 at 390 px. All ten chips fit their text. Each language generated one words request, and
+the daemon log recorded no failed words request. After the look the test daemon stopped and
+its port closed.
+
+The mounted client tests exercise failed downloads, the English fallback note, and web and
+native frame replacement. The daemon run did not force an RPC failure. A real phone WebView,
+relay delivery, speech bubbles and walk prompts over working agents, karaoke and the lounge
+games still need a device and a populated office.
+
 ## Not seen, and why
 
 | What                                                                            | Why                                                                                                                                                     |
