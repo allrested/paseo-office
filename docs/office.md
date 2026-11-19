@@ -201,7 +201,7 @@ titles for the banner. It receives its language, its dictionary and the daily-li
 writes scene state to the app origin's `localStorage` under keys that start with `office-`:
 which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
 the host's setting overwrites at each start), that the tour was seen (`office-tips`), and the
-clip's shape and music choice (`office-clip-shape`, `office-clip-music`), the duty roster, drill and farewell history. It reads
+clip's shape and music choice (`office-clip-shape`, `office-clip-music`), the cups in the pantry's sink (`office-duty`), drill and farewell history. It reads
 `office-autocam`.
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
@@ -392,6 +392,43 @@ the user's posts arrive as a user prompt. A post naming an agent that has not ru
 delivered after that agent's first turn or the next post that names it. Pending mention
 notifications are held in memory.
 
+## The duty board
+
+The pantry's duty board is kept on the host. You choose its duties: up to 12, each with a name (up
+to 40 characters), the weekdays it is due and, if an agent should do it, instructions (up to 2,000
+characters). A host starts with the four pantry chores, Monday to Friday, without instructions. The
+list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`).
+
+At 8:00 in the notes' time zone ("Time zone", the host's when empty) each duty due that day is
+posted as a task on the board `duty`, a host-wide board like the lobby's. The run also takes the
+done duties of earlier days off the board. When the office starts, and when you save the list, a
+duty due today that has no post yet is posted at once if it is past 8:00. A duty still open or
+claimed when its day ends is owed: it stays on the board and is not posted again. Removing a duty
+takes its open post off the board, and a claimed one stays until it is done. A new name or new
+instructions change today's open post.
+
+A duty with instructions goes to an idle agent as a lobby to-do does, under the same rules: one
+task or duty at a time per agent, the wake limits, **Wake agents** and **Agent tools**. Its prompt
+starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
+completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
+a duty with `office_update`. Nobody posts to the duty board, not even from the office.
+
+A duty without instructions is pretend. No agent is asked, and an agent cannot claim it. On the 3D
+floor a free person acts it out during that chore's hours, and the view tells the host, which
+records it as done by that agent. When two devices both act it out, the first to report wins. With
+no 3D office open during those hours, it stays open and is owed.
+
+A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
+lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it
+too. It shows today's duties with who has each, with Mark done or Reopen, and the list with each
+duty's name, instructions and day buttons, saved whole. The scene is told each duty's name, its
+chore, its holder's title cut to 24 characters and its state, never its instructions
+(`worldDuties` in `client/world/adapter.ts`). The board and its tooltip show them, and the scene
+keeps no rota of its own. The four starting duties keep the cups, bin, plants and tables chores.
+For a duty you add, the person walks to the board and back. The person of an agent that holds a
+duty acts its chore out once. HR posts the day's list in the chat in the morning. The scene's part
+is `paseo-duty-plan.js` and `people/duty.js`.
+
 ## Settings
 
 The office's settings are a screen in its page under Settings > Plugins > Office 3D
@@ -488,9 +525,9 @@ server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
 ## Schedules
 
-The office runs two schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
-on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, and the
-incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
+The office runs three schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
+on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, the duty board
+at 08:00 every day in the same zone, and the incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
@@ -500,6 +537,9 @@ office sets them from its settings each time it starts and at each save, and sto
   it. The plugin's log says when a run is waiting.
 - A notes run that could only start on a later day than it was due is dropped, so no entry is
   written for the wrong day.
+- The duty board's run needs no Paseo API: it posts at once, and only handing a duty to an idle
+  agent waits for the API. When the office starts, today's duties not yet posted are posted;
+  an earlier day's are not.
 
 ## Incidents
 
@@ -604,7 +644,7 @@ the workspace, where it is in the changes to review. The office installs and rem
 
 ## Data
 
-The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`,
+The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.json`, `chat.json`,
 `notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger) and `lift.json` (the build last serviced). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
@@ -614,7 +654,7 @@ refuses a document that holds `undefined`, and the device then keeps nothing.
 
 ## Staff and daily life
 
-The indoor scenes cover packed lunches at the microwave, duty rosters, tea, the accountant, rounds,
+The indoor scenes cover packed lunches at the microwave, the duty board, tea, the accountant, rounds,
 HR, farewells, interns, reception and delivery staff, the altar, lift servicing, the post and the
 quarterly fire drill. They run on the office clock. During the 12:30–13:30 desk nap, the lively
 floor pauses new activities. Street outings are separate.
@@ -633,8 +673,8 @@ remaining and a sticker containing its short build ID and the servicing timestam
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | HR                     | Stand-up, birthday, trophy, promotion, farewell and its photo caption, drill notice and report, duty roster |
 | Receptionist           | Parcel, lift back in service, altar                                                                         |
-| Named agent            | Stairs, goodbye, parcel acknowledgement, apology for a missed chore                                         |
-| Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break, chore complaint                         |
+| Named agent            | Stairs, goodbye, parcel acknowledgement                                                                     |
+| Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break                                          |
 
 For most agent lines, reception can speak when nobody is resting. Chat photos are omitted.
 
