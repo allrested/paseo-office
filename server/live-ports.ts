@@ -105,6 +105,11 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
       // The daemon finds archived agents by id too; the queue would drop a post for one unsent.
       return result === null || wakeTargetOf(result.agent) === "gone" ? null : result.agent.id;
     },
+    // Waits for the API: the boards load, and copy the lobby claims, before any hook has run.
+    async workspaceOf(agentId) {
+      const result = await (await holder.wait()).agents.ref(agentId).refresh();
+      return result?.agent.workspaceId ?? null;
+    },
     // A turn may start between the status read and the send. A prompt with a source agent joins
     // it (the daemon steers agent messages); one as from the user would cut it unless it steers.
     send: (agentId, prompt, source, messageId) =>

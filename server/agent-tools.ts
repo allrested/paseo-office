@@ -63,8 +63,9 @@ export function postLine(post: Post, label: (author: string) => string): string 
   const name = (author: string) => oneLine(label(author));
   const state = post.state ? ` ${post.state}` : "";
   const claim = post.claimedBy ? ` by ${name(post.claimedBy)}` : "";
+  const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}, from ${name(post.author)}${to}: ${indented(post.text)}`;
+  return `${post.id} ${post.kind}${state}${claim}${link}, from ${name(post.author)}${to}: ${indented(post.text)}`;
 }
 
 export function readText(

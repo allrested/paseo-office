@@ -87,6 +87,7 @@ export function OfficeWorkspace({
   return (
     <WorkspaceOverlay
       key={selection.workspaceId ?? hostId}
+      dockRequest={selection}
       onBoard={room ? openBoard : undefined}
       hostId={hostId}
       {...selection}

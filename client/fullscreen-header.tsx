@@ -1,3 +1,5 @@
+import { OfficeMark } from "./office-mark.js";
+import { useOfficeBrand } from "./office-brand-context.js";
 import { useCallback, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -70,6 +72,7 @@ export function FullscreenHeader({
   color,
   styles,
 }: FullscreenHeaderProps) {
+  const brand = useOfficeBrand();
   const { sessionsOpen, hideSessions, column } = sidebars;
   const { collapsed, setCollapsed } = column;
   const sessions = useCallback(() => hideSessions(sessionsOpen), [hideSessions, sessionsOpen]);
@@ -79,12 +82,14 @@ export function FullscreenHeader({
       <View style={styles.headerTools}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Office 3D"
+          accessibilityLabel={brand.name ?? "Office 3D"}
           onPress={onOffice}
           style={styles.headerBrand}
         >
-          <Icon name="Building2" size={20} color={styles.brandIcon.color} />
-          <Text style={styles.brandText}>Office 3D</Text>
+          <OfficeMark brand={brand} fallbackColor={styles.brandIcon.color} />
+          <Text numberOfLines={1} style={styles.brandText}>
+            {brand.name ?? "Office 3D"}
+          </Text>
         </Pressable>
         <View style={styles.headerModes}>{modes}</View>
       </View>

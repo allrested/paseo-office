@@ -2,7 +2,14 @@ import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { usePaseo } from "@getpaseo/plugin/client";
 import { TextInput } from "@getpaseo/plugin/client/ui";
-import { APPEARANCE_KEY, AVATARS, COLORS, SHIRTS, type Appearance } from "../shared/appearance.js";
+import {
+  APPEARANCE_KEY,
+  AVATARS,
+  GENDERS,
+  COLORS,
+  SHIRTS,
+  type Appearance,
+} from "../shared/appearance.js";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTitle } from "../shared/model.js";
 import { OfficeModal } from "./office-modal.js";
@@ -21,6 +28,7 @@ export function AppearanceEditor({
 }) {
   const paseo = usePaseo();
   const [name, setName] = useState(agent.appearance?.name ?? "");
+  const [gender, setGender] = useState(agent.appearance?.gender);
   const [avatar, setAvatar] = useState(agent.appearance?.avatar);
   const [color, setColor] = useState(agent.appearance?.color);
   const modalChange = useCallback(
@@ -32,13 +40,14 @@ export function AppearanceEditor({
   const save = useCallback(async () => {
     const appearance: Appearance = {};
     if (name.trim()) appearance.name = name.trim();
+    if (gender) appearance.gender = gender;
     if (avatar) appearance.avatar = avatar;
     if (color) appearance.color = color;
     await paseo.agents
       .ref(agent.id)
       .setMetadata({ [APPEARANCE_KEY]: Object.keys(appearance).length ? appearance : null });
     close();
-  }, [name, avatar, color, paseo, agent.id, close]);
+  }, [name, gender, avatar, color, paseo, agent.id, close]);
   return (
     <OfficeModal open title="Customize agent" onOpenChange={modalChange}>
       <OfficeModal.Content>
@@ -53,6 +62,21 @@ export function AppearanceEditor({
               placeholder="Use default name"
               style={styles.fieldInput}
             />
+          </View>
+          <Text style={styles.sheetLabel}>Character gender</Text>
+          <View style={choiceRow}>
+            {[undefined, ...GENDERS].map((option) => (
+              <Choice<(typeof GENDERS)[number]>
+                key={option ?? "auto"}
+                label={option ?? "Automatic gender"}
+                value={option}
+                selected={gender === option}
+                choose={setGender}
+                styles={styles}
+              >
+                {option ?? "Auto"}
+              </Choice>
+            ))}
           </View>
           <Text style={styles.sheetLabel}>Avatar</Text>
           <View style={choiceRow}>

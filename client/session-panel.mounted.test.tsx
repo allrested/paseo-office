@@ -509,16 +509,20 @@ test("Customize agent saves the chosen profile and can restore the defaults", as
   await draw({ agent: { ...AGENT, appearance: { name: "Ada" } } });
   await press("Customize agent");
   expect((labelled("Office display name") as HTMLInputElement).value).toBe("Ada");
+  await press("Male");
   await press("headphones");
   await press("Teal");
   await press("Save appearance");
   expect(metadataMock.ref).toHaveBeenCalledWith(AGENT.id);
   expect(metadataMock.setMetadata).toHaveBeenLastCalledWith({
-    "office.appearance": { name: "Ada", avatar: "headphones", color: "Teal" },
+    "office.appearance": { name: "Ada", gender: "Male", avatar: "headphones", color: "Teal" },
   });
   expect(maybe("Office display name")).toBeNull();
-  await draw({ agent: { ...AGENT, appearance: { avatar: "headphones", color: "Teal" } } });
+  await draw({
+    agent: { ...AGENT, appearance: { gender: "Female", avatar: "headphones", color: "Teal" } },
+  });
   await press("Customize agent");
+  await press("Automatic gender");
   await press("Initials");
   await press("Automatic color");
   await press("Save appearance");

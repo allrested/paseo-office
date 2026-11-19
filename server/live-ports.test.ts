@@ -8,6 +8,7 @@ import type { Paseo, PaseoHolder } from "./paseo-holder.js";
 
 interface FakeAgent {
   id: string;
+  workspaceId?: string;
   status: string;
   archivedAt: string | null;
   pendingPermissions: unknown[];
@@ -19,7 +20,7 @@ function agent(id: string, overrides: Partial<FakeAgent> = {}): FakeAgent {
 
 /** The daemon finds an agent by its id or by a start of it, archived agents too. */
 const KNOWN = new Map([
-  ["b-full-id", agent("b-full-id")],
+  ["b-full-id", agent("b-full-id", { workspaceId: "w1" })],
   ["b-fu", agent("b-full-id")],
   ["run", agent("run", { status: "running" })],
   ["old", agent("old", { archivedAt: "2026-11-10T08:00:00.000Z" })],
@@ -134,6 +135,13 @@ test("lobby pickup reads every page of idle agents, oldest idle first, and reche
 test("a cold office waits until a hook or handler has supplied its Paseo API", async () => {
   const holder = { held: () => false } as PaseoHolder;
   expect(await liveAgentPorts(holder).lobbyCandidates()).toEqual([]);
+});
+
+test("an agent's workspace is read from the daemon; an agent it does not know has none", async () => {
+  const { ports } = setup();
+  expect(await ports.workspaceOf("b-full-id")).toBe("w1");
+  expect(await ports.workspaceOf("run")).toBeNull();
+  expect(await ports.workspaceOf("nobody")).toBeNull();
 });
 
 test("a start of an id resolves to the full id; an agent that can get no post resolves to none", async () => {

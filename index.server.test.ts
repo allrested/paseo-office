@@ -1190,6 +1190,37 @@ test("a writer archived by someone else frees the bell", async () => {
   await stop();
 });
 
+test("an open office receives host branding, saved overrides and cleared defaults", async () => {
+  const { recorded, context, stop } = setup(async () => NOTES, {
+    env: { PASEO_BRAND_NAME: "Host office", PASEO_BRAND_COLOR: "#224466" },
+  });
+  await settle();
+  const events: { type: string; state?: { brand?: unknown } }[] = [];
+  const leaving = new AbortController();
+  const done = recorded.handlers.get("office.state")?.({}, {
+    ...context,
+    signal: leaving.signal,
+    push: async (event: { type: string }) => {
+      if (event.type === "snapshot") events.push(event);
+    },
+  } as never);
+  try {
+    await settle();
+    const latest = () => events.at(-1)?.state?.brand;
+    expect(latest()).toEqual({ name: "Host office", color: "#224466" });
+    for (const brandName of ["Studio", ""]) {
+      const state = { ...NOTES, values: { ...NOTES.values, brandName } } as SettingsState;
+      await Promise.all([...recorded.listeners].map((listener) => listener(state)));
+      await settle();
+      expect(latest()).toEqual({ name: brandName || "Host office", color: "#224466" });
+    }
+  } finally {
+    leaving.abort();
+    await done;
+    await stop();
+  }
+});
+
 test("an open office gets the notes state in its snapshot, and a schedule that fails after a save", async () => {
   const { recorded, context, stop } = setup(async () => NOTES);
   await settle();

@@ -179,12 +179,12 @@ function showMachine(on) {
 }
 
 /** Upstream's mark on the sign, as world/pro/floor.js draws it: the sign of a host without a logo. */
-function drawMark(g) {
+function drawMark(g, color = '#E8865F') {
   g.save();
   g.translate(150, SIGN.height / 2);
   g.scale(6.2, 6.2);
   g.translate(-12, -12);
-  g.fillStyle = '#E8865F';
+  g.fillStyle = color;
   g.fill(new Path2D(OFFICE_MARK), 'evenodd');
   g.restore();
 }
@@ -199,13 +199,14 @@ function showBrand(brand) {
   const paint = (logo) => {
     if (stopped) return;
     const old = material.map;
-    material.map = canvasTex(SIGN.width, SIGN.height, (g, w, h) => drawSign(g, w, h, { name: brand.name, logo, mark: drawMark }));
+    material.map = canvasTex(SIGN.width, SIGN.height, (g, w, h) => drawSign(g, w, h, { name: brand.name, logo, mark: (ctx) => drawMark(ctx, brand.color) }));
     material.needsUpdate = true;
     old?.dispose();
   };
   paint(null);
   if (typeof brand.logoUrl !== 'string' || !brand.logoUrl) return;
   const image = new Image();
+  image.crossOrigin = 'anonymous';
   image.onload = () => paint(image);
   image.src = brand.logoUrl;
 }

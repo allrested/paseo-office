@@ -22,7 +22,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { TextInput, View } = await import("react-native");
   const ScrollView = (props: { children: ReactNode }) =>
     createElement("div", { "data-scroll": "vertical" }, createElement(View, null, props.children));
-  return { ScrollView, TextInput };
+  return { ScrollView, TextInput, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -77,12 +77,17 @@ function useDraft(): NewAgentDraft {
   return useMemo(() => ({ open, setOpen, choice, change }), [open, choice, change]);
 }
 
+/** Whether the surface this panel is drawn in can show an agent's workspace. */
+let withWorkspace = false;
+const workspaces: string[] = [];
+
 function Harness({ value }: { value: OfficeState }) {
   const styles = useOfficeStyles(THEME, LAYOUT.compact, false);
   const newAgent = useDraft();
   const link: OfficeLink = {
     select: (agentId) => void selected.push(agentId),
     openSession: (agentId) => void opened.push(agentId),
+    ...(withWorkspace && { openWorkspace: (agentId: string) => void workspaces.push(agentId) }),
   };
   return createElement(SessionsPanel, {
     office: value,
@@ -166,6 +171,30 @@ test("a row shows the room's name and the doing-now line; a press selects", asyn
   await press("B: Idle");
   expect(selected).toEqual(["a", "b"]);
   expect(opened).toEqual([]);
+});
+
+test("a row's own button opens the agent's workspace without opening its details", async () => {
+  withWorkspace = true;
+  workspaces.length = 0;
+  selected.length = 0;
+  try {
+    await show(AGENTS);
+    await press("Open A's workspace");
+    expect(workspaces).toEqual(["a"]);
+    expect(selected).toEqual([]);
+    expect(opened).toEqual([]);
+    // The row itself still opens the details.
+    await press("A: Running");
+    expect(selected).toEqual(["a"]);
+    expect(workspaces).toEqual(["a"]);
+  } finally {
+    withWorkspace = false;
+  }
+});
+
+test("a surface that cannot show a workspace draws no such button", async () => {
+  await show(AGENTS);
+  expect(maybe("Open A's workspace")).toBeNull();
 });
 
 test("No agents yet. and No agent matches.", async () => {

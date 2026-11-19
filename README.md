@@ -14,7 +14,7 @@ my-office's.
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
 - The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
-- Choose **Change outdoor scene** on the 3D toolbar for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
+- Open **Outdoor scene** in Office settings for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
   on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
@@ -23,7 +23,8 @@ my-office's.
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
   starts an agent: a workspace, a provider and model, and a first prompt.
-- Open an agent’s session and select the pencil (**Customize agent**) to set its Office display name, avatar and color. Clear the name, select **Initials** and **Auto**, then save to restore the defaults.
+- Set the office name, logo and mark color in **Office settings → Appearance → Branding**. A blank field uses the host default. See the [branding environment variables](docs/office.md#custom-branding).
+- Open an agent’s session and select the pencil (**Customize agent**) to set its Office display name, character gender, avatar and color. Choose **Male** or **Female** to change how the character looks in 2D and 3D, or **Auto** to use its original appearance. Clear the name, select **Initials** and **Auto**, then save to restore the defaults.
 - Select **Full screen** beside the view switch to work inside the office. On a wide screen,
   Sessions sits on the left, the floor in the center, and activity or the open conversation
   on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.

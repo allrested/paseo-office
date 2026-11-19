@@ -51,6 +51,8 @@ async function harness(): Promise<Harness> {
     label,
     onBoard: () => undefined,
     onBoardRemoved: () => undefined,
+    workspaceOf: async (id) =>
+      [ALICE, BOB, LONER].find((agent) => agent.id === id)?.workspaceId ?? null,
   });
   await service.start();
   const ports: OfficeToolPorts = {
@@ -93,6 +95,47 @@ test("a post line names kind, state, claimer, author and target", () => {
   ]);
   expect(postLine(post, (author) => names.get(author) ?? author)).toBe(
     "p3 task claimed by Bob, from Alice to Bob: Write tests",
+  );
+});
+
+test("a post line names the lobby task of a copy, and the copy of a lobby task", () => {
+  const task: Post = {
+    id: "p34",
+    seq: 40,
+    board: "lobby",
+    kind: "task",
+    text: "Rotate keys",
+    author: "user",
+    state: "claimed",
+    claimedBy: "b",
+    link: "p57",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  const copy: Post = { ...task, id: "p57", seq: 57, board: "w1", link: "p34" };
+  const label = (author: string) => (author === "b" ? "Bob" : "the user");
+  expect(postLine(task, label)).toBe(
+    "p34 task claimed by Bob (on p57), from the user: Rotate keys",
+  );
+  expect(postLine(copy, label)).toBe(
+    "p57 task claimed by Bob (lobby p34), from the user: Rotate keys",
+  );
+});
+
+test("claiming a lobby task shows its copy on the claimer's room board, and done there finishes both", async () => {
+  const { ports } = await harness();
+  await runPost(ports, ALICE, { kind: "task", text: "Rotate keys", board: "lobby" });
+  expect(await runUpdate(ports, BOB, { id: "p1", action: "claim" })).toEqual({
+    text: "p1 task claimed by Bob (on p3), from Alice: Rotate keys",
+  });
+  expect(runRead(ports, BOB, {}).text).toBe(
+    "Board w1: 1 post(s), cursor 3.\np3 task claimed by Bob (lobby p1), from Alice: Rotate keys",
+  );
+  expect(await runUpdate(ports, BOB, { id: "p3", action: "done" })).toEqual({
+    text: "p3 task done by Bob (lobby p1), from Alice: Rotate keys",
+  });
+  expect(runRead(ports, BOB, { board: "lobby" }).text).toBe(
+    "Board lobby: 1 post(s), cursor 5.\np1 task done by Bob (on p3), from Alice: Rotate keys",
   );
 });
 

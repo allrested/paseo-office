@@ -67,7 +67,11 @@ export function updateZs(dt) {
     if (z.life <= 0) { scene.remove(z.s); z.s.material.dispose(); zs.splice(i, 1); }
   }
 }
-export function lookOf(s) { const h = hash(s.name); return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: s.appearance?.avatar || ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
+const genderStyles = { Male: ['plain', 'spiky', 'curly'], Female: ['bob', 'ponytail', 'bun'] };
+export function lookOf(s) {
+  const h = hash(s.name);
+  const styles = genderStyles[s.appearance?.gender] || STYLES;
+  return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: styles[(h >>> 3) % styles.length], acc: s.appearance?.avatar || ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
 export const workers = new Map();   // session id -> Worker
 export const npcs = [];             // people who aren't sessions: the director on the company floor
 export const subs = new Map();      // subagent id -> Worker
