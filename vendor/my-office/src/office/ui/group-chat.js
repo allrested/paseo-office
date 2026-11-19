@@ -2,3 +2,4 @@
 // nowhere.
 export function chatLife() {}
 export function chatSay() {}
+export function chatPhoto() {}

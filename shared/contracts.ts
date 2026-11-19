@@ -602,3 +602,10 @@ export const worldRpc = defineRpc({
   input: z.object({}),
   output: z.string(),
 });
+
+/** Optional car models for the street outside. */
+export const streetRpc = defineRpc({
+  name: "office.world.street",
+  input: z.object({}),
+  output: z.string(),
+});

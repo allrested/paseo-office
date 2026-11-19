@@ -24,7 +24,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("@getpaseo/plugin/client", () => ({
-  useRpc: () => async () => ({}),
+  useRpc: () => async () => "car models",
   useSettings: () => ({ status: "loading" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({ useToast: () => ({ error: () => undefined }) }));
@@ -36,7 +36,8 @@ vi.mock("./script-frame-kit.js", async () => {
   });
   return { kitScriptFrame: () => Frame, hasScriptFrame: () => true };
 });
-vi.mock("./world-loader.js", () => ({
+vi.mock("./world-loader.js", async (original) => ({
+  ...(await original<typeof import("./world-loader.js")>()),
   messageOf: (error: unknown) => String(error),
   sharedWorldLoader: {
     subscribe: () => () => undefined,
@@ -184,4 +185,12 @@ test("a changed plan stops the page and starts a new one on the new plan", async
   const start = calls().find((message) => message.call === "start");
   expect(start?.args[0]).toMatchObject({ plan: "cozy" });
   expect(names.filter((name) => name === "start")).toHaveLength(1);
+});
+
+test("starts a new phone frame with the car kit after the street is enabled", async () => {
+  await mount({ streetOn: false });
+  h.posted = [];
+  await mount({ streetOn: true });
+  const started = calls().find((m) => m.call === "start");
+  expect(started?.args[0]).toMatchObject({ street: { kit: "car models" } });
 });

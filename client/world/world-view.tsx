@@ -7,6 +7,7 @@ import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
+import { useStreetStart } from "./use-street-kit.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
@@ -21,6 +22,7 @@ import {
 } from "./world-view-shared.js";
 
 export interface WorldViewProps {
+  streetOn?: boolean | null;
   model: OfficeModel;
   theme: PluginTheme;
   styles: OfficeStyles;
@@ -75,7 +77,10 @@ export interface WorldViewProps {
   sound: SoundSwitch;
 }
 
-type WorldSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+type WorldSceneProps = Omit<WorldViewProps, "plan"> & {
+  plan: WorldPlan;
+  street: { kit: string | null } | null;
+};
 
 /**
  * The office in 3D on one plan. Web only: office-surface.tsx renders it in a browser with WebGL2
@@ -90,6 +95,7 @@ function WorldScene({
   theme,
   styles,
   plan,
+  street,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -126,6 +132,7 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    street,
     onSound: sound.set,
     onProblem,
   });
@@ -144,6 +151,7 @@ function WorldScene({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      street,
       onSound: sound.set,
       onProblem,
     };
@@ -161,6 +169,7 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    street,
     sound.set,
     onProblem,
   ]);
@@ -221,6 +230,7 @@ function WorldScene({
     machine,
     meeting,
     incidents,
+    streetNote: street?.kit === null,
     sound: sound.on,
     plan,
   });
@@ -240,7 +250,8 @@ function WorldScene({
  * The office in 3D, on the host's plan. A scene page starts once, so each plan is a scene of its
  * own: a changed plan takes the frame out and opens a new one.
  */
-export function WorldView({ plan, ...rest }: WorldViewProps) {
-  if (plan === null) return <WorldLoading styles={rest.styles} />;
-  return <WorldScene key={plan} plan={plan} {...rest} />;
+export function WorldView({ plan, streetOn = false, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(streetOn);
+  if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
+  return <WorldScene key={plan + String(street !== null)} street={street} plan={plan} {...rest} />;
 }

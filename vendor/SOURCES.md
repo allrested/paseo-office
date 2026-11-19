@@ -47,8 +47,7 @@ Nine copied files are changed by hand, and each change starts with `// PASEO:`:
   gap); the engine and every other sound are upstream's.
 - `src/office/core/env.js`: the build flag upstream reads from `process.env` is a constant, and
   the floor plan comes from Paseo, not from the page's address and storage.
-- `src/office/interact/first-person.js`: the street is cut (`street()` returns null, so the door
-  has no E action), E on a person passes `opts.open` to the session drawer, and `floorBounds` is
+- `src/office/interact/first-person.js`: E at the lift enters the enabled street. E on a person passes `opts.open` to the session drawer, and `floorBounds` is
   exported for the camera bar.
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,
   and the launch pad's card lists no repositories (a team is a workspace, and Paseo sends no
@@ -125,9 +124,8 @@ and `people.director`, which keeps upstream's emoji.
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
-connection, the replay, the demo, other languages, the street outside
-with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
-the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, the list
+connection, the replay, the demo, other languages, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
+the like). Of the camera toolbar and photo mode, the list
 button is left out on purpose.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
@@ -213,3 +211,9 @@ text upstream brings for a shop, an app or a product the table lacks, add it to
 `scripts/street-brands.mjs` with a made-up name, and run the script again. Then run
 `npm run build:world`, then `npm test`, and look at the office in a browser: a module
 upstream added to its start-up list may need a stand-in or a place in `DENY`.
+
+### Street assets and source changes
+
+The city, its population, and the staff outings come from the pinned checkout. The importer skips the alternate backdrops, the eight chain-specific shop modules, and every logo image. Shops use generic fittings and signs drawn in `world/backdrops/paseo-signs.js`. The ATM uses a plain square. Street audio waits for the street and sound switches. The optional Kenney Car Kit (CC0) is recorded in the manifest. The server sends it separately through `office.world.street`.
+
+After an upstream update run the importer, run `node scripts/genericise-street.mjs --check`, review changes in the hand-edited shops, ATM, traffic, audio and outings modules, and rebuild both generated files with `npm run build:world`.

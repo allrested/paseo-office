@@ -3,7 +3,7 @@
   "options": {
     "typeAware": false
   },
-  "ignorePatterns": ["vendor/**", "shared/upstream/**", "server/world.generated.ts"],
+  "ignorePatterns": ["vendor/**", "shared/upstream/**", "server/*.generated.ts"],
   "plugins": ["react", "react-perf", "unicorn", "typescript", "oxc", "import", "promise"],
   "categories": {
     "correctness": "error",

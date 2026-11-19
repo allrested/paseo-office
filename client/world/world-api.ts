@@ -122,6 +122,7 @@ export interface WorldBrand {
 }
 
 export interface WorldStartOptions {
+  street?: { kit: string | null };
   /**
    * The floor plan: "pro" is the company floor, "cozy" one open room. A page starts once, so a new
    * plan is a new page.

@@ -11,6 +11,7 @@ import { sharedWorldLoader } from "./world-loader.js";
 
 /** What the scene's callbacks and its start read: always the last render's. */
 export interface WorldLatest {
+  street?: { kit: string | null } | null;
   model: OfficeModel;
   theme: PluginTheme;
   focusRoomId: string | null;
@@ -40,6 +41,7 @@ export function worldStartOptions(
   const { focus } = extras;
   const { colors } = latest.current.theme;
   return {
+    ...(latest.current.street ? { street: latest.current.street } : {}),
     plan: extras.plan,
     dark: isDarkTheme(colors),
     colors,

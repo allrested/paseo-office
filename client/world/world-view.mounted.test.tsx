@@ -25,14 +25,15 @@ const frame = vi.hoisted(() => ({
 }));
 
 vi.mock("@getpaseo/plugin/client", () => ({
-  useRpc: () => async () => ({}),
+  useRpc: () => async () => "car models",
   useSettings: () => ({ status: "loading" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({
   useToast: () => ({ error: () => undefined }),
 }));
 vi.mock("../web-env.web.js", () => ({ readBrand: () => null }));
-vi.mock("./world-loader.js", () => ({
+vi.mock("./world-loader.js", async (original) => ({
+  ...(await original<typeof import("./world-loader.js")>()),
   messageOf: (error: unknown) => String(error),
   sharedWorldLoader: {
     subscribe: () => () => undefined,
@@ -115,9 +116,11 @@ function office(
   plan: WorldPlan | null,
   onSelectAgent: (id: string | null) => void = ignore,
   model: OfficeModel = MODEL,
+  streetOn = false,
 ) {
   return (
     <WorldView
+      streetOn={streetOn}
       plan={plan}
       model={model}
       theme={THEME}
@@ -256,4 +259,12 @@ test.each([
 test("the start gives the scene a Sound callback", async () => {
   const options = await startedOffice(ignore);
   expect(typeof options.onSound).toBe("function");
+});
+
+test("changing the street setting starts a fresh scene with the selected assets", async () => {
+  await act(async () => root.render(office("pro", ignore, MODEL, true)));
+  expect(frame.starts.at(-1)?.street).toEqual({ kit: "car models" });
+  await act(async () => root.render(office("pro", ignore, MODEL, false)));
+  expect(frame.starts.at(-1)).not.toHaveProperty("street");
+  expect(frame.disposed).toBe(1);
 });

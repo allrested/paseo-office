@@ -301,6 +301,8 @@ const api = {
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
+    host.street = options.street != null;
+    host.streetKit = options.street?.kit ?? null;
     host.photo = options.photo !== false;
     host.limits = () => limits;
     host.boardRows = () => boardRows;

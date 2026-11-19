@@ -30,17 +30,17 @@ if (!FROM || !THREE) {
 }
 
 /**
- * Not taken: upstream's panels, chat window, replay, demo, the street, and the daily-life scenes.
+ * Not taken: upstream's panels, chat window, replay, demo, the alternate backdrops, and the daily-life scenes.
  * The lounge's four games are taken (people/billiards.js, gaming.js, foosball.js, karaoke.js). life/incidents.js is
  * taken trimmed by hand, so it stays denied here and only its exports are checked.
  */
 const DENY = [
   /^office\/ui\/(?!event-text\.js$|icons\.js$|photo\.js$|tips\.js$|timelapse\.js$|clip-music\.js$)/,
   /^office\/(demo|replay)\//,
-  /^office\/world\/backdrops\//,
+  /^office\/world\/backdrops\/(?:index|countryside|beach|shared)\.js$/,
   /^office\/world\/pro\/wing\.js$/,
-  /^office\/people\/(outings|comnha|comtrua|duty|teatime|accountant|rounds|guard|hr|farewell|interns|nhau|photobooth|pickle|staff)\.js$/,
-  /^office\/life\/(seasons|rain|weather|altar|lift-service|drill|day-swaps|photostrips|post|incidents|nap)\.js$/,
+  /^office\/people\/(comnha|duty|teatime|accountant|rounds|hr|farewell|interns|staff)\.js$/,
+  /^office\/life\/(seasons|rain|weather|altar|lift-service|drill|day-swaps|post|incidents|nap)\.js$/,
   /^office\/main\.js$/,
   /^i18n\/index\.js$/,
   /^i18n\/locales\/(?!en\/)/,
@@ -89,6 +89,7 @@ function visit(rel) {
     if (spec.startsWith("three/addons/")) { visitAddon(spec.slice("three/".length)); continue; }
     if (!spec.startsWith(".")) throw new Error(`${rel} imports ${spec}: not a file of the checkout or three`);
     const target = posix(path.normalize(path.join(path.dirname(rel), spec)));
+    if (/^office\/world\/backdrops\/shop-(?:cong|dmx|highlands|katinat|longchau|mixue|phuclong|tgdd)\.js$/.test(target)) continue; // replaced by our plain signs
     if (denied(target)) {
       if (!needs.has(target)) needs.set(target, new Set());
       for (const name of namesOf(match[0])) needs.get(target).add(name);
@@ -228,7 +229,11 @@ for (const [rel, names] of [...needs].sort()) {
   if (missing.length > 0) report.missingStandIns.push(`${rel}: ${missing.join(", ")}`);
 }
 
+const cars = "assets/vehicles/cars.json";
+const carKit = readFileSync(path.join(FROM, "public", cars), "utf8");
+put(path.join(HERE, cars), carKit);
 const manifest = {
+  assets: { [cars]: sha(carKit) },
   upstream: { repository: "https://github.com/khanh020905/my-office", commit, version },
   three: { version: threeVersion, sha256: sha(threeBuild), bytes: threeBuild.length },
   setupOrder: kept.map((name) => imported.get(name)),

@@ -552,3 +552,9 @@ device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an 
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
 A save of a device setting spreads the values it read and never passes a key with no value: the host
 refuses a document that holds `undefined`, and the device then keeps nothing.
+
+## The street
+
+“The street outside” in plugin settings controls the optional city backdrop. The device saves the optional boolean `street` in `office-device`. A wide web layout defaults to on. Compact layouts and native apps default to off. Changing the setting opens a fresh scene. The street lights follow the app theme. In Walk mode take the lift at the door to reach the pavement.
+
+The device requests the CC0 car models from `office.world.street` and passes the string to the isolated scene in the `street.kit` start option. A failed request leaves procedural traffic and shops available and shows a floor note. The day’s street activities include shopping trips, the guard, lunch, evening drinks, the photo studio and pickleball. The upstream chain modules and branded artwork are excluded. Plain canvas signs carry the names from `scripts/street-brands.mjs`. See the street section of [the source inventory](../vendor/SOURCES.md) when importing upstream changes.

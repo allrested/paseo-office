@@ -10,6 +10,8 @@ my-office's.
 
 ## What it does
 
+- The optional street outside has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
+
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   has two plans, a company floor and a cozy room, chosen in Settings.
@@ -67,6 +69,7 @@ The settings are in Settings > Plugins > Office 3D. The gear over the floor open
 | The phone app with a script frame | The 3D floor without Photo mode, clips and the tour                                                                                                                                    |
 | The store phone app               | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
 | Sound                             | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
+| The street outside                | Available in 3D. Enabled by default on wide web layouts and disabled by default on phones.                                                                                             |
 | Stock Paseo 0.16                  | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
@@ -80,7 +83,7 @@ while the daemon was down is not made up.
 - It reads the host's agents and workspaces, their status, and the kind of thing each agent does
   (a read, an edit, a command, a test run). The kind is worked out on the host.
 - The 3D scene is told who is there and what kind of thing each does, never a file name, a command
-  or a prompt. The scene makes no network call.
+  or a prompt. With the street enabled, the host also sends the bundled Kenney Car Kit (CC0). The scene makes no network call.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and

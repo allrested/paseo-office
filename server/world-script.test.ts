@@ -76,9 +76,9 @@ describe("the embedded scene", () => {
       expect(script).toContain(`people.${line}.invite`);
     }
     // The scene with three.js r160; a jump means a module the port leaves out came back in.
-    // (Measured 1,144,567 after the camera extras.)
-    expect(script.length).toBeGreaterThan(1_000_000);
-    expect(script.length).toBeLessThan(1_200_000);
+    // (Measured about 1.52M with the street; the car kit travels separately.)
+    expect(script.length).toBeGreaterThan(1_350_000);
+    expect(script.length).toBeLessThan(1_750_000);
     // Node's globals would throw in the page: upstream's build flag was the one use.
     expect(script).not.toContain("process.env");
     expect(script).not.toMatch(/\brequire\(/);
@@ -140,7 +140,7 @@ describe("the embedded scene", () => {
     const bundle = WORLD_SCRIPT;
 
     expect(walk).not.toContain("stand-in");
-    expect(walk).toMatch(/\/\/ PASEO:[^\n]*\n\s*const street = \(\) => null;/);
+    expect(walk).toContain("THEME.live?.street");
     expect(walk).toMatch(/export const floorBounds/);
     expect(walk).toContain("open: true");
     expect(bundle).toContain("fp-near");
@@ -177,4 +177,12 @@ describe("the embedded scene", () => {
       "Phúc Long",
     ]);
   });
+});
+
+it("sends the street models separately and makes no calls for the artwork", async () => {
+  const kit = await embeddedWorldScript().readStreet();
+  expect(JSON.parse(kit).models).toHaveProperty("sedan");
+  expect(WORLD_SCRIPT).not.toContain(kit.slice(0, 150));
+  for (const url of ["/assets/brands", "/assets/vehicles", "/api/claude-version"])
+    expect(WORLD_SCRIPT).not.toContain(url);
 });

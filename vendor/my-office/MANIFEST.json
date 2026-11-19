@@ -1,4 +1,7 @@
 {
+  "assets": {
+    "assets/vehicles/cars.json": "cc43dfeecb62532f37baff17bc6c63199a0e918f2a75d24dbbb626e40de834a3"
+  },
   "upstream": {
     "repository": "https://github.com/khanh020905/my-office",
     "commit": "b68228871fe30cd2c759a2c919337a9a9d1f5644",
@@ -17,6 +20,7 @@
     "office/scene/lights.js",
     "office/scene/quality.js",
     "office/world/terrace.js",
+    "office/world/backdrops/city.js",
     "office/world/layout.js",
     "office/world/cozy-room.js",
     "office/world/windows.js",
@@ -60,6 +64,8 @@
     "office/people/director.js",
     "office/people/errands.js",
     "office/people/gatherings.js",
+    "office/people/outings.js",
+    "office/people/guard.js",
     "office/people/foosball.js",
     "office/people/gaming.js",
     "office/people/billiards.js",
@@ -67,6 +73,7 @@
     "office/life/trophies.js",
     "office/life/quota.js",
     "office/life/tests.js",
+    "office/life/photostrips.js",
     "office/world/room-update.js",
     "office/interact/props.js",
     "office/interact/place-chips.js",
@@ -124,12 +131,15 @@
     ],
     "office/life/weather.js": [
       "applyWeather",
-      "updateWeather"
+      "updateWeather",
+      "wx"
     ],
     "office/people/accountant.js": [
       "updateAccountant"
     ],
     "office/people/comnha.js": [
+      "homeLunch",
+      "microNow",
       "updateMicro"
     ],
     "office/people/duty.js": [
@@ -139,17 +149,11 @@
     "office/people/farewell.js": [
       "updateFarewell"
     ],
-    "office/people/guard.js": [
-      "updateGuard"
-    ],
     "office/people/hr.js": [
       "updateHr"
     ],
     "office/people/interns.js": [
       "updateInterns"
-    ],
-    "office/people/outings.js": [
-      "updateOutings"
     ],
     "office/people/rounds.js": [
       "updateRounds"
@@ -179,6 +183,7 @@
     ],
     "office/ui/group-chat.js": [
       "chatLife",
+      "chatPhoto",
       "chatSay"
     ],
     "office/ui/lite.js": [
@@ -209,15 +214,9 @@
       "ray",
       "updateBoard"
     ],
-    "office/world/backdrops/city.js": [
-      "dotTex"
-    ],
     "office/world/backdrops/index.js": [
       "THEME",
       "THEMES"
-    ],
-    "office/world/backdrops/street-folk.js": [
-      "seen"
     ],
     "office/world/pro/wing.js": [
       "DEPT_SIGNS"
@@ -248,6 +247,7 @@
     "office/interact/place-chips.js": "602bbf24a39821ca534a45ff02d6244ec6f03ade1ed36db970b6b6317fb00f4b",
     "office/interact/props.js": "eaea94db0fb65a93267ee17364b8fb6640cec7b68b3de3e5a404bedd5db6a815",
     "office/interact/rings.js": "a1ba8574ed6377f1589de0ac30c91c74dc2b1cf8c1b261840e31f4ed64a65d96",
+    "office/life/photostrips.js": "f401b9f1ffd0e71f09ee0f33436a150279eea7118beb8f294d0697c05ba34c45",
     "office/life/quota.js": "5a6553ea901b5b72d3b02f124c2cd2d241dfdcad0b7e0529d98e1f7f26abc4f5",
     "office/life/tests.js": "03c5096eaf9a1302d7036816155e78b77f00db28ce1c4ade5c4c4e1953893273",
     "office/life/trophies.js": "422c4cd10e0191a5e225e0d7ed3a2c4b7de9e0c10a3a13f28ffba5a4dbfbcb80",
@@ -257,15 +257,23 @@
     "office/people/billiards.js": "e36f8a6d21d867b4440298cd7035638af2e7cd372d74651c1eb2b02c3f11b4ce",
     "office/people/breaks.js": "39c8ca718c4976b8674cc8b53bb2fd74d8cf754a811e5055b4bb6ae0435a6b5e",
     "office/people/chibi-rig.js": "091a2963043ee84647a3435682b2abc238afc76817a208af2bb9b3d9d9de80e2",
+    "office/people/comtrua.js": "f400b0b0aa73059f9412a50d00c60a728e6ec547dbe3f1d2c0eb15399db545d1",
     "office/people/director.js": "4760331b5d2fb0622e49d5ea45b546c8f76a4a4b999fdad3b9593bde7ac57b8e",
     "office/people/errands.js": "963fc359ce0aeeae2acac35a976b48fdbb31ef287c3328ac5ef09a650c5a2c47",
+    "office/people/evswap.js": "8bc5023b579baf244a46ebd793d6fdf10b0e8687c8eb9e753a6b1f9e03a1dad5",
     "office/people/foosball.js": "70c15e67ec3fefa12d95565f26820aeb68a8d670762e5754e465cfef32695d12",
     "office/people/gaming.js": "276840830cd2daecd60f0f501ff3ab4733b373062403ae45dc30bf0437c5cd2b",
     "office/people/gatherings.js": "8f5e0e413ba3f3dfcf6eb2854444066eb1d7153b36fc17897af1f5bfd4d852a5",
+    "office/people/guard.js": "d916172b8e05310867b3d653bdd27e400a4aa1556ff1de856394ca4c7682b439",
     "office/people/karaoke-songs.js": "a2062d9a2b3d2cb6c615514d651a06c149773627fb116bdf0004504e7343284d",
     "office/people/karaoke.js": "8529733197fd60796bbe3bf3cdb4ac81f6df20308ff555120cc94bdb67d0b823",
     "office/people/look.js": "1f7bc510fad4eef1eeeae186a5c1e889545aaef640466d4597c9541de3dda655",
     "office/people/navigation.js": "ccc374ba6660b9b14ee1a78e9d053c8671e1b55da13be2e2e8270709da4fe76a",
+    "office/people/nhau.js": "7675f9af4e5ef6a17a910b91d03d61c80ff087dc365e8062a5f925d0fa5db965",
+    "office/people/outings.js": "ac11d90c40c30f2c5a325dfc913b6e738442db1c05d7e623de4c0c2ad25989f3",
+    "office/people/payday.js": "9d844664f7793786e226c49fbc3c49eaba78e8b55ccfe23a83ec96b25be8ee05",
+    "office/people/photobooth.js": "a577622193c7c545377a64b4e67336769e4ca66ab4b145e16cf8a90f210151c0",
+    "office/people/pickle.js": "c6a2a3b6b2b3fe016d556f5cc41cbc664cd46a68d91810e437056ee9976198b1",
     "office/people/team-lines.js": "6213942c582c65888a4a5fa124fc771e0966edb6e180664aa95e904463060405",
     "office/people/workers.js": "44ff11013da0000ad013e799cb9eba8b8c2f3f02869ddc42bb2aaad65ddbc032",
     "office/scene/blocks.js": "02bf430c1438035c04eb3edcbffc4cecb80e8adb0ba4ac9e0110192f523a3798",
@@ -278,6 +286,30 @@
     "office/ui/photo.js": "6406ea9f4a1a26893dcad0308d65378676812607f2e72c1b92d8a4e76e8a9ad0",
     "office/ui/timelapse.js": "80a91bed3a819260510a51f9b584a4ecdcb495088f8542d2fd98d19b22881164",
     "office/ui/tips.js": "9b028db0bbcc6da590df10baa2ad2a3c2ae7cad4e43881e5b2fe70c95dbfaae4",
+    "office/world/backdrops/city.js": "7b76998f9aea7c98d3cdbc8ed5a965b34d8622b0afd1ef723f8229c394a97e14",
+    "office/world/backdrops/eat-com.js": "f2de986e6563e8dc5b95c49fb3c6ab744a2796e2e6cd9d764983e991b92bb9c0",
+    "office/world/backdrops/shop-paint.js": "171ac8f618e2486965c0da87711ace0140c5aff8d61adeed28b2625dba2ecbb2",
+    "office/world/backdrops/shops.js": "0b24ec93d9731efe23e89424607f6ea4bf2a3f6819500e52bc32149cbc5cbc6a",
+    "office/world/backdrops/street-atm.js": "735b6a1c0ee09229e57e3565c979296d550b69d7b1e8f527deb56aad1ef52e45",
+    "office/world/backdrops/street-corner.js": "9a418f52b8a8766cb7e87769b0867a37de03b4b0f4c4d99977280eb778eb0b67",
+    "office/world/backdrops/street-csgt.js": "6341e13d5d96f28858ac1ab9fc3f2040ee69e2daf22b532af7868d311514e629",
+    "office/world/backdrops/street-ev.js": "2cedb2c89836980c0b159ff0ae503df2058600286bfc23a9517db0624d19b921",
+    "office/world/backdrops/street-folk.js": "16e64fc607c67d146e36a6fcec04bf6abe1840160b015e6e1d943764a725f477",
+    "office/world/backdrops/street-life.js": "2a6f872b7fa3893c0678c076dd6115d6cb4910f0689179c73bbc40afff061333",
+    "office/world/backdrops/street-lunar.js": "25e0d86ae41419bce4d155162ab3b2a95ae62ae5a9ce8e2f0c353fa4115a42c1",
+    "office/world/backdrops/street-morning.js": "94186061cef988ee5c85bd87e0b530a8f634796199eec6c4b4e0336688cf731a",
+    "office/world/backdrops/street-nhau.js": "36a4ce23c1bd215de2cb54cb36ef1c95d290a67a9d41f3f9ba4485fc029aa993",
+    "office/world/backdrops/street-park.js": "6b911ac8da7b4478cd39c2fa7ffc0b91c46d9c53e88bf0b0315f81afeb1f82b8",
+    "office/world/backdrops/street-photo.js": "e335de3d9bb967ccd9a678795c6957e3d59088f165ce32ebfbfaec45071c5ec5",
+    "office/world/backdrops/street-pickle.js": "8dc42cb4e93ae6a0a42d88a42f844805950ea48e92ebf1d330dfe19e6182cdaa",
+    "office/world/backdrops/street-repair.js": "903300b33eee72745cb171790e2815ffdaa05509a1176242b4164047d7f8bbbc",
+    "office/world/backdrops/street-riders.js": "5a3c5a1e44cbedbbb73d51679e6397bb17e9e2f66a5f81b4c8dc0eb8ccf928cb",
+    "office/world/backdrops/street-shade.js": "e73fd2447c8c7d09fef7dcdb988e315e1abbacd0b4013a1531b99c91c088453c",
+    "office/world/backdrops/street-signals.js": "f4296185934b35c136f34ff7221857810da12b6f56eecae15535de27c5f5bfc1",
+    "office/world/backdrops/street-siren.js": "462a9c60a04f6d4da168db54abe8c56bc34890a5cbb5014a82e8dcbdc5f4434d",
+    "office/world/backdrops/street-spots.js": "32676006908d25e267ebdbd884ee9990fab4c6a36af8f9dcc241c141284e9d2d",
+    "office/world/backdrops/street-wedding.js": "8cc63b04f454a3b6636d9cafeee11e83d6d20b12c5ffcf997e0d7bee127216df",
+    "office/world/backdrops/street-wires.js": "cf9055199789282be33549303dccb21f295453205dd677777592d7f41451942a",
     "office/world/cozy-room.js": "6d97d3b3bfacc0c9f5957ea0d63040fb0779496c26c0ae7cf59afecd2b4be1b9",
     "office/world/desks.js": "9657ee54ad8a5fed27f5c3cd3a5227bd5728988fa9beb64242c1380e6719bbc4",
     "office/world/entrance.js": "214eb0073156deba09aa1ac56062d672741f7747cb6a8375032c08394d83b484",

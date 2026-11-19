@@ -6,6 +6,7 @@ import * as sceneRenderer from './scene/renderer.js';
 import * as sceneLights from './scene/lights.js';
 import * as sceneQuality from './scene/quality.js';
 import * as worldTerrace from './world/terrace.js';
+import * as worldBackdropsCity from './world/backdrops/city.js';
 import * as worldLayout from './world/layout.js';
 import * as worldCozyRoom from './world/cozy-room.js';
 import * as worldWindows from './world/windows.js';
@@ -49,6 +50,8 @@ import * as peopleTeamLines from './people/team-lines.js';
 import * as peopleDirector from './people/director.js';
 import * as peopleErrands from './people/errands.js';
 import * as peopleGatherings from './people/gatherings.js';
+import * as peopleOutings from './people/outings.js';
+import * as peopleGuard from './people/guard.js';
 import * as peopleFoosball from './people/foosball.js';
 import * as peopleGaming from './people/gaming.js';
 import * as peopleBilliards from './people/billiards.js';
@@ -56,6 +59,7 @@ import * as peopleKaraoke from './people/karaoke.js';
 import * as lifeTrophies from './life/trophies.js';
 import * as lifeQuota from './life/quota.js';
 import * as lifeTests from './life/tests.js';
+import * as lifePhotostrips from './life/photostrips.js';
 import * as worldRoomUpdate from './world/room-update.js';
 import * as interactProps from './interact/props.js';
 import * as interactPlaceChips from './interact/place-chips.js';
@@ -78,6 +82,7 @@ export const MODULES = [
   ['sceneLights', sceneLights],
   ['sceneQuality', sceneQuality],
   ['worldTerrace', worldTerrace],
+  ['worldBackdropsCity', worldBackdropsCity],
   ['worldLayout', worldLayout],
   ['worldCozyRoom', worldCozyRoom],
   ['worldWindows', worldWindows],
@@ -121,6 +126,8 @@ export const MODULES = [
   ['peopleDirector', peopleDirector],
   ['peopleErrands', peopleErrands],
   ['peopleGatherings', peopleGatherings],
+  ['peopleOutings', peopleOutings],
+  ['peopleGuard', peopleGuard],
   ['peopleFoosball', peopleFoosball],
   ['peopleGaming', peopleGaming],
   ['peopleBilliards', peopleBilliards],
@@ -128,6 +135,7 @@ export const MODULES = [
   ['lifeTrophies', lifeTrophies],
   ['lifeQuota', lifeQuota],
   ['lifeTests', lifeTests],
+  ['lifePhotostrips', lifePhotostrips],
   ['worldRoomUpdate', worldRoomUpdate],
   ['interactProps', interactProps],
   ['interactPlaceChips', interactPlaceChips],
