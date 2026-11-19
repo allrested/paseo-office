@@ -7,10 +7,12 @@ import { act, createElement, useCallback, useMemo, useState, type ReactNode } fr
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { officeDeviceSettings } from "../shared/settings.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { NewAgentDraft, OfficeLink } from "./office-link.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 import { SessionsPanel } from "./sessions-panel.js";
+import { stockSave } from "./stock-save.test.js";
 import { useOfficeStyles } from "./styles.js";
 import type { OfficeState } from "./use-office.js";
 
@@ -108,7 +110,7 @@ vi.mock("@getpaseo/plugin/client", () => ({
     saveError: null,
     save: async (values: unknown, revision: string) => {
       host.saves.push({ values, revision });
-      return host.saved;
+      return host.saved && (await stockSave(officeDeviceSettings)(values));
     },
     reset: async () => true,
     reload: async () => undefined,

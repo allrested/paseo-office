@@ -10,6 +10,7 @@ import type { SettingsState } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { IncidentsState } from "../shared/contracts.js";
 import { officeHostSettings } from "../shared/settings.js";
+import { stockSave } from "./stock-save.test.js";
 import { HostSwitches } from "./host-switches.js";
 import { useOfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -50,6 +51,7 @@ vi.mock("@getpaseo/plugin/client", () => ({
         saveError = checked.error.issues.map((issue) => issue.message).join("\n");
         return false;
       }
+      if (!(await stockSave(officeHostSettings)(values))) return false;
       saved.push({ values, revision });
       return answer ?? true;
     },

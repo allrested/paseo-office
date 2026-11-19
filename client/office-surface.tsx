@@ -400,9 +400,8 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
   const revision =
     settings.status === "ready" || settings.status === "invalid" ? settings.revision : null;
   const storedValue = settings.status === "ready" ? chosenView(settings.values) : null;
-  // A view's save keeps the incidents this device rang for and the last agent it started.
-  const rungIncidents = settings.status === "ready" ? settings.values.rungIncidents : NONE_RUNG;
-  const lastAgent = settings.status === "ready" ? settings.values.lastAgent : undefined;
+  // A view's save carries the values as read, so no key is passed without a value.
+  const values = settings.status === "ready" ? settings.values : null;
   const { save, reload } = settings;
   useEffect(() => {
     const stored = revision === null ? null : { value: storedValue, revision };
@@ -415,7 +414,7 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
     dispatch({ type: "start", value: step.value, against: step.against, retry: step.retry });
     async function store(value: OfficeViewChoice, against: string): Promise<void> {
       const ok = await save(
-        { threeD: value !== "list", view: value, rungIncidents, lastAgent },
+        { rungIncidents: NONE_RUNG, ...values, threeD: value !== "list", view: value },
         against,
       );
       if (!mounted.current) return;
@@ -426,7 +425,7 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
       if (mounted.current) dispatch({ type: "checked" });
     }
     void store(step.value, step.against);
-  }, [sync, revision, storedValue, rungIncidents, lastAgent, save, reload]);
+  }, [sync, revision, storedValue, values, save, reload]);
   const choose = useCallback(
     (next: OfficeViewChoice) => dispatch({ type: "tap", value: next }),
     [],

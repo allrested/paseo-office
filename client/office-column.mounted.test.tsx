@@ -7,7 +7,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { Pressable, Text } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { officeColumnSettings } from "../shared/settings.js";
 import { OfficeColumn } from "./office-column.js";
+import { stockSave } from "./stock-save.test.js";
 import { useOfficeStyles } from "./styles.js";
 import { useColumn } from "./use-column.js";
 
@@ -26,7 +28,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
     saveError: null,
     save: async (values: unknown) => {
       saves.push(values);
-      return true;
+      return stockSave(officeColumnSettings)(values);
     },
     reset: async () => true,
     reload: async () => undefined,

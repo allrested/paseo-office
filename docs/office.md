@@ -471,3 +471,5 @@ The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
+A save of a device setting spreads the values it read and never passes a key with no value: the host
+refuses a document that holds `undefined`, and the device then keeps nothing.

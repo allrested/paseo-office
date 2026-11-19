@@ -10,8 +10,9 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeEvent } from "../shared/contracts.js";
-import { officeHostSettings } from "../shared/settings.js";
+import { officeDeviceSettings, officeHostSettings } from "../shared/settings.js";
 import { EMPTY_OFFICE } from "./office-state.js";
+import { stockSave } from "./stock-save.test.js";
 
 let hostSaves: unknown[];
 let deviceSaves: unknown[];
@@ -34,7 +35,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
       saveError: null,
       save: async (values: unknown) => {
         (device ? deviceSaves : hostSaves).push(values);
-        return true;
+        return stockSave(device ? officeDeviceSettings : officeHostSettings)(values);
       },
       reset: async () => true,
       reload: async () => undefined,
@@ -137,6 +138,16 @@ test("a view chosen here keeps the last agent the device holds", async () => {
   deviceValues.current = { threeD: true, view: "list", rungIncidents: {} };
 
   expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {}, lastAgent }]);
+});
+
+test("a view chosen on a device that never started an agent is stored and not shown as unsaved", async () => {
+  deviceValues.current = { threeD: true, rungIncidents: {} };
+  await mount();
+  await act(async () => labelled("List view")?.click());
+  deviceValues.current = { threeD: true, view: "list", rungIncidents: {} };
+
+  expect(deviceSaves).toStrictEqual([{ threeD: false, view: "list", rungIncidents: {} }]);
+  expect(container.textContent).not.toContain("Unable to save the view on this device");
 });
 
 test("the notes schedule's failure shows under the Time zone field", async () => {

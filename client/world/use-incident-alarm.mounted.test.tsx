@@ -8,7 +8,8 @@ import { createRoot, type Root } from "react-dom/client";
 import type { SettingsState } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Incident, IncidentsState } from "../../shared/contracts.js";
-import type { officeDeviceSettings } from "../../shared/settings.js";
+import { officeDeviceSettings } from "../../shared/settings.js";
+import { stockSave } from "../stock-save.test.js";
 import { useIncidentAlarm } from "./use-incident-alarm.js";
 import type { WorldApi, WorldIncident } from "./world-api.js";
 
@@ -37,6 +38,7 @@ vi.mock("@getpaseo/plugin/client", () => ({
     saveError: null,
     save: async (values: DeviceValues, revision: string) => {
       if (movedBy !== null) return false;
+      if (!(await stockSave(officeDeviceSettings)(values))) return false;
       saved.push({ values, revision });
       stored = { status: "ready", values, revision: `r${saved.length + 1}` };
       return true;
