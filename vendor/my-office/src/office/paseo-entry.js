@@ -400,6 +400,7 @@ const api = {
     if (!started || stopped) return;
     stopped = true;
     stopWatchingAudio();
+    closePlace();
     renderer.dispose();
     renderer.forceContextLoss();
   },
