@@ -61,6 +61,7 @@ import {
 import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
 import { SessionPane, sessionOf, sessionTabsOf, type SessionContext } from "./session-pane.js";
+import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
@@ -843,13 +844,15 @@ interface ColumnViewPanelProps extends Omit<ColumnPanelSwitchProps, "tab"> {
 /** The chosen view's panel: a tab's, or an open session's. */
 function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
   if (view.kind === "session") {
-    const { model, ...context } = session;
+    const { model, replies, ...context } = session;
     const { agent, room } = sessionOf(model, view.agentId);
     return (
       <SessionPane
         agentId={view.agentId}
         agent={agent}
         room={room}
+        reply={replies.texts.get(view.agentId) ?? ""}
+        setReply={replies.setText}
         context={context}
         styles={panel.styles}
         layout={panel.layout}
@@ -1342,9 +1345,10 @@ export function OfficeSurface(
     [column.sessions, model.agents],
   );
   const { closeSession } = column;
+  const replies = useReplyDrafts(column.sessions);
   const session = useMemo(
-    (): SessionContext => ({ model, actions, navigation, closeSession }),
-    [model, actions, navigation, closeSession],
+    (): SessionContext => ({ model, replies, actions, navigation, closeSession }),
+    [model, replies, actions, navigation, closeSession],
   );
   const color = theme.colors.foreground;
   // One tree in both layouts, so a flip between them does not draw the floor again: compact adds

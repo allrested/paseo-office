@@ -66,12 +66,23 @@ const context = { actions, navigation: undefined, closeSession: () => undefined 
 let container: HTMLElement;
 let root: Root;
 
-function Harness(props: Pick<SessionPaneProps, "agent" | "room">) {
+type Shown = Pick<SessionPaneProps, "agent" | "room"> & { reply?: string };
+
+const setReply = () => undefined;
+
+function Harness({ reply = "", ...props }: Shown) {
   const styles = useOfficeStyles(THEME, layout.compact, false);
-  return createElement(SessionPane, { agentId: "a1", context, styles, layout, ...props });
+  return createElement(SessionPane, {
+    agentId: "a1",
+    reply,
+    setReply,
+    context,
+    styles,
+    layout,
+    ...props,
+  });
 }
-const draw = (props: Pick<SessionPaneProps, "agent" | "room">) =>
-  act(async () => root.render(createElement(Harness, props)));
+const draw = (props: Shown) => act(async () => root.render(createElement(Harness, props)));
 
 beforeEach(() => {
   draws = 0;
@@ -96,6 +107,12 @@ test("an agent that came again unchanged does not draw the pane; a change to its
   await draw({ agent: agent("a1", "running"), room: "Acme shop" });
   await draw({ agent: agent("a1", "running"), room: "Acme lab" });
   expect(draws).toBe(3);
+});
+
+test("a change to the reply's text draws the pane", async () => {
+  await draw({ agent: agent("a1"), room: null });
+  await draw({ agent: agent("a1"), room: null, reply: "half" });
+  expect(draws).toBe(2);
 });
 
 test("sessionOf reads one agent and its room off the model", () => {

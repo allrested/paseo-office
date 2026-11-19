@@ -1,4 +1,12 @@
-import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import {
   Text,
   View,
@@ -31,10 +39,19 @@ import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
 import { useConversation, type Conversation } from "./use-conversation.js";
 
+/** What is typed in the reply box, kept by the surface. */
+export interface ReplyDraft {
+  text: string;
+  /** Takes an updater as well: a send that returns keeps what was typed while it was away. */
+  setText(next: SetStateAction<string>): void;
+}
+
 export interface SessionPanelProps {
   /** Null once the agent has left the office: the panel says so and offers Close. */
   agent: OfficeAgent | null;
   agentId: string;
+  /** The reply box's text: the surface's, so it outlives the panel. */
+  draft: ReplyDraft;
   /** The room's name, for the header. */
   room: string | null;
   actions: AgentActions;
@@ -225,13 +242,14 @@ function Asks({ agent, actions, canOpenWorkspace, styles }: AsksProps) {
 
 interface ComposerProps {
   agent: OfficeAgent;
+  draft: ReplyDraft;
   actions: AgentActions;
   touchScreen: boolean;
   styles: OfficeStyles;
 }
 
-function Composer({ agent, actions, touchScreen, styles }: ComposerProps) {
-  const [text, setText] = useState("");
+function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps) {
+  const { text, setText } = draft;
   const [error, setError] = useState<string | null>(null);
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
@@ -249,7 +267,7 @@ function Composer({ agent, actions, touchScreen, styles }: ComposerProps) {
       setError(failureText("Send", failure));
     }
     sending.current = false;
-  }, [text, actions, agentId]);
+  }, [text, setText, actions, agentId]);
   const stop = useCallback(() => actions.cancel?.(agentId), [actions, agentId]);
   const onKeyPress = useCallback(
     (event: KeyPress) => {
@@ -298,6 +316,7 @@ function Composer({ agent, actions, touchScreen, styles }: ComposerProps) {
 export function SessionPanel({
   agent,
   agentId,
+  draft,
   room,
   actions,
   styles,
@@ -340,7 +359,13 @@ export function SessionPanel({
             canOpenWorkspace={onOpenWorkspace !== undefined}
             styles={styles}
           />
-          <Composer agent={agent} actions={actions} touchScreen={touchScreen} styles={styles} />
+          <Composer
+            agent={agent}
+            draft={draft}
+            actions={actions}
+            touchScreen={touchScreen}
+            styles={styles}
+          />
         </>
       )}
     </View>

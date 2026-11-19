@@ -120,8 +120,11 @@ An open session is a tab after the four, with the agent's status dot and title a
 close it (`client/session-panel.tsx`, `client/use-conversation.ts`). A tab shows the
 conversation (your messages and the agent's replies as text, a tool call as one line, never the
 reasoning), the requests waiting on the agent with Approve and Deny, a reply box, and Stop while
-a turn runs on a host that can stop one. A plan or a question is answered in the
-workspace, where the app gives one: the panel then says "Answer this in the workspace." and offers
+a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
+it); while a request waits, the daemon denies that request when the reply goes in, and the box
+says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
+tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a
+question is answered in the workspace, where the app gives one: the panel then says "Answer this in the workspace." and offers
 "Open in workspace"; in an app that gives none it says "This cannot be answered here."
 Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
 there. A tab leaves only when it is closed: an agent that leaves the office keeps its tab,

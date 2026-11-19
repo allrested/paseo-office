@@ -877,3 +877,80 @@ test("Close in the sheet's header removes the session", async () => {
   expect(labelled("Sessions, 1 open")).toBeNull();
   expect(sheet()?.textContent).not.toContain("Reading the ledger");
 });
+
+// A half-typed reply is the surface's, by agent: a tab switch or a dismissed sheet keeps it, and a
+// closed session or a sent reply clears it.
+
+async function typeReply(text: string): Promise<void> {
+  const field = labelled("Message") as HTMLTextAreaElement | null;
+  if (!field) throw new Error("The session has no Message box");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const reply = () => (labelled("Message") as HTMLTextAreaElement | null)?.value;
+
+test("a half-typed reply survives a look at another tab in the wide column, and Close clears it", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await typeReply("half a thought");
+
+  await pressTab("Sessions");
+  expect(labelled("Message")).toBeNull();
+  await pressTab("Ada");
+  expect(reply()).toBe("half a thought");
+
+  await press("Close");
+  await pressFirst("Ada");
+  await press("Open session");
+  expect(reply()).toBe("");
+});
+
+test("a sent reply is not typed again after a look at another tab", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await typeReply("Add tests");
+  await press("Send");
+
+  await pressTab("Sessions");
+  await pressTab("Ada");
+  expect(reply()).toBe("");
+});
+
+test("a half-typed reply survives a dismissed sheet on a phone, and Close clears it", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await typeReply("half a thought");
+
+  await press("Close the column");
+  expect(sheet()).toBeNull();
+  await pressBarSessions();
+  const row = [...(sheet()?.querySelectorAll<HTMLElement>('[role="button"]') ?? [])].find(
+    (button) => button.getAttribute("aria-label")?.startsWith("Ada"),
+  );
+  if (!row) throw new Error("The sheet has no row for the agent");
+  await act(async () => row.click());
+  await press("Open session");
+  expect(reply()).toBe("half a thought");
+
+  await press("Close Ada");
+  // Closing the session leaves the sheet on Sessions.
+  expect(sheet()).not.toBeNull();
+  const again = [...(sheet()?.querySelectorAll<HTMLElement>('[role="button"]') ?? [])].find(
+    (button) => button.getAttribute("aria-label")?.startsWith("Ada"),
+  );
+  if (!again) throw new Error("The sheet has no row for the agent");
+  await act(async () => again.click());
+  await press("Open session");
+  expect(reply()).toBe("");
+});

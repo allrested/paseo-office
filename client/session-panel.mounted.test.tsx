@@ -3,7 +3,7 @@
  */
 // The session panel, mounted: the conversation hook is a stand-in the test sets, and the actions
 // are mocks the test reads. The host's scroller and input are plain stand-ins.
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { ScrollViewProps } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -90,9 +90,12 @@ function ready(rows: ConversationRow[], extra: Partial<Conversation> = {}): Conv
 function Harness(props: Partial<SessionPanelProps>) {
   const layout = { compact: true, platform: "web" } as const;
   const styles = useOfficeStyles(THEME, layout.compact, false);
+  // The surface keeps the reply's text; here the harness does, for as long as it stays mounted.
+  const [text, setText] = useState("");
   return createElement(SessionPanel, {
     agent: AGENT,
     agentId: "a1",
+    draft: { text, setText },
     room: "Acme shop",
     actions: { send, respond, cancel },
     styles,
