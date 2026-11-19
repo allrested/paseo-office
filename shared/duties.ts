@@ -31,6 +31,7 @@ export interface DutyDraft {
 function dutyProblem(duty: DutyDraft, index: number): string | null {
   const name = duty.name.trim();
   if (name === "") return `duty ${index + 1} has no name`;
+  if (/[\r\n\u2028\u2029]/.test(name)) return `the name of duty ${index + 1} has a line break`;
   if (name.length > DUTY_NAME_MAX) return `"${name}" is longer than ${DUTY_NAME_MAX} characters`;
   if (duty.instructions.trim().length > DUTY_INSTRUCTIONS_MAX) {
     return `the instructions of "${name}" are longer than 2,000 characters`;

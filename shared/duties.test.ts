@@ -73,6 +73,11 @@ test("a list is refused with a clear message: count, name, instructions, days", 
   expect(dutyListProblem([{ ...ok, days: [2, 2] }])).toBe(
     'Unable to save: "Water the plants" has a day twice',
   );
+  for (const name of ["Water\nthe plants", "Water the\r\nplants", "Water\u2028plants"]) {
+    expect(dutyListProblem([ok, { ...ok, name }])).toBe(
+      "Unable to save: the name of duty 2 has a line break",
+    );
+  }
 });
 
 test("a duty's post is its name, then its instructions after a blank line", () => {
