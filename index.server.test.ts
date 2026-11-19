@@ -23,6 +23,7 @@ import {
   type IncidentsStore,
 } from "./server/incidents-store.js";
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
+import type { DutiesFile } from "./server/duty-service.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -349,6 +350,8 @@ function setup(
     env?: NodeJS.ProcessEnv;
     fetchFn?: typeof fetch;
     chatStore?: ChatStore;
+    /** The kept duty list; an empty one by default, so no duty takes a post id. Null: none kept. */
+    duties?: DutiesFile | null;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
     server?: (base: PluginServerContext) => PluginServerContext;
   } = {},
@@ -381,6 +384,11 @@ function setup(
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
     tenureFile: { load: async () => null, save: async () => {} },
+    dutiesFile: {
+      load: async () =>
+        options.duties === undefined ? { version: 1, duties: [] } : options.duties,
+      save: async () => {},
+    },
     liftFile: { load: async () => null, save: async () => {} },
     env: options.env ?? {},
     clock,
@@ -753,6 +761,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.delete.request",
     "office.board.clear_done.request",
     "office.set_wakes_paused.request",
+    "office.duties.save.request",
+    "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
     "office.chat.request",
@@ -760,7 +770,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.street.events",
     "office.tenure.request",
   ]);
-  expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "incidents"]);
+  expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "duty-board", "incidents"]);
   expect([...recorded.hooks.keys()]).toEqual([
     "agent.open.before",
     "agent.turn.after",
@@ -1467,5 +1477,52 @@ test("a tenure write the ledger does not hold is refused", async () => {
   const { recorded, context, stop } = setup(async () => ON);
   const write = recorded.handlers.get("office.tenure.request");
   expect(await write?.({ op: "official", name: "api" }, context as never)).toEqual({ ok: false });
+  await stop();
+});
+
+test("a host without a duty list posts the pantry chores at 08:00; a save and the 3D office's report change the board", async () => {
+  const { recorded, context, stop } = setup(async () => ON, { duties: null });
+  await settle();
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = () =>
+    office.events.filter((event) => event.type === "snapshot").at(-1)?.state as
+      | {
+          duties?: { duties: { name: string }[]; day: string | null };
+          boards: Record<string, { id: string; state?: string; claimedBy?: string }[]>;
+        }
+      | undefined;
+  expect(snapshot()?.duties?.day).toBe("2026-11-11");
+  expect(snapshot()?.duties?.duties.map((duty) => duty.name)).toEqual([
+    "Wash the cups",
+    "Take out the bin",
+    "Water the plants",
+    "Wipe the tables",
+  ]);
+  expect(snapshot()?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
+  const save = recorded.handlers.get("office.duties.save.request");
+  expect(await save?.({ duties: [{ name: "", instructions: "", days: [] }] }, context)).toEqual({
+    ok: false,
+    error: "Unable to save: duty 1 has no name",
+  });
+  expect(
+    await save?.({ duties: [{ id: "cups", name: "Mugs", instructions: "", days: [3] }] }, context),
+  ).toEqual({ ok: true });
+  await settle();
+  expect(snapshot()?.duties?.duties.map((duty) => duty.name)).toEqual(["Mugs"]);
+  const acted = recorded.handlers.get("office.duty.acted.request");
+  expect(await acted?.({ id: "p1", agentId: "agent-1" }, context)).toMatchObject({
+    ok: true,
+    post: { id: "p1", state: "done", claimedBy: "agent-1" },
+  });
+  await settle();
+  const board = office.events.filter((event) => event.type === "board").at(-1) as unknown as {
+    board: string;
+    posts: { id: string; state?: string }[];
+  };
+  expect(board.board).toBe("duty");
+  expect(board.posts.map((post) => [post.id, post.state])).toEqual([["p1", "done"]]);
+  await office.leave();
   await stop();
 });

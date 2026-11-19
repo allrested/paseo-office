@@ -5,6 +5,7 @@ import type {
   WeatherState,
   Checklists,
   ChecklistCounts,
+  DutyBoard,
   NotesState,
   OfficeAgent,
   OfficeEvent,
@@ -70,6 +71,8 @@ export interface Hub {
   setWake(wake: WakeState): void;
   /** The stand-up notes writer's state; the same state again sends nothing. */
   setNotes(notes: NotesState): void;
+  /** The duty list and the duty board's day; the same again sends nothing. */
+  setDuties(duties: DutyBoard): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
@@ -138,6 +141,8 @@ export function createHub(ports: HubPorts): Hub {
   let wake: WakeState = { paused: false, queued: {} };
   let notes: NotesState | null = null;
   let sentNotes = "";
+  let duties: DutyBoard | null = null;
+  let sentDuties = "";
   let incidents: IncidentsState | null = null;
   let weather: WeatherState | null = null;
   let sentWeather = "";
@@ -171,6 +176,7 @@ export function createHub(ports: HubPorts): Hub {
       ...(weather === null ? {} : { weather }),
       ...(incidents === null ? {} : { incidents: { ...incidents } }),
       ...(chatSource === null ? {} : { chat: chatSource() }),
+      ...(duties === null ? {} : { duties: { ...duties, duties: [...duties.duties] } }),
     };
   }
 
@@ -500,6 +506,13 @@ export function createHub(ports: HubPorts): Hub {
       if (text === sentNotes) return;
       sentNotes = text;
       notes = { ...next };
+      broadcast({ type: "snapshot", state: snapshot() });
+    },
+    setDuties(next) {
+      const text = JSON.stringify(next);
+      if (text === sentDuties) return;
+      sentDuties = text;
+      duties = { ...next, duties: [...next.duties] };
       broadcast({ type: "snapshot", state: snapshot() });
     },
     setWeather(next) {

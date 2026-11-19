@@ -681,6 +681,37 @@ export const setWakesPausedRpc = defineRpc({
   output: WakeStateSchema,
 });
 
+/** The duty list as the editor saves it: a duty already listed keeps its id. */
+export const DutyDraftSchema = z.object({
+  id: z.string().min(1).max(80).optional(),
+  name: z.string().max(400),
+  instructions: z.string().max(20_000),
+  days: z.array(z.number()).max(14),
+});
+
+export const DutiesResultSchema = z.union([
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+export type DutiesResult = z.output<typeof DutiesResultSchema>;
+
+/** Saves the whole duty list; a duty due today that has no post yet is posted at once. */
+export const dutiesSaveRpc = defineRpc({
+  name: "office.duties.save.request",
+  input: z.object({ duties: z.array(DutyDraftSchema).max(50) }),
+  output: DutiesResultSchema,
+});
+
+/**
+ * The 3D office acted out a pretend duty with this agent's figure: it is done by that agent. The
+ * first report wins; one for a duty an agent is handed is refused.
+ */
+export const dutyActedRpc = defineRpc({
+  name: "office.duty.acted.request",
+  input: z.object({ id: z.string().min(1), agentId: z.string().min(1) }),
+  output: PostResultSchema,
+});
+
 /**
  * Starts the stand-up notes writer, as the bell does. `started` is false when none started: one
  * is at work, no folder is set, or it could not start (the snapshot's `notes.problem` says why).

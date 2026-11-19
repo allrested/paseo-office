@@ -57,11 +57,18 @@ import {
 } from "./server/notes-schedule.js";
 import { createNotesStore, createNotesWriter, type NotesStore } from "./server/notes-writer.js";
 import { createLocalSchedules, type LocalSchedules } from "./server/local-schedules.js";
+import {
+  DUTY_SCHEDULE,
+  createDutyService,
+  dutiesFileStore,
+  type DutiesFile,
+} from "./server/duty-service.js";
 import { createOffice } from "./server/office.js";
 import { createPaseoHolder } from "./server/paseo-holder.js";
 import {
   boardsFile,
   chatFile,
+  dutiesFile,
   hostSkillFolders,
   incidentsFile,
   notesWriterFile,
@@ -75,6 +82,8 @@ import {
   cleanupRpc,
   clearDoneRpc,
   deleteRpc,
+  dutiesSaveRpc,
+  dutyActedRpc,
   incidentsDismissRpc,
   janitorRpc,
   machineSubscription,
@@ -105,6 +114,8 @@ export interface OfficePluginDeps {
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
   liftFile: LifeFile<LiftKept>;
+  /** The owner's duty list. */
+  dutiesFile: LifeFile<DutiesFile>;
   /** The daemon's environment: the trackers' tokens are read from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -227,6 +238,23 @@ export function createOfficePlugin(
     changed: (state) => hub.setNotes({ ...state, scheduleError: notesSchedule.error() }),
     log,
   });
+  // The duty list, posted on the duty board at 08:00 in the notes' zone, and caught up at the
+  // start and at each save. A zone that cannot be read is the host's.
+  const duties = createDutyService({
+    file: deps.dutiesFile,
+    board: office,
+    schedules: deps.schedules,
+    zone: () =>
+      readHostSettings().then(
+        (values) => notesTimeZone(values, deps.hostTimeZone),
+        () => deps.hostTimeZone,
+      ),
+    now: () => deps.clock.now(),
+    listed: (list) => office.setDuties(list),
+    changed: (state) => hub.setDuties(state),
+    log,
+  });
+  void duties.start();
   // Every 5 minutes while a tracker is on; it follows the settings as the 8:00 schedule does.
   const incidentsSchedule = createIncidentsSchedule({ schedules: deps.schedules, log });
   // The check's last state, kept so a save that changes the schedule's error pushes it again.
@@ -349,6 +377,7 @@ export function createOfficePlugin(
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
+    await duties.settingsChanged();
     // The writer reads the folder again, and its push carries the schedule's error with it.
     await writer
       .settingsChanged()
@@ -447,6 +476,14 @@ export function createOfficePlugin(
     holder.remember(context.paseo);
     return guarded("pause", () => office.setWakesPaused(input.paused));
   });
+  server.handle(dutiesSaveRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("duties save", () => duties.save(input.duties));
+  });
+  server.handle(dutyActedRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("duty acted", () => office.actDuty(input.id, input.agentId));
+  });
   // The bell. A start never rejects: why none started is in the snapshot's notes.
   server.handle(notesWriteRpc, (_input, context) => {
     holder.remember(context.paseo);
@@ -480,6 +517,8 @@ export function createOfficePlugin(
     }
     await writer.start();
   });
+  // The duty board's day: what is due is posted, and done duties of earlier days leave.
+  const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, () => duties.sync());
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
   );
@@ -624,6 +663,7 @@ export function createOfficePlugin(
     stopWatchingWeather();
     weather.stop();
     stopNotesRuns();
+    stopDutyRuns();
     stopIncidentsRuns();
     deps.schedules.stop();
     for (const remove of removeHooks) remove();
@@ -657,6 +697,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
+    dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir())),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),
