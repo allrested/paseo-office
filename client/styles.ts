@@ -44,6 +44,7 @@ export interface OfficeStyles {
   sessionRowYou: ViewStyle;
   sessionTool: TextStyle;
   sessionComposer: ViewStyle;
+  composerWarning: TextStyle;
   sessionTabMain: ViewStyle;
   sessionTabClose: ViewStyle;
   sessionTabCloseHidden: ViewStyle;
@@ -611,6 +612,7 @@ export function useOfficeStyles(
         borderTopWidth: 1,
         borderTopColor: colors.border,
       },
+      composerWarning: { ...small, color: colors.statusWarning },
       sessionTab: {
         minHeight: controlHeight,
         flexDirection: "row",

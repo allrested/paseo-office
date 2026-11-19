@@ -28,7 +28,13 @@ interface Loaded {
   starting: StartingProvider[];
 }
 
-const LOADING: Loaded = { status: "loading", error: null, workspaces: [], providers: [], starting: [] };
+const LOADING: Loaded = {
+  status: "loading",
+  error: null,
+  workspaces: [],
+  providers: [],
+  starting: [],
+};
 
 /** The form waits this long for the providers to finish loading; the SDK's own wait is a minute. */
 const PROVIDERS_WAIT_MS = 5000;
@@ -113,8 +119,7 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
   const chosen = providers.find((entry) => entry.id === choice.provider);
   const chosenModelOffered = chosen?.models.some((model) => model.id === choice.model) === true;
   // A chosen provider that is only still loading is kept, not moved to another.
-  const stillOffered =
-    chosenModelOffered || starting.some((entry) => entry.id === choice.provider);
+  const stillOffered = chosenModelOffered || starting.some((entry) => entry.id === choice.provider);
   useEffect(() => {
     if (loaded.status !== "ready" || !settingRead || stillOffered) return;
     change(startingAgent(providers, last, starting));

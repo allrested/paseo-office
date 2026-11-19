@@ -251,6 +251,25 @@ test("a pending permission is answered above the composer, with the request's id
   expect(respond).toHaveBeenLastCalledWith("a1", "p1", false);
 });
 
+test("a waiting request that a send would deny is said by the box whatever is typed", async () => {
+  const asking = {
+    ...AGENT,
+    permissions: [{ id: "p1", kind: "tool" as const, title: "Run ls" }],
+  };
+  await draw({ agent: asking });
+  const line = () =>
+    [...container.querySelectorAll("div, span")].some(
+      (element) =>
+        element.children.length === 0 && element.textContent === "Sending denies the request above.",
+    );
+  expect(line()).toBe(true);
+  await type("Not now");
+  expect(line()).toBe(true);
+  expect(box().placeholder).toBe("Message Builder");
+  await draw({ agent: AGENT });
+  expect(line()).toBe(false);
+});
+
 const PLAN = {
   id: "p2",
   kind: "plan" as const,

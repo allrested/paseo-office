@@ -30,6 +30,7 @@ import {
   EARLIER_FAILED,
   LOADING,
   NOTHING_SAID,
+  SENDING_DENIES,
   UNLISTED_LINE,
   composerPlaceholder,
   rowLabel,
@@ -290,6 +291,9 @@ function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps)
         multiline
         style={styles.input}
       />
+      {agent.permissions.length > 0 ? (
+        <Text style={styles.composerWarning}>{SENDING_DENIES}</Text>
+      ) : null}
       {error === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {error}
