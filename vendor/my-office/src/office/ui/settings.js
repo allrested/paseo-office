@@ -4,6 +4,7 @@ import { state } from '../core/state.js';
 import { host } from '../paseo-host.js';
 import { night } from '../world/room-update.js';
 import { applyNight, holdNight } from '../world/backdrops/index.js';
+import { sfx } from '../audio/sfx.js';
 
 /**
  * Upstream's 'auto' follows the clock; Paseo's follows the app's theme (the scene is lit by night while the app is dark).
@@ -19,6 +20,13 @@ export function syncTimeBtns() {
   const mode = state.nightManual ? (night ? 'night' : 'day') : 'auto';
   for (const b of document.querySelectorAll('[data-ph-time]')) b.setAttribute('aria-pressed', String(b.dataset.phTime === mode));
 }
-export function syncToggles() {}
+/** The photo bar's Music button follows the Sound setting: the clip's music is made only while Sound is on (ui/clip-music.js). */
+export function syncToggles() {
+  const music = document.getElementById('ph-music');
+  if (!music) return;
+  const on = !!sfx?.on;
+  music.disabled = !on;
+  music.title = on ? 'Original lo-fi music, made in the browser' : 'Turn Sound on to add music to the clip';
+}
 /** Upstream's settings popover: there is none here (its tour button, `#btn-tips`, is not in the page either). */
 export function togglePop() {}

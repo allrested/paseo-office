@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 // Photo mode's switch (ui/photo.js): a host that says photo is false has no button and no P key.
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+// @ts-expect-error vendored JavaScript has no declarations
+import { state } from "../../vendor/my-office/src/office/core/state.js";
 
 const h = vi.hoisted(() => ({
   host: { photo: true, brandName: "", toast: () => undefined },
   setTimeMode: vi.fn(),
+  syncToggles: vi.fn(),
 }));
 
 vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({ host: h.host }));
@@ -33,6 +36,7 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
 }));
 vi.mock("../../vendor/my-office/src/office/ui/settings.js", () => ({
   setTimeMode: h.setTimeMode,
+  syncToggles: h.syncToggles,
   syncTimeBtns() {},
 }));
 vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({ night: false }));
@@ -106,4 +110,29 @@ test("leaving photo mode puts the lights back to the app's theme", () => {
   exitPhoto();
   expect(h.setTimeMode).toHaveBeenLastCalledWith("auto");
   expect(document.getElementById("photo-bar")?.hidden).toBe(true);
+});
+
+test("opening photo mode syncs the Music button with the Sound setting", () => {
+  h.host.photo = true;
+  setup();
+  exitPhoto();
+  h.syncToggles.mockClear();
+  enterPhoto();
+  expect(h.syncToggles).toHaveBeenCalledTimes(1);
+});
+
+test("Escape and P leave photo mode alone while a clip is made", () => {
+  h.host.photo = true;
+  setup();
+  exitPhoto();
+  enterPhoto();
+  h.setTimeMode.mockClear();
+  state.clip = true;
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  pressP();
+  expect(document.body.classList.contains("is-photo")).toBe(true);
+  expect(h.setTimeMode).not.toHaveBeenCalled();
+  state.clip = false;
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(document.body.classList.contains("is-photo")).toBe(false);
 });

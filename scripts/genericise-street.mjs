@@ -239,14 +239,22 @@ export function swap(text) {
 
 const found = (re, text) => new RegExp(re.source, re.flags).test(text);
 
+/** The phrases with no name of the table in them: nothing else reports those. */
+const NAMELESS = PHRASES.map(({ from }, i) => ({ from, re: PHRASE_RES[i].re })).filter(
+  ({ from }) => !NAMES.some(({ re }) => found(re, from)),
+);
+
 /**
  * What the swap would still change in the text: the table's real names (in table order), then
- * the real keys (in table order), each once. Empty exactly when `swap(text) === text`.
+ * the real keys (in table order), then the phrases that hold no name of the table, each once.
+ * Empty exactly when `swap(text) === text`.
  */
 export function leftIn(text) {
   const names = new Set(NAMES.filter(({ re }) => found(re, text)).map(({ brand }) => brand.real));
   const keys = KEYS.filter(({ res }) => res.some((re) => found(re, text))).map(({ from }) => from);
-  return [...BRANDS.map((brand) => brand.real).filter((real) => names.has(real)), ...new Set(keys)];
+  const real = BRANDS.map((brand) => brand.real).filter((name) => names.has(name));
+  const phrases = NAMELESS.filter(({ re }) => found(re, text)).map(({ from }) => from);
+  return [...real, ...new Set(keys), ...phrases];
 }
 
 /** The text as this script leaves a file: swapped, with the note on its first line when it changed. */

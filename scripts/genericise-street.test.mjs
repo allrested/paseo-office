@@ -111,6 +111,15 @@ const CASES = {
     ),
     say("A weekend needs a Cộng coffee", "A weekend needs an Olive Cafe coffee"),
     say("not without a Cộng coconut coffee", "not without an Olive Cafe coconut coffee"),
+    // (a comment's words over a line break, and a video app's feature named in a comment)
+    say(
+      "// vertical (1080 × 1920) for Reels, TikTok\n// and Shorts, the camera turning",
+      "// vertical (1080 × 1920) for short-video\n// apps, the camera turning",
+    ),
+    say(
+      "// over the top and bottom of the picture (Reels: about the top 14%, the",
+      "// over the top and bottom of the picture (about the top 14%, the",
+    ),
   ],
 };
 

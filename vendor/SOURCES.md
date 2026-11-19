@@ -36,7 +36,12 @@ shows only where Walk in does (a fine pointer; `state.isLocal` is set from it in
 `ui/camera-bar.js`), once per device (`office-tips`), and its person card's words are Paseo's
 (`OURS` in `i18n/index.js`). Its cards' styles are in `paseo-style.js`.
 
-Seven copied files are changed by hand, and each change starts with `// PASEO:`:
+So is the 15-second clip, from photo mode's bar (`ui/timelapse.js`, `ui/clip-music.js`). It is
+offered on a desktop or in a browser only (a recorder, a capturable canvas, a fine pointer, and
+`host.photo`); its markup and styles are in `ui/camera-bar.js`. Its music is made in the page and
+goes into the recording, never to the speakers.
+
+Nine copied files are changed by hand, and each change starts with `// PASEO:`:
 
 - `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
   gap); the engine and every other sound are upstream's.
@@ -53,10 +58,16 @@ Seven copied files are changed by hand, and each change starts with `// PASEO:`:
 - `src/office/ui/photo.js`: the mark painted into a photo is the host's brand name (Paseo's when
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
   has no Photo mode (the button is hidden and `enterPhoto` returns), and leaving photo mode calls
-  `setTimeMode('auto')`, so Day and Night, held for the photo, go back to the app's theme.
+  `setTimeMode('auto')`, so Day and Night, held for the photo, go back to the app's theme, the
+  Music button is synced with the Sound setting as the bar opens, and Escape and P do nothing
+  while a clip is made.
 - `src/office/ui/tips.js`: the bell card is dropped (a click on the bell in Paseo also has the
   stand-up notes written), and a card's look calls `setView(null)`, so Overview is not shown
   pressed and a resize does not refit under the card.
+- `src/office/ui/timelapse.js`: the clip's file is named `office-clip-...`.
+- `src/office/ui/clip-music.js`: `musicTrack` returns null while `sfx.on` is false, so the music,
+  and the audio context that carries it into the recording, exist only while the Sound setting is
+  on.
 
 ### Made-up names
 
@@ -78,6 +89,7 @@ the swap would change nothing in it. It changed these, and nothing else in them:
 - `src/office/world/props/tv-games.js`
 - `src/office/interact/first-person.js`, which is also changed by hand (above)
 - `src/office/audio/sfx.js`, which is also changed by hand (above)
+- `src/office/ui/timelapse.js`, which is also changed by hand (above)
 
 The import tool runs the same swap on what it copies: a file whose only note is the names one is
 written as upstream's with the names swapped, so it is compared and updated like an unchanged
@@ -115,8 +127,8 @@ and `people.director`, which keeps upstream's emoji.
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
 connection, the replay, the demo, other languages, the street outside
 with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
-the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, these
-are left out on purpose: the list button and clip recording.
+the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, the list
+button is left out on purpose.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
 with `// PASEO: stand-in`. Most export what is asked of them and do nothing. These do work:
@@ -172,10 +184,13 @@ and titles for the banner. The scene runs in upstream's streamer mode, which wri
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
 
-The scene writes four things to the app origin's `localStorage`, under keys that start with
-`office-`: which team sits where, the plants, the graphics level, and the Sound switch
-(`office-sound`, which the host's setting overwrites at each start). It reads a few more
-`office-` keys that nothing here writes. It makes no network call.
+The scene writes seven things to the app origin's `localStorage`, under keys that start with
+`office-`: which team sits where, the plants, the graphics level, the Sound switch
+(`office-sound`, which the host's setting overwrites at each start), that the tour was seen
+(`office-tips`), and the clip's shape and music choice (`office-clip-shape`, `office-clip-music`).
+It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
+that nothing here writes. It makes no network call; a clip is recorded in the page and saved as a
+download.
 
 ### Taking a newer upstream
 

@@ -14,6 +14,8 @@ const h = vi.hoisted(() => ({
   toast: vi.fn(),
   /** The floor plan the page was started on (paseo-host.js `plan`). */
   plan: "pro" as string,
+  /** The host's photo switch (paseo-host.js `photo`): false where the app cannot keep a download. */
+  photo: true,
   set: vi.fn(),
   copy: vi.fn(),
   /** What the focus target's clone gives: where a glide goes back to. */
@@ -62,6 +64,9 @@ vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({
   host: {
     get plan() {
       return h.plan;
+    },
+    get photo() {
+      return h.photo;
     },
     toast: h.toast,
   },
@@ -168,6 +173,7 @@ beforeEach(() => {
   h.clone.mockClear();
   h.toast.mockReset();
   h.plan = "pro";
+  h.photo = true;
   state.selectedId = null;
   state.zoomGoal = null;
   camera.zoom = 1;
@@ -188,6 +194,7 @@ beforeEach(() => {
 /** Spies a test made that must not outlive it. */
 const onAfter: { mockRestore(): void }[] = [];
 afterEach(() => {
+  recorder(false);
   for (const spy of onAfter.splice(0)) spy.mockRestore();
   for (const [type, listener, options] of onDocument.mock.calls) {
     document.removeEventListener(type, listener, options);
@@ -724,7 +731,7 @@ test("photo mode's bar keeps upstream's focus ring, its round exit, and drops th
   build();
   const css = styles();
   expect(css).toContain(
-    ".pb-tgl:focus-visible, .pb-seg button:focus-visible, .pb-shoot:focus-visible, .pb-exit:focus-visible { outline: 2px solid #F2B33D; outline-offset: 2px; }",
+    ".pb-tgl:focus-visible, .pb-seg button:focus-visible, .pb-shoot:focus-visible, .pb-clip:focus-visible, .clip-stop:focus-visible, .pb-exit:focus-visible { outline: 2px solid #F2B33D; outline-offset: 2px; }",
   );
   expect(css).toContain(".pb-exit { display: inline-grid; place-items: center; padding: 7px; }");
   expect(css).toContain(
@@ -872,4 +879,83 @@ test("a person chosen during the glide keeps the camera where it is when it ends
   state.selectedId = "a";
   vi.advanceTimersByTime(8_000);
   expect(h.copy).not.toHaveBeenCalled();
+});
+
+/** What a browser needs to record a clip: a recorder and a canvas that can be captured. */
+function recorder(has: boolean) {
+  if (has) {
+    vi.stubGlobal("MediaRecorder", vi.fn());
+    Object.defineProperty(HTMLCanvasElement.prototype, "captureStream", {
+      configurable: true,
+      value: () => ({}),
+    });
+  } else {
+    vi.stubGlobal("MediaRecorder", undefined);
+    delete (HTMLCanvasElement.prototype as { captureStream?: unknown }).captureStream;
+  }
+}
+
+test("photo mode's bar has the clip's controls, hidden until the bar knows the clip can be made", () => {
+  build();
+
+  expect(page("ph-clipset").hidden).toBe(true);
+  expect(page("ph-clip").textContent).toContain("Clip 15 s");
+  expect(
+    [...document.querySelectorAll<HTMLElement>("[data-clip-shape]")].map(
+      (b) => b.dataset.clipShape,
+    ),
+  ).toEqual(["square", "tall"]);
+  expect(page("ph-music").getAttribute("aria-pressed")).toBe("true");
+});
+
+test("the clip is offered with a recorder, a capturable canvas, a fine pointer and photo mode", () => {
+  recorder(true);
+  open();
+  expect(page("ph-clipset").hidden).toBe(false);
+});
+
+test("the clip is hidden without a recorder, with a coarse pointer, or where photo mode is off", () => {
+  recorder(false);
+  open();
+  expect(page("ph-clipset").hidden).toBe(true);
+
+  recorder(true);
+  document.body.innerHTML = '<div id="stage-wrap"><div id="stage"></div></div>';
+  open({ fine: false });
+  expect(page("ph-clipset").hidden).toBe(true);
+
+  document.body.innerHTML = '<div id="stage-wrap"><div id="stage"></div></div>';
+  h.photo = false;
+  open();
+  expect(page("ph-clipset").hidden).toBe(true);
+});
+
+test("the clip follows the pointer when it changes", () => {
+  recorder(true);
+  const fine = open({ fine: false });
+  expect(page("ph-clipset").hidden).toBe(true);
+  fine.change(true);
+  expect(page("ph-clipset").hidden).toBe(false);
+});
+
+test("the clip's cover is not hidden by photo mode's rule, and the clip's styles are in the bar", () => {
+  build();
+  const css = styles();
+  expect(css).toContain(
+    "body.is-photo #stage-wrap > :not(#stage):not(#photo-bar):not(.clip-cover) { display: none !important; }",
+  );
+  for (const rule of [
+    ".pb-clip {",
+    ".pb-music {",
+    ".pb-music:disabled {",
+    ".clip-cover {",
+    ".clip-view {",
+    ".clip-prog {",
+    ".clip-label {",
+    ".clip-stop {",
+  ]) {
+    expect(css).toContain(rule);
+  }
+  expect(css).not.toContain("var(--accent-line)");
+  expect(css).not.toContain("var(--font)");
 });

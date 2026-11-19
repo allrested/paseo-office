@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   host: { night: false },
   applyNight: vi.fn(),
   holdNight: vi.fn(),
+  sfx: { on: false },
   /** Whether the scene is lit by night now (world/room-update.js `night`). */
   night: false,
 }));
@@ -19,6 +20,7 @@ vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({
     return h.night;
   },
 }));
+vi.mock("../../vendor/my-office/src/office/audio/sfx.js", () => ({ sfx: h.sfx }));
 vi.mock("../../vendor/my-office/src/office/world/backdrops/index.js", () => ({
   applyNight: h.applyNight,
   holdNight: h.holdNight,
@@ -88,4 +90,19 @@ test("without the photo bar the calls other modules make do nothing", () => {
     syncTimeBtns();
     syncToggles();
   }).not.toThrow();
+});
+
+test("the photo bar's Music button follows the Sound setting", () => {
+  document.body.innerHTML = '<button id="ph-music"></button>';
+  const music = document.getElementById("ph-music") as HTMLButtonElement;
+
+  h.sfx.on = false;
+  syncToggles();
+  expect(music.disabled).toBe(true);
+  expect(music.title).toBe("Turn Sound on to add music to the clip");
+
+  h.sfx.on = true;
+  syncToggles();
+  expect(music.disabled).toBe(false);
+  expect(music.title).toBe("Original lo-fi music, made in the browser");
 });

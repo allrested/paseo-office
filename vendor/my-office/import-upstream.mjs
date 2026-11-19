@@ -35,7 +35,7 @@ if (!FROM || !THREE) {
  * taken trimmed by hand, so it stays denied here and only its exports are checked.
  */
 const DENY = [
-  /^office\/ui\/(?!event-text\.js$|icons\.js$|photo\.js$|tips\.js$)/,
+  /^office\/ui\/(?!event-text\.js$|icons\.js$|photo\.js$|tips\.js$|timelapse\.js$|clip-music\.js$)/,
   /^office\/(demo|replay)\//,
   /^office\/world\/backdrops\//,
   /^office\/world\/pro\/wing\.js$/,

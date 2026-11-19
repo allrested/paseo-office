@@ -72,6 +72,7 @@
     "office/interact/place-chips.js",
     "office/interact/place-cards.js",
     "office/ui/photo.js",
+    "office/ui/timelapse.js",
     "office/ui/tips.js",
     "office/interact/first-person.js",
     "office/net/live.js",
@@ -200,10 +201,6 @@
       "syncToggles",
       "togglePop"
     ],
-    "office/ui/timelapse.js": [
-      "clipCamera",
-      "clipFrame"
-    ],
     "office/ui/topbar.js": [
       "bellOn"
     ],
@@ -275,9 +272,11 @@
     "office/scene/lights.js": "d032ce0f2eb4e34fbcb10672ee72ed3b87f70200fe0a7d18162110b9193bda95",
     "office/scene/quality.js": "fe2c71f296d15e7ed642077e5ddf81af023e595a9279f55bb4fca7475dc9ddb8",
     "office/scene/renderer.js": "9cd0f1f7c22e4ff15f49a874773ec8f9e42e507746c186cd9cfdec73beafeb10",
+    "office/ui/clip-music.js": "fdf2934837229c3077d78dc83e6e32dc0de562daca4c96e9f7a8da41443f147f",
     "office/ui/event-text.js": "aacc48a70644ad3ba284f264b2383bdd57b0612da81ea19a7c8bf8eb3c33faf4",
     "office/ui/icons.js": "0aa45c14cd93a1cd31acc1038a4e65faa390e80c3de55daeeedfdf9118896973",
     "office/ui/photo.js": "6406ea9f4a1a26893dcad0308d65378676812607f2e72c1b92d8a4e76e8a9ad0",
+    "office/ui/timelapse.js": "80a91bed3a819260510a51f9b584a4ecdcb495088f8542d2fd98d19b22881164",
     "office/ui/tips.js": "9b028db0bbcc6da590df10baa2ad2a3c2ae7cad4e43881e5b2fe70c95dbfaae4",
     "office/world/cozy-room.js": "6d97d3b3bfacc0c9f5957ea0d63040fb0779496c26c0ae7cf59afecd2b4be1b9",
     "office/world/desks.js": "9657ee54ad8a5fed27f5c3cd3a5227bd5728988fa9beb64242c1380e6719bbc4",

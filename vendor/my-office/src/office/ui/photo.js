@@ -7,7 +7,7 @@ import { $, stage } from '../core/env.js';
 import { SOFTWARE_GL, camera, composer, controls, renderer, resize, scene } from '../scene/renderer.js';
 import { npcs, subs, workers } from '../people/workers.js';
 import { exitFp, fp } from '../interact/first-person.js';
-import { setTimeMode, syncTimeBtns } from './settings.js';
+import { setTimeMode, syncTimeBtns, syncToggles } from './settings.js';
 import { night } from '../world/room-update.js';
 import { toast } from './activity.js';
 import { OFFICE_MARK } from '../world/pro/pieces.js';
@@ -31,10 +31,12 @@ export function enterPhoto() {
   document.body.classList.add('is-photo');
   $('photo-bar').hidden = false;
   sync();
+  syncToggles(); // PASEO: the Music button follows the Sound setting as the bar opens
   $('ph-shoot').focus({ preventScroll: true });
 }
 export function exitPhoto() {
   if (!on) return;
+  if (state.clip) return; // PASEO: a clip being made keeps photo mode until it ends (Escape and P would reset the lights under it)
   on = false; state.photo = false;
   Object.assign(controls, kept); controls.update();   // the camera slides back inside the usual limits
   document.body.classList.remove('is-photo', 'photo-nonames');

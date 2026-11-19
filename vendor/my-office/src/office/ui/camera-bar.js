@@ -94,6 +94,7 @@ const BAR = `
         <div class="pb-seg" title="Light for the photo: Auto follows the app's theme, Day and Night hold for this photo only"><button type="button" data-ph-time="auto" aria-pressed="true">Auto</button><button type="button" data-ph-time="day" aria-pressed="false">Day</button><button type="button" data-ph-time="night" aria-pressed="false">Night</button></div>
         <span class="pb-sep"></span>
         <div class="pb-seg" title="Picture size"><button type="button" data-ph-size="screen" aria-pressed="false">Screen</button><button type="button" data-ph-size="fhd" aria-pressed="true">Full HD</button><button type="button" data-ph-size="4k" aria-pressed="false">4K</button></div>
+        <span class="pb-clipset" id="ph-clipset" hidden><span class="pb-sep"></span><div class="pb-seg" title="Clip shape: square for a feed, vertical 9:16 for short-video apps"><button type="button" data-clip-shape="square" aria-pressed="true">Square 1:1</button><button type="button" data-clip-shape="tall" aria-pressed="false">Vertical 9:16</button></div><button type="button" class="pb-tgl pb-music" id="ph-music" aria-pressed="true" title="Original lo-fi music, made in the browser"><span data-icon="music"></span><span>Music</span></button><button type="button" class="pb-clip" id="ph-clip" title="A 15-second video of the office, from morning to evening"><span data-icon="rec"></span><span>Clip 15 s</span></button></span>
         <button type="button" class="pb-shoot" id="ph-shoot"><span data-icon="camera"></span><span>Take photo</span></button>
         <button type="button" class="pb-exit" id="ph-exit" aria-label="Leave photo mode" title="Leave photo mode"><span data-icon="x"></span></button>
       </div>
@@ -178,7 +179,7 @@ const STYLE = `
 @media (max-width: 520px) { .toolbar { gap: 2px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 6px; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
 body.is-photo .toolbar { display: none; }
 /* Photo mode: the office alone, with one bar to frame and take the picture */
-body.is-photo #stage-wrap > :not(#stage):not(#photo-bar) { display: none !important; }
+body.is-photo #stage-wrap > :not(#stage):not(#photo-bar):not(.clip-cover) { display: none !important; }
 /* people's names only: no bubbles, chips, warnings or the cat's meow */
 body.is-photo .labels > :not(.tag), body.is-photo .labels > .tag--lost, body.is-photo .labels > .cat-say, body.is-photo .labels > .tag--me { display: none !important; }
 body.is-photo.photo-nonames .labels { display: none !important; }
@@ -192,7 +193,23 @@ body.is-photo.photo-nonames .labels { display: none !important; }
 .pb-shoot { display: inline-flex; align-items: center; gap: 7px; font: 700 .84rem/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1A1206; background: #F2B33D; border: 0; border-radius: 11px; padding: 10px 16px; cursor: pointer; }
 .pb-shoot:disabled { opacity: .6; cursor: progress; }
 .pb-exit { display: inline-grid; place-items: center; padding: 7px; }
-.pb-tgl:focus-visible, .pb-seg button:focus-visible, .pb-shoot:focus-visible, .pb-exit:focus-visible { outline: 2px solid #F2B33D; outline-offset: 2px; }
+/* the clip (ui/timelapse.js): upstream's styles/photo.css, its variables as literals */
+.pb-clipset { display: contents; }
+.pb-clip { display: inline-flex; align-items: center; gap: 7px; font: 700 .84rem/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #F6EFE4; background: rgba(255, 255, 255, .08); border: 1px solid rgba(232, 134, 95, .7); border-radius: 11px; padding: 9px 14px; cursor: pointer; }
+.pb-clip .ic { color: #FF6B5E; }
+.pb-music { display: inline-flex; align-items: center; gap: 6px; }
+.pb-music .ic { width: 14px; height: 14px; }
+.pb-music:disabled { opacity: .45; cursor: not-allowed; }
+/* the clip being made: a dark cover over the office with the picture as it is recorded, above the bar */
+.clip-cover { position: absolute; inset: 0; z-index: 8; display: grid; place-content: center; justify-items: center; gap: 12px; background: rgba(8, 11, 17, .92); }
+.clip-view { width: min(72vh, 82vw); height: min(72vh, 82vw); border-radius: 14px; box-shadow: 0 18px 48px rgba(0, 0, 0, .5); }
+.clip-prog { width: min(72vh, 82vw); height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.clip-cover--tall .clip-view { height: min(72vh, 146vw); width: calc(min(72vh, 146vw) * 9 / 16); }
+.clip-cover--tall .clip-prog { width: calc(min(72vh, 146vw) * 9 / 16); }
+.clip-prog i { display: block; height: 100%; width: 0; background: #F2B33D; }
+.clip-label { font: 600 .82rem/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #EEF1F7; }
+.clip-stop { font: 700 .8rem/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #EEF1F7; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .2); border-radius: 10px; padding: 8px 16px; cursor: pointer; }
+.pb-tgl:focus-visible, .pb-seg button:focus-visible, .pb-shoot:focus-visible, .pb-clip:focus-visible, .clip-stop:focus-visible, .pb-exit:focus-visible { outline: 2px solid #F2B33D; outline-offset: 2px; }
 @media (max-width: 720px) { .photo-hint { display: none; } .pb-sep { display: none; } }
 `;
 
@@ -346,6 +363,10 @@ export function setup() {
   const fine = matchMedia('(pointer: fine)');
   const showWalk = () => { $('btn-fp').hidden = !fine.matches; state.isLocal = fine.matches; };
   showWalk(); fine.addEventListener('change', showWalk);
+  // The clip needs a recorder, a canvas that can be captured, photo mode (a host that cannot keep a download has none) and
+  // a pointer (a phone's browser would render 1080 px at four times the pace for fifteen seconds: memory and heat)
+  const showClip = () => { $('ph-clipset').hidden = !(host.photo !== false && typeof MediaRecorder === 'function' && typeof HTMLCanvasElement.prototype.captureStream === 'function' && fine.matches); };
+  showClip(); fine.addEventListener('change', showClip);
   // upstream leaves walk-in from ui/topbar.js, which is not taken: the place card goes first, as there
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !fp.on) return;

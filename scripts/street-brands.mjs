@@ -135,6 +135,10 @@ export const PHRASES = [
   { from: "a Mixue cone", to: "a Frosty Cone soft-serve" },
   { from: "a Cộng coffee", to: "an Olive Cafe coffee" },
   { from: "a Cộng coconut coffee", to: "an Olive Cafe coconut coffee" },
+  // (comments in the clip's file name a video app's features; the first sentence runs over two lines)
+  { from: "(1080 × 1920) for Reels, TikTok", to: "(1080 × 1920) for short-video" },
+  { from: "and Shorts, the camera turning", to: "apps, the camera turning" },
+  { from: "(Reels: about the top 14%", to: "(about the top 14%" },
 ];
 
 /** Every real name, in table order. `leftIn` reports these. */
