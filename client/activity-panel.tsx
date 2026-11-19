@@ -41,6 +41,8 @@ interface PillProps<Value extends string> {
   name?: string;
   count?: number;
   on: boolean;
+  /** Not pressable: a screen reader hears it as unavailable. */
+  disabled?: boolean;
   /** A chip is a toggle and says it is pressed; a tab says it is the chosen one. */
   toggle: boolean;
   onPress(value: Value): void;
@@ -54,6 +56,7 @@ export function Pill<Value extends string>({
   name,
   count,
   on,
+  disabled = false,
   toggle,
   onPress,
   styles,
@@ -74,6 +77,7 @@ export function Pill<Value extends string>({
       accessibilityLabel={name ?? label}
       aria-pressed={toggle ? on : undefined}
       aria-selected={toggle ? undefined : on}
+      disabled={disabled}
       onPress={press}
       onPressIn={pressIn}
       onPressOut={pressOut}

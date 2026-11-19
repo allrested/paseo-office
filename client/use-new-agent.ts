@@ -98,15 +98,22 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
     change(startingAgent(providers, last));
   }, [loaded.status, settingRead, stillOffered, providers, last, change]);
 
+  // A remembered workspace the host no longer lists is no choice.
+  const { workspaceId } = choice;
+  const workspaceListed = loaded.workspaces.some((entry) => entry.id === workspaceId);
+  useEffect(() => {
+    if (loaded.status === "ready" && workspaceId !== null && !workspaceListed) {
+      change({ workspaceId: null });
+    }
+  }, [loaded.status, workspaceId, workspaceListed, change]);
+
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
   const chooseProvider = useCallback(
-    (provider: string) =>
-      change(
-        startingAgent(
-          providers.filter((entry) => entry.id === provider),
-          null,
-        ),
-      ),
+    (provider: string) => {
+      // A provider with no model cannot start an agent: it is never the choice.
+      const offered = providers.filter((entry) => entry.id === provider && entry.models.length > 0);
+      if (offered.length > 0) change(startingAgent(offered, null));
+    },
     [providers, change],
   );
   const { save } = device;

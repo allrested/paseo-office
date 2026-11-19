@@ -141,6 +141,8 @@ const PROVIDERS = {
   ],
 };
 
+/** What the draft holds when the office mounts: a test's remembered choice. */
+let startChoice: NewAgentChoice;
 let opened: string[];
 let container: HTMLElement;
 let root: Root;
@@ -155,7 +157,7 @@ const office: OfficeState = {
 /** The draft as the surface holds it: state above the panel, so the panel keeps none. */
 function useDraft(): NewAgentDraft {
   const [open, setOpen] = useState(false);
-  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
+  const [choice, setChoice] = useState<NewAgentChoice>(startChoice);
   const change = useCallback(
     (patch: Partial<NewAgentChoice>) => setChoice((current) => ({ ...current, ...patch })),
     [],
@@ -213,6 +215,7 @@ async function fillForm(prompt = "Fix the cart"): Promise<void> {
 }
 
 beforeEach(() => {
+  startChoice = EMPTY_CHOICE;
   opened = [];
   host.workspaceCalls = [];
   host.providerCalls = 0;
@@ -424,4 +427,44 @@ test("without a ready provider the form says there is none to start on", async (
   host.providers = { entries: [PROVIDERS.entries[2]] };
   await openForm();
   expect(container.textContent).toContain("No provider is available.");
+});
+
+test("a provider with no models says so, is not selectable and never becomes the choice", async () => {
+  host.providers = {
+    entries: [
+      ...PROVIDERS.entries.slice(0, 2),
+      { provider: "aider", status: "ready", enabled: true, label: "Aider", models: [] },
+    ],
+  };
+  await openForm();
+  const pill = labelled("Aider (No models)");
+  expect(pill.getAttribute("aria-disabled")).toBe("true");
+  await press("Aider (No models)");
+  expect(selected("Claude")).toBe("true");
+  expect(selected("Aider (No models)")).toBe("false");
+  expect(selected("Opus")).toBe("true");
+});
+
+test("a host with no workspaces says so, and a search with no match says that instead", async () => {
+  host.pages = [{ entries: [], pageInfo: { nextCursor: null, prevCursor: null, hasMore: false } }];
+  await openForm();
+  expect(container.textContent).toContain("No workspaces on this host yet.");
+  expect(container.textContent).not.toContain("No workspace matches.");
+});
+
+test("a search that matches nothing says no workspace matches", async () => {
+  await openForm();
+  await type("Search workspaces", "zzz");
+  expect(container.textContent).toContain("No workspace matches.");
+  expect(container.textContent).not.toContain("No workspaces on this host yet.");
+});
+
+test("a remembered workspace that is no longer listed is not shown as chosen", async () => {
+  startChoice = { ...EMPTY_CHOICE, workspaceId: "gone", prompt: "Kept text" };
+  act(() => root.render(null));
+  act(() => root.render(createElement(Harness)));
+  await openForm();
+  expect(checked("main: /src/shop")).toBe("false");
+  expect(container.textContent).toContain("Choose a workspace.");
+  expect((labelled("First prompt") as HTMLInputElement).value).toBe("Kept text");
 });

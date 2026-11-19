@@ -86,7 +86,7 @@ function defaultModel(models: readonly ModelOption[]): string | null {
 
 /**
  * The provider and model to start with: the last choice if it is still offered, else the first
- * available provider and its default model.
+ * provider that has a model and its default model. A provider with no model is never the start.
  */
 export function startingAgent(
   providers: readonly ProviderOption[],
@@ -96,7 +96,7 @@ export function startingAgent(
   if (kept !== undefined && kept.models.some((model) => model.id === last?.model)) {
     return { provider: kept.id, model: last?.model ?? null };
   }
-  const first = providers[0];
+  const first = providers.find((entry) => entry.models.length > 0);
   if (first === undefined) return { provider: null, model: null };
   return { provider: first.id, model: defaultModel(first.models) };
 }

@@ -84,7 +84,16 @@ test("without a default the first model starts; without a provider nothing does"
     model: null,
   });
   expect(startingAgent([{ id: "x", label: "X", models: [] }], null)).toEqual({
-    provider: "x",
+    provider: null,
+    model: null,
+  });
+});
+
+test("a provider with no models is never the start", () => {
+  const empty: ProviderOption = { id: "x", label: "X", models: [] };
+  expect(startingAgent([empty, ...PROVIDERS], null)).toEqual({ provider: "claude", model: "opus" });
+  expect(startingAgent([empty], { provider: "x", model: "any" })).toEqual({
+    provider: null,
     model: null,
   });
 });

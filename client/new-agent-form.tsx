@@ -28,6 +28,10 @@ interface WorkspacesProps {
 function Workspaces({ workspaces, value, onChoose, styles }: WorkspacesProps) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => workspaceGroups(workspaces, query), [workspaces, query]);
+  const emptyText =
+    workspaces.length === 0 && query.trim() === ""
+      ? "No workspaces on this host yet."
+      : "No workspace matches.";
   return (
     <View style={styles.sheetField}>
       <Text style={styles.sheetLabel}>Workspace</Text>
@@ -61,7 +65,7 @@ function Workspaces({ workspaces, value, onChoose, styles }: WorkspacesProps) {
               </View>
             </View>
           ))}
-          {groups.length === 0 ? <Text style={styles.muted}>No workspace matches.</Text> : null}
+          {groups.length === 0 ? <Text style={styles.muted}>{emptyText}</Text> : null}
         </View>
       </ScrollView>
     </View>
@@ -114,7 +118,8 @@ export function NewAgentForm({ choice, change, onBack, onCreated, styles }: NewA
               <Pill<string>
                 key={entry.id}
                 value={entry.id}
-                label={entry.label}
+                label={entry.models.length === 0 ? `${entry.label} (No models)` : entry.label}
+                disabled={entry.models.length === 0}
                 on={entry.id === choice.provider}
                 toggle={false}
                 onPress={chooseProvider}
