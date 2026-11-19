@@ -10,7 +10,8 @@ import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
 import { useConversation, type Conversation } from "./use-conversation.js";
 
 interface Page {
-  entries: { seqStart: number; seqEnd: number; item: AgentTimelineItem }[];
+  epoch: string;
+  entries: { seqStart: number; seqEnd: number; item: AgentTimelineItem; turnId?: string }[];
   startCursor: { epoch: string; seq: number } | null;
   hasOlder: boolean;
   staleCursor?: boolean;
@@ -85,6 +86,7 @@ const entry = (seq: number, item: AgentTimelineItem, seqEnd = seq, turnId?: stri
   turnId,
 });
 const page = (entries: Page["entries"], extra: Partial<Page> = {}): Page => ({
+  epoch: "e1",
   entries,
   startCursor: entries.length ? { epoch: "e1", seq: entries[0]!.seqStart } : null,
   hasOlder: false,
@@ -194,6 +196,28 @@ test("a read after a restored subscription keeps what is live past the page; a r
   await push({ agentId: "a1", event: { type: "replacement", epoch: "e2" } });
   await answer(2, page([entry(1, you("Fresh"))]));
   expect(texts()).toEqual(["Fresh"]);
+});
+
+test("a read keeps what is live past the page only when the page has the epoch of what is held", async () => {
+  await mount();
+  await answer(0, page([entry(1, you("One"))]));
+  await push(live(2, you("two")));
+  await push({ agentId: "a1", subscriptionId: "s", event: { type: "subscription_restored" } });
+  // A new epoch numbers the history afresh: the held "two" is the old numbering's.
+  await answer(1, page([entry(1, you("Fresh"))], { epoch: "e2" }));
+  expect(texts()).toEqual(["Fresh"]);
+  // What came live in the page's own epoch is kept.
+  await push(live(2, you("again"), undefined, "e2"));
+  await push({ agentId: "a1", subscriptionId: "s", event: { type: "subscription_restored" } });
+  await answer(2, page([entry(1, you("Fresh"))], { epoch: "e2" }));
+  expect(texts()).toEqual(["Fresh", "again"]);
+});
+
+test("pieces that came live before the first page are dropped when the page is another epoch", async () => {
+  await mount();
+  await push(live(3, you("three")));
+  await answer(0, page([entry(1, you("One")), entry(2, you("Two"))], { epoch: "e2" }));
+  expect(texts()).toEqual(["One", "Two"]);
 });
 
 test("the turn of a page entry and of a live piece reaches the rows", async () => {

@@ -36,7 +36,7 @@ interface Cursor {
   seq: number;
 }
 
-/** The part of a timeline page this hook reads: `entries`, `startCursor`, `hasOlder`, `error`. */
+/** The part of a timeline page this hook reads: `entries`, `epoch`, `startCursor`, `hasOlder`, `error`. */
 interface Page {
   entries: readonly {
     seqStart: number;
@@ -44,6 +44,8 @@ interface Page {
     item: AgentTimelineItem;
     turnId?: string;
   }[];
+  /** The numbering the page's sequence numbers belong to. */
+  epoch: string;
   startCursor: Cursor | null;
   hasOlder: boolean;
   staleCursor: boolean;
@@ -53,6 +55,8 @@ interface Page {
 interface State {
   agentId: string;
   held: Held[];
+  /** The epoch the held numbers belong to; null until a page or a live piece names it. */
+  epoch: string | null;
   status: Conversation["status"];
   error: string | null;
   /** Cursor of the earliest page read: the next earlier page is "before" it. */
@@ -65,6 +69,7 @@ interface State {
 const fresh = (agentId: string): State => ({
   agentId,
   held: [],
+  epoch: null,
   status: "loading",
   error: null,
   cursor: null,
@@ -98,14 +103,20 @@ function withLive(held: Held[], seq: number, item: AgentTimelineItem, turnId?: s
 
 function liveItem(
   event: unknown,
-): { seq: number; item: AgentTimelineItem; turnId?: string } | null {
+): { seq: number; item: AgentTimelineItem; turnId?: string; epoch?: string } | null {
   const message = event as {
     seq?: number;
+    epoch?: string;
     event?: { type?: string; item?: AgentTimelineItem; turnId?: string };
   };
   if (message.event?.type !== "timeline" || !message.event.item) return null;
   if (typeof message.seq !== "number") return null;
-  return { seq: message.seq, item: message.event.item, turnId: message.event.turnId };
+  return {
+    seq: message.seq,
+    item: message.event.item,
+    turnId: message.event.turnId,
+    epoch: message.epoch,
+  };
 }
 
 function checked(page: Page): Page {
@@ -141,8 +152,9 @@ export function useConversation(agentId: string): Conversation {
       }));
     };
     // `keepLive` keeps the live pieces held past the page's last entry: what came while the page was
-    // read, or after a restored subscription. A replacement starts a new epoch, whose numbers are
-    // not the held ones', so it keeps none.
+    // read, or after a restored subscription. They are kept only when the page is of the epoch of
+    // what is held: another epoch numbers the history afresh, so everything held is replaced. A
+    // replacement says so too, and keeps none.
     const readLatest = async (keepLive: boolean) => {
       const page = checked((await timeline.refetch({ direction: "tail", ...PAGE })) as Page);
       if (!alive) return;
@@ -151,7 +163,11 @@ export function useConversation(agentId: string): Conversation {
       const pageEnd = fromTail.length === 0 ? -1 : fromTail[fromTail.length - 1]!.end;
       commit((s) => ({
         ...s,
-        held: keepLive ? fromTail.concat(s.held.filter((h) => h.seq > pageEnd)) : fromTail,
+        held:
+          keepLive && (s.epoch === null || s.epoch === page.epoch)
+            ? fromTail.concat(s.held.filter((h) => h.seq > pageEnd))
+            : fromTail,
+        epoch: page.epoch,
         status: "ready",
         error: null,
         cursor: page.startCursor,
@@ -173,6 +189,7 @@ export function useConversation(agentId: string): Conversation {
         commit((s) => ({
           ...s,
           held: withLive(s.held, piece.seq, piece.item, piece.turnId),
+          epoch: s.epoch ?? piece.epoch ?? null,
         }));
     });
 
