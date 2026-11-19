@@ -4,9 +4,11 @@ import {
   chatFile,
   hostSkillFolders,
   incidentsFile,
+  liftFile,
   notesWriterFile,
   officeDir,
   paseoHome,
+  tenureFile,
   workspaceSkillFolders,
 } from "./paths.js";
 
@@ -25,6 +27,8 @@ test("keeps the office's files under PASEO_HOME/office", () => {
   expect(notesWriterFile(env, HOME)).toBe("/srv/paseo/office/notes-writer.json");
   expect(incidentsFile(env, HOME)).toBe("/srv/paseo/office/incidents.json");
   expect(chatFile(env, HOME)).toBe("/srv/paseo/office/chat.json");
+  expect(tenureFile(env, HOME)).toBe("/srv/paseo/office/tenure.json");
+  expect(liftFile(env, HOME)).toBe("/srv/paseo/office/lift.json");
 });
 
 test("reads the host's skills from the Claude config folder and Paseo's two other homes", () => {
