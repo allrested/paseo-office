@@ -140,8 +140,9 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   and providers are read when the form opens, not when the office does. The provider and model
   start as the last agent's, kept in the `lastAgent` field of the `office-device` setting, or the
   first provider's default model when that choice is gone. A failure shows its reason with
-  everything typed kept, and Back keeps what was typed for the next time the tab's form opens
-  while the Sessions tab stays chosen. A new project folder, a new worktree, attachments and modes
+  everything typed kept. Whether the form is open, the workspace, provider and model chosen and
+  the prompt typed are the surface's, as the Chat box is: another tab, Back and a dismissed phone
+  sheet keep them while the office is mounted, and a create clears the prompt. A new project folder, a new worktree, attachments and modes
   stay in the app's own screen.
 - **Activity** is a feed derived on the client from the office's state, kept in memory for this
   app run. It fills only while an office surface is open.

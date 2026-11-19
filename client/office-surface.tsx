@@ -62,7 +62,8 @@ import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
 import { SessionPane, sessionTabsOf, type SessionContext } from "./session-pane.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
-import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
+import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
+import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
 import { SessionsPanel } from "./sessions-panel.js";
 import { PixelOffice } from "./pixel/pixel-office.js";
 import { StructureView } from "./structure-view.js";
@@ -861,6 +862,19 @@ function useChatDraft(): ChatDraft {
   return useMemo(() => ({ text, setText, replyTo, setReplyTo }), [text, replyTo]);
 }
 
+/** What is chosen and typed in the Sessions tab's New agent form: the surface's, as the chat's is. */
+function useNewAgentDraft(): NewAgentDraft {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
+  const change = useCallback((patch: Partial<NewAgentChoice>) => {
+    const entries = Object.entries(patch) as [keyof NewAgentChoice, string | null][];
+    setChoice((current) =>
+      entries.every(([key, value]) => current[key] === value) ? current : { ...current, ...patch },
+    );
+  }, []);
+  return useMemo(() => ({ open, setOpen, choice, change }), [open, choice, change]);
+}
+
 interface ColumnContentInput {
   live: boolean;
   /** Why the office is not live, while it is in error or closed. */
@@ -1303,6 +1317,7 @@ export function OfficeSurface(
     ],
   );
   const draft = useChatDraft();
+  const newAgent = useNewAgentDraft();
   const { badges, attention } = useColumnContent({
     live,
     problem: loadProblem(office.subscription),
@@ -1317,7 +1332,7 @@ export function OfficeSurface(
   const selectedActivity = kept === null ? null : (office.state.activity[kept] ?? null);
   // The panels size their controls for the surface they are in, not only for the device.
   const panelLayout = useMemo(() => ({ ...layout, compact }), [layout, compact]);
-  const panel = { office, styles, theme, layout: panelLayout, attention, draft };
+  const panel = { office, styles, theme, layout: panelLayout, attention, draft, newAgent };
   const sessions = useMemo(
     () => sessionTabsOf(column.sessions, model.agents),
     [column.sessions, model.agents],

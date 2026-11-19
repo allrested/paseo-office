@@ -6,7 +6,6 @@ import { loadProblem, Pill } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";
 import { ActionButton } from "./action-button.js";
 import { NewAgentForm } from "./new-agent-form.js";
-import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import { LIST_TABS, NO_MATCH, SEARCH_LABEL, tabCounts, type ListTab } from "./list-text.js";
 import type { ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { NO_AGENTS, sessionRows, type SessionRow } from "./sessions-text.js";
@@ -80,30 +79,22 @@ function AgentRow({ entry, endsGroup, link, styles }: AgentRowProps) {
  * list, under the List view's tabs and search.
  */
 export function SessionsPanel(props: ColumnPanelProps) {
-  const { link, styles } = props;
-  const [form, setForm] = useState(false);
-  // The form's choice lives here, so Back keeps it for the next time the form opens.
-  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
-  const change = useCallback((patch: Partial<NewAgentChoice>) => {
-    const entries = Object.entries(patch) as [keyof NewAgentChoice, string | null][];
-    setChoice((current) =>
-      entries.every(([key, value]) => current[key] === value) ? current : { ...current, ...patch },
-    );
-  }, []);
-  const open = useCallback(() => setForm(true), []);
-  const back = useCallback(() => setForm(false), []);
+  const { link, styles, newAgent } = props;
+  const { setOpen, change } = newAgent;
+  const open = useCallback(() => setOpen(true), [setOpen]);
+  const back = useCallback(() => setOpen(false), [setOpen]);
   const created = useCallback(
     (agentId: string) => {
-      setForm(false);
-      setChoice(EMPTY_CHOICE);
+      setOpen(false);
+      change({ prompt: "" });
       link.openSession(agentId);
     },
-    [link],
+    [link, setOpen, change],
   );
-  if (form) {
+  if (newAgent.open) {
     return (
       <NewAgentForm
-        choice={choice}
+        choice={newAgent.choice}
         change={change}
         onBack={back}
         onCreated={created}

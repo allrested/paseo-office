@@ -3,11 +3,12 @@
  */
 // New agent, mounted as the Sessions tab mounts it, with the host's workspaces, providers and
 // agent creation stood in. The device setting is a stand-in too, and records its saves.
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, useCallback, useMemo, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { OfficeLink } from "./office-link.js";
+import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
+import type { NewAgentDraft, OfficeLink } from "./office-link.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 import { SessionsPanel } from "./sessions-panel.js";
 import { useOfficeStyles } from "./styles.js";
@@ -151,10 +152,29 @@ const office: OfficeState = {
   chat: null,
 };
 
+/** The draft as the surface holds it: state above the panel, so the panel keeps none. */
+function useDraft(): NewAgentDraft {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
+  const change = useCallback(
+    (patch: Partial<NewAgentChoice>) => setChoice((current) => ({ ...current, ...patch })),
+    [],
+  );
+  return useMemo(() => ({ open, setOpen, choice, change }), [open, choice, change]);
+}
+
 function Harness() {
   const styles = useOfficeStyles(THEME, LAYOUT.compact, false);
+  const newAgent = useDraft();
   const link: OfficeLink = { select: () => undefined, openSession: (id) => void opened.push(id) };
-  return createElement(SessionsPanel, { office, styles, theme: THEME, layout: LAYOUT, link });
+  return createElement(SessionsPanel, {
+    office,
+    styles,
+    theme: THEME,
+    layout: LAYOUT,
+    link,
+    newAgent,
+  });
 }
 
 function maybe(label: string): HTMLElement | null {
@@ -377,7 +397,7 @@ test("Back keeps what was typed for the next time the form opens", async () => {
   expect(checked("main: /src/shop")).toBe("true");
 });
 
-test("a created agent's form starts fresh the next time", async () => {
+test("after a create the prompt is cleared and the workspace and model stay chosen", async () => {
   await openForm();
   await fillForm("Done");
   await press("Create");
@@ -385,7 +405,7 @@ test("a created agent's form starts fresh the next time", async () => {
   host.pages = [WORKSPACE_PAGE];
   await openForm();
   expect((labelled("First prompt") as HTMLInputElement).value).toBe("");
-  expect(checked("main: /src/shop")).toBe("false");
+  expect(checked("main: /src/shop")).toBe("true");
 });
 
 test("a failed read shows its reason and can be tried again", async () => {

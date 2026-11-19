@@ -3,14 +3,15 @@
  */
 // The Sessions panel, mounted as the office's column mounts it: the surface's state arrives as a
 // prop, and a test re-renders with the next state to see the panel change.
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, useCallback, useMemo, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginSubscriptionState } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent, OfficeSnapshot } from "../shared/contracts.js";
 import { NO_MATCH, SEARCH_LABEL } from "./list-text.js";
-import type { OfficeLink } from "./office-link.js";
+import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
+import type { NewAgentDraft, OfficeLink } from "./office-link.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 import { SessionsPanel } from "./sessions-panel.js";
 import { NO_AGENTS } from "./sessions-text.js";
@@ -65,8 +66,20 @@ function office(state: Partial<OfficeSnapshot>, extra: Partial<OfficeState> = {}
   };
 }
 
+/** The draft as the surface holds it: state above the panel, so the panel keeps none. */
+function useDraft(): NewAgentDraft {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
+  const change = useCallback(
+    (patch: Partial<NewAgentChoice>) => setChoice((current) => ({ ...current, ...patch })),
+    [],
+  );
+  return useMemo(() => ({ open, setOpen, choice, change }), [open, choice, change]);
+}
+
 function Harness({ value }: { value: OfficeState }) {
   const styles = useOfficeStyles(THEME, LAYOUT.compact, false);
+  const newAgent = useDraft();
   const link: OfficeLink = {
     select: (agentId) => void selected.push(agentId),
     openSession: (agentId) => void opened.push(agentId),
@@ -77,6 +90,7 @@ function Harness({ value }: { value: OfficeState }) {
     theme: THEME,
     layout: LAYOUT,
     link,
+    newAgent,
   });
 }
 

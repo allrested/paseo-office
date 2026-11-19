@@ -11,7 +11,8 @@ import type { OfficeAgent, OfficeSnapshot } from "../shared/contracts.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { feedStore, type FeedEvent, type FeedKind } from "./activity-feed.js";
 import { FEED_EMPTY, FEED_NO_MATCH } from "./activity-feed-text.js";
-import type { OfficeLink } from "./office-link.js";
+import { EMPTY_CHOICE } from "./new-agent-model.js";
+import type { NewAgentDraft, OfficeLink } from "./office-link.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 import { useOfficeStyles } from "./styles.js";
 import type { OfficeState } from "./use-office.js";
@@ -73,6 +74,14 @@ function office(state: Partial<OfficeSnapshot>, extra: Partial<OfficeState> = {}
   };
 }
 
+/** These panels have no form: the surface's draft for it is never read. */
+const NO_FORM: NewAgentDraft = {
+  open: false,
+  setOpen: () => undefined,
+  choice: EMPTY_CHOICE,
+  change: () => undefined,
+};
+
 function Harness({ value }: { value: OfficeState }) {
   const styles = useOfficeStyles(THEME, LAYOUT.compact, false);
   const link: OfficeLink = {
@@ -85,6 +94,7 @@ function Harness({ value }: { value: OfficeState }) {
     theme: THEME,
     layout: LAYOUT,
     link,
+    newAgent: NO_FORM,
   });
 }
 

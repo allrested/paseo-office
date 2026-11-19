@@ -27,6 +27,35 @@ let deliver: ((event: OfficeEvent) => void) | null;
 
 // One object for every render, as the host's SDK object is. An agent's timeline holds one line.
 const sdk = vi.hoisted(() => ({
+  workspaces: {
+    list: async () => ({
+      entries: [
+        {
+          id: "w1",
+          name: "main",
+          projectId: "shop",
+          projectDisplayName: "Shop",
+          projectRootPath: "/src/shop",
+          workspaceDirectory: "/src/shop",
+          archivingAt: null,
+        },
+      ],
+      pageInfo: { nextCursor: null, prevCursor: null, hasMore: false },
+    }),
+  },
+  providers: {
+    waitForReady: async () => ({
+      entries: [
+        {
+          provider: "claude",
+          status: "ready",
+          enabled: true,
+          label: "Claude",
+          models: [{ provider: "claude", id: "opus", label: "Opus", isDefault: true }],
+        },
+      ],
+    }),
+  },
   agents: {
     ref: () => ({
       send: async () => undefined,
@@ -560,6 +589,51 @@ test("a half-typed chat message is still there after a look at another tab", asy
   await pressTab("Chat");
 
   expect(box()?.value).toBe("hello");
+});
+
+async function typeFirstPrompt(text: string): Promise<void> {
+  const field = labelled("First prompt") as HTMLTextAreaElement | null;
+  if (!field) throw new Error("The form has no First prompt box");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+const firstPrompt = () => (labelled("First prompt") as HTMLTextAreaElement | null)?.value;
+
+test("a half-typed new agent is still there after a look at another tab", async () => {
+  compact = false;
+  await mount();
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+  await press("New agent");
+  await act(async () => undefined);
+  await typeFirstPrompt("Fix the cart");
+  await press("main: /src/shop");
+
+  await pressTab("Activity");
+  expect(firstPrompt()).toBeUndefined();
+  await pressTab("Sessions");
+
+  // The form is open as it was left, with the text and the workspace.
+  expect(firstPrompt()).toBe("Fix the cart");
+  expect(labelled("main: /src/shop")?.getAttribute("aria-checked")).toBe("true");
+});
+
+test("a half-typed new agent is still there after the phone's sheet is dismissed", async () => {
+  compact = true;
+  await mount();
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+  await pressBarSessions();
+  await press("New agent");
+  await act(async () => undefined);
+  await typeFirstPrompt("Fix the cart");
+
+  await press("Close the column");
+  expect(sheet()).toBeNull();
+  await pressBarSessions();
+
+  expect(firstPrompt()).toBe("Fix the cart");
 });
 
 test("Attention says why while the subscription is in error or closed", async () => {

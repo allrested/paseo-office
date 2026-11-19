@@ -20,7 +20,8 @@ import type {
 import { getChatSeen, resetChatSeen } from "./chat-seen.js";
 import { CHAT_EMPTY, CHAT_RECALLED, REACTION_CHOICES, STICKERS, remindState } from "./chat-text.js";
 import { ChatPanel } from "./chat-panel.js";
-import type { ChatDraft, OfficeLink } from "./office-link.js";
+import { EMPTY_CHOICE } from "./new-agent-model.js";
+import type { ChatDraft, NewAgentDraft, OfficeLink } from "./office-link.js";
 import { applyChatEvent, EMPTY_OFFICE } from "./office-state.js";
 import { useOfficeStyles } from "./styles.js";
 import type { OfficeState } from "./use-office.js";
@@ -105,6 +106,14 @@ let root: Root;
 let current: OfficeState;
 let compactLayout: boolean;
 
+/** These panels have no form: the surface's draft for it is never read. */
+const NO_FORM: NewAgentDraft = {
+  open: false,
+  setOpen: () => undefined,
+  choice: EMPTY_CHOICE,
+  change: () => undefined,
+};
+
 /** The panel as the surface draws it: the surface holds the draft. */
 function Harness({ value }: { value: OfficeState }) {
   const layout = { compact: compactLayout, platform: "web" } as const;
@@ -116,7 +125,15 @@ function Harness({ value }: { value: OfficeState }) {
     select: (agentId) => void selected.push(agentId),
     openSession: (agentId) => void opened.push(agentId),
   };
-  return createElement(ChatPanel, { office: value, styles, theme: THEME, layout, link, draft });
+  return createElement(ChatPanel, {
+    office: value,
+    styles,
+    theme: THEME,
+    layout,
+    link,
+    draft,
+    newAgent: NO_FORM,
+  });
 }
 
 const draw = () => act(async () => root.render(createElement(Harness, { value: current })));
