@@ -135,3 +135,92 @@ test("setOn tells subscribers only when the switch changes, and an unsubscribed 
   m.setOn("yes"); // only `true` turns it on
   expect(m.sound.on).toBe(false);
 });
+
+const key = (name: string) => Object.assign(new Event("keydown"), { key: name });
+
+test("an Escape or a bare modifier key is not an activation: the state stays idle and a later press probes", async () => {
+  install("runs");
+  const m = await fresh();
+  stop = m.watchAudio(window);
+  window.dispatchEvent(key("Escape"));
+  window.dispatchEvent(key("Shift"));
+  await settle();
+  expect(m.sound.audio).toBe("idle");
+  expect(made.contexts).toBe(0);
+  window.dispatchEvent(new Event("pointerup"));
+  await settle();
+  expect(m.sound.audio).toBe("ready");
+});
+
+test("an event while the frame has no active user activation does not probe", async () => {
+  install("runs");
+  const m = await fresh();
+  const activation = { isActive: false };
+  Object.defineProperty(navigator, "userActivation", { configurable: true, value: activation });
+  try {
+    stop = m.watchAudio(window);
+    window.dispatchEvent(new Event("pointerup"));
+    await settle();
+    expect(m.sound.audio).toBe("idle");
+    expect(made.contexts).toBe(0);
+    activation.isActive = true;
+    window.dispatchEvent(new Event("pointerup"));
+    await settle();
+    expect(m.sound.audio).toBe("ready");
+  } finally {
+    delete (navigator as unknown as Record<string, unknown>).userActivation;
+  }
+});
+
+test("blocked is not final: a later press whose context runs makes it ready and lets the switch on", async () => {
+  install("hangs");
+  const m = await fresh();
+  stop = m.watchAudio(window, 1500);
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(m.sound.audio).toBe("blocked");
+  m.setOn(true);
+  expect(m.sound.on).toBe(false);
+  install("runs");
+  window.dispatchEvent(new Event("pointerup"));
+  await settle();
+  expect(m.sound.audio).toBe("ready");
+  m.setOn(true);
+  expect(m.sound.on).toBe(true);
+});
+
+test("a press while a probe is in flight does not start a second one", async () => {
+  install("hangs");
+  const m = await fresh();
+  stop = m.watchAudio(window, 1500);
+  window.dispatchEvent(new Event("pointerup"));
+  window.dispatchEvent(new Event("pointerup"));
+  expect(made.contexts).toBe(1);
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(m.sound.audio).toBe("blocked");
+});
+
+test("unsupported is not retried", async () => {
+  const m = await fresh();
+  stop = m.watchAudio(window);
+  install("runs");
+  window.dispatchEvent(new Event("pointerup"));
+  await settle();
+  expect(m.sound.audio).toBe("unsupported");
+  expect(made.contexts).toBe(0);
+});
+
+test("stop() during a probe in flight leaves the state and the listeners alone when it later fires", async () => {
+  install("hangs");
+  const m = await fresh();
+  const stopWatching = m.watchAudio(window, 1500);
+  const told = vi.fn();
+  m.sound.subscribe(told);
+  window.dispatchEvent(new Event("pointerup"));
+  stopWatching();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(m.sound.audio).toBe("idle");
+  expect(told).not.toHaveBeenCalled();
+  window.dispatchEvent(new Event("pointerup"));
+  expect(made.contexts).toBe(1);
+});

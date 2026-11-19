@@ -44,50 +44,73 @@ function setAudio(audio) {
   emit();
 }
 
+const QUIET_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Fn', 'OS']);
+
 /**
- * Finds out whether this page lets audio start. With no Web Audio it is 'unsupported' at once. Otherwise the first
- * press (pointerup, which counts as a gesture on a touch screen where pointerdown does not, or a key) makes a context
- * of its own, asks it to run, and says 'ready' if it runs and 'blocked' if it throws, rejects or has not run within
- * `timeoutMs`. The context is closed after. Returns the function that stops listening.
+ * Finds out whether this page lets audio start. With no Web Audio it is 'unsupported' at once, for good. Otherwise a
+ * press that is a real user activation (pointerup, which counts as a gesture on a touch screen where pointerdown does
+ * not, or a key; not Escape or a bare modifier, and not while `navigator.userActivation` says there is none) makes a
+ * context of its own, asks it to run, and says 'ready' if it runs and 'blocked' if it throws, rejects or has not run
+ * within `timeoutMs`. The context is closed after. 'ready' is final and stops listening; 'blocked' is not: the next
+ * activating press probes again, so a slow start or a frame that gains audio later is not lost until a reload.
+ * Returns the function that stops listening and drops a probe in flight (no state change after it).
  */
 export function watchAudio(win = window, timeoutMs = 1500) {
-  const Context = win.AudioContext || win.webkitAudioContext;
-  if (!Context) {
+  const contextOf = () => win.AudioContext || win.webkitAudioContext;
+  if (!contextOf()) {
     setAudio('unsupported');
     return () => {};
   }
   const events = ['pointerup', 'keydown'];
+  let stopped = false;
+  let probing = false;
+  let cancel = () => {};
   const stop = () => {
-    for (const type of events) win.removeEventListener(type, probe, true);
+    stopped = true;
+    cancel();
+    for (const type of events) win.removeEventListener(type, onPress, true);
   };
+  function onPress(event) {
+    if (stopped || probing) return;
+    if (event.type === 'keydown' && QUIET_KEYS.has(event.key)) return;
+    if (win.navigator?.userActivation && !win.navigator.userActivation.isActive) return;
+    probe();
+  }
   function probe() {
-    stop();
     let context;
     try {
+      const Context = contextOf();
       context = new Context();
     } catch {
       setAudio('blocked');
       return;
     }
+    probing = true;
     let settled = false;
+    let timer;
     const finish = () => {
       if (settled) return;
       settled = true;
+      probing = false;
       clearTimeout(timer);
-      setAudio(context.state === 'running' ? 'ready' : 'blocked');
+      if (!stopped) {
+        setAudio(context.state === 'running' ? 'ready' : 'blocked');
+        if (sound.audio === 'ready') stop();
+      }
       try {
         Promise.resolve(context.close()).catch(() => {});
       } catch {
         /* already closed */
       }
     };
-    const timer = setTimeout(finish, timeoutMs);
+    cancel = finish;
+    timer = setTimeout(finish, timeoutMs);
     try {
       Promise.resolve(context.resume()).then(finish, finish);
     } catch {
       finish();
     }
   }
-  for (const type of events) win.addEventListener(type, probe, true);
+  for (const type of events) win.addEventListener(type, onPress, true);
   return stop;
 }

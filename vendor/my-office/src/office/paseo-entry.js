@@ -50,6 +50,7 @@ let boardRows = [];
 let problem = () => {};
 let onMachine = null;
 let stopped = false;
+let stopWatchingAudio = () => {};
 
 /** What upstream's page markup gives the kept modules: the stage, the place card, two controls. */
 function buildPage() {
@@ -303,7 +304,7 @@ const api = {
     sfx.set(false);
     sound.subscribe(() => sfx.set(sound.on));
     sound.request = (next) => { setOn(next); options.onSound?.(next); };
-    watchAudio(window);
+    stopWatchingAudio = watchAudio(window);
     cameraBar.setup();
     // Escape closes the place card and gives the keyboard back to the chip that opened it.
     document.addEventListener('keydown', (event) => {
@@ -344,6 +345,7 @@ const api = {
   stop() {
     if (!started || stopped) return;
     stopped = true;
+    stopWatchingAudio();
     renderer.dispose();
     renderer.forceContextLoss();
   },

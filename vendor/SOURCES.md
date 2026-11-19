@@ -126,8 +126,11 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 
 Paseo's own files sit beside upstream's and are named for it: `paseo-entry.js` (the bundle's
 entry: builds the page, starts the modules in upstream's order, sets `PaseoOfficeWorld`),
-`paseo-host.js` (what the stand-ins read and call), `paseo-sound.js` (the Sound switch's state and whether the page lets audio start), `paseo-style.js` (the page's stylesheet, in
-Paseo's design language), `paseo-modules.js` (generated: the kept modules in start-up order),
+`paseo-host.js` (what the stand-ins read and call), `paseo-sound.js` (the Sound switch's state, and
+the probe that finds out whether the page lets audio start: it runs on a real activating press only,
+never on Escape or a bare modifier key or while the frame has no active user activation; 'blocked'
+is tried again on the next press, 'ready' and 'unsupported' are final), `paseo-style.js` (the page's
+stylesheet, in Paseo's design language), `paseo-modules.js` (generated: the kept modules in start-up order),
 `paseo-sign.js` (the picture on the lobby's sign and the reception's plaque, with the host's
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
 `paseo-leisure-plan.js` (who gets up from a rest, when and for what; no scene in it, so
