@@ -24,6 +24,8 @@ my-office's.
   instructions for that folder, which may sit in its own or a parent folder's `AGENTS.md` or
   `CLAUDE.md`.
 - Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
+- Plays my-office's sounds in the 3D floor: off until you turn on Sound in the settings or with the
+  speaker button on the floor's toolbar.
 - Reads the host (on Linux): memory, CPU, and what each agent left running, with a way to clean it
   up.
 
@@ -59,6 +61,7 @@ The settings are in Settings > Plugins > Office 3D. The gear over the floor open
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Desktop app and browsers | The 3D floor, the 2D floor and the list                                                                                                                                                |
 | The store phone app      | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
+| Sound                    | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
 | Stock Paseo 0.16         | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.

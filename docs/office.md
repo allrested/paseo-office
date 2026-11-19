@@ -184,8 +184,9 @@ to the app's window.
 
 The scene is told who is there and what kind of thing each does, and the open incidents' keys and
 titles for the banner; never a file name, a command or a prompt. It makes no network call. It
-writes three things to the app origin's `localStorage` under keys that start with `office-`:
-which team sits where, the plants, and the graphics level.
+writes four things to the app origin's `localStorage` under keys that start with `office-`:
+which team sits where, the plants, the graphics level, and the Sound switch (`office-sound`, which
+the host's setting overwrites at each start).
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
 pop out to, the ride and delivery apps, the bank, the medicines) are made-up ones, not my-office's
@@ -224,6 +225,29 @@ rest the gaps are 10 to 20 minutes. The games are my-office's; the office's plan
 (`vendor/my-office/src/office/paseo-leisure.js`) only starts them, and starts nothing at night,
 during a gathering or with reduced motion. After 21:00 an agent that has rested 30 minutes walks
 home, its rest counted from the host's last change of the agent.
+
+### Sound
+
+The scene's sounds are my-office's, made in the page with Web Audio, no sound file: all of them
+but one shop's tune. They are off until turned on. The switch is the `sound` field of the
+`office-device` setting (off by default), so it is the device's, not the host's: the settings page's
+"Sound" switch and the speaker button on the floor's toolbar, after Photo mode, both change it.
+The host sends the switch to the scene with `setSound`; the button asks for a change with
+`onSound`, and the host stores it and answers with `setSound`. The page starts off.
+
+A browser lets a page start audio only inside a press, so the scene's audio starts there: a press
+on the button plays at once, and a press anywhere in the scene starts the audio the switch turned
+on. A probe (`paseo-sound.js`) finds out whether the frame allows audio at all. It runs inside a
+real press only (not for Escape or a bare modifier key, and not while the page has no user
+activation), and makes and closes a context of its own. A page with no Web Audio is "not
+available" at once, for good: the button is dimmed, says "Sound is not available here", and does
+nothing. A press after which no context ran makes the button the same, and turns the scene's sound
+off; the next press tries again, and once a context runs the button can be used again. It then
+shows off until it is pressed, whatever the setting says.
+
+Karaoke follows the switch, because it reads `sfx.on`, and so does the incidents' siren. Every
+saver of the device's document (the view, the incidents rung, the Sound switch) writes it whole,
+so changing one keeps the others.
 
 ## The 2D floor
 
@@ -286,7 +310,7 @@ holds every wake until it is turned back on; wakes that wait are not kept across
 
 The office's settings are a screen in its page under Settings > Plugins > Office 3D
 (`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Notes folder", "Time
-zone", "Stand-up days" and the tracker fields. Three things open it with
+zone", "Stand-up days", "Sound" and the tracker fields. Three things open it with
 `client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
 settings", and the Attention tab's Settings card.
 
@@ -417,8 +441,8 @@ rings nothing for the time it was off.
 The Incidents card dismisses through `office.incidents.dismiss.request`. The 3D floor shows a
 banner naming the newest, with 25 s of red light, a fail bubble over each person at work and
 my-office's siren for one this device has not rung for. A device keeps what it rang for in its
-`office-device` setting, so opening the office again rings nothing. A browser plays the siren only
-after a click or a key press in the scene.
+`office-device` setting, so opening the office again rings nothing. The siren plays only while
+Sound is on, and only after a press in the scene.
 
 ## Reviews
 
