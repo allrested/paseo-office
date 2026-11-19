@@ -81,6 +81,9 @@ export const OURS = {
   // (an incident is one Paseo's office found in a tracker, not three failures in five minutes: the newest on the banner)
   'incident.banner': 'Incident: {key} {title}',
   'incident.more': '+{n} more',
+  // (the pantry's board with the host's duties, people/duty.js: whom a duty has nobody for yet, and a day with none due)
+  'paseo.duty.open': 'open',
+  'paseo.duty.none': 'No duty is due today',
 };
 
 const get = (dict, key) => { let o = dict; for (const k of key.split('.')) { if (o == null || typeof o !== 'object' || !own(o, k)) return undefined; o = o[k]; } return o; };
