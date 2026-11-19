@@ -1,4 +1,5 @@
 import { LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
+import { assignmentFooter } from "../shared/lobby-assignment.js";
 import type { BoardService } from "./board-service.js";
 import { errorMessage } from "./errors.js";
 import type { MentionQueue } from "./mention-queue.js";
@@ -21,11 +22,6 @@ interface PickupPorts {
   clock: Clock;
   enabled(): boolean;
   log(message: string): void;
-}
-
-// A session opened before a plugin reload may still have the previous tool registration.
-export function completionLine(claim: Post): string {
-  return `Completed office task ${claim.id} (assignment ${claim.seq}).`;
 }
 
 function unassigned(task: Post): boolean {
@@ -73,8 +69,7 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     const prompt = [
       `The office assigned you lobby task ${task.id} from ${author}.`,
       `  ${indented(task.text)}`,
-      `Work on this task. When it is complete, use office_update with id "${task.id}" and action "done". If you need input, leave it claimed and explain what you need.`,
-      `If the tool is unavailable and you have finished, put this exact line at the end of your reply: ${completionLine(claim)}`,
+      assignmentFooter(claim),
     ].join("\n");
     // The daemon deduplicates this ID even after a network failure or a plugin restart.
     await agents.send(agentId, prompt, source, claim.pickupMessageId);

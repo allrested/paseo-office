@@ -15,7 +15,8 @@ import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
 import { createMentionQueue, type MentionQueue, type WakeTarget } from "./mention-queue.js";
-import { completionLine, createLobbyPickup, type LobbyPickup } from "./lobby-pickup.js";
+import { completionLine } from "../shared/lobby-assignment.js";
+import { createLobbyPickup, type LobbyPickup } from "./lobby-pickup.js";
 import { oneLine } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 

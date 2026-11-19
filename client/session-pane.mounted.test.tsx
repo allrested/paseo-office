@@ -40,7 +40,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
       return createElement(View, null, props.children);
     },
   );
-  return { ScrollView, TextInput };
+  return { ScrollView, TextInput, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

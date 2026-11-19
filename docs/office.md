@@ -130,15 +130,18 @@ from `office-device` because that one is saved whole.
 An open session is a tab after the four, with the agent's status dot and title and a button to
 close it (`client/session-panel.tsx`, `client/use-conversation.ts`). Tabs past the column's edge
 scroll sideways: with a mouse the scroll bar shows, and the tab of the session just shown is
-scrolled into view. A tab shows the
-conversation (your messages and the agent's replies as text, a tool call as one line, never the
-reasoning), the requests waiting on the agent with Approve and Deny, a reply box, and Stop while
+scrolled into view. Chat shows formatted replies and folds consecutive tool calls into an
+expandable row. Failed and canceled calls stay visible. **Steps** lists each tool call individually.
+A lobby assignment shows the task and expands to reveal the original instructions.
+The session also shows requests with Approve and Deny, a reply box, and Stop while
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
 says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
 tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. For a plan, a question, attachments, model changes or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 Open sessions and the chosen tab last while the office is mounted, not across a reload.
+
+[Desktop Office controls](workspace-controls.webp) · [Phone Office controls](workspace-controls-mobile.webp)
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
   something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,

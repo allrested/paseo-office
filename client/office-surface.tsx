@@ -2120,7 +2120,7 @@ export function OfficeSurface(
         styles={styles}
         layout={panelLayout}
         onSelect={showAgentWorkspace}
-        onBoard={openWorkspaceBoard}
+        onBoard={full.integrated ? board.open : openWorkspaceBoard}
         onClose={closeWorkspace}
       />
       <FullscreenSettings

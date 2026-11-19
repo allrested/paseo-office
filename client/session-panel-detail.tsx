@@ -1,5 +1,6 @@
-import { useCallback } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useMemo } from "react";
+import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
+import { Icon } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTask, agentTitle, dotTone } from "../shared/model.js";
 import { stateLabel } from "./agent-card.js";
@@ -21,47 +22,170 @@ export function SessionIdentity({
   const name = agentTitle(agent);
   const context = contextPercent(agent);
   const cost = agent.costUsd === 0 ? "$0.00" : costText(agent.costUsd);
+  const fill = useMemo(
+    () => [styles.sessions.contextGauge, { width: `${context ?? 0}%` as const }],
+    [context, styles],
+  );
   return (
-    <>
-      <View style={styles.chatRow}>
-        <View style={styles.sessions.avatar} aria-hidden>
+    <View style={styles.sessions.identity}>
+      <View style={styles.sessions.identityLead}>
+        <View style={styles.sessions.identityAvatar} aria-hidden>
           <Text style={styles.sessions.initials}>{avatarInitials(name)}</Text>
           <View style={styles.sessions.badge}>
             <View style={styles.dot[dotTone(agent)]} />
           </View>
         </View>
-        <View style={styles.columnBody}>
-          <Text style={styles.rowTitle} numberOfLines={2}>
+        <View style={styles.sessions.identityText}>
+          <Text accessibilityRole="header" style={styles.sessions.identityName} numberOfLines={2}>
             {name}
           </Text>
-          <Text style={styles.chatMeta}>{statusLine(agent, room)}</Text>
+          <Text numberOfLines={2} style={styles.chatMeta}>
+            {statusLine(agent, room)}
+          </Text>
         </View>
       </View>
-      <View style={styles.sessions.summary}>
-        <View style={styles.sessions.metric}>
+      <View style={styles.sessions.metadata}>
+        <View style={styles.sessions.metaChip}>
           <Text style={styles.sessions.caption}>{agent.model ? "Model" : "Provider"}</Text>
-          <Text style={styles.sessions.name} numberOfLines={2} selectable>
+          <Text style={styles.sessions.metaValue} numberOfLines={2} selectable>
             {agent.model || agent.provider}
           </Text>
         </View>
         {context !== null && (
           <View
-            style={styles.sessions.metric}
+            style={styles.sessions.metaChip}
             accessible
             accessibilityLabel={contextLine(agent) ?? undefined}
           >
             <Text style={styles.sessions.caption}>Context</Text>
-            <Text style={styles.sessions.count}>{context}%</Text>
+            <View style={styles.sessions.contextTrack} aria-hidden>
+              <View style={fill} />
+            </View>
+            <Text style={styles.sessions.metaValue}>{context}%</Text>
           </View>
         )}
         {cost !== null && (
-          <View style={styles.sessions.metric}>
+          <View style={styles.sessions.metaChip}>
             <Text style={styles.sessions.caption}>Cost</Text>
-            <Text style={styles.sessions.count}>{cost}</Text>
+            <Text style={styles.sessions.metaValue}>{cost}</Text>
           </View>
         )}
       </View>
-    </>
+    </View>
+  );
+}
+
+export function SessionButton({
+  icon,
+  label,
+  onPress,
+  styles,
+  primary = false,
+  caption = false,
+  disabled = false,
+}: {
+  icon: string;
+  label: string;
+  onPress(): void;
+  styles: OfficeStyles;
+  primary?: boolean;
+  caption?: boolean;
+  disabled?: boolean;
+}) {
+  const buttonStyle = useCallback(
+    ({ pressed }: PressableStateCallbackType) => {
+      const palette = styles.sessions;
+      if (caption) return palette.deskLink;
+      if (!primary) return pressed ? palette.deskActionPressed : palette.deskAction;
+      if (disabled) return palette.sendDisabled;
+      return pressed ? palette.sendPressed : palette.send;
+    },
+    [primary, disabled, caption, styles],
+  );
+  const color = primary && !disabled ? String(styles.buttonPrimaryText.color) : styles.iconColor;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onPress}
+      style={buttonStyle}
+    >
+      <Icon name={icon} size={caption ? 15 : 18} color={color} />
+      {caption && <Text style={styles.sessions.deskLinkLabel}>{label}</Text>}
+    </Pressable>
+  );
+}
+
+export type SessionDetailTab = "chat" | "steps" | "subagents";
+const detailTabs = [
+  { id: "chat", label: "Chat", icon: "MessageCircle" },
+  { id: "steps", label: "Steps", icon: "ListChecks" },
+  { id: "subagents", label: "Subagents", icon: "UsersRound" },
+] as const;
+
+export function SessionDetailTabs({
+  tab,
+  setTab,
+  childCount,
+  styles,
+}: {
+  tab: SessionDetailTab;
+  setTab(tab: SessionDetailTab): void;
+  childCount?: number;
+  styles: OfficeStyles;
+}) {
+  return (
+    <View style={styles.sessions.detailTabs} role="group" aria-label="Session details">
+      {detailTabs.map((item) =>
+        item.id === "subagents" && childCount === undefined ? null : (
+          <DetailTab
+            key={item.id}
+            item={item}
+            selected={tab === item.id}
+            onSelect={setTab}
+            count={item.id === "subagents" ? childCount : undefined}
+            styles={styles}
+          />
+        ),
+      )}
+    </View>
+  );
+}
+
+function DetailTab({
+  item,
+  selected,
+  onSelect,
+  count,
+  styles,
+}: {
+  item: (typeof detailTabs)[number];
+  selected: boolean;
+  onSelect(tab: SessionDetailTab): void;
+  count?: number;
+  styles: OfficeStyles;
+}) {
+  const press = useCallback(() => onSelect(item.id), [item.id, onSelect]);
+  const tabStyle = useMemo(
+    () => [styles.sessions.detailTab, selected && styles.sessions.detailTabActive],
+    [styles, selected],
+  );
+  const label = selected ? styles.sessions.detailLabelActive : styles.sessions.detailLabel;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Session ${item.id}`}
+      aria-pressed={selected}
+      onPress={press}
+      style={tabStyle}
+    >
+      <Icon name={item.icon} size={14} color={String(label.color)} />
+      <Text numberOfLines={1} style={label}>
+        {item.label}
+        {count ? ` · ${count}` : ""}
+      </Text>
+    </Pressable>
   );
 }
 

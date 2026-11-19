@@ -229,7 +229,9 @@ test("running then completed with one call id is one row, with the completed tex
       tool({ status: "failed", error: "boom", detail: { type: "shell", command: "make" } }),
     ),
   );
-  expect(failed).toEqual([{ kind: "tool", key: "1", text: "Bash failed: make" }]);
+  expect(failed).toEqual([
+    { kind: "tool", key: "1", text: "Bash failed: make", outcome: "failed" },
+  ]);
 });
 
 test("calls with different ids are different rows; a repeat with no detail keeps the earlier one", () => {

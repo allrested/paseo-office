@@ -1163,6 +1163,24 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
       },
     });
     try {
+      await press("Open in workspace");
+      const workspace = surface.querySelector<HTMLDialogElement>("dialog[open]")!;
+      const workbench = workspace.querySelector('iframe[title="Paseo workspace"]');
+      expect(workbench).not.toBeNull();
+      await press("Office controls");
+      const steps = workspace.querySelector<HTMLElement>('[aria-label="Session steps"]')!;
+      await act(async () => steps.click());
+      await press("Paseo workspace");
+      await press("Office controls");
+      expect(workspace.querySelector("iframe")).toBe(workbench);
+      expect(steps.isConnected && steps.getAttribute("aria-pressed") === "true").toBe(true);
+      expect(workspace.querySelector('[aria-label="Close"]')).toBeNull();
+      await press("Workspace board");
+      expect(surface.querySelectorAll("dialog[open]")).toHaveLength(2);
+      await press("Close shop-api board");
+      expect(surface.querySelector("dialog[open]")).toBe(workspace);
+      expect(workspace.querySelector("textarea")?.value).toBe("Keep this draft");
+      await press("Close Shop · shop-api");
       await press("Office settings");
       const settingsDialog = surface.querySelector("dialog[open]");
       expect(settingsDialog?.querySelector('[aria-label="Notes folder"]')).toBeInstanceOf(

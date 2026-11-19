@@ -1,3 +1,4 @@
+import { transcriptStyles } from "./transcript-styles.js";
 import { sessionStyles } from "./session-styles.js";
 import { messengerStyles } from "./messenger-styles.js";
 import { useMemo } from "react";
@@ -13,9 +14,12 @@ export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
   sessions: ReturnType<typeof sessionStyles>;
+  transcript: ReturnType<typeof transcriptStyles>;
   messenger: ReturnType<typeof messengerStyles>;
   fullscreenHeader: ViewStyle;
   headerTools: ViewStyle;
+  workspaceAction: ViewStyle;
+  workspaceAccent: string;
   headerBrand: ViewStyle;
   brandText: TextStyle;
   brandIcon: { color: string };
@@ -61,13 +65,8 @@ export interface OfficeStyles {
   columnTabsScroll: ViewStyle;
   /** An open session's tab: its pill, the button to press, and the close button beside it. */
   sessionTab: ViewStyle;
-  /** The session panel: its header, the list of rows, a tool's one line, and the composer. */
-  sessionHead: ViewStyle;
+  /** Reading width and spacing for a session transcript. */
   sessionList: ViewStyle;
-  sessionRow: ViewStyle;
-  sessionRowYou: ViewStyle;
-  sessionTool: TextStyle;
-  sessionComposer: ViewStyle;
   composerWarning: TextStyle;
   sessionTabMain: ViewStyle;
   sessionTabClose: ViewStyle;
@@ -583,6 +582,8 @@ export function useOfficeStyles(
         backgroundColor: colors.surface0,
       },
       headerTools,
+      workspaceAction: { ...sidebarButton, borderColor: "transparent" },
+      workspaceAccent: colors.accent,
       headerBrand: { ...headerTools, marginRight: 8 },
       brandText: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
       brandIcon: { color: colors.statusWarning },
@@ -700,30 +701,13 @@ export function useOfficeStyles(
       },
       columnTabsVertical: { alignItems: "center", gap: 4 },
       columnTabsScroll: { flexShrink: 1 },
-      sessionHead: {
+      sessionList: {
+        width: "100%",
+        maxWidth: 880,
+        alignSelf: "center",
         paddingHorizontal: pad,
-        paddingVertical: 8,
-        gap: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      },
-      sessionList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
-      sessionRow: { gap: 2 },
-      sessionRowYou: {
-        gap: 2,
-        alignSelf: "flex-end",
-        maxWidth: "90%",
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: colors.surface2,
-      },
-      sessionTool: { ...small, fontFamily: MONOSPACE, color: colors.foregroundMuted },
-      sessionComposer: {
-        paddingHorizontal: pad,
-        paddingVertical: 8,
-        gap: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
+        paddingVertical: 16,
+        gap: 12,
       },
       composerWarning: { ...small, color: colors.statusWarning },
       sessionTab: {
@@ -1247,6 +1231,7 @@ export function useOfficeStyles(
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
       sessions: sessionStyles(colors, touch),
+      transcript: transcriptStyles(colors, touch),
       messenger: messengerStyles(theme, compact, touch),
       sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       activityTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 12, gap: 10 },

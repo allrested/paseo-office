@@ -52,6 +52,7 @@ export function sessionChildren(model: OfficeModel, agentId: string): OfficeAgen
 
 export interface SessionPaneProps {
   agentId: string;
+  hideClose?: boolean;
   subagents?: readonly OfficeAgent[];
   onOpenSubagent?(id: string): void;
   /** The agent as the office lists it; null when it does not. */
@@ -73,6 +74,7 @@ function samePane(before: SessionPaneProps, after: SessionPaneProps): boolean {
   return (
     before.agentId === after.agentId &&
     before.room === after.room &&
+    before.hideClose === after.hideClose &&
     before.reply === after.reply &&
     before.setReply === after.setReply &&
     before.context.actions === after.context.actions &&
@@ -89,6 +91,7 @@ function samePane(before: SessionPaneProps, after: SessionPaneProps): boolean {
 /** One open session as the column or the sheet shows it. */
 export const SessionPane = memo(function SessionPane({
   agentId,
+  hideClose,
   subagents,
   onOpenSubagent,
   agent,
@@ -122,6 +125,7 @@ export const SessionPane = memo(function SessionPane({
       styles={styles}
       layout={layout}
       onOpenWorkspace={onOpenWorkspace}
+      hideClose={hideClose}
       onClose={onClose}
     />
   );

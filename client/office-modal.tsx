@@ -28,7 +28,12 @@ interface DialogAppearance {
   styles: OfficeStyles;
 }
 
-type OfficeModalProps = ModalProps & { size?: "standard" | "wide" };
+type OfficeModalProps = ModalProps & { size?: "standard" | "wide"; headerActions?: ReactNode };
+
+// The stock modal owns its header; on that surface the workspace toolbar belongs in the body.
+export function useFullscreenDialog(): boolean {
+  return useContext(Fullscreen) !== null;
+}
 
 const Fullscreen = createContext<DialogAppearance | null>(null);
 
@@ -42,6 +47,8 @@ const dialogCss = `
   box-shadow: 0 24px 80px rgba(0,0,0,.32), 0 4px 18px rgba(0,0,0,.18);
 }
 .paseo-office-dialog[data-size="wide"] { width: min(1120px, calc(100% - 32px)); }
+.paseo-office-dialog[data-size="wide"] .office-dialog-bounded { height: min(84dvh, 880px); }
+.paseo-office-dialog .office-dialog-tools { min-width: 0; }
 .paseo-office-dialog::backdrop { background: rgba(6,10,16,.5); backdrop-filter: blur(3px); }
 .paseo-office-dialog .office-dialog-frame {
   display: flex; flex-direction: column; max-height: calc(100dvh - 36px); min-height: 0;
@@ -71,6 +78,10 @@ const dialogCss = `
 }
 .paseo-office-dialog .office-dialog-bounded {
   display: flex; flex-direction: column; height: 72dvh; min-height: 0;
+}
+@media (max-width: 700px) {
+  .paseo-office-dialog[data-size="wide"] .office-dialog-head { flex-wrap: wrap; gap: 6px 8px; }
+  .paseo-office-dialog .office-dialog-tools { order: 1; width: 100%; }
 }
 @media (max-width: 600px), (pointer: coarse) {
   .paseo-office-dialog .office-dialog-close { width: 44px; height: 44px; }
@@ -122,6 +133,7 @@ function cycleFocus(event: KeyboardEvent<HTMLDialogElement>): void {
 function BrowserDialog({
   title,
   icon,
+  headerActions,
   size,
   onOpenChange,
   children,
@@ -190,6 +202,7 @@ function BrowserDialog({
             </span>
           )}
           <h2>{title}</h2>
+          {headerActions && <div className="office-dialog-tools">{headerActions}</div>}
           <button
             type="button"
             className="office-dialog-close"
@@ -206,10 +219,12 @@ function BrowserDialog({
   );
 }
 
-export function OfficeModal({ size, ...props }: OfficeModalProps) {
+export function OfficeModal({ size, headerActions, ...props }: OfficeModalProps) {
   const appearance = useContext(Fullscreen);
   if (appearance === null) return <PaseoModal {...props} />;
-  return props.open ? <BrowserDialog {...props} size={size} {...appearance} /> : null;
+  return props.open ? (
+    <BrowserDialog {...props} size={size} headerActions={headerActions} {...appearance} />
+  ) : null;
 }
 
 OfficeModal.Content = function Content({

@@ -47,7 +47,9 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
       return createElement(View, null, props.children);
     },
   );
-  return { ScrollView, TextInput };
+  const Markdown = ({ children }: { children: string }) =>
+    createElement("div", { "data-markdown": "" }, children);
+  return { ScrollView, TextInput, Markdown, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -178,6 +180,12 @@ test("without a way to the workspace, Open in workspace is not drawn", async () 
   expect(maybe("Close")).not.toBeNull();
 });
 
+test("the workspace dialog provides the close control for its embedded session", async () => {
+  await draw({ hideClose: true, onOpenWorkspace: undefined });
+  expect(maybe("Close")).toBeNull();
+  expect(box().getAttribute("placeholder")).toBe("Message Builder");
+});
+
 test("session detail shows reported usage, filters live steps and opens a child without losing a draft", async () => {
   const onOpenSubagent = vi.fn();
   const child = { ...AGENT, id: "a2", parentAgentId: AGENT.id, title: "Check types" };
@@ -227,6 +235,59 @@ test("rows draw in order; the two voices are told apart by name; a tool is one l
   expect(follows(you, agent) && follows(agent, tool) && follows(tool, notice)).toBe(true);
   expect(tool.textContent).toBe("Ran npm test");
   expect(getComputedStyle(tool.querySelector("div,span") ?? tool).whiteSpace).toBe("nowrap");
+});
+
+test("chat folds consecutive tool steps, leaves a failed call visible, and keeps the run open during updates", async () => {
+  const tools: ConversationRow[] = [
+    { kind: "tool", key: "1", text: "shell: npm test" },
+    { kind: "tool", key: "2", text: "shell: git status" },
+  ];
+  const failure = {
+    kind: "tool",
+    key: "3",
+    outcome: "failed",
+    text: "shell failed: npm run build",
+  } as const;
+  conversation = ready([...tools, failure, { kind: "agent", key: "4", text: "**Build** failed." }]);
+  await draw();
+  expect(labelled("2 tool steps").getAttribute("aria-expanded")).toBe("false");
+  expect(maybe("shell: npm test")).toBeNull();
+  expect(maybe(failure.text)).not.toBeNull();
+  expect(container.querySelector("[data-markdown]")?.textContent).toBe("**Build** failed.");
+  await press("2 tool steps");
+  expect(maybe("shell: npm test")).not.toBeNull();
+  conversation = ready([...tools, { kind: "tool", key: "5", text: "shell: git diff" }, failure]);
+  await draw();
+  expect(labelled("3 tool steps").getAttribute("aria-expanded")).toBe("true");
+  await press("3 tool steps");
+  expect(maybe("shell: git diff")).toBeNull();
+  await press("Session steps");
+  expect(maybe("shell: git diff")).not.toBeNull();
+  expect(maybe("3 tool steps")).toBeNull();
+});
+
+test("a complete Office lobby assignment shows its task and can disclose the original prompt", async () => {
+  const text = [
+    "The office assigned you lobby task p30 from the user.",
+    "  Improve the workspace.",
+    "  Keep the office open.",
+    'Work on this task. When it is complete, use office_update with id "p30" and action "done". If you need input, leave it claimed and explain what you need.',
+    "If the tool is unavailable and you have finished, put this exact line at the end of your reply: Completed office task p30 (assignment 31).",
+  ].join("\n");
+  conversation = ready([{ kind: "you", key: "1", text }]);
+  await draw();
+  expect(container.textContent).toContain("Improve the workspace.\nKeep the office open.");
+  expect(container.textContent).not.toContain("office_update");
+  await press("Lobby task p30, original message");
+  expect(container.textContent).toContain(text);
+  await press("Lobby task p30, original message");
+  expect(container.textContent).not.toContain("office_update");
+  conversation = ready([
+    { kind: "you", key: "1", text: text.replace("(assignment 31).", "and more") },
+  ]);
+  await draw();
+  expect(maybe("Lobby task p30, original message")).toBeNull();
+  expect(container.textContent).toContain("office_update");
 });
 
 test("while loading it says so; an error is the sentence and a Retry", async () => {
@@ -414,6 +475,7 @@ test("two Enter presses while a send is pending make one call", async () => {
   await type("hello");
   await key("Enter");
   await key("Enter");
+  expect(labelled("Sending...").hasAttribute("disabled")).toBe(true);
   expect(send).toHaveBeenCalledTimes(1);
   await act(async () => finish());
 });
