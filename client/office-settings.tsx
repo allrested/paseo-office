@@ -3,18 +3,12 @@ import { View } from "react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
 import { LabeledSwitch } from "./labeled-switch.js";
-import { UNSAVED_VIEW, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
+import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
 import { useOfficeStyles } from "./styles.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
-import { UNSAVED_SOUND, useSoundSwitch } from "./use-sound.js";
+import { useSoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
-
-/** The line under the device's switches: the view's refusal first, then the Sound switch's. */
-function deviceProblemOf(viewUnsaved: boolean, soundUnsaved: boolean): string | null {
-  if (viewUnsaved) return UNSAVED_VIEW;
-  return soundUnsaved ? UNSAVED_SOUND : null;
-}
 
 /**
  * The office's settings, under the app's Settings: what the host holds (wakes, agent tools, the

@@ -51,6 +51,9 @@ let problem = () => {};
 let onMachine = null;
 let stopped = false;
 let stopWatchingAudio = () => {};
+let noteTimer = 0;
+/** How long the scene's own note stays. */
+const NOTE_MS = 4000;
 
 /** What upstream's page markup gives the kept modules: the stage, the place card, two controls. */
 function buildPage() {
@@ -66,7 +69,21 @@ function buildPage() {
         <div class="plc-body" id="plc-body"></div><footer class="plc-foot" id="plc-foot" hidden></footer>
       </section>
     </div>
+    <div id="paseo-note" role="status"></div>
     <span id="conn" hidden><i></i><span></span></span><button type="button" id="btn-night" hidden></button>`;
+}
+
+/**
+ * Where the host shows no toast, the scene's short line is a note over the floor for four seconds; a new one replaces
+ * it. It goes in `#paseo-note`, a polite live region that stays in the page, empty between notes, so each text is read
+ * out. Outside `#stage-wrap`, so photo mode's bar does not hide it.
+ */
+function showNote(text) {
+  const live = document.getElementById('paseo-note');
+  if (!live || !text) return;
+  clearTimeout(noteTimer);
+  live.replaceChildren(el('span', 'paseo-note', text));
+  noteTimer = setTimeout(() => live.replaceChildren(), NOTE_MS);
 }
 
 /** The app theme, as the custom properties paseo-style.js reads and the page's colour scheme. */
@@ -256,7 +273,7 @@ const api = {
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
    * chip and the bookshelf), onBell() (a click on the meeting table's bell), onNotes() (the label over
    * the meeting room's screen, on the company floor), onOpen(id) (E by a person while walking: their
-   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text).
+   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
    * Throws when the world cannot be built (no WebGL, a module failed).
    */
   start(options = {}) {
@@ -268,7 +285,7 @@ const api = {
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
     onMachine = typeof options.onMachine === 'function' ? options.onMachine : null;
     host.machine = null;
-    host.toast = (text) => options.onToast?.(text);
+    host.toast = typeof options.onToast === 'function' ? (text) => options.onToast(text) : showNote;
     host.library = typeof options.onLibrary === 'function' ? () => options.onLibrary() : null;
     host.resources = typeof options.onResources === 'function' ? () => options.onResources() : null;
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;

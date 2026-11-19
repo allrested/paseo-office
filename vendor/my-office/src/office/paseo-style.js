@@ -21,14 +21,17 @@
 //   reaches it;
 // - the incidents' banner is a label with the danger border and dot, at the top of the stage,
 //   clear of the floor's note in the bottom corner; the red over the stage while the alarm rings is
-//   upstream's, the one glow, and it holds still under reduced motion.
+//   upstream's, the one glow, and it holds still under reduced motion;
+// - the scene's own note, where the host shows no toast (paseo-entry.js), is upstream's toast
+//   (styles/responsive.css `.toast`) in its place over the toolbar, in the page's colours and the
+//   card's radius, without its shadow; it rises in, and under reduced motion it just appears.
 export const STYLE = `
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 body { font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--o-fg); -webkit-font-smoothing: antialiased; }
 #stage-wrap, #stage { position: absolute; inset: 0; }
 /* PASEO: what the host draws over the stage's top right corner (client/styles.ts viewCorner) is cleared by what the scene
    puts at the stage's top edge: Exit and the help line in walk-in (ui/camera-bar.js) and the incident banner. The
-   tallest corner is the touch one with the unsaved-view note: inset 16 + border 2 + padding 8 + one row of 44 (the view
+   tallest corner is the touch one with an unsaved note (the view's or the Sound switch's, one at a time): inset 16 + border 2 + padding 8 + one row of 44 (the view
    switch and the settings button), then the note (gap 4, two lines of 16) = 106. */
 :root { --corner-clear: 106px; }
 #stage canvas { display: block; outline: none; touch-action: none; cursor: grab; }
@@ -130,8 +133,12 @@ button.pl-chip { cursor: pointer; }
 .incident-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .incident:hover { background: var(--o-surface); }
 .incident:focus-visible { outline: 2px solid var(--o-fg); outline-offset: 2px; }
+#paseo-note { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 7; width: max-content; max-width: calc(100% - 32px); pointer-events: none; }
+body.is-photo #paseo-note { bottom: 118px; }
+.paseo-note { display: block; padding: 10px 16px; border-radius: 12px; background: var(--o-surface-raised); color: var(--o-fg); border: 1px solid var(--o-border); font-size: 13px; font-weight: 600; line-height: 1.35; text-align: center; overflow-wrap: anywhere; animation: note-in .22s ease-out; }
+@keyframes note-in { from { opacity: 0; transform: translateY(8px); } }
 #stage-wrap.is-incident::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(255, 30, 30, .45); animation: incident-blink 1s ease-in-out infinite; }
 @keyframes incident-blink { 50% { opacity: .3; } }
 
-@media (prefers-reduced-motion: reduce) { .tag, .bubble, .zone { transition: none; } #stage-wrap.is-incident::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tag, .bubble, .zone { transition: none; } #stage-wrap.is-incident::after { animation: none; } .paseo-note { animation: none; } }
 `;

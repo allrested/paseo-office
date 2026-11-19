@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { useSoundSwitch } from "../use-sound.js";
 import { worldBrand } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
 import { useWorldFeed } from "./use-world-feed.js";
@@ -46,10 +45,10 @@ export function WorldViewNative({
   incidents,
   onOpenIncidents,
   onProblem,
+  sound,
 }: WorldViewProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
-  const sound = useSoundSwitch();
   const latest = useRef<WorldLatest>({
     model,
     theme,

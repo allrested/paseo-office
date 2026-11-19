@@ -587,3 +587,40 @@ test("a value that is not true is off", () => {
   world.setSound("yes");
   expect(h.sound).toEqual([true, false]);
 });
+
+test("with no toast from the host the scene shows the text itself: one polite note, a new text replacing the old, gone after four seconds", () => {
+  vi.useFakeTimers();
+  try {
+    host.toast("This browser won't go full screen.");
+    const notes = document.querySelectorAll('[role="status"]');
+    expect(notes).toHaveLength(1);
+    const note = notes[0] as HTMLElement;
+    expect(note.textContent).toBe("This browser won't go full screen.");
+    vi.advanceTimersByTime(3000);
+    host.toast("This app does not let the office play sound.");
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(note.textContent).toBe("This app does not let the office play sound.");
+    vi.advanceTimersByTime(3900);
+    expect(note.textContent).toBe("This app does not let the office play sound.");
+    vi.advanceTimersByTime(200);
+    expect(note.textContent).toBe("");
+    // The live region stays in the page, so the next text is announced too.
+    expect(note.isConnected).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("the scene's note is styled with the page's colours, clear of the toolbar, and holds still under reduced motion", async () => {
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { STYLE } = await import("../../vendor/my-office/src/office/paseo-style.js");
+  const css = STYLE as string;
+  expect(css).toMatch(
+    /\.paseo-note \{[^}]*background: var\(--o-surface-raised\);[^}]*color: var\(--o-fg\);[^}]*border: 1px solid var\(--o-border\);/,
+  );
+  // The toolbar is 16 px up and 54 px tall: the note's live region starts 84 px up, and over it.
+  expect(css).toMatch(/#paseo-note \{[^}]*bottom: 84px;[^}]*z-index: 7;[^}]*pointer-events: none;/);
+  expect(css).toMatch(
+    /@media \(prefers-reduced-motion: reduce\) \{[^\n]*\.paseo-note \{ animation: none; \}/,
+  );
+});

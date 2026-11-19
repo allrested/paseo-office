@@ -120,12 +120,13 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places; zoom and full screen, the Sound button, and Walk in with its overlay |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
-| `ui/activity.js`            | Passes the scene's toasts to Paseo                                     |
+| `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night            |
 | `life/nap.js`               | No midday nap; calls Paseo's lively floor every frame                  |
 
 Paseo's own files sit beside upstream's and are named for it: `paseo-entry.js` (the bundle's
-entry: builds the page, starts the modules in upstream's order, sets `PaseoOfficeWorld`),
+entry: builds the page, starts the modules in upstream's order, sets `PaseoOfficeWorld`, and shows
+the scene's toasts in a note of its own over the floor where the host gives no `onToast`),
 `paseo-host.js` (what the stand-ins read and call), `paseo-sound.js` (the Sound switch's state, and
 the probe that finds out whether the page lets audio start: it runs on a real activating press only,
 never on Escape or a bare modifier key or while the frame has no active user activation; 'blocked'

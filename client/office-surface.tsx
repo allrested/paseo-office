@@ -88,6 +88,7 @@ import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
 import { useOffice, type OfficeState } from "./use-office.js";
+import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
 import { hasWebGL2 } from "./web-env.web.js";
 import { hasScriptFrame } from "./world/script-frame-kit.js";
@@ -338,6 +339,12 @@ const NOTHING_WAITS = "Nothing needs you.";
 
 export const UNSAVED_VIEW =
   "Unable to save the view on this device. It holds until the office is closed.";
+
+/** The line under the device's switches: the view's refusal first, then the Sound switch's. */
+export function deviceProblemOf(viewUnsaved: boolean, soundUnsaved: boolean): string | null {
+  if (viewUnsaved) return UNSAVED_VIEW;
+  return soundUnsaved ? UNSAVED_SOUND : null;
+}
 
 /** The view's next request for an agent. Nonces start at 1: the scene counts 0 as handled. */
 export function nextFocusRequest(previous: FocusRequest | null, agentId: string): FocusRequest {
@@ -608,6 +615,8 @@ interface SurfaceBodyProps {
   onOpenIncidents(): void;
   onSceneProblem(message: string): void;
   platform: Platform;
+  /** The device's Sound switch, which the 3D office follows and its button sets. */
+  sound: SoundSwitch;
 }
 
 function SurfaceBody({
@@ -638,6 +647,7 @@ function SurfaceBody({
   onOpenIncidents,
   onSceneProblem,
   platform,
+  sound,
 }: SurfaceBodyProps) {
   if (office.subscription.status === "error") {
     const { message } = office.subscription.error;
@@ -680,6 +690,7 @@ function SurfaceBody({
         incidents={incidents}
         onOpenIncidents={onOpenIncidents}
         onProblem={onSceneProblem}
+        sound={sound}
       />
     );
   }
@@ -757,6 +768,8 @@ interface ViewControlsProps {
   /** True once a floor is drawn under them: they take its corner, else a row of the page. */
   floorDrawn: boolean;
   viewChoice: ViewChoiceState;
+  /** The device refused to store a press on the 3D floor's Sound button. */
+  soundUnsaved: boolean;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -769,6 +782,7 @@ interface ViewControlsProps {
 function ViewControls({
   floorDrawn,
   viewChoice,
+  soundUnsaved,
   onChange,
   compact,
   touchScreen,
@@ -776,6 +790,7 @@ function ViewControls({
   onOpenSettings,
   styles,
 }: ViewControlsProps) {
+  const problem = deviceProblemOf(viewChoice.unsaved, soundUnsaved);
   return (
     // The controls show in the row first and move to the corner once the floor is drawn.
     <View
@@ -799,11 +814,11 @@ function ViewControls({
           />
         ) : null}
       </View>
-      {viewChoice.unsaved ? (
+      {problem === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>
-          {UNSAVED_VIEW}
+          {problem}
         </Text>
-      ) : null}
+      )}
     </View>
   );
 }
@@ -1194,6 +1209,8 @@ export function OfficeSurface(
   const readNotes = useRpc(notesReadRpc);
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
+  // One Sound switch for the floor: the 3D office follows it, and the corner shows a refused save.
+  const sound = useSoundSwitch();
   const model = useMemo(() => buildOfficeModel(office.state), [office.state]);
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
     layout.compact,
@@ -1361,6 +1378,7 @@ export function OfficeSurface(
           <ViewControls
             floorDrawn={floorDrawn}
             viewChoice={viewChoice}
+            soundUnsaved={sound.unsaved}
             onChange={changeView}
             compact={layout.compact}
             touchScreen={touchScreen}
@@ -1396,6 +1414,7 @@ export function OfficeSurface(
             onOpenIncidents={openIncidents}
             onSceneProblem={setSceneProblem}
             platform={layout.platform}
+            sound={sound}
           />
           <PhoneSheet
             compact={compact}

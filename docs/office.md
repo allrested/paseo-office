@@ -246,7 +246,15 @@ off without changing the setting; the next press tries again. Once a context run
 used again and the scene follows the setting with no further press: on if the setting is on. A
 press on the button itself while audio is held off waits for the probe that press started: if audio
 then starts, the press turns sound on as any press on it does; if not, it says "This app does not
-let the office play sound."
+let the office play sound." The host gives the scene no toast, so the scene shows such a line itself:
+a note over the floor's toolbar, read out politely by a screen reader, for four seconds, a new one
+replacing it (a refused full screen, and my-office's own lines from its games and karaoke, show the
+same way).
+
+A Sound save the device refuses is said where the switch was used: under the settings page's
+switches, or in the floor's view corner, where the view switch's own refusal shows (that one first
+when both are refused): "Unable to save the Sound setting on this device. It holds until this
+screen is closed."
 
 Karaoke follows the switch, because it reads `sfx.on`, and so does the incidents' siren. Every
 saver of the device's document (the view, the incidents rung, the Sound switch) writes it whole,

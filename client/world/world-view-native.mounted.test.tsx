@@ -89,6 +89,8 @@ async function mount(overrides: Partial<Parameters<typeof WorldViewNative>[0]> =
     incidents: undefined,
     onOpenIncidents: ignore,
     onProblem: ignore,
+    // The surface holds the switch: still being read here.
+    sound: { on: null, unsaved: false, set: ignore },
     ...overrides,
   };
   await act(async () => root.render(<WorldViewNative {...props} />));

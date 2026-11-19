@@ -3,7 +3,7 @@ import { useSettings } from "@getpaseo/plugin/client";
 import { officeDeviceSettings } from "../shared/settings.js";
 
 export const UNSAVED_SOUND =
-  "Unable to save the Sound setting on this device. It holds until the office is closed.";
+  "Unable to save the Sound setting on this device. It holds until this screen is closed.";
 
 export interface SoundSwitch {
   /** The switch as the person left it (a tap shows at once); null while the device's setting is read or unreadable. */

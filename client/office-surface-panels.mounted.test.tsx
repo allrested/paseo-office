@@ -25,6 +25,22 @@ let subscriptionStatus: "live" | "error" | "closed";
 /** The office's events, once its subscription is drawn. */
 let deliver: ((event: OfficeEvent) => void) | null;
 
+/**
+ * The 3D floor, stood in: whether the browser has WebGL2 (none unless a test says so), whether the
+ * device refuses a save, and the props the floor was last drawn with.
+ */
+const floor = vi.hoisted(() => ({
+  webgl: false,
+  refuse: false,
+  props: null as null | { sound?: { set(next: boolean): void } },
+}));
+vi.mock("./world/world-view.js", () => ({
+  WorldView: (props: { sound?: { set(next: boolean): void } }) => {
+    floor.props = props;
+    return null;
+  },
+}));
+
 /** What a send does: a test says, per agent, whether it fails or waits. */
 const sends = vi.hoisted(() => ({
   run: async (_agentId: string, _text: string): Promise<void> => undefined,
@@ -92,7 +108,7 @@ const DEVICE: SettingsState<typeof officeDeviceSettings.schema> = {
   revision: "r1",
   saving: false,
   saveError: null,
-  save: async () => true,
+  save: async () => !floor.refuse,
   reset: async () => true,
   reload: async () => undefined,
 };
@@ -174,7 +190,7 @@ vi.stubGlobal(
 // A test browser draws no 3D: the surface asks for WebGL2 as it loads, and the answer is no.
 vi.mock("./web-env.web.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./web-env.web.js")>()),
-  hasWebGL2: () => false,
+  hasWebGL2: () => floor.webgl,
 }));
 
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
@@ -246,6 +262,9 @@ function chatMessage(at: number, from: string | undefined, kind = "text"): ChatM
 }
 
 beforeEach(() => {
+  floor.webgl = false;
+  floor.refuse = false;
+  floor.props = null;
   view = "list";
   subscriptionStatus = "live";
   deliver = null;
@@ -336,6 +355,23 @@ test("the corner has an Office settings button that opens the settings", async (
   await press("Office settings");
 
   expect(settingsOpened).toBe(1);
+});
+
+test("a Sound save the device refuses after a press on the floor's button is shown in the view corner", async () => {
+  floor.webgl = true;
+  floor.refuse = true;
+  view = "3d";
+  await mount();
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+  expect(container.textContent).not.toContain("Unable to save the Sound setting");
+
+  // The scene's onSound is the floor's sound.set: the press asks for Sound on.
+  await act(async () => floor.props?.sound?.set(true));
+
+  const corner = container.querySelector('[data-testid="office-view-corner"]');
+  expect(corner?.textContent).toContain(
+    "Unable to save the Sound setting on this device. It holds until this screen is closed.",
+  );
 });
 
 test("with no way to the settings, the corner has no Office settings button", async () => {

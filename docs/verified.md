@@ -227,7 +227,10 @@ Seen at 1280 px:
   the scene started), the button was dimmed and crossed out, its label and tooltip "Sound is not
   available here", and a press on it changed nothing: no stored value, and no toast. The button's
   toast ("This app does not let the office play sound.") is not shown anywhere: the client gives the
-  scene no `onToast`, so every toast of the scene is dropped. With Sound then turned on in the
+  scene no `onToast`, so every toast of the scene is dropped (fixed after this look, to be seen
+  again: with no `onToast` the scene now shows the line itself, in a note over the toolbar; and a
+  Sound save the device refuses after a press on the button is now said in the floor's view
+  corner, which was not tried in this look). With Sound then turned on in the
   settings and the office opened again, the button stayed off and dimmed.
 - A frame whose first press does not start a context was made with a script that made the probe's
   first context report "suspended" and never resume. Escape and Shift made no probe. The first

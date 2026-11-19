@@ -5,7 +5,7 @@ import type { IncidentsState, Machine } from "../../shared/contracts.js";
 import type { FocusRequest } from "../focus-request.js";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
-import { useSoundSwitch } from "../use-sound.js";
+import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand } from "./adapter.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
@@ -62,6 +62,11 @@ export interface WorldViewProps {
   onOpenIncidents(): void;
   /** The script could not load, the office could not start, or the WebGL context was lost. */
   onProblem(message: string): void;
+  /**
+   * The device's Sound switch, the surface's: the scene follows `on`, and a press on its button
+   * calls `set`. The surface shows a save the device refused.
+   */
+  sound: SoundSwitch;
 }
 
 /**
@@ -91,10 +96,10 @@ export function WorldView({
   incidents,
   onOpenIncidents,
   onProblem,
+  sound,
 }: WorldViewProps) {
   const containerId = useId();
   const onBell = useStandupBell();
-  const sound = useSoundSwitch();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.

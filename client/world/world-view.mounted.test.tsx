@@ -76,6 +76,8 @@ const MODEL: OfficeModel = {
   waitingOn: new Map(),
 };
 const ignore = () => undefined;
+/** The surface holds the Sound switch: still being read here. */
+const SOUND = { on: null, unsaved: false, set: ignore };
 
 let container: HTMLElement;
 let root: Root;
@@ -122,6 +124,7 @@ async function startedOffice(
         incidents={undefined}
         onOpenIncidents={ignore}
         onProblem={ignore}
+        sound={SOUND}
       />,
     ),
   );
