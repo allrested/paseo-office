@@ -26,12 +26,22 @@ billiards.js`, `gaming.js`, `foosball.js`, `karaoke.js`). Upstream's files are c
 except that `'three'` and `'three/addons/...'` imports are rewritten to relative paths, so the
 bundle needs no resolver, and that real brand names are swapped for made-up ones (below).
 
+The import takes English, Vietnamese and Thai area files named by the scene’s English index
+and generates a matching index for each. Vietnamese and Thai come from the same pinned commit,
+including the Thai people submodules. Brand replacements preserve each area’s shared keys.
+
+The port wrote `i18n/locales/id/` in upstream’s format for all the same areas. Its `ours.js`
+contains the port-specific lines. The locale tests check keys, order, plural forms, slots,
+markup, emoji and list lengths. The translator recorded lines for native-speaker review in
+`scripts/id-review-notes.json`. Run `node scripts/id-review-list.mjs` for English and Indonesian
+side by side.
+
 The first-person walk is taken too: Walk in, at the camera bar's end, walks the floor as your own
 character, and a game can be played from there. The games call the group chat and the sounds. The
 chat's window is not taken: its stand-in exports what the games import and does nothing. The sounds are upstream's,
 off until the Sound switch is on, so a game and a karaoke song are heard then.
 
-The first-visit tour is taken too (`ui/tips.js`, with its English words, `locales/en/tips.js`). It
+The first-visit tour is taken too (`ui/tips.js`, with its words in each shipped locale’s `tips.js`). It
 shows only where Walk in does (a fine pointer; `state.isLocal` is set from it in
 `ui/camera-bar.js`), once per device (`office-tips`), and its person card's words are Paseo's
 (`OURS` in `i18n/index.js`). Its cards' styles are in `paseo-style.js`.
@@ -96,6 +106,9 @@ the swap would change nothing in it. It changed these, and nothing else in them:
 - `src/office/audio/sfx.js`, which is also changed by hand (above)
 - `src/office/ui/timelapse.js`, which is also changed by hand (above)
 
+Vietnamese and Thai use the same replacements during import. Run
+`node scripts/replace-locale-brands.mjs --check` to scan the dictionaries.
+
 The import tool runs the same swap on what it copies: a file whose only note is the names one is
 written as upstream's with the names swapped, so it is compared and updated like an unchanged
 copy, and `MANIFEST.json` keeps upstream's sha256. `npm run test:scripts` runs the script's
@@ -140,7 +153,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 
 | Stand-in                    | What it does                                                           |
 | --------------------------- | ---------------------------------------------------------------------- |
-| `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command |
+| `i18n/index.js`             | Reads the selected dictionary at scene start, falls back to English, removes decorative emoji and applies the port’s own wording |
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera; `state.isLocal` for the tour |
@@ -179,7 +192,7 @@ cards, voice, push notifications and prompt rewriting are not. All seven staff h
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
 world-api.ts`), never a file name, a command or a prompt. It sends the team’s spending, repository birthday, tenure and lift servicing, the weather mode or reading, plus the open incidents' keys
-and titles for the banner. The scene runs in upstream's streamer mode, which writes "a file" and
+and titles for the banner. A translated scene receives its language and dictionary. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
 
@@ -201,11 +214,12 @@ node vendor/my-office/import-upstream.mjs \
 ```
 
 `--check` writes nothing and lists what would change. Without it the tool copies the files,
-regenerates `paseo-modules.js`, the English locale index and `MANIFEST.json`, and reports:
+regenerates `paseo-modules.js`, the English, Vietnamese and Thai locale indexes and `MANIFEST.json`, and reports:
 
 - files it kept because they carry a `PASEO:` note: compare each with upstream by hand;
 - stand-ins that lack an export a kept module now imports: add it.
 
+Compare upstream’s `src/i18n/index.js` with the stand-in for new exports or value shapes.
 Then run `node scripts/genericise-street.mjs`: the tool swaps the names it copies, but a kept
 file you merged by hand needs the script. The script knows only the table's names: read the new
 text upstream brings for a shop, an app or a product the table lacks, add it to

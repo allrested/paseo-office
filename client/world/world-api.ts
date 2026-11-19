@@ -1,3 +1,4 @@
+import type { WordsLanguage } from "../../shared/scene-language.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 
 /**
@@ -154,6 +155,8 @@ export interface WorldStartOptions {
   onTenure?(op: { op: "farewell" | "official"; name: string }): void;
 
   street?: { kit: string | null };
+  language?: WordsLanguage;
+  words?: string;
   /**
    * The floor plan: "pro" is the company floor, "cozy" one open room, and "hq" headquarters. A page starts once, so a new
    * plan is a new page.

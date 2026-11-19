@@ -197,12 +197,20 @@ Object.assign(window, {
     }
   },
 });
+// @ts-expect-error vendored JavaScript has no declarations
+const { lang, locale, t: translate } = await import("../../vendor/my-office/src/i18n/index.js");
 world.start({
+  language: "vi",
+  words: JSON.stringify({ dict: { time: { day: { other: "{n} ngày" } } } }),
   brand: { name: "Acme" },
   onSound: (on: boolean) => h.soundAsked.push(on),
   onIncidents: () => {
     h.incidentsOpened += 1;
   },
+});
+test("the language is set before the scene builds its page", () => {
+  expect([lang(), locale(), document.documentElement.lang]).toEqual(["vi", "vi-VN", "vi"]);
+  expect(translate("time.day", { n: 2 })).toBe("2 ngày");
 });
 const atStart = [...h.sound];
 

@@ -158,7 +158,11 @@ function open({ fullscreen = true, refuse = false, fine = true } = {}) {
   return handle;
 }
 
+// @ts-expect-error vendored JavaScript has no declarations
+import { setLanguage } from "../../vendor/my-office/src/i18n/index.js";
+
 beforeEach(() => {
+  setLanguage("en");
   vi.useFakeTimers();
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
   resized = null;
@@ -958,4 +962,36 @@ test("the clip's cover is not hidden by photo mode's rule, and the clip's styles
   }
   expect(css).not.toContain("var(--accent-line)");
   expect(css).not.toContain("var(--font)");
+});
+
+test("translated camera labels preserve literal punctuation and fall back per key", () => {
+  const home = 'Tổng quan "b" <i> & c';
+  setLanguage(
+    "vi",
+    JSON.stringify({ dict: { ui: { cameraToolbar: { home }, photo: { shoot: "Chụp ảnh" } } } }),
+  );
+  build();
+  const view = document.querySelector('[data-view="home"]');
+  expect([
+    view?.getAttribute("aria-label"),
+    view?.getAttribute("title"),
+    view?.textContent,
+  ]).toEqual([home, home, home]);
+  expect(view?.querySelector("i")).toBeNull();
+  expect(page("ph-shoot").textContent).toBe("Chụp ảnh");
+  expect(document.querySelector('[data-view="desks"]')?.textContent).toBe("Desks");
+});
+
+test("the English camera controls use the office labels", () => {
+  build();
+  expect(
+    [...document.querySelectorAll("[data-view]")].map((el) => el.getAttribute("aria-label")),
+  ).toEqual(["Overview", "Desks", "Meeting room", "Servers"]);
+  expect(
+    ["zoom-out", "zoom-in", "btn-full", "btn-fp", "ph-exit"].map((id) =>
+      page(id).getAttribute("aria-label"),
+    ),
+  ).toEqual(["Zoom out", "Zoom in", "Full screen", "Walk in", "Leave photo mode"]);
+  expect(document.querySelector(".fp-help")?.textContent).toMatch(/^Walking the office/);
+  expect(page("ph-shoot").textContent).toBe("Take photo");
 });

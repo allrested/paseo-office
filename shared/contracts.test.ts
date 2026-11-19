@@ -12,6 +12,7 @@ import {
   OfficeSnapshotSchema,
   PostSchema,
   worldRpc,
+  worldWordsRpc,
   deleteRpc,
   incidentsDismissRpc,
   officeStateSubscription,
@@ -39,6 +40,7 @@ test("contract names follow the dotted request convention", () => {
     deleteRpc.name,
     setWakesPausedRpc.name,
     worldRpc.name,
+    worldWordsRpc.name,
     incidentsDismissRpc.name,
   ]).toEqual([
     "office.state",
@@ -47,6 +49,7 @@ test("contract names follow the dotted request convention", () => {
     "office.delete.request",
     "office.set_wakes_paused.request",
     "office.world.request",
+    "office.world.words",
     "office.incidents.dismiss.request",
   ]);
 });

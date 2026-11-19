@@ -8,6 +8,7 @@ import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { useStreetStart } from "./use-street-kit.js";
+import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
@@ -123,6 +124,7 @@ function WorldScene({
   const containerId = useId();
   const onBell = useStandupBell();
   const onLife = useSceneLifeChat();
+  const words = useSceneWords();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -203,7 +205,7 @@ function WorldScene({
 
   const script = useWorldScript(sized, onProblem);
   useEffect(() => {
-    if (script === null || !sized) return undefined;
+    if (words.status !== "ready" || script === null || !sized) return undefined;
     const container = document.getElementById(containerId);
     if (container === null) return undefined;
     let live = true;
@@ -216,6 +218,8 @@ function WorldScene({
             focus: focusApp,
             // Read when the office starts: a page's brand does not change while the page lives.
             brand: worldBrand(readBrand()),
+            language: words.language,
+            words: words.words,
             plan,
           }),
         );
@@ -233,9 +237,9 @@ function WorldScene({
       setApi(null);
       frame.dispose();
     };
-  }, [script, sized, containerId, plan]);
+  }, [script, sized, containerId, plan, words.status, words.language, words.words]);
 
-  const { note } = useWorldFeed(api, {
+  const { note: feedNote } = useWorldFeed(api, {
     model,
     theme,
     focusRoomId,
@@ -250,6 +254,7 @@ function WorldScene({
     sound: sound.on,
     plan,
   });
+  const note = feedNote ?? words.note;
   return (
     <View id={containerId} style={styles.scene}>
       {api === null ? <Text style={styles.sceneStatus}>Loading the 3D view...</Text> : null}

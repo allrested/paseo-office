@@ -16,6 +16,9 @@ my-office's.
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
+- Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
+  on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
+  none of the three non-English scene languages, so select one explicitly to use it.
 - Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
@@ -79,6 +82,10 @@ The stand-up notes and the incidents check run on the plugin's own timers. After
 restart, a run waits until the office is opened or an agent opens or ends a turn. A run missed
 while the daemon was down is not made up.
 
+The column, agent cards, settings, team chat (including @Director), whiteboard rows and host
+notifications stay in English. Thai and Indonesian use the English karaoke songs. Vietnamese
+and Thai also use English for the port’s custom lines.
+
 ## What it reads and where it sends it
 
 - It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
@@ -87,6 +94,8 @@ while the daemon was down is not made up.
   and the lift’s servicing time. It receives no file names, commands or prompts and makes no
   network calls. It sends chat moments with a name or count, and reports farewells and promotions.
 - With the street enabled, the device receives the bundled Kenney Car Kit (CC0).
+- English travels with the scene. For each other language the host sends one dictionary on request
+  to the device that chose it. The device keeps those words for the life of the page.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
@@ -109,6 +118,9 @@ The 3D scene is my-office at commit
 [`b68228871fe30cd2c759a2c919337a9a9d1f5644`](https://github.com/khanh020905/my-office/tree/b68228871fe30cd2c759a2c919337a9a9d1f5644)
 (v0.6.0), with three.js 0.160.0. [vendor/SOURCES.md](vendor/SOURCES.md) says what is taken, what
 stands in for the rest, and how to take a newer my-office.
+
+Upstream supplies the Vietnamese and Thai text, with real brand names replaced. The Indonesian
+text was written for this port in my-office’s locale format.
 
 ## Develop
 

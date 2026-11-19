@@ -1,3 +1,4 @@
+import { LANGUAGE_CHOICES } from "./scene-language.js";
 import { defineSettings } from "@getpaseo/plugin";
 import { WEATHER_MODES, MANUAL_CHOICES } from "./weather.js";
 import { z } from "zod";
@@ -189,4 +190,16 @@ export const officeColumnSettings = defineSettings({
     width: z.number().default(360),
     collapsed: z.boolean().default(false),
   }),
+});
+
+/**
+ * The 3D office's language on this device. "auto" follows the app's language where the office has words for
+ * it, else English. A setting of its own, as the column's is: the view's and the incidents' saves write
+ * `office-device` whole, and would drop a field of this one.
+ */
+export const officeLanguageSettings = defineSettings({
+  id: "office-language",
+  scope: "device",
+  version: 1,
+  schema: z.object({ choice: z.enum(LANGUAGE_CHOICES).default("auto") }),
 });

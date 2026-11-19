@@ -4,6 +4,7 @@ import {
   JIRA_KEY,
   officeDeviceSettings,
   officeHostSettings,
+  officeLanguageSettings,
   parseKeys,
   SENTRY_SLUG,
 } from "./settings.js";
@@ -255,4 +256,14 @@ test("the weather address is checked in every mode, and its refusal does not hol
     expect(issues[0]).not.toContain("SECRET");
     expect(issues[0]).not.toContain("weather.example.test");
   }
+});
+
+test("the language choice is a separate device document with Automatic as its default", () => {
+  const setting = officeLanguageSettings;
+  expect(setting.id).toBe("office-language");
+  expect(setting.scope).toBe("device");
+  expect(setting.schema.parse({})).toEqual({ choice: "auto" });
+  for (const choice of ["auto", "en", "vi", "th", "id"])
+    expect(setting.schema.parse({ choice })).toEqual({ choice });
+  for (const choice of ["fr", 1]) expect(setting.schema.safeParse({ choice }).success).toBe(false);
 });

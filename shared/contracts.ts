@@ -1,3 +1,4 @@
+import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
@@ -680,5 +681,15 @@ export const tenureRpc = defineRpc({
 export const streetRpc = defineRpc({
   name: "office.world.street",
   input: z.object({}),
+  output: z.string(),
+});
+
+/**
+ * One language's words for the 3D office, as JSON text `{ dict, ours? }`: the scene carries English and the
+ * host sends the rest on request, so a device loads its own language only.
+ */
+export const worldWordsRpc = defineRpc({
+  name: "office.world.words",
+  input: z.object({ language: z.enum(WORDS_LANGUAGES) }),
   output: z.string(),
 });

@@ -386,6 +386,7 @@ function setup(
     clock,
     log: (message) => logs.push(message),
     world: { read: async () => "the scene", readStreet: async () => "{}" },
+    words: { read: async (language) => "words of " + language },
     machine: {
       procRoot: "/nonexistent-proc",
       cgroupRoot: "/nonexistent-cgroup",
@@ -716,6 +717,9 @@ test("the 3D page script is answered from the world the plugin carries", async (
   const world = recorded.handlers.get("office.world.request");
   expect(await world?.({}, context)).toBe("the scene");
   expect(await recorded.handlers.get("office.world.street")?.({}, context)).toBe("{}");
+  expect(await recorded.handlers.get("office.world.words")?.({ language: "vi" }, context)).toBe(
+    "words of vi",
+  );
   await stop();
 });
 
@@ -737,6 +741,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.state",
     "office.world.street",
     "office.world.request",
+    "office.world.words",
     "office.machine",
     "office.machine.cleanup.request",
     "office.janitor.request",

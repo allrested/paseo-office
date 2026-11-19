@@ -45,7 +45,7 @@ import { onTurnDone } from './life/your-turn.js';
 import * as lifeIncidents from './life/incidents.js';
 import { sfx } from './audio/sfx.js';
 import { setOn, sound, watchAudio } from './paseo-sound.js';
-import { t as tr } from '../i18n/index.js';
+import { lang, setLanguage, t as tr } from '../i18n/index.js';
 
 const VERSION = 1;
 let started = false;
@@ -66,7 +66,7 @@ function buildPage() {
   const style = document.createElement('style');
   style.textContent = STYLE;
   document.head.append(style);
-  document.documentElement.lang = 'en';
+  document.documentElement.lang = lang();
   document.body.innerHTML = `
     <div id="stage-wrap"><div id="stage"></div>
       <section class="plc" id="plc" hidden role="dialog" aria-labelledby="plc-title">
@@ -286,7 +286,7 @@ const api = {
   version: VERSION,
   /**
    * Builds the office. `options`: plan ('pro' | 'cozy' | 'hq'), dark, colors (the app theme), brand
-   * ({ name, logoUrl }, for the lobby's sign), photo (false hides Photo mode), and what
+   * ({ name, logoUrl }, for the lobby's sign), photo (false hides Photo mode), language and its JSON words (English by default), and what
    * the scene tells Paseo: onSelect(id | null), onBoard(project | null) (a team's chip, or the
    * whiteboard), onProblem(message), and, when Paseo has something to show for them, onMachine()
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
@@ -298,6 +298,7 @@ const api = {
   start(options = {}) {
     if (started) return;
     started = true;
+    setLanguage(options.language, options.words);
     host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
     host.select = (id) => options.onSelect?.(id);

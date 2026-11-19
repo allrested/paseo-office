@@ -4,6 +4,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
 import { chatRpc, notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
+import { isWordsLanguage, type SceneLanguage } from "../../shared/scene-language.js";
 import { failureText } from "../action-button.js";
 import { boardRoom, isDarkTheme, type WorldPlan } from "./adapter.js";
 import type { WorldBrand, WorldStartOptions } from "./world-api.js";
@@ -38,7 +39,14 @@ export interface WorldLatest {
  */
 export function worldStartOptions(
   latest: { readonly current: WorldLatest },
-  extras: { focus(): void; brand: WorldBrand; plan: WorldPlan; photo?: false },
+  extras: {
+    focus(): void;
+    brand: WorldBrand;
+    plan: WorldPlan;
+    photo?: false;
+    language: SceneLanguage;
+    words: string | undefined;
+  },
 ): WorldStartOptions {
   const { focus } = extras;
   const { colors } = latest.current.theme;
@@ -48,6 +56,9 @@ export function worldStartOptions(
     dark: isDarkTheme(colors),
     colors,
     brand: extras.brand,
+    ...(isWordsLanguage(extras.language) && extras.words !== undefined
+      ? { language: extras.language, words: extras.words }
+      : {}),
     ...(extras.photo === undefined ? {} : { photo: extras.photo }),
     onSelect: (agentId) => {
       if (agentId !== null) focus();

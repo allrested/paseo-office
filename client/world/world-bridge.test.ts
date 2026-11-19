@@ -130,3 +130,10 @@ test("setSound goes to the page as a call, and the scene's onSound comes back as
   receive(JSON.stringify({ callback: "onSound", args: [true] }));
   expect(onSound).toHaveBeenCalledWith(true);
 });
+
+test("start sends the requested language and its JSON to the WebView", () => {
+  const { api, posted } = bridge();
+  const language = { language: "vi" as const, words: '{"dict":{}}' };
+  api.start(options(language));
+  expect(posted).toMatchObject([{ call: "start", args: [language] }]);
+});
