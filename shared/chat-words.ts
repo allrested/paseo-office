@@ -13,6 +13,15 @@ function isList(words: ChatWords): words is readonly ChatWords[] {
 
 // Lines the chat says that upstream words with a company's name: the office's own wording instead.
 const OURS: Readonly<Record<string, readonly string[]>> = {
+  "chat.life.pickleDone": [
+    "Court time’s up 😆 {share} each 💸",
+    "Tonight’s court was {share} each 🏓",
+  ],
+  "chat.life.nhauInvite": ["A few cans tonight, everyone? 🍻"],
+  "chat.life.nhauYes": ["I’m in!", "Count me in 🙋", "Save me a seat", "Ok, the Ba Khía place"],
+  "chat.life.nhauCheers": ["Một hai ba dô 🍻"],
+  "chat.life.nhauNoDrive": ["If you’ve had a drink, don’t drive 🚕"],
+  "chat.life.nhauRide": ["Ridely’s on its way"],
   "chat.life.parcel": [
     "{name}, a parcel for you 📦 come down for it",
     "The courier’s here with {name}’s parcel 📦",

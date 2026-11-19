@@ -16,7 +16,8 @@ import { called, goDown, goUp, here, live, mainExit, outside, resume, street, wa
 import { chatLife } from '../ui/group-chat.js';
 import { queueUi } from '../ui/activity.js';
 import { board } from '../world/furniture/board.js';
-import { pinStrip, stripPhoto } from '../life/photostrips.js';
+// PASEO: pin the strip locally. The team chat carries the release tag only.
+import { pinStrip } from '../life/photostrips.js';
 import { colorize, mergeAll, vmat } from '../world/terrace.js';
 import { t as tr } from '../../i18n/index.js';
 
@@ -119,7 +120,7 @@ function printed(S, Q) {
       if (!T) return;
       T.strip = { tag: T.tag, day: T.day, seed: T.seed, people: T.members.map((m) => ({ hair: m.w.cfg.hair, skin: m.w.cfg.skin, shirt: m.w.cfg.shirt })) };
       T.carrier = first; first.w.carry = null; say(first.w, 'people.photo.say.done');
-      chatLife('photoStrip', { id: first.w.id, tag: T.tag, photo: stripPhoto(T.strip), every: 60e3 });
+      chatLife('photoStrip', { id: first.w.id, tag: T.tag, every: 60e3 });
       for (const m of T.members) if (!m.dead && m.stage === 'out') home(m, S);
     });
   }, at.face);
