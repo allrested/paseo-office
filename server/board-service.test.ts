@@ -1,7 +1,12 @@
 import { expect, test } from "vitest";
-import type { Post } from "../shared/contracts.js";
+import type { Duty, Post } from "../shared/contracts.js";
 import { EMPTY_BOARDS, type BoardStore, type BoardsFile } from "./board-store.js";
-import { createBoardService, trimBoard, type BoardService } from "./board-service.js";
+import {
+  createBoardService,
+  trimBoard,
+  type BoardService,
+  type BoardServicePorts,
+} from "./board-service.js";
 import { createFakeClock, settle, type FakeClock } from "./fake-clock.js";
 
 const T0 = Date.parse("2026-11-11T09:00:00.000Z");
@@ -50,6 +55,7 @@ interface Harness {
 interface Listeners {
   onBoard?: (board: string, posts: readonly Post[]) => void;
   onBoardRemoved?: (board: string) => void;
+  refuse?: BoardServicePorts["refuse"];
 }
 
 /** A service that has not loaded its boards yet. */
@@ -66,6 +72,7 @@ function build(initial?: BoardsFile, listeners: Listeners = {}): Harness {
       listeners.onBoard ??
       ((board, posts) => events.push(`board ${board} ${posts.map((item) => item.id).join(",")}`)),
     onBoardRemoved: listeners.onBoardRemoved ?? ((board) => events.push(`removed ${board}`)),
+    ...(listeners.refuse ? { refuse: listeners.refuse } : {}),
   });
   return { service, store, clock, events };
 }
@@ -482,4 +489,117 @@ test("a listener that throws is logged and the change still stands", async () =>
     "log [office] board listener failed: hub down",
     "log [office] board listener failed: hub gone",
   ]);
+});
+
+function dutyPost(seq: number, id: string, day: string, fields: Partial<Post> = {}): Post {
+  return post(seq, { board: "duty", kind: "task", state: "open", duty: { id, day }, ...fields });
+}
+
+const CUPS: Duty = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" };
+const BUILD: Duty = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
+
+test("the day's sync posts each due duty once, keyed by duty and day", async () => {
+  const { service, store, events } = await harness();
+  const plan = { duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD] };
+  await service.syncDuties(plan);
+  expect(service.postsOf("duty")).toMatchObject([
+    {
+      id: "p1",
+      text: "Cups",
+      state: "open",
+      author: "user",
+      duty: { id: "cups", day: "2026-11-11" },
+    },
+    { id: "p2", text: "Build\n\nRun the build", duty: { id: "build", day: "2026-11-11" } },
+  ]);
+  expect(events).toEqual(["board duty p1,p2"]);
+  await service.syncDuties(plan);
+  await service.update({ id: "p1", action: "done", actor: "user" });
+  await service.syncDuties(plan);
+  expect(service.postsOf("duty")).toHaveLength(2);
+  expect(store.saved).toHaveLength(2);
+});
+
+test("an open or claimed duty of an earlier day is owed: no second post; done ones of earlier days go", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-10", { text: "Cups" }),
+      dutyPost(2, "build", "2026-11-10", { state: "claimed", claimedBy: "a" }),
+      dutyPost(3, "cups", "2026-11-09", { state: "done" }),
+      dutyPost(4, "build", "2026-11-11", { state: "done" }),
+    ]),
+  );
+  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD] });
+  expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2", "p4"]);
+  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-12", due: [] });
+  expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2"]);
+});
+
+test("a duty that leaves the list takes its open post; an edit changes its open post's text", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-11"),
+      dutyPost(2, "build", "2026-11-11", { text: "Build\n\nRun the build" }),
+      dutyPost(3, "gone", "2026-11-11", { state: "claimed", claimedBy: "a" }),
+      dutyPost(4, "gone2", "2026-11-11"),
+    ]),
+  );
+  const edited = { ...BUILD, name: "Build it", instructions: "Run the full build" };
+  await service.syncDuties({ duties: [edited], day: "2026-11-11", due: [] });
+  const posts = service.postsOf("duty");
+  expect(posts.map((item) => item.id)).toEqual(["p3", "p2"]);
+  expect(posts[1]).toMatchObject({ text: "Build it\n\nRun the full build", seq: 5 });
+});
+
+test("a pretend duty acted out is done by that agent; the first report wins", async () => {
+  const { service } = await harness(
+    file([
+      dutyPost(1, "cups", "2026-11-11"),
+      lobbyTask(2),
+      dutyPost(3, "build", "2026-11-11", { state: "claimed", claimedBy: "b" }),
+    ]),
+  );
+  expect(await service.actDuty("p1", "a")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "a" },
+  });
+  expect(await service.actDuty("p1", "b")).toMatchObject({ ok: true, post: { claimedBy: "a" } });
+  expect(await service.actDuty("p2", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p2: it is not a duty",
+  });
+  expect(await service.actDuty("p3", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p3: claimed by Bob",
+  });
+  expect(await service.actDuty("p9", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p9: no such post",
+  });
+});
+
+test("a refusal port stops an update before the state rules, and pickup claims duty posts too", async () => {
+  const { service } = await harness(
+    file([dutyPost(1, "cups", "2026-11-11"), dutyPost(2, "build", "2026-11-11"), lobbyTask(3)]),
+    {
+      refuse: (item, input) =>
+        item.duty?.id === "cups" && input.action === "claim" ? "it is a pretend duty" : null,
+    },
+  );
+  expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toEqual({
+    ok: false,
+    error: "Unable to claim p1: it is a pretend duty",
+  });
+  expect(await service.claimLobbyTask("p1", "a", 1)).toBeNull();
+  const claim = await service.claimLobbyTask("p2", "a", 2);
+  expect(claim).toMatchObject({ id: "p2", state: "claimed", claimedBy: "a" });
+  // One at a time: an agent holding a duty is handed no lobby task.
+  expect(await service.claimLobbyTask("p3", "a", 3)).toBeNull();
+  if (!claim) throw new Error("expected a claim");
+  await service.releaseLobbyTask(claim);
+  expect(service.postsOf("duty")[1]).toMatchObject({ state: "open", duty: { id: "build" } });
+  const again = await service.claimLobbyTask("p2", "a", service.postsOf("duty")[1]?.seq ?? 0);
+  if (!again) throw new Error("expected a second claim");
+  await service.finishLobbyClaim(again);
+  expect(service.postsOf("duty")[1]).toMatchObject({ state: "done", duty: { id: "build" } });
 });
