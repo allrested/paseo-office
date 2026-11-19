@@ -22,6 +22,7 @@ import { useIncidentAlarm } from "./use-incident-alarm.js";
 import type { WorldApi } from "./world-api.js";
 
 export interface WorldFeedInput {
+  life?: import("../../shared/contracts.js").LifeEvent | null;
   model: OfficeModel;
   theme: PluginTheme;
   /** The workspace tab's room; the view starts on its team's desks. */
@@ -51,6 +52,7 @@ export function useWorldFeed(
   api: WorldApi | null,
   {
     model,
+    life,
     theme,
     focusRoomId,
     focusRequest,
@@ -84,7 +86,10 @@ export function useWorldFeed(
     if (sound !== null) world.current?.setSound?.(sound);
   }, [sound, api]);
 
-  const people = useMemo(() => worldPeople(model, PLAN_DESKS[plan]), [model, plan]);
+  const people = useMemo(
+    () => worldPeople(model, PLAN_DESKS[plan], life?.born),
+    [model, plan, life?.born],
+  );
   useEffect(() => {
     const scene = world.current;
     if (scene === null) return;
@@ -104,6 +109,20 @@ export function useWorldFeed(
     world.current?.setMachine(worldReadings);
   }, [worldReadings, api]);
 
+  useEffect(() => {
+    if (life?.tenure) api?.setTenure?.(life.tenure);
+  }, [life?.tenure, api]);
+  const lastLift = useRef<{ api: WorldApi; key: string } | null>(null);
+  useEffect(() => {
+    if (!api || !life) {
+      lastLift.current = null;
+      return;
+    }
+    const key = JSON.stringify(life.lift);
+    if (lastLift.current?.api === api && lastLift.current.key === key) return;
+    api.setLiftService?.(life.lift);
+    lastLift.current = { api, key };
+  }, [life, api]);
   const focusTeam = useMemo(() => teamOfRoom(model, focusRoomId), [model, focusRoomId]);
   useEffect(() => {
     if (focusTeam !== null) world.current?.focusProject(focusTeam);

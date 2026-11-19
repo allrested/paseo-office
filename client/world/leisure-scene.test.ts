@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   open: null as Record<string, boolean> | null,
 }));
 
+vi.mock("../../vendor/my-office/src/office/life/nap.js", () => ({ napOn: false }));
 vi.mock("../../vendor/my-office/src/office/core/env.js", () => ({
   get PRO() {
     return h.env.PRO;

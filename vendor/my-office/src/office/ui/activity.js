@@ -12,7 +12,13 @@ export function queueUi() { state.boardDirty = true; }
 export function renderHud() {}
 export function addFeed() {}
 
+// PASEO: the lively floor (paseo-leisure.js) runs from here, once a frame: upstream's life/nap.js, which it ran from
+// before, is upstream's own now and has no such hook. paseo-entry.js sets it.
+let frame = null;
+export function everyFrame(fn) { frame = fn; }
+
 export function updateMarkers(t) {
+  frame?.();
   const sel = state.selectedId ? workers.get(state.selectedId) : null;
   selRing.visible = !!sel;
   if (sel) { selRing.position.set(sel.pos.x, 0.03 + sel.gy(), sel.pos.y); selRing.scale.setScalar(1 + Math.sin(t * 4) * 0.06); }

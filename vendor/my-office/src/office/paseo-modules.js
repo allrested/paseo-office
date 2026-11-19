@@ -49,13 +49,28 @@ import * as peopleTeamLines from './people/team-lines.js';
 import * as peopleDirector from './people/director.js';
 import * as peopleErrands from './people/errands.js';
 import * as peopleGatherings from './people/gatherings.js';
+import * as peopleComnha from './people/comnha.js';
+import * as peopleStaff from './people/staff.js';
+import * as peopleDuty from './people/duty.js';
+import * as peopleTeatime from './people/teatime.js';
+import * as peopleAccountant from './people/accountant.js';
+import * as peopleRounds from './people/rounds.js';
+import * as peopleHr from './people/hr.js';
 import * as peopleFoosball from './people/foosball.js';
 import * as peopleGaming from './people/gaming.js';
 import * as peopleBilliards from './people/billiards.js';
 import * as peopleKaraoke from './people/karaoke.js';
+import * as peopleFarewell from './people/farewell.js';
+import * as peopleInterns from './people/interns.js';
 import * as lifeTrophies from './life/trophies.js';
+import * as lifeNap from './life/nap.js';
 import * as lifeQuota from './life/quota.js';
+import * as lifeAltar from './life/altar.js';
+import * as lifeLiftService from './life/lift-service.js';
+import * as lifeDrill from './life/drill.js';
+import * as lifeDaySwaps from './life/day-swaps.js';
 import * as lifeTests from './life/tests.js';
+import * as lifePost from './life/post.js';
 import * as worldRoomUpdate from './world/room-update.js';
 import * as interactProps from './interact/props.js';
 import * as interactPlaceChips from './interact/place-chips.js';
@@ -121,13 +136,28 @@ export const MODULES = [
   ['peopleDirector', peopleDirector],
   ['peopleErrands', peopleErrands],
   ['peopleGatherings', peopleGatherings],
+  ['peopleComnha', peopleComnha],
+  ['peopleStaff', peopleStaff],
+  ['peopleDuty', peopleDuty],
+  ['peopleTeatime', peopleTeatime],
+  ['peopleAccountant', peopleAccountant],
+  ['peopleRounds', peopleRounds],
+  ['peopleHr', peopleHr],
   ['peopleFoosball', peopleFoosball],
   ['peopleGaming', peopleGaming],
   ['peopleBilliards', peopleBilliards],
   ['peopleKaraoke', peopleKaraoke],
+  ['peopleFarewell', peopleFarewell],
+  ['peopleInterns', peopleInterns],
   ['lifeTrophies', lifeTrophies],
+  ['lifeNap', lifeNap],
   ['lifeQuota', lifeQuota],
+  ['lifeAltar', lifeAltar],
+  ['lifeLiftService', lifeLiftService],
+  ['lifeDrill', lifeDrill],
+  ['lifeDaySwaps', lifeDaySwaps],
   ['lifeTests', lifeTests],
+  ['lifePost', lifePost],
   ['worldRoomUpdate', worldRoomUpdate],
   ['interactProps', interactProps],
   ['interactPlaceChips', interactPlaceChips],

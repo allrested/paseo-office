@@ -1,8 +1,9 @@
 // PASEO: the lively floor. An agent at rest does not sleep the day away at its desk: after a gap it gets up for a game
 // (upstream's pool, foosball, TV match and karaoke, through their own starters), a nap on the sofa, the fish, the arcade,
 // a cup in the dining room or the restroom, with upstream's own moves (errand(), visitWc(), feedFish(), brewCoffee()).
-// paseo-leisure-plan.js decides who, when and what; this file moves the people. The stand-in of life/nap.js calls
+// paseo-leisure-plan.js decides who, when and what; this file moves the people. updateMarkers in ui/activity.js calls
 // updateLeisure every frame, once paseo-entry.js has set it there.
+import { napOn } from './life/nap.js';
 import { state } from './core/state.js';
 import { PRO, nowMs, officeNow, rand, reduceMotion, replay } from './core/env.js';
 import { AQ } from './world/props/aquarium.js';
@@ -134,7 +135,7 @@ export function updateLeisure() {
   lookAt = state.sim + 1;
   const agents = [];
   for (const [id, w] of workers) { const s = sessions.get(id); agents.push({ id, resting: resting(w, s), idle: idle(w, s) }); }
-  const next = plan.step({ now: state.sim, wall: nowMs(), hour: officeNow().getHours(), quiet: reduceMotion || !!gatheringNow(), agents, open: openNow() });
+  const next = plan.step({ now: state.sim, wall: nowMs(), hour: officeNow().getHours(), quiet: reduceMotion || !!gatheringNow() || napOn, agents, open: openNow() });
   if (!next) return;
   if (!leisureNow(next.id, next.kind)) plan.declined(next.id, state.sim, nowMs());
 }

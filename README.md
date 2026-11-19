@@ -77,20 +77,21 @@ while the daemon was down is not made up.
 
 ## What it reads and where it sends it
 
-- It reads the host's agents and workspaces, their status, and the kind of thing each agent does
-  (a read, an edit, a command, a test run). The kind is worked out on the host.
-- The 3D scene is told who is there and what kind of thing each does, never a file name, a command
-  or a prompt. The scene makes no network call.
+- It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
+  of activity. On the host it runs Git once per workspace folder to read the first commit date.
+- The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
+  and the lift’s servicing time. It receives no file names, commands or prompts and makes no
+  network calls. It sends chat moments with a name or count, and reports farewells and promotions.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
-  music choice. The column keeps when this device last had the chat open (`office-chat-seen`).
+  music choice, the duty roster, drill and farewell history. The column keeps when this device last had the chat open (`office-chat-seen`).
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
 - The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
   notes' prompt to the host's own agents, and so to whichever provider runs them.
 - It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
-  in `office/`.
+  in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
 
 ## Based on
 

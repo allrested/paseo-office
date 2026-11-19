@@ -15,6 +15,7 @@ import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
+  useSceneLifeChat,
   useWorldScript,
   worldStartOptions,
   type WorldLatest,
@@ -39,6 +40,8 @@ export interface WorldViewProps {
   /** A tap on a team's chip or on the whiteboard: opens that room's board. */
   onSelectBoard(roomId: string): void;
   /** The host's readings; null when the host has none, and then the server room is furniture. */
+  life?: import("../../shared/contracts.js").LifeEvent | null;
+  onTenure?: WorldLatest["onTenure"];
   machine: Machine | null;
   /**
    * A tap on the server room: its chip, the racks or a server box, and the wall screen while
@@ -95,6 +98,8 @@ function WorldScene({
   selectedAgentId,
   onSelectAgent,
   onSelectBoard,
+  life,
+  onTenure,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -109,6 +114,7 @@ function WorldScene({
 }: WorldSceneProps) {
   const containerId = useId();
   const onBell = useStandupBell();
+  const onLife = useSceneLifeChat();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -126,6 +132,8 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
     onSound: sound.set,
     onProblem,
   });
@@ -144,6 +152,8 @@ function WorldScene({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      onLife,
+      onTenure,
       onSound: sound.set,
       onProblem,
     };
@@ -161,6 +171,8 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
     sound.set,
     onProblem,
   ]);
@@ -218,6 +230,7 @@ function WorldScene({
     focusRoomId,
     focusRequest,
     selectedAgentId,
+    life,
     machine,
     meeting,
     incidents,

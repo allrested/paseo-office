@@ -184,11 +184,11 @@ scene, and anything the scene opens in the app (the agent card, a board), gives 
 to the app's window.
 
 The scene is told who is there and what kind of thing each does, and the open incidents' keys and
-titles for the banner; never a file name, a command or a prompt. It makes no network call. It
-writes seven things to the app origin's `localStorage` under keys that start with `office-`:
+titles for the banner. It receives the daily-life data described below, without file names, commands or prompts. It makes no network call. It
+writes scene state to the app origin's `localStorage` under keys that start with `office-`:
 which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
 the host's setting overwrites at each start), that the tour was seen (`office-tips`), and the
-clip's shape and music choice (`office-clip-shape`, `office-clip-music`). It reads
+clip's shape and music choice (`office-clip-shape`, `office-clip-music`), the duty roster, drill and farewell history. It reads
 `office-autocam`.
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
@@ -552,3 +552,25 @@ device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an 
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
 A save of a device setting spreads the values it read and never passes a key with no value: the host
 refuses a document that holds `undefined`, and the device then keeps nothing.
+
+## Staff and daily life
+
+The indoor scenes cover packed lunches at the microwave, duty rosters, tea, the accountant, rounds,
+HR, farewells, interns, reception and delivery staff, the altar, lift servicing, the post and the
+quarterly fire drill. They run on the office clock. During the 12:30–13:30 desk nap, the lively
+floor pauses new activities. Street outings are separate.
+
+The accountant reads provider-reported spending. HR uses the repository’s first commit month for
+birthdays. The first set of workspaces is permanent. A later team can graduate after 20 turns over
+two days. A previously active team can have a farewell after 30 quiet days. The lift is serviced
+for three minutes at server start or five when the scene build has changed. Commits put letters in the post box and pushes send the postman to collect them. The other indoor scenes
+use the office clock and the people already seated.
+
+| Chat sender            | Moments                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| HR                     | Stand-up, birthday, trophy, promotion, farewell and its photo caption, drill notice and report, duty roster |
+| Receptionist           | Parcel, lift back in service, altar                                                                         |
+| Named agent            | Stairs, goodbye, parcel acknowledgement, apology for a missed chore                                         |
+| Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break, chore complaint                         |
+
+For most agent lines, reception can speak when nobody is resting. Chat photos are omitted.

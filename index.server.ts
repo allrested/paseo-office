@@ -1,3 +1,13 @@
+import { createHash } from "node:crypto";
+import { execCommand } from "@getpaseo/plugin/server";
+import { WORLD_SCRIPT } from "./server/world.generated.js";
+import { createTenure, type TenureStore } from "./server/tenure.js";
+import { createLiftService } from "./server/lift-service.js";
+import { readRepoAge } from "./server/repo-age.js";
+import { createLifeFeed } from "./server/life-feed.js";
+import { createLifeStore } from "./server/life-store.js";
+import { liftFile, tenureFile } from "./server/paths.js";
+import { lifeSubscription, tenureRpc, type LifeEvent } from "./shared/contracts.js";
 import { homedir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import type {
@@ -86,6 +96,8 @@ export interface OfficePluginDeps {
   incidentsStore: IncidentsStore;
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
+  tenureStore: TenureStore & { flush(): void };
+  liftStore: TenureStore & { flush(): void };
   /** The daemon's environment: the trackers' tokens are read from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -237,6 +249,24 @@ export function createOfficePlugin(
     .catch((error: unknown) => log(`[office] incidents load failed: ${errorMessage(error)}`));
   // One service for the office's life, made as the server starts. Its file is read first; until
   // then the chat call waits, and a snapshot has no chat.
+  const now = () => deps.clock.now();
+  const listeners = new Map<(event: LifeEvent) => void, () => void>();
+  const lift = createLiftService({
+    ...deps.liftStore,
+    build: createHash("sha256").update(WORLD_SCRIPT).digest("hex").slice(0, 7),
+    now: now(),
+  });
+  const feed = createLifeFeed({
+    now,
+    tenure: createTenure({ store: deps.tenureStore, now }),
+    lift,
+    days: () => ({ choices: [30], days: 30 }),
+    age: (folder) => readRepoAge(folder, execCommand),
+    emit: (snapshot) => {
+      for (const send of listeners.keys()) send({ type: "life", ...snapshot });
+    },
+  });
+  const stopLife = hub.watch(feed.view);
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
   async function startChat(): Promise<void> {
@@ -412,6 +442,26 @@ export function createOfficePlugin(
       return chat.request(input);
     });
   });
+  server.handle(lifeSubscription, (_input, context) => {
+    holder.remember(context.paseo);
+    if (context.signal.aborted) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const send = (event: LifeEvent) => {
+        void context
+          .push(event)
+          .catch((error) => log("[office] life push failed: " + errorMessage(error)));
+      };
+      const close = () => {
+        listeners.delete(send);
+        context.signal.removeEventListener("abort", close);
+        resolve();
+      };
+      listeners.set(send, close);
+      context.signal.addEventListener("abort", close, { once: true });
+      send({ type: "life", ...feed.snapshot() });
+    });
+  });
+  server.handle(tenureRpc, (input) => feed.write(input));
   // A check never rejects: a tracker that fails shows its problem on the Incidents card. It is
   // about now, so a run that waited checks when it resumes.
   const stopIncidentsRuns = deps.schedules.handle(INCIDENTS_SCHEDULE, async () => {
@@ -444,6 +494,7 @@ export function createOfficePlugin(
         holder.remember(context.paseo);
         office.noteAgent(agent);
         office.turnEnded(agent.id);
+        feed.turnEnded(agent.id);
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);
       }
@@ -502,6 +553,10 @@ export function createOfficePlugin(
     stopIncidentsRuns();
     deps.schedules.stop();
     for (const remove of removeHooks) remove();
+    stopLife();
+    for (const close of listeners.values()) close();
+    deps.tenureStore.flush();
+    deps.liftStore.flush();
     machine.stop();
     office.stop();
     // A chat still loading would start its clock after this stop.
@@ -524,6 +579,8 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     }),
     notesStore: createNotesStore({ file: notesWriterFile(process.env, homedir()), log }),
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
+    tenureStore: createLifeStore(tenureFile(process.env, homedir()), 10_000, log),
+    liftStore: createLifeStore(liftFile(process.env, homedir()), 0, log),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),

@@ -619,3 +619,16 @@ describe("the lobby's sign", () => {
     expect(worldBrand(null)).toEqual({ name: "Paseo", logoUrl: null });
   });
 });
+
+it("sends spending without requiring context and includes the repository's first day", () => {
+  const model = buildOfficeModel(
+    office([agent("1", { costUsd: 1.5 }), agent("2", { workspaceId: "w2" })]),
+  );
+  const { sessions } = worldPeople(model, 12, { "shop-api": "2020-02-03" });
+  expect(sessions[0]).toMatchObject({
+    usage: { ctx: 0, ctxMax: 0, cost: 1.5 },
+    git: { repo: "shop-api", born: "2020-02-03" },
+  });
+  expect(sessions[1]?.usage).toBeUndefined();
+  expect(sessions[1]?.git).toEqual({ repo: "landing" });
+});

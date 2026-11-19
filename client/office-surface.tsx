@@ -86,6 +86,7 @@ import { useQa } from "./use-qa.js";
 import { useReviews } from "./use-reviews.js";
 import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
+import { useLife } from "./world/use-life.js";
 import { useMachine } from "./use-machine.js";
 import { useOffice, type OfficeState } from "./use-office.js";
 import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js";
@@ -651,6 +652,7 @@ function SurfaceBody({
   sound,
 }: SurfaceBodyProps) {
   const plan = useFloorPlan();
+  const { life, tell } = useLife();
   if (office.subscription.status === "error") {
     const { message } = office.subscription.error;
     return (
@@ -674,6 +676,8 @@ function SurfaceBody({
     const World = worldViewFor(platform);
     return (
       <World
+        life={life}
+        onTenure={tell}
         model={model}
         theme={theme}
         styles={styles}

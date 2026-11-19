@@ -307,6 +307,11 @@ export type ChatChange = z.output<typeof ChatChangeSchema>;
 /** What the owner does in the chat; each op goes to the engine's function of that name. */
 export const ChatRequestSchema = z.discriminatedUnion("op", [
   z.object({
+    op: z.literal("life"),
+    kind: z.string().min(1).max(40),
+    vars: z.record(z.string().max(40), z.string().max(200)).default({}),
+  }),
+  z.object({
     op: z.literal("send"),
     text: z.string().max(CHAT_TEXT_MAX).optional(),
     sticker: z.number().int().min(0).optional(),
@@ -601,4 +606,45 @@ export const worldRpc = defineRpc({
   name: "office.world.request",
   input: z.object({}),
   output: z.string(),
+});
+
+export const WorldTenureSchema = z.object({
+  days: z.number(),
+  choices: z.array(z.number()),
+  projects: z.array(
+    z.object({
+      name: z.string(),
+      last: z.number(),
+      days: z.number(),
+      turns: z.number(),
+      due: z.boolean(),
+      farewell: z.number(),
+      back: z.number(),
+      intern: z.boolean(),
+      ready: z.boolean(),
+      official: z.number(),
+    }),
+  ),
+});
+export const LifeEventSchema = z.object({
+  type: z.literal("life"),
+  born: z.record(z.string(), z.string()),
+  tenure: WorldTenureSchema,
+  lift: z.object({
+    left: z.number(),
+    total: z.number(),
+    newBuild: z.boolean(),
+    sticker: z.object({ version: z.string(), at: z.number(), build: z.string() }).nullable(),
+  }),
+});
+export type LifeEvent = z.output<typeof LifeEventSchema>;
+export const lifeSubscription = defineSubscription({
+  name: "office.life",
+  input: z.object({}),
+  event: LifeEventSchema,
+});
+export const tenureRpc = defineRpc({
+  name: "office.tenure.request",
+  input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),
+  output: z.object({ ok: z.boolean() }),
 });

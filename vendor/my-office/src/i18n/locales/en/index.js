@@ -4,6 +4,7 @@ import time from './time.js';
 import ui from './ui.js';
 import settings from './settings.js';
 import fp from './fp.js';
+import drawer from './drawer.js';
 import activity from './activity.js';
 import incident from './incident.js';
 import events from './events.js';
@@ -14,4 +15,4 @@ import world from './world.js';
 import life from './life.js';
 import tips from './tips.js';
 
-export default { common, time, ui, settings, fp, activity, incident, events, people, places, props, world, life, tips };
+export default { common, time, ui, settings, fp, drawer, activity, incident, events, people, places, props, world, life, tips };

@@ -190,3 +190,19 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
 });
+
+test("life reaches each started scene once across equivalent lift readings", async () => {
+  const { api, calls } = fakeScene();
+  const life = {
+    type: "life" as const,
+    born: {},
+    tenure: { days: 30, choices: [30], projects: [] },
+    lift: { left: 1, total: 2, newBuild: false, sticker: null },
+  };
+  await act(async () => root.render(<Probe api={api} feed={input({ life })} />));
+  await act(async () =>
+    root.render(<Probe api={api} feed={input({ life: { ...life, lift: { ...life.lift } } })} />),
+  );
+  expect(calls.filter((call) => call.startsWith("setTenure:"))).toHaveLength(1);
+  expect(calls.filter((call) => call.startsWith("setLiftService:"))).toHaveLength(1);
+});

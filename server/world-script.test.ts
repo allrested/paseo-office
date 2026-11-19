@@ -76,9 +76,9 @@ describe("the embedded scene", () => {
       expect(script).toContain(`people.${line}.invite`);
     }
     // The scene with three.js r160; a jump means a module the port leaves out came back in.
-    // (Measured 1,144,567 after the camera extras.)
+    // (The indoor staff build is approximately 1.26 million characters.)
     expect(script.length).toBeGreaterThan(1_000_000);
-    expect(script.length).toBeLessThan(1_200_000);
+    expect(script.length).toBeLessThan(1_400_000);
     // Node's globals would throw in the page: upstream's build flag was the one use.
     expect(script).not.toContain("process.env");
     expect(script).not.toMatch(/\brequire\(/);
@@ -130,6 +130,21 @@ describe("the embedded scene", () => {
     expect(bundle).toContain("office-autocam");
     // The scene still makes no network call of its own: nothing the new files add calls out.
     expect(bundle).not.toMatch(/\bfetch\(["'`]https?:/);
+  });
+
+  it("bundles the staff scenes, with no network call and no real brand's mark", () => {
+    for (const line of [
+      "people.hr.",
+      "people.accountant.",
+      "people.duty.",
+      "life.liftService.",
+      "life.drill.",
+      "life.altar.",
+    ]) {
+      expect(WORLD_SCRIPT).toContain(line);
+    }
+    expect(WORLD_SCRIPT).not.toContain("fetch(");
+    expect(WORLD_SCRIPT).not.toContain("/api/");
   });
 
   it("bundles upstream's first-person walk, with the street cut", () => {

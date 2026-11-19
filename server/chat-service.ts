@@ -1,3 +1,4 @@
+import { lifeLine } from "../shared/life-lines.js";
 import type { PluginTurnOutcome } from "@getpaseo/plugin/server";
 import {
   CHAT_MESSAGE_MAX,
@@ -64,9 +65,19 @@ export interface ChatService {
   stop(): Promise<void>;
 }
 
-/** Of upstream's staff only the director speaks; the others have nobody on the floor. */
+const STAFF_NAMES: Readonly<Record<string, string>> = {
+  __director: "Director",
+  __reception: "Receptionist",
+  __hr: "HR",
+  __cleaner: "Cleaner",
+  __guard: "Security guard",
+  __courier: "Courier",
+  __accountant: "Accountant",
+};
+/** The staff the scene has on the floor speak in the chat under these names. */
 export function staffNameOf(key: string, tr: Translate): string | null {
-  return key === DIRECTOR ? tr("people.director") : null;
+  if (key === DIRECTOR) return tr("people.director");
+  return Object.hasOwn(STAFF_NAMES, key) ? (STAFF_NAMES[key] ?? null) : null;
 }
 
 export function isUsageLimit(message: string): boolean {
@@ -312,6 +323,24 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     return OK;
   }
 
+  function life(input: Extract<ChatRequest, { op: "life" }>): ChatResult {
+    const line = lifeLine(input.kind, input.vars, {
+      resting: () => [...roster.values()].filter((m) => m.status === "rest").map((m) => m.id),
+      name: (id) => roster.get(id)?.name ?? null,
+      now: clock.now(),
+    });
+    if (line === null) return { ok: false, error: "There is no such line." };
+    const text = tr(line.key, line.vars);
+    if (text === line.key) return { ok: false, error: "There is no such line." };
+    engine.say(line.from, text, line.options);
+    if (line.extra)
+      engine.say(line.extra.from, tr(line.extra.key), {
+        delay: line.extra.delay,
+        key: `${line.options.key}:${line.extra.key}`,
+      });
+    return OK;
+  }
+
   return {
     snapshot: () => ({ messages: wireMessages(), typing: [...engine.state.typing] }),
 
@@ -387,6 +416,8 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
 
     async request(input) {
       switch (input.op) {
+        case "life":
+          return life(input);
         case "send":
           return send(input);
         case "react":

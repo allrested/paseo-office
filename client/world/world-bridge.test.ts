@@ -68,7 +68,10 @@ test("a callback the page posts calls the real one with its arguments", () => {
   const { api, receive } = bridge();
   const onSelect = vi.fn();
   const onBoard = vi.fn();
-  api.start(options({ onSelect, onBoard }));
+  const onLife = vi.fn();
+  api.start(options({ onSelect, onBoard, onLife }));
+  receive(JSON.stringify({ callback: "onLife", args: ["stairs", { id: "a1" }] }));
+  expect(onLife).toHaveBeenCalledWith("stairs", { id: "a1" });
   receive(JSON.stringify({ callback: "onSelect", args: ["a1"] }));
   receive(JSON.stringify({ callback: "onBoard", args: [null] }));
   expect(onSelect).toHaveBeenCalledWith("a1");
