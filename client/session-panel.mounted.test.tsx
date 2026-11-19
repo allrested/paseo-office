@@ -17,6 +17,19 @@ import type { AgentActions } from "./use-agent-actions.js";
 
 let conversation: Conversation;
 let asked: string[];
+/** The keys of the rows drawn: `rowLabel` runs once each time a row draws. */
+let drawn: string[];
+
+vi.mock("./session-text.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./session-text.js")>();
+  return {
+    ...actual,
+    rowLabel: (row: ConversationRow, name: string) => {
+      drawn.push(row.key);
+      return actual.rowLabel(row, name);
+    },
+  };
+});
 
 vi.mock("./use-conversation.js", () => ({
   useConversation: (agentId: string) => {
@@ -95,6 +108,7 @@ const draw = (props: Partial<SessionPanelProps> = {}) =>
 
 beforeEach(() => {
   asked = [];
+  drawn = [];
   conversation = ready([]);
   send = vi.fn(async () => undefined);
   respond = vi.fn(async () => undefined);
@@ -265,6 +279,23 @@ test("Send sends the trimmed text and clears the box; empty text sends nothing",
   expect(send).toHaveBeenCalledWith("a1", "Add tests", { activeTurnBehavior: "steer" });
   expect(box().value).toBe("");
   expect(box().getAttribute("placeholder")).toBe("Message Builder");
+});
+
+test("a streamed piece redraws only the row that changed", async () => {
+  const rows = (last: string): ConversationRow[] => [
+    { kind: "you", key: "1", text: "Hi" },
+    { kind: "tool", key: "2", text: "Bash: ls" },
+    { kind: "agent", key: "3", text: last },
+  ];
+  conversation = ready(rows("Hel"));
+  await draw();
+  expect(drawn).toEqual(["1", "2", "3"]);
+  drawn = [];
+  // The rows are new objects each time the list is read: only a changed one may draw again.
+  conversation = ready(rows("Hello"));
+  await draw();
+  expect(drawn).toEqual(["3"]);
+  expect(container.textContent).toContain("Hello");
 });
 
 test("a send that fails shows its reason under the box and keeps the text", async () => {

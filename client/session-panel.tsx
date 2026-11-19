@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Text,
   View,
@@ -85,7 +85,27 @@ function Header({ agent, room, onOpenWorkspace, onClose, styles }: HeaderProps) 
   );
 }
 
-function Row({ row, name, styles }: { row: ConversationRow; name: string; styles: OfficeStyles }) {
+interface RowProps {
+  row: ConversationRow;
+  name: string;
+  styles: OfficeStyles;
+}
+
+/** The rows are new objects each time the list is read, so a row is compared by what it shows. */
+function sameRow(before: RowProps, after: RowProps): boolean {
+  const [a, b] = [before.row, after.row];
+  return (
+    before.name === after.name &&
+    before.styles === after.styles &&
+    a.kind === b.kind &&
+    a.key === b.key &&
+    a.text === b.text &&
+    (a.kind !== "notice" || (b.kind === "notice" && a.tone === b.tone))
+  );
+}
+
+/** One line of the conversation; a streamed piece redraws only the row it changed. */
+const Row = memo(function Row({ row, name, styles }: RowProps) {
   const label = rowLabel(row, name);
   if (row.kind === "tool") {
     return (
@@ -111,7 +131,7 @@ function Row({ row, name, styles }: { row: ConversationRow; name: string; styles
       </Text>
     </View>
   );
-}
+}, sameRow);
 
 function Alert({ text, styles }: { text: string; styles: OfficeStyles }) {
   return (

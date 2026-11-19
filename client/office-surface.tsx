@@ -60,7 +60,7 @@ import {
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
-import { SessionPane, sessionTabsOf, type SessionContext } from "./session-pane.js";
+import { SessionPane, sessionOf, sessionTabsOf, type SessionContext } from "./session-pane.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
@@ -843,10 +843,14 @@ interface ColumnViewPanelProps extends Omit<ColumnPanelSwitchProps, "tab"> {
 /** The chosen view's panel: a tab's, or an open session's. */
 function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
   if (view.kind === "session") {
+    const { model, ...context } = session;
+    const { agent, room } = sessionOf(model, view.agentId);
     return (
       <SessionPane
         agentId={view.agentId}
-        context={session}
+        agent={agent}
+        room={room}
+        context={context}
         styles={panel.styles}
         layout={panel.layout}
       />
