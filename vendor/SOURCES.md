@@ -24,7 +24,7 @@ The scene: the floor plans, the furniture, the people and how they move, the lab
 the place cards, and the lounge's four games (pool, the TV matches, foosball, karaoke: `people/
 billiards.js`, `gaming.js`, `foosball.js`, `karaoke.js`). Upstream's files are copied unchanged,
 except that `'three'` and `'three/addons/...'` imports are rewritten to relative paths, so the
-bundle needs no resolver.
+bundle needs no resolver, and that real brand names are swapped for made-up ones (below).
 
 The first-person walk is taken too: Walk in, at the camera bar's end, walks the floor as your own
 character, and a game can be played from there. The games call the group chat and the sounds. The
@@ -47,6 +47,29 @@ Five copied files are changed by hand, and each change starts with `// PASEO:`:
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
   has no Photo mode (the button is hidden and `enterPhoto` returns).
 
+### Made-up names
+
+my-office's text and comments name real shops, apps and products: the convenience stores and
+cafés people pop out to, ride and delivery apps, a bank, medicines, a film studio's look. This
+plugin is public and ships no real brand's name, so `scripts/genericise-street.mjs` swaps each
+for a made-up one through one table, `scripts/street-brands.mjs` (the one list of the real
+names). It renames the keys upstream uses for them too (`mixue`, `grab`, the look
+`pixar`...), and their camelCase compounds (`mixueAsk`), in every file, so a key stays the same
+across files. It works on every `.js` under `my-office/src/` and `../shared/upstream/`, and
+puts `// PASEO: names ...` on the first line of each file it changes. It changed these, and
+nothing else in them:
+
+- `../shared/upstream/chat.js`
+- `src/i18n/locales/en/fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`
+- `src/office/people/chibi-rig.js`, `src/office/people/look.js`
+- `src/office/world/props/tv-games.js`
+- `src/office/interact/first-person.js`, which is also changed by hand (above)
+
+The import tool runs the same swap on what it copies: a file whose only note is the names one is
+written as upstream's with the names swapped, so it is compared and updated like an unchanged
+copy, and `MANIFEST.json` keeps upstream's sha256. `npm run test:scripts` runs the script's
+`--check` over the tree, and `server/world-script.test.ts` checks the bundle.
+
 Two files are taken trimmed. Their paths stay in the import tool's `DENY`, so it never writes them
 and only checks that they export what the kept modules import (which is why `MANIFEST.json` lists
 them under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry.js` runs their
@@ -65,12 +88,13 @@ them under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry
   because `people/karaoke.js` sings through its own audio while it is on.
 
 The team chat's engine (`src/shared/chat-engine.js`) and the English `chat` area
-(`src/i18n/locales/en/chat.js`) are taken unchanged into the plugin's `shared/upstream/`, not into
-`my-office/src/`. The office's server runs the engine (`server/chat-service.ts`) and the chat's
-panel reads its stickers and reactions (`client/chat-text.ts`); the plugin compiler bundles only
-modules under `client/`, `server/` and `shared/`, so neither could import them from `my-office/`.
-The scene does not take them. Nothing in the start-up list reaches the engine, so the import tool
-takes the two files by name and records them under `chat` in `MANIFEST.json`. The plugin compiles
+(`src/i18n/locales/en/chat.js`, with its names made up) are taken into the plugin's
+`shared/upstream/`, not into `my-office/src/`. The office's server runs the engine
+(`server/chat-service.ts`) and the chat's panel reads its stickers and reactions
+(`client/chat-text.ts`); the plugin compiler bundles only modules under `client/`, `server/`
+and `shared/`, so neither could import them from `my-office/`. The scene does not take them.
+Nothing in the start-up list reaches the engine, so the import tool takes the two files by name
+and records them under `chat` in `MANIFEST.json`. The plugin compiles
 with `allowJs` off, so two `.d.ts` files beside them type what the office calls:
 `shared/upstream/chat-engine.d.ts` and `shared/upstream/chat.d.ts`. The import tool never writes a
 `.d.ts`. The engine's `tr` is `shared/chat-words.ts`, the stand-in's lookup over the `chat` area
@@ -148,5 +172,9 @@ regenerates `paseo-modules.js`, the English locale index and `MANIFEST.json`, an
 - files it kept because they carry a `PASEO:` note: compare each with upstream by hand;
 - stand-ins that lack an export a kept module now imports: add it.
 
-Then run `npm run build:world`, then `npm test`, and look at the office in a browser: a module
+Then run `node scripts/genericise-street.mjs`: the tool swaps the names it copies, but a kept
+file you merged by hand needs the script. The script knows only the table's names: read the new
+text upstream brings for a shop, an app or a product the table lacks, add it to
+`scripts/street-brands.mjs` with a made-up name, and run the script again. Then run
+`npm run build:world`, then `npm test`, and look at the office in a browser: a module
 upstream added to its start-up list may need a stand-in or a place in `DENY`.
