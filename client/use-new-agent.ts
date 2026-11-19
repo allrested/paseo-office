@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { usePaseo, useSettings } from "@getpaseo/plugin/client";
-import type { PaseoApi } from "@getpaseo/client";
+import { usePaseo, useSettings, type PluginPaseoApi } from "@getpaseo/plugin/client";
 import { officeDeviceSettings } from "../shared/settings.js";
 import { failureText } from "./action-button.js";
 import {
@@ -27,7 +26,7 @@ interface Loaded {
 
 const LOADING: Loaded = { status: "loading", error: null, workspaces: [], providers: [] };
 
-async function readWorkspaces(paseo: PaseoApi): Promise<WorkspaceOption[]> {
+async function readWorkspaces(paseo: PluginPaseoApi): Promise<WorkspaceOption[]> {
   const all: WorkspaceOption[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < WORKSPACE_PAGES; page += 1) {

@@ -1,5 +1,8 @@
 import type { AgentModelDefinition, ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
-import type { PaseoWorkspace } from "@getpaseo/client";
+import type { PluginPaseoApi } from "@getpaseo/plugin/client";
+
+// A Git install has no @getpaseo/client: the workspace type is read off the SDK the host supplies.
+type PaseoWorkspace = Awaited<ReturnType<PluginPaseoApi["workspaces"]["list"]>>["entries"][number];
 
 export interface NewAgentChoice {
   workspaceId: string | null;
