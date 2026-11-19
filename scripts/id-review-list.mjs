@@ -49,3 +49,22 @@ console.log(
 console.log(
   `## Noted\n\n${noted.join("\n") || "None."}\n\n## Long\n\n${long.join("\n") || "None."}`,
 );
+
+const firstRead = [
+  "people.billiards.win[1]",
+  "people.atm.say.use[1]",
+  "people.pickle.tally.run",
+  "people.karaoke.join[2]",
+  "fp.bil.cleared",
+  "events.bubble.testfail[0]",
+  "world.nhau.chat.cheers",
+  "world.nhau.fpJoinDone",
+  "life.tet.coupletLeft",
+  "world.csgt.paper.copies",
+];
+console.log("\n## Ten lines for the first read\n");
+for (const key of firstRead) console.log(show(key, rows.get(key), notes[key]));
+console.log("\n## All port-specific lines\n");
+for (const [key, row] of rows) {
+  if (key.startsWith("ours.")) console.log(show(key, row, notes[key]));
+}
