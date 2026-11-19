@@ -93,6 +93,7 @@ import { FullscreenHeader, type SidebarControls } from "./fullscreen-header.js";
 import { useColumn, type ColumnState } from "./use-column.js";
 import { LibraryCard } from "./library-card.js";
 import { NotesCard } from "./notes-card.js";
+import { leaveFullscreenAfter, lockEscape, pageUsesEscape, unlockEscape } from "./world/escape.js";
 import { todayZone } from "./notes-text.js";
 import { QaCard } from "./qa-card.js";
 import { ReviewCard } from "./review-card.js";
@@ -1438,9 +1439,23 @@ function useFullscreen(props: OfficeSurfaceProps, launcher: SidebarLauncher | un
       const active = Object.is(document.fullscreenElement, root.current);
       if (active) setExpandedInPage(false);
       setFullscreen(active);
+      // The scene's Escape (getting up from an activity, leaving walk-in) is the browser's own
+      // while fullscreen: hold it for the page, and give it back with fullscreen.
+      if (active) lockEscape(navigator);
+      else unlockEscape(navigator);
+    };
+    // With Escape held, a press nothing used leaves fullscreen as it did before.
+    const pressed = (event: KeyboardEvent) => {
+      if (!Object.is(document.fullscreenElement, root.current)) return;
+      leaveFullscreenAfter(event, pageUsesEscape(document), document);
     };
     document.addEventListener("fullscreenchange", changed);
-    return () => document.removeEventListener("fullscreenchange", changed);
+    document.addEventListener("keydown", pressed, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", changed);
+      document.removeEventListener("keydown", pressed, true);
+      unlockEscape(navigator);
+    };
   }, [canFullscreen]);
   // A sidebar press on a retained screen must not activate a hidden floor.
   const launch = useCallback(() => {
