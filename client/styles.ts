@@ -7,7 +7,7 @@ import type { AttentionReason, DotTone } from "../shared/model.js";
 /** A log is read in a fixed-width face, as in the terminal it comes from. */
 const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 
-export const SESSION_RAIL_WIDTH = 260;
+export const SESSION_RAIL_WIDTH = 336;
 
 export interface OfficeStyles {
   fullscreenHeader: ViewStyle;

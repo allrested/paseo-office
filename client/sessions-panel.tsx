@@ -130,7 +130,7 @@ function SessionList({
           <View style={styles.sessionTools}>
             <TextInput
               accessibilityLabel={SEARCH_LABEL}
-              placeholder={SEARCH_LABEL}
+              placeholder="Search"
               placeholderTextColor={styles.placeholderColor}
               value={query}
               onChangeText={setQuery}
