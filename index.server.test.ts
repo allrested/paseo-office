@@ -10,14 +10,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, expect, test } from "vitest";
+import { afterAll, afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { createOfficePlugin } from "./index.server.js";
 import { EMPTY_BOARDS, type BoardStore } from "./server/board-store.js";
 import { emptyChat, type ChatData, type ChatStore } from "./server/chat-store.js";
 import { createFakeClock, settle } from "./server/fake-clock.js";
-import type { LifeFile } from "./server/life-store.js";
-import type { LiftKept } from "./server/lift-service.js";
 import type { LocalSchedules, OfficeCadence } from "./server/local-schedules.js";
 import {
   EMPTY_INCIDENTS,
@@ -25,7 +23,6 @@ import {
   type IncidentsStore,
 } from "./server/incidents-store.js";
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
-import type { TenureLedger } from "./server/tenure.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -63,6 +60,9 @@ const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
   sentryProjects: "",
+  weatherMode: "off" as const,
+  weatherManual: "season" as const,
+  weatherUrl: "",
   sentryUrl: "https://sentry.io",
 };
 const ON: SettingsState = {
@@ -205,6 +205,7 @@ function fakeContext(
         }),
       },
       workspaces: {
+        ref: (id: string) => ({ refresh: async () => (id === "w1" ? { name: "api" } : null) }),
         list: async () => listOf([]),
         open: async (cwd: string) => ({
           id: "wks_notes",
@@ -284,16 +285,6 @@ function memoryIncidentsStore(): IncidentsStore & { kept: IncidentsData } {
   return store;
 }
 
-function memoryLifeFile<T>(): LifeFile<T> {
-  let kept: T | null = null;
-  return {
-    load: async () => structuredClone(kept),
-    save: async (data) => {
-      kept = structuredClone(data);
-    },
-  };
-}
-
 function memoryChatStore(): ChatStore & { kept: ChatData } {
   // Copied on each load and save, as the file is.
   const store = {
@@ -356,6 +347,7 @@ function setup(
   read: () => Promise<SettingsState>,
   options: {
     env?: NodeJS.ProcessEnv;
+    fetchFn?: typeof fetch;
     chatStore?: ChatStore;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
     server?: (base: PluginServerContext) => PluginServerContext;
@@ -387,12 +379,14 @@ function setup(
     notesStore,
     incidentsStore,
     chatStore,
-    tenureFile: memoryLifeFile<TenureLedger>(),
-    liftFile: memoryLifeFile<LiftKept>(),
+    fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
+    tenureFile: { load: async () => null, save: async () => {} },
+    liftFile: { load: async () => null, save: async () => {} },
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
-    world: { read: async () => "the scene" },
+    world: { read: async () => "the scene", readStreet: async () => "{}" },
+    words: { read: async (language) => "words of " + language },
     machine: {
       procRoot: "/nonexistent-proc",
       cgroupRoot: "/nonexistent-cgroup",
@@ -722,6 +716,10 @@ test("the 3D page script is answered from the world the plugin carries", async (
   const { recorded, context, stop } = setup(async () => ON);
   const world = recorded.handlers.get("office.world.request");
   expect(await world?.({}, context)).toBe("the scene");
+  expect(await recorded.handlers.get("office.world.street")?.({}, context)).toBe("{}");
+  expect(await recorded.handlers.get("office.world.words")?.({ language: "vi" }, context)).toBe(
+    "words of vi",
+  );
   await stop();
 });
 
@@ -741,7 +739,9 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
   await settle();
   expect([...recorded.handlers.keys()]).toEqual([
     "office.state",
+    "office.world.street",
     "office.world.request",
+    "office.world.words",
     "office.machine",
     "office.machine.cleanup.request",
     "office.janitor.request",
@@ -755,9 +755,10 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.set_wakes_paused.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
-    "office.life",
-    "office.tenure.request",
     "office.chat.request",
+    "office.life",
+    "office.street.events",
+    "office.tenure.request",
   ]);
   expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "incidents"]);
   expect([...recorded.hooks.keys()]).toEqual([
@@ -1403,6 +1404,35 @@ test("a tracker's problem goes once no tracker is on", async () => {
 
   leaving.abort();
   await done;
+  await stop();
+});
+
+test("weather is read only for an open office, reaches its snapshot and stops when it closes", async () => {
+  const url = "http://127.0.0.1:9/weather.json?key=SECRET";
+  const fetchFn = vi.fn(async () =>
+    Response.json({ current: { weather_code: 63, temperature_2m: 14.2, cloud_cover: 90 } }),
+  );
+  const values = { ...ON.values, weatherMode: "service" as const, weatherUrl: url };
+  const { recorded, clock, context, stop } = setup(async () => ({ ...ON, values }), { fetchFn });
+  await settle();
+  expect(fetchFn).not.toHaveBeenCalled();
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(fetchFn).toHaveBeenCalledExactlyOnceWith(
+    url,
+    expect.objectContaining({ redirect: "manual" }),
+  );
+  expect(office.events.at(-1)?.state).toMatchObject({
+    weather: {
+      scene: { kind: "reading", code: 63, temp: 14.2, cloud: 0.9 },
+      problem: null,
+      readAt: clock.now(),
+    },
+  });
+  await office.leave();
+  clock.advance(3 * 3600_000);
+  await settle();
+  expect(fetchFn).toHaveBeenCalledTimes(1);
   await stop();
 });
 

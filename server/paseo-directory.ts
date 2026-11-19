@@ -1,10 +1,9 @@
 import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
 import {
   agentsFromSnapshot,
+  foldersOf,
   applyAgentUpdate,
-  applyFolderUpdate,
   applyWorkspaceUpdate,
-  foldersFromSnapshot,
   sortAgents,
   sortWorkspaces,
   workspacesFromSnapshot,
@@ -49,13 +48,16 @@ export async function openPaseoDirectory(
   }
   let agents = new Map<string, OfficeAgent>();
   let workspaces = new Map<string, OfficeWorkspace>();
-  let folders = new Map<string, string>();
+  let folders: Record<string, string> = {};
+  let haveAgents = false,
+    haveWorkspaces = false;
   function emit(): void {
+    if (!haveAgents || !haveWorkspaces) return;
     try {
       onChange({
+        folders,
         agents: newestAgents(agents.values()),
         workspaces: sortWorkspaces(workspaces.values()),
-        folders: Object.fromEntries(folders),
       });
     } catch (error) {
       log(`[office] directory change failed: ${errorMessage(error)}`);
@@ -74,6 +76,7 @@ export async function openPaseoDirectory(
     });
   const stopAgents = agentList.subscription.subscribe({
     snapshot: (snapshot) => {
+      haveAgents = true;
       agents = agentsFromSnapshot(snapshot.entries.map((entry) => entry.agent));
       emit();
     },
@@ -86,14 +89,18 @@ export async function openPaseoDirectory(
   });
   const stopWorkspaces = workspaceList.subscription.subscribe({
     snapshot: (snapshot) => {
+      haveWorkspaces = true;
+      folders = foldersOf(snapshot.entries);
       workspaces = workspacesFromSnapshot(snapshot.entries);
-      folders = foldersFromSnapshot(snapshot.entries);
       emit();
     },
     update: (message) => {
       if (message.type !== "workspace_update") return;
+      const update = message.payload;
+      folders = { ...folders };
+      delete folders[update.kind === "remove" ? update.id : update.workspace.id];
+      if (update.kind === "upsert") folders = { ...folders, ...foldersOf([update.workspace]) };
       workspaces = applyWorkspaceUpdate(workspaces, message.payload);
-      folders = applyFolderUpdate(folders, message.payload);
       emit();
     },
     error: (error) => end("workspaces", error),

@@ -26,12 +26,23 @@ billiards.js`, `gaming.js`, `foosball.js`, `karaoke.js`). Upstream's files are c
 except that `'three'` and `'three/addons/...'` imports are rewritten to relative paths, so the
 bundle needs no resolver, and that real brand names are swapped for made-up ones (below).
 
+The import takes English, Vietnamese and Thai area files named by the scene’s English index
+and generates a matching index for each. Vietnamese and Thai come from the same pinned commit,
+including the Thai people submodules. The upstream Thai drawer omits
+`drawer.sessionGone`, so that message uses the English fallback. Brand replacements preserve each area’s shared keys.
+
+The port wrote `i18n/locales/id/` in upstream’s format for all the same areas. Its `ours.js`
+contains the port-specific lines. The locale tests check keys, order, plural forms, slots,
+markup, emoji and list lengths. The translator recorded lines for native-speaker review in
+`scripts/id-review-notes.json`. Run `node scripts/id-review-list.mjs` for English and Indonesian
+side by side.
+
 The first-person walk is taken too: Walk in, at the camera bar's end, walks the floor as your own
 character, and a game can be played from there. The games call the group chat and the sounds. The
 chat's window is not taken: its stand-in exports what the games import and does nothing. The sounds are upstream's,
 off until the Sound switch is on, so a game and a karaoke song are heard then.
 
-The first-visit tour is taken too (`ui/tips.js`, with its English words, `locales/en/tips.js`). It
+The first-visit tour is taken too (`ui/tips.js`, with its words in each shipped locale’s `tips.js`). It
 shows only where Walk in does (a fine pointer; `state.isLocal` is set from it in
 `ui/camera-bar.js`), once per device (`office-tips`), and its person card's words are Paseo's
 (`OURS` in `i18n/index.js`). Its cards' styles are in `paseo-style.js`.
@@ -41,36 +52,22 @@ offered on a desktop or in a browser only (a recorder, a capturable canvas, a fi
 `host.photo`); its markup and styles are in `ui/camera-bar.js`. Its music is made in the page and
 goes into the recording, never to the speakers.
 
-The staff and daily-life scenes that happen on the office floor are taken: lunch from home at the
-pantry's microwaves (`people/comnha.js`, with `src/shared/comnha.js`), the duty roster
-(`duty.js`), Friday's tea (`teatime.js`), the accountant (`accountant.js`), the director's rounds
-(`rounds.js`), HR's desk and the month's birthdays (`hr.js`), a project's farewell and return
-(`farewell.js`), the interns (`interns.js`), reception, the cleaner and the courier (`staff.js`),
-the lobby's altar (`life/altar.js`), the lift's servicing (`life/lift-service.js`), the post
-(`life/post.js`), the fire drill (`life/drill.js`), the swapped days off (`life/day-swaps.js`) and
-the midday nap (`life/nap.js`). Three of them are changed by hand (below).
+The seasonal decorations and animated centrepieces come from `life/seasons.js`; the umbrella stand and entrance rain props come from `life/rain.js`.
 
-Twelve copied files are changed by hand, and each change starts with `// PASEO:`:
+The following copied files include changes marked with `// PASEO:`.
 
 - `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
   gap); the engine and every other sound are upstream's.
 - `src/office/core/env.js`: the build flag upstream reads from `process.env` is a constant, and
   the floor plan comes from Paseo, not from the page's address and storage.
-- `src/office/interact/first-person.js`: the street is cut (`street()` returns null, so the door
-  has no E action), E on a person passes `opts.open` to the session drawer, and `floorBounds` is
+- `src/office/interact/first-person.js`: E at the lift enters the enabled street. E on a person passes `opts.open` to the session drawer, and `floorBounds` is
   exported for the camera bar.
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,
   and the launch pad's card lists no repositories (a team is a workspace, and Paseo sends no
   repository state).
+- `src/office/life/weather.js` draws rain, storm flashes, fog and light. The host supplies readings through `setWeather`. The upstream city list, storage, chips, timer and Open-Meteo fetch are removed. `wx.city` stays empty.
 - `src/office/life/tests.js`: `clearRun` puts out the lamp of a test run whose end Paseo never
   learns.
-- `src/office/people/farewell.js`: the tenure list comes from the host (`setTenure`) and a farewell
-  held is told to it (`host.tenure`), not fetched from or posted to upstream's server; every page
-  tells it, not only upstream's local one.
-- `src/office/people/interns.js`: an intern made permanent is told to the host (`host.tenure`),
-  the same way.
-- `src/office/people/staff.js`: the courier's label has a plain box mark; the real logo's path
-  data is gone.
 - `src/office/ui/photo.js`: the mark painted into a photo is the host's brand name (Paseo's when
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
   has no Photo mode (the button is hidden and `enterPhoto` returns), and leaving photo mode calls
@@ -84,6 +81,9 @@ Twelve copied files are changed by hand, and each change starts with `// PASEO:`
 - `src/office/ui/clip-music.js`: `musicTrack` returns null while `sfx.on` is false, so the music,
   and the audio context that carries it into the recording, exist only while the Sound setting is
   on.
+
+- `src/office/people/farewell.js` and `interns.js` read the host’s tenure list and report ceremonies through its callback.
+- `src/office/people/staff.js` uses a plain parcel mark on the courier’s carton.
 
 ### Made-up names
 
@@ -100,14 +100,16 @@ works on every `.js` under `my-office/src/` and `../shared/upstream/`, and puts
 the swap would change nothing in it. It changed these, and nothing else in them:
 
 - `../shared/upstream/chat.js`
-- `src/i18n/locales/en/fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`
+- Under `src/i18n/locales/en/` and `vi/`: `fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`
+- Under `src/i18n/locales/th/`: the same files, with `people-a.js` and `people-b.js` holding the dialogue
 - `src/office/people/chibi-rig.js`, `src/office/people/look.js`
 - `src/office/world/props/tv-games.js`
 - `src/office/interact/first-person.js`, which is also changed by hand (above)
 - `src/office/audio/sfx.js`, which is also changed by hand (above)
-- `src/office/people/comnha.js`
-- `src/office/people/staff.js`, which is also changed by hand (above)
 - `src/office/ui/timelapse.js`, which is also changed by hand (above)
+
+Vietnamese and Thai use the same replacements during import. Run
+`node scripts/replace-locale-brands.mjs --check` to scan the dictionaries.
 
 The import tool runs the same swap on what it copies: a file whose only note is the names one is
 written as upstream's with the names swapped, so it is compared and updated like an unchanged
@@ -140,31 +142,27 @@ with `allowJs` off, so two `.d.ts` files beside them type what the office calls:
 `.d.ts`. The engine's `tr` is `shared/chat-words.ts`, the stand-in's lookup over the `chat` area
 and `people.director`, which keeps upstream's emoji.
 
+The Headquarters wing (`src/office/world/pro/wing.js`) is imported from upstream. Its room plaques follow desk assignment. The camera uses the walk bounds for all three plans.
+
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
-connection, the replay, the demo, other languages, the street outside with its shops, the six staff
-scenes that happen on the street (lunch out, the guard, drinks after work, the photo booth,
-pickleball, the outings), the seasons and the weather. The plugin takes the office floor only. Of
-the camera toolbar and photo mode, the list button is left out on purpose.
+connection, replay, the demo and alternate landscapes. Of the camera toolbar and photo mode, the list
+button is left out on purpose.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
 with `// PASEO: stand-in`. Most export what is asked of them and do nothing. These do work:
 
 | Stand-in                    | What it does                                                           |
 | --------------------------- | ---------------------------------------------------------------------- |
-| `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command; the lift's sticker says "Office" and the scene's build |
+| `i18n/index.js`             | Reads the selected dictionary at scene start, falls back to English, removes decorative emoji and applies the port’s own wording |
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera; `state.isLocal` for the tour |
 | `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons; `togglePop` does nothing |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
-| `ui/group-chat.js` | `chatLife` tells the host a moment (a kind and a few words); `chatSay` does nothing; `chatPhoto` is null |
-| `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor; runs Paseo's lively floor every frame |
+| `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
-| `people/outings.js`         | `resting`, `called`, `resume` are upstream's; there is no street (`street()` is null) |
-| `people/guard.js`           | No guard's post; the drill's marshal is off                            |
-| `life/rain.js`              | No rain, so the wet-floor sign never shows                             |
 
 The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
 follow the app's theme (`paseo.clock.hint` in `OURS`). A person already in the office whose status
@@ -183,42 +181,28 @@ stylesheet, in Paseo's design language, the tour's cards included), `paseo-modul
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
 `paseo-leisure-plan.js` (who gets up from a rest, when and for what; no scene in it, so
 `client/world/leisure.test.ts` runs it) and `paseo-leisure.js` (which moves the people with
-upstream's own moves and starts upstream's games through their starters). `ui/activity.js`'s
-`updateMarkers` runs it every frame, and it starts nothing during upstream's midday nap.
+upstream's own moves and starts upstream's games through their starters). The marker update in `ui/activity.js` runs it every frame, yielding during the midday nap.
 
 The library's place card is not shown: `paseo-entry.js` gives the place an `open`, so its chip
 and the bookshelf open Paseo's Library card.
 
 Of the team chat, only the engine and its words are taken, into `shared/upstream/`. Its window
 (`ui/group-chat*.js`; the games' `ui/group-chat.js` stays a stand-in), its CI, loop and denied
-cards, voice, push notifications and prompt rewriting are not. The staff speak under Paseo's
-names for them (`server/chat-service.ts`, `staffNameOf`): the director, reception, HR, the cleaner,
-the guard, the courier and the accountant, so the engine's morning hello, its Monday stand-up and
-Friday tea reminders, and HR's line when you write about a meeting come as upstream has them. The
-lunch poll still comes from an agent. The engine's `tea` act does nothing. The scene's moments (a
-birthday, the fire drill, the lift back in service, ...) reach it through `ui/group-chat.js`'s
-stand-in, which sends the host a kind and a few words, once per period; `shared/life-lines.ts`, a
-copy of upstream's `chatLife` table read from the names script's text, gives each kind its sender,
-words and answers. A photo is not sent, and the games' own `chatSay` lines still go nowhere.
+cards, voice, push notifications and prompt rewriting are not. All seven staff have names. The scene sends moments through `ui/group-chat.js` and the server chooses words and reactions using `shared/life-lines.ts`. Game chat and chat photos stay local.
 
 ### What the scene is told
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
-world-api.ts`), never a file name, a command or a prompt. It also sends the open incidents' keys
-and titles for the banner. For the staff scenes it sends what each agent has cost, the day each
-team's repository began, the tenure list and the lift's servicing (`client/world/use-life.ts`,
-`office.life`), and it hears back a chat moment as a kind and a few words, and a farewell or a
-promotion held. The scene runs in upstream's streamer mode, which writes "a file" and
+world-api.ts`), never a file name, a command or a prompt. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It also sends the weather mode or reading and the open incidents' keys
+and titles for the banner. A translated scene receives its language and dictionary. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
 
-The scene writes eleven things to the app origin's `localStorage`, under keys that start with
+The scene writes office state to the app origin's `localStorage`, under keys that start with
 `office-`: which team sits where, the plants, the graphics level, the Sound switch
 (`office-sound`, which the host's setting overwrites at each start), that the tour was seen
-(`office-tips`), the clip's shape and music choice (`office-clip-shape`, `office-clip-music`),
-and the staff scenes' own: the teams that had their farewell (`office-gone`) or came back
-(`office-back:*`), the duty roster (`office-duty`) and the fire drill's day (`office-drill-day`).
-It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
+(`office-tips`), and the clip's shape and music choice (`office-clip-shape`, `office-clip-music`).
+It also records the duty roster (`office-duty`), the fire drill’s day (`office-drill-day`), team farewells (`office-gone`) and returns (`office-back:*`). It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
 that nothing here writes. It makes no network call; a clip is recorded in the page and saved as a
 download.
 
@@ -232,14 +216,21 @@ node vendor/my-office/import-upstream.mjs \
 ```
 
 `--check` writes nothing and lists what would change. Without it the tool copies the files,
-regenerates `paseo-modules.js`, the English locale index and `MANIFEST.json`, and reports:
+regenerates `paseo-modules.js`, the English, Vietnamese and Thai locale indexes and `MANIFEST.json`, and reports:
 
 - files it kept because they carry a `PASEO:` note: compare each with upstream by hand;
 - stand-ins that lack an export a kept module now imports: add it.
 
+Compare upstream’s `src/i18n/index.js` with the stand-in for new exports or value shapes.
 Then run `node scripts/genericise-street.mjs`: the tool swaps the names it copies, but a kept
 file you merged by hand needs the script. The script knows only the table's names: read the new
 text upstream brings for a shop, an app or a product the table lacks, add it to
 `scripts/street-brands.mjs` with a made-up name, and run the script again. Then run
 `npm run build:world`, then `npm test`, and look at the office in a browser: a module
 upstream added to its start-up list may need a stand-in or a place in `DENY`.
+
+### Street assets and source changes
+
+The city, its population, and the staff outings come from the pinned checkout. The importer skips the alternate backdrops, the eight chain-specific shop modules, and every logo image. Shops use generic fittings and signs drawn in `world/backdrops/paseo-signs.js`. The ATM uses a plain square. Street audio waits for the street and sound switches. The optional Kenney Car Kit (CC0) is recorded in the manifest. The server sends it separately through `office.world.street`.
+
+After an upstream update run the importer, run `node scripts/genericise-street.mjs --check`, review changes in the hand-edited shops, ATM, traffic, audio and outings modules, and rebuild both generated files with `npm run build:world`.

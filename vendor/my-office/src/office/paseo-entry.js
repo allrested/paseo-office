@@ -7,7 +7,9 @@ import { MODULES } from './paseo-modules.js';
 import { host } from './paseo-host.js';
 import { STYLE } from './paseo-style.js';
 import { CSS2DObject } from '../../three/addons/renderers/CSS2DRenderer.js';
-import { el, reduceMotion, short } from './core/env.js';
+import { setWeather as drawWeather } from './life/weather.js';
+import { weatherToDraw } from './paseo-weather-plan.js';
+import { SEASON, el, reduceMotion, short } from './core/env.js';
 import { renderer, scene } from './scene/renderer.js';
 import { canvasTex } from './scene/blocks.js';
 import { focusTarget } from './core/loop.js';
@@ -27,10 +29,15 @@ import { SIGN, drawSign } from './paseo-sign.js';
 import { followHostFocus } from './paseo-focus.js';
 import { ringWithEveryone, updateLeisure } from './paseo-leisure.js';
 import { everyFrame } from './ui/activity.js';
+import { lookForUpgrade } from './people/outings.js';
+import { photoRelease } from './people/photobooth.js';
+import { setTenure } from './people/farewell.js';
+import { setLiftService } from './life/lift-service.js';
 import { dropSub, sessions, spawnSub, subAct, subs, workers } from './people/workers.js';
 import { director } from './people/director.js';
 import { STATIONS } from './people/navigation.js';
 import { applaud, ringBell } from './people/gatherings.js';
+import { onCommit, onPush, postAction } from './life/post.js';
 import { launchRocket } from './world/room-update.js';
 import { printPage } from './world/props/printer.js';
 import { lostObj, syncDevBoxes } from './world/props/dev-servers.js';
@@ -40,9 +47,7 @@ import { onTurnDone } from './life/your-turn.js';
 import * as lifeIncidents from './life/incidents.js';
 import { sfx } from './audio/sfx.js';
 import { setOn, sound, watchAudio } from './paseo-sound.js';
-import { t as tr } from '../i18n/index.js';
-import { setTenure } from './people/farewell.js';
-import { setLiftService } from './life/lift-service.js';
+import { lang, setLanguage, t as tr } from '../i18n/index.js';
 
 const VERSION = 1;
 let started = false;
@@ -52,6 +57,7 @@ let boardRows = [];
 let problem = () => {};
 let onMachine = null;
 let stopped = false;
+let weatherKey = '';
 let stopWatchingAudio = () => {};
 let noteTimer = 0;
 /** How long the scene's own note stays. */
@@ -62,7 +68,7 @@ function buildPage() {
   const style = document.createElement('style');
   style.textContent = STYLE;
   document.head.append(style);
-  document.documentElement.lang = 'en';
+  document.documentElement.lang = lang();
   document.body.innerHTML = `
     <div id="stage-wrap"><div id="stage"></div>
       <section class="plc" id="plc" hidden role="dialog" aria-labelledby="plc-title">
@@ -139,7 +145,8 @@ function makeNotesLabel() {
   label.addEventListener('click', open);
   asButton(label, open);
   const o = new CSS2DObject(label);
-  o.position.set(0.2, 2.525, -7.95);
+  // Tết hangs its red banner above this screen. Lift the label over the banner as well.
+  o.position.set(0.2, SEASON === 'tet' ? 4.2 : 2.525, -7.95);
   o.center.set(0.5, 1);
   scene.add(o);
 }
@@ -233,6 +240,8 @@ function onEvent(e) {
   record(e);
   const s = sessions.get(e.sess), w = workers.get(e.sess);
   if (e.type === 'stop' || e.type === 'commit') printPage();   // every finished turn and every commit prints a page
+  if (e.type === 'commit') onCommit();
+  if (e.type === 'push') onPush();
   if (e.type === 'test' || e.type === 'testok' || e.type === 'testfail') onTest(e);
   if (e.type === 'deploy' && w) w.cheeredAt = null;   // (upstream's applaud cheers someone once per 600 s: a deploy is cheered also right after a push)
   if (e.type === 'push' || e.type === 'deploy') applaud(e.sess);
@@ -262,6 +271,7 @@ function onEvent(e) {
     a = { station: 'director', anim: 'think', type: 'stop', text: !done ? tr('incident.reportNoTask') : tr('incident.report', { task: short(done, 40) }), e, dwell: 2.4,
       after: () => { if (!director.ack(w)) w.say('stop', tr('incident.reportLeft')); w.push(rest); } };
   }
+  if (e.type === 'commit') a = postAction(w, a) || a;
   w.push(e.type === 'compact' ? shredAction(w, a) : a);
 }
 
@@ -278,20 +288,21 @@ function glideToRequest(was, now) {
 const api = {
   version: VERSION,
   /**
-   * Builds the office. `options`: plan ('pro' | 'cozy'), dark, colors (the app theme), brand
-   * ({ name, logoUrl }, for the lobby's sign), photo (false hides Photo mode), and what
+   * Builds the office. `options`: plan ('pro' | 'cozy' | 'hq'), dark, colors (the app theme), brand
+   * ({ name, logoUrl }, for the lobby's sign), photo (false hides Photo mode), language and its JSON words (English by default), and what
    * the scene tells Paseo: onSelect(id | null), onBoard(project | null) (a team's chip, or the
    * whiteboard), onProblem(message), and, when Paseo has something to show for them, onMachine()
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
    * chip and the bookshelf), onBell() (a click on the meeting table's bell), onNotes() (the label over
    * the meeting room's screen, on the company floor), onOpen(id) (E by a person while walking: their
-   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`), onTenure({ op, name }) (a farewell held, an intern made permanent), onLife(kind, vars) (a moment for the team chat) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
+   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
    * Throws when the world cannot be built (no WebGL, a module failed).
    */
   start(options = {}) {
     if (started) return;
     started = true;
-    host.plan = options.plan === 'cozy' ? 'cozy' : 'pro';
+    setLanguage(options.language, options.words);
+    host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
     host.select = (id) => options.onSelect?.(id);
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
@@ -303,11 +314,14 @@ const api = {
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
-    host.photo = options.photo !== false;
+    // Only completed farewells and promotions are writes to the tenure ledger.
     host.tenure = typeof options.onTenure === 'function'
       ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }
       : () => {};
     host.life = typeof options.onLife === 'function' ? (kind, vars) => options.onLife(kind, vars) : () => {};
+    host.street = options.street != null;
+    host.streetKit = options.street?.kit ?? null;
+    host.photo = options.photo !== false;
     host.limits = () => limits;
     host.boardRows = () => boardRows;
     problem = (message) => options.onProblem?.(message);
@@ -357,7 +371,7 @@ const api = {
     // on it also tells Paseo, which has the day's stand-up notes written. meet() rings without it.)
     const bell = PROPS.get('bell');
     if (bell) { const ring = bell.act; bell.act = () => { ringWithEveryone(ring); host.bell?.(); }; }
-    if (host.plan === 'pro' && host.notes) makeNotesLabel();
+    if (host.plan !== 'cozy' && host.notes) makeNotesLabel();
     makeIncidentBanner(() => options.onIncidents?.());
     // (the wall screen opens Paseo's Resources when Paseo has it, and its tooltip says so; the racks and the server
     // room's chip keep the panel)
@@ -396,8 +410,8 @@ const api = {
   /** The host's Sound switch. On plays upstream's sounds once a press has started audio; off, and anywhere audio cannot start, plays none. */
   setSound(on) { if (!started || stopped) return; setOn(on === true); },
   /**
-   * Everyone in the office now, in upstream's session shape: { id, name, title, dir, git: { repo, born },
-   * status: 'work' | 'wait' | 'rest', agent, lastPrompt, doneAt, last, stuck, subs, usage: { ctx, ctxMax, cost } }.
+   * Everyone in the office now, in upstream's session shape: { id, name, title, dir, git: { repo },
+   * status: 'work' | 'wait' | 'rest', agent, lastPrompt, doneAt, last, stuck, subs, usage: { ctx, ctxMax } }.
    * The first list is seated at once; later a newcomer walks in from the lift and someone who is
    * gone walks out. `usage` is the context window in tokens: the paper on the desk and in its bin.
    * `doneAt` is when someone resting came to rest (ms). The last event the scene saw of a person stays, and its time
@@ -482,12 +496,27 @@ const api = {
     // With every incident dismissed, the red ends at the next frame rather than after its 25 s.
     if (open.length === 0) state.incidentUntil = 0;
   },
-  /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
-  setLimits(list) { limits = Array.isArray(list) ? list : []; },
+  /**
+   * The weather outside, from the host: `{ kind: 'none' }` draws none, `{ kind: 'season' }` the weather of the
+   * scene's own season (paseo-weather-plan.js), `{ kind: 'reading', code, temp, cloud }` a WMO weather code, a
+   * temperature and a cloud share (0 to 1). The host's server reads the weather service; the scene asks nobody.
+   * The same weather again, in the same season, draws nothing new.
+   */
+  setWeather(scene) {
+    if (!started || stopped) return;
+    const key = JSON.stringify([scene, SEASON]);
+    if (key === weatherKey) return;
+    weatherKey = key;
+    drawWeather(weatherToDraw(scene, SEASON));
+  },
   /** The tenure list: { days, choices, projects: [{ name, last, days, turns, due, farewell, back, intern, ready, official }] }. */
+  photoRelease(tag) { if (started && !stopped && host.street) photoRelease(tag); },
+  setClaudeVersion(reading) { if (!started || stopped || !host.street) return; host.claudeReading = reading; lookForUpgrade(); },
   setTenure(data) { if (!started || stopped || !data) return; setTenure(data); },
   /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
   setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
+  /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
+  setLimits(list) { limits = Array.isArray(list) ? list : []; },
 };
 
 globalThis.PaseoOfficeWorld = api;

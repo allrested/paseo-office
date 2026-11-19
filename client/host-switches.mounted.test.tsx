@@ -35,6 +35,9 @@ const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
   sentryProjects: "",
+  weatherMode: "off" as const,
+  weatherManual: "season" as const,
+  weatherUrl: "",
   sentryUrl: "https://sentry.io",
 };
 
@@ -360,19 +363,19 @@ async function pressPlan(name: string): Promise<void> {
   );
 }
 
-test("the floor plan row has two buttons, the stored one pressed", async () => {
+test("the floor plan row has three buttons, the stored one pressed", async () => {
   await mount();
-  expect(planButtons()).toEqual(["Company floor true", "Cozy room false"]);
+  expect(planButtons()).toEqual(["Company floor true", "Cozy room false", "Headquarters false"]);
   stored = { ...stored, floorPlan: "cozy" };
   await mount();
-  expect(planButtons()).toEqual(["Company floor false", "Cozy room true"]);
+  expect(planButtons()).toEqual(["Company floor false", "Cozy room true", "Headquarters false"]);
 });
 
 test("the hint says the plan is for the 3D floor only, and what a change does", async () => {
   await mount();
   const text = planRow().parentElement?.textContent ?? "";
-  expect(text).toContain("The 3D floor only");
-  expect(text).toContain("2D floor and the List");
+  expect(text).toContain("For the 3D view.");
+  expect(text).toContain(`Headquarters ${PLAN_DESKS.hq}`);
   expect(text).toContain(`Company floor has ${PLAN_DESKS.pro} desks`);
   expect(text).toContain(`Cozy room ${PLAN_DESKS.cozy}`);
   expect(text).toContain("starts the 3D view again");
@@ -386,7 +389,7 @@ test("a pressed plan saves the whole document with only the plan changed", async
   await mount();
   await pressPlan("Cozy room");
   // The press shows at once, before the host has answered.
-  expect(planButtons()).toEqual(["Company floor false", "Cozy room true"]);
+  expect(planButtons()).toEqual(["Company floor false", "Cozy room true", "Headquarters false"]);
   expect(saved).toEqual([{ values: { ...stored, floorPlan: "cozy" }, revision: "r1" }]);
   await act(async () => reply(true));
 });
@@ -404,14 +407,14 @@ test("while the host has not answered the plan, the row takes no other press", a
     [...planRow().querySelectorAll('[role="button"]')].map((button) =>
       button.getAttribute("aria-disabled"),
     );
-  expect(disabled()).toEqual(["true", "true"]);
+  expect(disabled()).toEqual(["true", "true", "true"]);
 
   await act(async () => reply(true));
   answer = null;
   // The host now holds the cozy room.
   stored = { ...stored, floorPlan: "cozy" };
   await mount();
-  expect(disabled()).toEqual([null, null]);
+  expect(disabled()).toEqual([null, null, null]);
   await pressPlan("Company floor");
   expect(saved.map((save) => save.values.floorPlan)).toEqual(["cozy", "pro"]);
 });
@@ -428,7 +431,7 @@ test("a refused plan goes back and shows the reason under the row", async () => 
   await pressPlan("Cozy room");
   saveError = "Settings changed on another client. Reload before saving again.";
   await mount();
-  expect(planButtons()).toEqual(["Company floor true", "Cozy room false"]);
+  expect(planButtons()).toEqual(["Company floor true", "Cozy room false", "Headquarters false"]);
   expect(planRow().parentElement?.textContent).toContain(
     "Unable to save the Floor plan setting: Settings changed on another client.",
   );
@@ -476,4 +479,28 @@ test("the incidents schedule's failure shows under the incidents fields", async 
   if (!alert) throw new Error("No alert");
   const after = field("Sentry address").compareDocumentPosition(alert);
   expect(after & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
+test("weather defaults off, manual and service expose their own controls", async () => {
+  await mount();
+  const button = (label: string) =>
+    container.querySelector<HTMLElement>(`[role="button"][aria-label="${label}"]`);
+  expect(button("Off")?.getAttribute("aria-pressed")).toBe("true");
+  expect(button("Storm")).toBeNull();
+  await act(async () => button("Manual")?.click());
+  expect(saved.at(-1)?.values.weatherMode).toBe("manual");
+  stored = { ...stored, weatherMode: "manual" };
+  await mount();
+  expect(button("Follow the season")?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => button("Storm")?.click());
+  expect(saved.at(-1)?.values.weatherManual).toBe("storm");
+  stored = { ...stored, weatherMode: "service" };
+  await mount();
+  expect(field("Weather address").value).toBe("");
+  expect(container.textContent).toContain("No address");
+  await type("Weather address", "http://weather.test/?key=SECRET");
+  await leave("Weather address");
+  await mount();
+  expect(container.textContent).toContain("plain http only on this machine");
+  expect(container.textContent).not.toContain("SECRET");
 });

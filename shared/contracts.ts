@@ -1,3 +1,4 @@
+import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
@@ -234,6 +235,32 @@ export const IncidentsStateSchema = z.object({
 });
 export type IncidentsState = z.output<typeof IncidentsStateSchema>;
 
+/** What the 3D scene is told of the weather. `season` leaves the weather to the scene's own season. */
+export const WeatherSceneSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }),
+  z.object({ kind: z.literal("season") }),
+  z.object({
+    kind: z.literal("reading"),
+    /** A WMO weather code. */
+    code: z.number().int().min(0).max(99),
+    /** Degrees Celsius; null when not known. */
+    temp: z.number().nullable(),
+    /** Cloud as a share, 0 to 1. */
+    cloud: z.number().min(0).max(1),
+  }),
+]);
+export type WeatherScene = z.output<typeof WeatherSceneSchema>;
+
+/** The weather the host holds: what the scene draws, why a service could not be read, and when it last was. */
+export const WeatherStateSchema = z.object({
+  scene: WeatherSceneSchema,
+  /** Why the service's last read failed, one sentence that never holds the address; null once one succeeds. */
+  problem: z.string().nullable(),
+  /** Epoch ms of the answer the scene is drawing; null when it draws no service's answer. */
+  readAt: z.number().nullable(),
+});
+export type WeatherState = z.output<typeof WeatherStateSchema>;
+
 /** The most characters of one chat message the office takes. */
 export const CHAT_TEXT_MAX = 600;
 /** The most chat messages kept, as upstream's engine keeps them. */
@@ -307,6 +334,11 @@ export type ChatChange = z.output<typeof ChatChangeSchema>;
 /** What the owner does in the chat; each op goes to the engine's function of that name. */
 export const ChatRequestSchema = z.discriminatedUnion("op", [
   z.object({
+    op: z.literal("life"),
+    kind: z.string().min(1).max(40),
+    vars: z.record(z.string().max(40), z.string().max(200)).default({}),
+  }),
+  z.object({
     op: z.literal("send"),
     text: z.string().max(CHAT_TEXT_MAX).optional(),
     sticker: z.number().int().min(0).optional(),
@@ -316,12 +348,6 @@ export const ChatRequestSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("vote"), id: z.string().min(1), index: z.number().int().min(0) }),
   z.object({ op: z.literal("rsvp"), id: z.string().min(1), yes: z.boolean() }),
   z.object({ op: z.literal("recall"), id: z.string().min(1) }),
-  /** A moment of the office's life the scene saw (a birthday, the fire drill), with a few words. */
-  z.object({
-    op: z.literal("life"),
-    kind: z.string().min(1).max(40),
-    vars: z.record(z.string().max(40), z.string().max(200)).default({}),
-  }),
 ]);
 export type ChatRequest = z.output<typeof ChatRequestSchema>;
 
@@ -347,6 +373,7 @@ export const OfficeSnapshotSchema = z.object({
   notes: NotesStateSchema.optional(),
   /** Absent until the office's server has read the incidents. */
   incidents: IncidentsStateSchema.optional(),
+  weather: WeatherStateSchema.optional(),
   /** Absent until the office's server has loaded the chat. */
   chat: ChatSnapshotSchema.optional(),
 });
@@ -599,7 +626,16 @@ export const chatRpc = defineRpc({
   output: ChatResultSchema,
 });
 
-/** The tenure list as the scene's farewell and interns read it (people/farewell.js setTenure). */
+/**
+ * The script of the page that draws the 3D office: the vendored my-office scene with three.js,
+ * one self-contained file. A browser evaluates it in a frame of its own.
+ */
+export const worldRpc = defineRpc({
+  name: "office.world.request",
+  input: z.object({}),
+  output: z.string(),
+});
+
 export const WorldTenureSchema = z.object({
   days: z.number(),
   choices: z.array(z.number()),
@@ -618,50 +654,56 @@ export const WorldTenureSchema = z.object({
     }),
   ),
 });
-export type WorldTenure = z.output<typeof WorldTenureSchema>;
-
-/** The lift's servicing as the scene reads it (life/lift-service.js setLiftService). */
-export const WorldLiftServiceSchema = z.object({
-  /** Milliseconds still to go when the server sent it; 0 when done. */
-  left: z.number(),
-  total: z.number(),
-  newBuild: z.boolean(),
-  sticker: z.object({ version: z.string(), at: z.number(), build: z.string() }).nullable(),
-});
-export type WorldLiftService = z.output<typeof WorldLiftServiceSchema>;
-
-/**
- * What the staff scenes read beyond the people: each team's repository's first day (by the
- * workspace's name), the tenure list, the lift's servicing. No folder, file name or command.
- */
 export const LifeEventSchema = z.object({
   type: z.literal("life"),
   born: z.record(z.string(), z.string()),
   tenure: WorldTenureSchema,
-  lift: WorldLiftServiceSchema,
+  lift: z.object({
+    left: z.number(),
+    total: z.number(),
+    newBuild: z.boolean(),
+    sticker: z.object({ version: z.string(), at: z.number(), build: z.string() }).nullable(),
+  }),
 });
 export type LifeEvent = z.output<typeof LifeEventSchema>;
-
-/** Now, then at each change while someone listens. */
 export const lifeSubscription = defineSubscription({
   name: "office.life",
   input: z.object({}),
   event: LifeEventSchema,
 });
-
-/** A farewell the scene held, or an intern it made permanent: the server's ledger keeps it. */
 export const tenureRpc = defineRpc({
   name: "office.tenure.request",
   input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),
   output: z.object({ ok: z.boolean() }),
 });
 
-/**
- * The script of the page that draws the 3D office: the vendored my-office scene with three.js,
- * one self-contained file. A browser evaluates it in a frame of its own.
- */
-export const worldRpc = defineRpc({
-  name: "office.world.request",
+/** Optional car models for the street outside. */
+export const streetRpc = defineRpc({
+  name: "office.world.street",
   input: z.object({}),
   output: z.string(),
+});
+
+/**
+ * One language's words for the 3D office, as JSON text `{ dict, ours? }`: the scene carries English and the
+ * host sends the rest on request, so a device loads its own language only.
+ */
+export const worldWordsRpc = defineRpc({
+  name: "office.world.words",
+  input: z.object({ language: z.enum(WORDS_LANGUAGES) }),
+  output: z.string(),
+});
+
+const StreetEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("release"), tag: z.string().min(1) }),
+  z.object({
+    type: z.literal("claude"),
+    reading: z.object({ version: z.string(), at: z.number() }).nullable(),
+  }),
+]);
+export type StreetEvent = z.output<typeof StreetEventSchema>;
+export const streetSubscription = defineSubscription({
+  name: "office.street.events",
+  input: z.object({}),
+  event: StreetEventSchema,
 });

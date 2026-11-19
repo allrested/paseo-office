@@ -4,6 +4,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
 import { notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
+import { isWordsLanguage, type SceneLanguage } from "../../shared/scene-language.js";
 import { failureText } from "../action-button.js";
 import { boardRoom, isDarkTheme, type WorldPlan } from "./adapter.js";
 import type { WorldBrand, WorldStartOptions } from "./world-api.js";
@@ -11,6 +12,7 @@ import { sharedWorldLoader } from "./world-loader.js";
 
 /** What the scene's callbacks and its start read: always the last render's. */
 export interface WorldLatest {
+  street?: { kit: string | null } | null;
   model: OfficeModel;
   theme: PluginTheme;
   focusRoomId: string | null;
@@ -24,9 +26,9 @@ export interface WorldLatest {
   onOpenNotes(): void;
   onOpenIncidents(): void;
   onBell(): void | Promise<void>;
+  onLife?: WorldStartOptions["onLife"];
+  onTenure?: WorldStartOptions["onTenure"];
   onSound(on: boolean): void;
-  onLife(kind: string, vars: Record<string, string>): void;
-  onTenure(op: { op: "farewell" | "official"; name: string }): void;
   onProblem(message: string): void;
 }
 
@@ -37,15 +39,26 @@ export interface WorldLatest {
  */
 export function worldStartOptions(
   latest: { readonly current: WorldLatest },
-  extras: { focus(): void; brand: WorldBrand; plan: WorldPlan; photo?: false },
+  extras: {
+    focus(): void;
+    brand: WorldBrand;
+    plan: WorldPlan;
+    photo?: false;
+    language: SceneLanguage;
+    words: string | undefined;
+  },
 ): WorldStartOptions {
   const { focus } = extras;
   const { colors } = latest.current.theme;
   return {
+    ...(latest.current.street ? { street: latest.current.street } : {}),
     plan: extras.plan,
     dark: isDarkTheme(colors),
     colors,
     brand: extras.brand,
+    ...(isWordsLanguage(extras.language) && extras.words !== undefined
+      ? { language: extras.language, words: extras.words }
+      : {}),
     ...(extras.photo === undefined ? {} : { photo: extras.photo }),
     onSelect: (agentId) => {
       if (agentId !== null) focus();
@@ -89,10 +102,10 @@ export function worldStartOptions(
             latest.current.onOpenSession?.(agentId);
           },
         }),
+    onLife: (kind, vars) => latest.current.onLife?.(kind, vars),
+    onTenure: (op) => latest.current.onTenure?.(op),
     onBell: () => void latest.current.onBell(),
     onSound: (on) => latest.current.onSound(on),
-    onLife: (kind, vars) => latest.current.onLife(kind, vars),
-    onTenure: (op) => latest.current.onTenure(op),
     onNotes: () => {
       focus();
       latest.current.onOpenNotes();

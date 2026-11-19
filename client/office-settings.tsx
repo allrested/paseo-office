@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import { View } from "react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
+import { LanguageSetting } from "./language-switch.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
 import { useOfficeStyles } from "./styles.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
+import { UNSAVED_STREET, useStreetSwitch } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
 
@@ -26,6 +28,7 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
   const office = useOffice();
   const actions = useBoardActions();
   const view = useViewChoice(layout.platform);
+  const street = useStreetSwitch(layout);
   const sound = useSoundSwitch();
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
@@ -35,8 +38,11 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
         wake={office.loaded && live ? office.state.wake : null}
         actions={actions}
         styles={styles}
-        deviceProblem={deviceProblemOf(view.unsaved, sound.unsaved)}
+        deviceProblem={
+          deviceProblemOf(view.unsaved, sound.unsaved) ?? (street.unsaved ? UNSAVED_STREET : null)
+        }
         scheduleError={office.state.notes?.scheduleError ?? null}
+        weather={office.state.weather}
         incidents={office.state.incidents}
       >
         <>
@@ -47,8 +53,16 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
             styles={styles}
           />
           <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
+          <LabeledSwitch
+            label="The street outside"
+            note="Draw shops and traffic. Off by default on a phone."
+            value={street.on}
+            onChange={street.set}
+            styles={styles}
+          />
         </>
       </HostSwitches>
+      <LanguageSetting styles={styles} />
     </View>
   );
 }

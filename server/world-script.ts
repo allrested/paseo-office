@@ -1,6 +1,9 @@
 import { WORLD_SCRIPT } from "./world.generated.js";
 
+import { STREET_KIT } from "./street-kit.generated.js";
+
 export interface WorldScript {
+  readStreet(): Promise<string>;
   /** The script of the page that draws the 3D office. */
   read(): Promise<string>;
 }
@@ -11,5 +14,5 @@ export interface WorldScript {
  * know its own folder.
  */
 export function embeddedWorldScript(): WorldScript {
-  return { read: async () => WORLD_SCRIPT };
+  return { read: async () => WORLD_SCRIPT, readStreet: async () => STREET_KIT };
 }

@@ -1,15 +1,31 @@
-// PASEO: stand-in for my-office's i18n/index.js. English only: the office plugin has one language.
-// Same calls as upstream: t(key, vars, as), num(n, digits), lang(), locale(). Upstream's lines end
-// in emoji; Paseo's labels are text and the speech bubbles have line icons, so a line is given
-// without them (a line that is nothing but emoji is kept as it is).
+// PASEO: stand-in for my-office's i18n/index.js. Same calls as upstream: t(key, vars, as), num(n, digits), lang(),
+// locale(), createT(). What differs, each on purpose:
+// - Upstream imports every language and reads the page's <html lang>. Here English is bundled and one more language is
+//   set once, by setLanguage(), from the words the host sent for it (JSON text), so a device carries only its own.
+// - Upstream's lines end in emoji; Paseo's labels are text and the speech bubbles have line icons, so a line is given
+//   without them (a line that is nothing but emoji is kept as it is). The rule holds in every language.
+// - OURS is Paseo's wording where upstream's line needs a file name, a command or a repository's state. It is English
+//   in every language but Indonesian, whose words bring their own `ours`.
+// - {mac} is "host": the office runs on a host, upstream's names the machine from <html data-os>.
+// A line is looked up in: the language's `ours`, OURS, the language's dictionary, English.
 import en from './locales/en/index.js';
 
 export const DEFAULT_LANG = 'en';
-const LOCALE = 'en-US';
-const plural = new Intl.PluralRules(LOCALE);
+const LOCALES = { en: 'en-US', vi: 'vi-VN', th: 'th-TH', id: 'id-ID' };
+const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+export const pickLang = (l) => (typeof l === 'string' && own(LOCALES, l) ? l : DEFAULT_LANG);
+
 // Paseo's wording, where upstream's line needs something Paseo does not send (a file's name, a
 // prompt, a repository's state) or counts a day when the office counts since it was opened.
-const OURS = {
+export const OURS = {
+  // the courier is any courier (people/staff.js; upstream names a shop)
+  'people.staff.shipper': 'Courier',
+  'people.staff.shipperHi': ['Delivery!', 'A parcel, I will leave it at the desk!'],
+  'people.staff.call': ['{name}, a parcel for you!', '{name}, your parcel is here!'],
+  'people.staff.callDoor': ['{name}, parcel!', 'Delivery! {name}?'],
+  // the lift's sticker (life/lift-service.js): the build is the office plugin's, not upstream's
+  'life.liftService.stickerWhat': 'Office {version}',
+
   'people.handOver': 'A new task for you',
   'events.generic.grep': 'the code',
   'events.generic.web': 'the web',
@@ -47,6 +63,7 @@ const OURS = {
   'tips.person.title': 'Each person is an agent',
   'tips.person.text': 'Click someone to open their card: what they are doing now, and a way into their session.',
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
+  'props.season.hint': '{season} decorations',
   'paseo.notes': 'Stand-up notes',
   'places.deploy.today': { one: '{n} deploy since the office opened', other: '{n} deploys since the office opened' },
   'places.live.deployToday': '{n} so far',
@@ -60,34 +77,63 @@ const OURS = {
   'paseo.leisure.fish': 'Feeding the fish',
   'paseo.leisure.arcade': 'One round at the arcade',
   'paseo.leisure.cup': 'Making a coffee',
-  // the lift's sticker (life/lift-service.js): the build is the office plugin's, not upstream's
-  'life.liftService.stickerWhat': 'Office {version}',
   'paseo.leisure.wc': 'Back in a minute',
   // (an incident is one Paseo's office found in a tracker, not three failures in five minutes: the newest on the banner)
   'incident.banner': 'Incident: {key} {title}',
   'incident.more': '+{n} more',
 };
-const get = (key) => { if (key in OURS) return OURS[key]; let o = en; for (const k of key.split('.')) { if (o == null || typeof o !== 'object') return undefined; o = o[k]; } return o; };
+
+const get = (dict, key) => { let o = dict; for (const k of key.split('.')) { if (o == null || typeof o !== 'object' || !own(o, k)) return undefined; o = o[k]; } return o; };
 const EMOJI = /\s*(?![©®™])\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}]*/gu;
 const plain = (s) => { if (typeof s !== 'string') return s; const out = s.replace(EMOJI, '').trim(); return out === '' ? s : out; };
 const fill = (s, vars) => (vars ? s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? m : String(vars[k]))) : s);
 
+const ENGLISH = { lang: DEFAULT_LANG, locale: LOCALES.en, dict: null, ours: null, plural: new Intl.PluralRules(LOCALES.en) };
+let now = ENGLISH;
+const object = (v) => (v !== null && typeof v === 'object' && !Array.isArray(v) ? v : null);
+
+/**
+ * Sets the language the office speaks. `words` is the JSON text the host sent for it: { dict, ours? }, `dict` one entry per
+ * area. Anything else (no text, text that does not parse, a language the office has no words for) leaves English.
+ */
+export function setLanguage(language, words) {
+  const lang = pickLang(language);
+  let parsed = null;
+  if (lang !== DEFAULT_LANG && typeof words === 'string') { try { parsed = object(JSON.parse(words)); } catch { parsed = null; } }
+  const dict = object(parsed?.dict);
+  now = dict ? { lang, locale: LOCALES[lang], dict, ours: object(parsed.ours), plural: new Intl.PluralRules(LOCALES[lang]) } : ENGLISH;
+  t.lang = now.lang;
+  t.locale = now.locale;
+}
+
 /** @type {(key: string, vars?: object|null, as?: 'list') => any} */
 export const t = (key, vars, as) => {
-  let v = get(key);
+  let rules = now.plural;
+  let v = now.ours && own(now.ours, key) ? now.ours[key] : undefined;
+  if (v === undefined && own(OURS, key)) {
+    v = OURS[key];
+    rules = ENGLISH.plural;
+  }
+  if (v === undefined) v = get(now.dict, key);
+  if (v === undefined) {
+    v = get(en, key);
+    rules = ENGLISH.plural;
+  }
   if (v === undefined) return as === 'list' ? [] : key;
   if (as === 'list') return (Array.isArray(v) ? v : [v]).map(plain);
   if (typeof v === 'function') return plain(v(vars || {}, t));
   if (Array.isArray(v)) v = v[Math.floor(Math.random() * v.length)];
-  else if (v && typeof v === 'object') v = v[plural.select(Number(vars?.n ?? 0))] ?? v.other;
+  else if (v && typeof v === 'object') {
+    v = v[rules.select(Number(vars?.n ?? 0))] ?? v.other;
+  }
   v = String(v);
   // upstream names the machine it runs on; Paseo's office runs on a host
   if (v.includes('{mac}') || v.includes('{Mac}')) vars = { mac: 'host', Mac: 'Host', ...vars };
   return fill(plain(v), vars);
 };
 t.lang = DEFAULT_LANG;
-t.locale = LOCALE;
-export const num = (n, digits = 0) => Number(n || 0).toLocaleString(LOCALE, { maximumFractionDigits: digits });
-export const lang = () => DEFAULT_LANG;
-export const locale = () => LOCALE;
+t.locale = LOCALES.en;
+export const num = (n, digits = 0) => Number(n || 0).toLocaleString(now.locale, { maximumFractionDigits: digits });
+export const lang = () => now.lang;
+export const locale = () => now.locale;
 export const createT = () => t;

@@ -10,11 +10,12 @@ export function toast(message) { host.toast(String(message ?? '')); }
 /** Upstream redraws its panels; here only the whiteboard has something to redraw. */
 export function queueUi() { state.boardDirty = true; }
 export function renderHud() {}
+export function addFeed() {}
+
 // PASEO: the lively floor (paseo-leisure.js) runs from here, once a frame: upstream's life/nap.js, which it ran from
 // before, is upstream's own now and has no such hook. paseo-entry.js sets it.
 let frame = null;
 export function everyFrame(fn) { frame = fn; }
-export function addFeed() {}
 
 export function updateMarkers(t) {
   frame?.();

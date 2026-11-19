@@ -18,8 +18,8 @@ import { hrOnDuty } from './hr.js';
 import { applaud, celebrate, gatheringNow } from './gatherings.js';
 import { free, later } from './errands.js';
 import { napOn } from '../life/nap.js';
+import { host } from '../paseo-host.js';
 import { projOf } from '../net/live.js';
-import { host } from '../paseo-host.js';   // PASEO: the host is told a promotion, not a server
 import { setTenure, tenureNow } from './farewell.js';
 import { chatLife } from '../ui/group-chat.js';
 import { toast } from '../ui/activity.js';
@@ -154,7 +154,7 @@ function finish() {
   if (C.host && C.hostFace != null && !C.host.job) C.host.faceTarget = C.hostFace;   // (HR back to her screen)
   w.wearCard(null);
   chatLife('official', { id: w.id, name, every: 60e3 });
-  if (!DEMO) host.tenure({ op: 'official', name: project });   // PASEO: the host is told, not a server; every page tells it, it keeps the first
+  if (!DEMO) host.tenure({ op: 'official', name: project }); // PASEO: host RPC
   const p = listOf().find((x) => x.name === project); if (p) { p.intern = false; p.ready = false; p.official = Date.now(); }
   sync();
   last = { name: project, who: name, stage: 'done', shook: !!C.shook };

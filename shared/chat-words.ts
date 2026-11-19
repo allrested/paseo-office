@@ -11,8 +11,26 @@ function isList(words: ChatWords): words is readonly ChatWords[] {
   return Array.isArray(words);
 }
 
+// Lines the chat says that upstream words with a company's name: the office's own wording instead.
+const OURS: Readonly<Record<string, readonly string[]>> = {
+  "chat.life.pickleDone": [
+    "Court time’s up 😆 {share} each 💸",
+    "Tonight’s court was {share} each 🏓",
+  ],
+  "chat.life.nhauInvite": ["A few cans tonight, everyone? 🍻"],
+  "chat.life.nhauYes": ["I’m in!", "Count me in 🙋", "Save me a seat", "Ok, the Ba Khía place"],
+  "chat.life.nhauCheers": ["Một hai ba dô 🍻"],
+  "chat.life.nhauNoDrive": ["If you’ve had a drink, don’t drive 🚕"],
+  "chat.life.nhauRide": ["Ridely’s on its way"],
+  "chat.life.parcel": [
+    "{name}, a parcel for you 📦 come down for it",
+    "The courier’s here with {name}’s parcel 📦",
+  ],
+};
+
 function find(key: string): ChatWords | undefined {
   if (key === "people.director") return DIRECTOR;
+  if (Object.hasOwn(OURS, key)) return OURS[key];
   if (!key.startsWith(CHAT_PREFIX)) return undefined;
   let found: ChatWords | undefined = chat;
   for (const part of key.slice(CHAT_PREFIX.length).split(".")) {

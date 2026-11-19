@@ -36,16 +36,6 @@ export function chatFile(env: NodeJS.ProcessEnv, home: string): string {
   return join(officeDir(env, home), "chat.json");
 }
 
-/** How long each team has been in the office, for the farewells and the interns. */
-export function tenureFile(env: NodeJS.ProcessEnv, home: string): string {
-  return join(officeDir(env, home), "tenure.json");
-}
-
-/** The scene's build the lift was last serviced for, and its sticker. */
-export function liftFile(env: NodeJS.ProcessEnv, home: string): string {
-  return join(officeDir(env, home), "lift.json");
-}
-
 /** A folder skills are read from, and the name the card gives it. */
 export interface SkillFolder {
   label: string;
@@ -71,4 +61,12 @@ export function hostSkillFolders(env: NodeJS.ProcessEnv, home: string): SkillFol
 /** A workspace's own skills folders, named as the host's are. */
 export function workspaceSkillFolders(folder: string): SkillFolder[] {
   return SKILL_HOMES.map((label) => ({ label, path: join(folder, label, "skills") }));
+}
+
+export function liftFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "lift.json");
+}
+
+export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "tenure.json");
 }

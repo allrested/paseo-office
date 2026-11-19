@@ -7,6 +7,8 @@ import {
   type OfficeRow,
 } from "../../shared/model.js";
 import type {
+  WorkspacePullRequest,
+  WeatherScene,
   ActivityKind,
   ActivityStep,
   Machine,
@@ -16,6 +18,7 @@ import type {
 import { machineTitle, memoryPercent, memoryTone } from "../../shared/machine-text.js";
 import { relativeLuminance } from "../luminance.js";
 import type {
+  WorldWeather,
   WorldBoardRow,
   WorldBrand,
   WorldColors,
@@ -26,7 +29,7 @@ import type {
 } from "./world-api.js";
 
 /** Desks of each floor plan of the vendored scene. */
-export const PLAN_DESKS = { pro: 12, cozy: 9 } as const;
+export const PLAN_DESKS = { pro: 12, cozy: 9, hq: 44 } as const;
 export type WorldPlan = keyof typeof PLAN_DESKS;
 
 export interface WorldPeople {
@@ -57,17 +60,10 @@ function rank(session: WorldSession): number {
   return session.status === "work" ? 1 : 2;
 }
 
-/** The context window and what the agent cost, each when known; nothing when neither is. */
-function usageOf(agent: OfficeRow["agent"]): Pick<WorldSession, "usage"> {
-  const cost = agent.costUsd === undefined ? {} : { cost: agent.costUsd };
-  if (agent.context === undefined)
-    return agent.costUsd === undefined ? {} : { usage: { ctx: 0, ctxMax: 0, ...cost } };
-  return { usage: { ctx: agent.context.usedTokens, ctxMax: agent.context.maxTokens, ...cost } };
-}
-
 function toSession(
   row: OfficeRow,
   team: string,
+  checks: WorkspacePullRequest["checks"] | undefined,
   born: Readonly<Record<string, string>>,
 ): WorldSession {
   const { agent } = row;
@@ -80,7 +76,12 @@ function toSession(
     name: title,
     title,
     dir: team,
-    git: Object.hasOwn(born, team) ? { repo: team, born: born[team] } : { repo: team },
+    git: {
+      repo: team,
+      ...(checks === "failure" ? { ci: "red" as const } : {}),
+      ...(checks === "success" ? { ci: "green" as const } : {}),
+      ...(Object.hasOwn(born, team) ? { born: born[team] } : {}),
+    },
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
@@ -88,7 +89,15 @@ function toSession(
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: [],
-    ...usageOf(agent),
+    ...(agent.context === undefined && agent.costUsd === undefined
+      ? {}
+      : {
+          usage: {
+            ctx: agent.context?.usedTokens ?? 0,
+            ctxMax: agent.context?.maxTokens ?? 0,
+            ...(agent.costUsd === undefined ? {} : { cost: agent.costUsd }),
+          },
+        }),
   };
 }
 
@@ -101,8 +110,10 @@ export function worldPeople(
   desks: number,
   born: Readonly<Record<string, string>> = {},
 ): WorldPeople {
-  const rows = model.rooms.flatMap((room) => room.rows.map((row) => ({ row, team: room.name })));
-  const all = rows.map(({ row, team }) => toSession(row, team, born));
+  const rows = model.rooms.flatMap((room) =>
+    room.rows.map((row) => ({ row, team: room.name, checks: room.workspace?.pullRequest?.checks })),
+  );
+  const all = rows.map(({ row, team, checks }) => toSession(row, team, checks, born));
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks
@@ -400,4 +411,11 @@ const PRODUCT_NAME = "Paseo";
 /** What the lobby's sign shows: the host's brand, or the product's name over the scene's mark. */
 export function worldBrand(brand: OfficeBrand | null): WorldBrand {
   return { name: brand?.name ?? PRODUCT_NAME, logoUrl: brand?.logoUrl ?? null };
+}
+
+/** What the scene is told of the weather: the host's scene, or none while the host has not said. */
+export function worldWeather(scene: WeatherScene | undefined): WorldWeather {
+  if (scene === undefined || scene.kind === "none") return { kind: "none" };
+  if (scene.kind === "season") return { kind: "season" };
+  return { kind: "reading", code: scene.code, temp: scene.temp, cloud: scene.cloud };
 }

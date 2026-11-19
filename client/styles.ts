@@ -7,7 +7,12 @@ import type { AttentionReason, DotTone } from "../shared/model.js";
 /** A log is read in a fixed-width face, as in the terminal it comes from. */
 const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 
+export const SESSION_RAIL_WIDTH = 336;
+
 export interface OfficeStyles {
+  fullscreenHeader: ViewStyle;
+  sessionRail: ViewStyle;
+  sessionRailTitle: TextStyle;
   screen: ViewStyle;
   header: ViewStyle;
   /** Holds the floor and what lies over its corner. */
@@ -270,6 +275,10 @@ export interface OfficeStyles {
   sceneNote: ViewStyle;
   sceneNoteText: TextStyle;
   /** The Activity panel beside the floor: its top and its feed of cards. */
+  sessionTools: ViewStyle;
+  sessionSearch: TextStyle;
+  sessionFilterPair: ViewStyle;
+  sessionFilter: ViewStyle;
   panelTop: ViewStyle;
   /** The "Live" tag: the running dot and its word. */
   panelLive: ViewStyle;
@@ -512,6 +521,21 @@ export function useOfficeStyles(
     };
     const chatActions: ViewStyle = { flexDirection: "row", gap: 8 };
     return {
+      fullscreenHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingBottom: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      sessionRail: {
+        width: SESSION_RAIL_WIDTH,
+        borderRightWidth: 1,
+        borderRightColor: colors.border,
+      },
+      sessionRailTitle: { color: colors.foreground, fontWeight: "600", padding: 12 },
       screen: { flex: 1, backgroundColor: colors.surface0 },
       // No side padding here: the strip scrolls to the screen edge, and each row pads itself.
       header: { paddingTop: 8, gap: 8 },
@@ -579,8 +603,9 @@ export function useOfficeStyles(
         borderBottomColor: colors.border,
       },
       columnTabs: { ...segments, flexShrink: 1, flexWrap: "wrap" },
-      // At 44 the chosen tab's label pushes the row past 280 px and Chat wraps to a second row.
       columnTab: {
+        flexDirection: "row",
+        gap: 4,
         minHeight: controlHeight,
         minWidth: controlHeight,
         paddingHorizontal: 12,
@@ -1091,6 +1116,10 @@ export function useOfficeStyles(
         pointerEvents: "none",
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
+      sessionTools: { flexDirection: "row", alignItems: "center", gap: 8 },
+      sessionSearch: { ...lineInput, flex: 1, minWidth: 0 },
+      sessionFilterPair: { ...segments, flexGrow: 1, flexBasis: 146 },
+      sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       panelTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 8, gap: 8 },
       panelLive: { flexDirection: "row", alignItems: "center", gap: 8 },
       panelLiveText: { ...small, color: colors.foregroundMuted },

@@ -14,7 +14,13 @@ import type { WorldPlan } from "./adapter.js";
 import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { WorldView } from "./world-view.js";
 
+import type { SceneWords } from "./use-scene-words.js";
+const words = vi.hoisted(() => ({ current: {} as SceneWords }));
+vi.mock("./use-scene-words.js", () => ({ useSceneWords: () => words.current }));
+
 const frame = vi.hoisted(() => ({
+  photoRelease: vi.fn(),
+  setClaudeVersion: vi.fn(),
   focusApp: vi.fn(),
   started: null as WorldStartOptions | null,
   /** Every start, in order, and how many frames were taken out. */
@@ -24,16 +30,25 @@ const frame = vi.hoisted(() => ({
   loaded: { status: "ready", script: "" },
 }));
 
+let receiveStreet: (event: import("../../shared/contracts.js").StreetEvent) => void;
 vi.mock("@getpaseo/plugin/client", () => ({
-  useRpc: () => async () => ({}),
+  useRpc: () => async () => "car models",
+  useSubscription: (
+    contract: { name: string },
+    _input: unknown,
+    onEvent: (event: import("../../shared/contracts.js").StreetEvent) => void,
+  ) => {
+    if (contract.name === "office.street.events") receiveStreet = onEvent;
+    return { status: "live" };
+  },
   useSettings: () => ({ status: "loading" }),
-  useSubscription: () => ({ status: "connecting" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({
   useToast: () => ({ error: () => undefined }),
 }));
 vi.mock("../web-env.web.js", () => ({ readBrand: () => null }));
-vi.mock("./world-loader.js", () => ({
+vi.mock("./world-loader.js", async (original) => ({
+  ...(await original<typeof import("./world-loader.js")>()),
   messageOf: (error: unknown) => String(error),
   sharedWorldLoader: {
     subscribe: () => () => undefined,
@@ -47,6 +62,7 @@ vi.mock("./world-frame.web.js", () => ({
     // Every method does nothing but start; "then" stays absent so the promise resolves to it.
     const api = new Proxy({} as WorldApi, {
       get: (_, key) => {
+        if (key === "photoRelease" || key === "setClaudeVersion") return frame[key];
         if (key === "then") return undefined;
         if (key === "start") {
           return (options: WorldStartOptions) => {
@@ -94,6 +110,7 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  words.current = { status: "ready", language: "en", words: undefined, note: null };
   frame.focusApp.mockClear();
   frame.started = null;
   frame.starts = [];
@@ -116,9 +133,11 @@ function office(
   plan: WorldPlan | null,
   onSelectAgent: (id: string | null) => void = ignore,
   model: OfficeModel = MODEL,
+  streetOn = false,
 ) {
   return (
     <WorldView
+      streetOn={streetOn}
       plan={plan}
       model={model}
       theme={THEME}
@@ -197,6 +216,9 @@ const EMPTY_FLOOR = "No agents on this host yet. One that starts takes a desk he
 test("an empty floor gets its note; a floor with someone on it does not", async () => {
   await startedOffice(ignore);
   expect(container.textContent).toContain(EMPTY_FLOOR);
+  words.current.note = "The language could not be loaded.";
+  await startedOffice(ignore);
+  expect(container.textContent).not.toContain(words.current.note);
   const agent: OfficeAgent = {
     id: "a1",
     title: "Agent a1",
@@ -218,6 +240,7 @@ test("an empty floor gets its note; a floor with someone on it does not", async 
   });
   await startedOffice(ignore, model);
   expect(container.textContent).not.toContain(EMPTY_FLOOR);
+  expect(container.textContent).toContain(words.current.note);
 });
 
 let probed: OfficeStyles | null = null;
@@ -257,4 +280,30 @@ test.each([
 test("the start gives the scene a Sound callback", async () => {
   const options = await startedOffice(ignore);
   expect(typeof options.onSound).toBe("function");
+});
+
+test("changing the street setting starts a fresh scene with the selected assets", async () => {
+  await act(async () => root.render(office("pro", ignore, MODEL, true)));
+  expect(frame.starts.at(-1)?.street).toEqual({ kit: "car models" });
+  receiveStreet({ type: "release", tag: "v3.8.4" });
+  receiveStreet({ type: "claude", reading: null });
+  expect(frame.photoRelease).toHaveBeenCalledWith("v3.8.4");
+  expect(frame.setClaudeVersion).toHaveBeenCalledWith(null);
+  await act(async () => root.render(office("pro", ignore, MODEL, false)));
+  expect(frame.starts.at(-1)).not.toHaveProperty("street");
+  expect(frame.disposed).toBe(1);
+});
+
+test("the web frame waits for words and restarts in each chosen language", async () => {
+  words.current.status = "loading";
+  await act(async () => root.render(office("pro")));
+  expect(frame.starts).toHaveLength(0);
+  expect(container.textContent).toContain("Loading the 3D view...");
+  words.current = { status: "ready", language: "vi", words: '{"dict":{}}', note: null };
+  await act(async () => root.render(office("pro")));
+  expect(frame.started).toMatchObject({ language: "vi", words: '{"dict":{}}' });
+  words.current = { ...words.current, language: "th", words: "{}" };
+  await act(async () => root.render(office("pro")));
+  expect(frame.disposed).toBe(1);
+  expect(frame.starts).toMatchObject([{ language: "vi" }, { language: "th", words: "{}" }]);
 });

@@ -31,20 +31,19 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onOpenIncidents: vi.fn(),
       onBell: vi.fn(),
       onSound: vi.fn(),
-      onLife: vi.fn(),
-      onTenure: vi.fn(),
       onProblem: vi.fn(),
       ...overrides,
     },
   };
 }
 
+const ENGLISH = { language: "en", words: undefined } as const;
 const BRAND = { name: "Paseo", logoUrl: null };
 
 test("a person chosen takes the keyboard; a card closed leaves it", () => {
   const focus = vi.fn();
   const now = latest();
-  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   options.onSelect(null);
   expect(focus).not.toHaveBeenCalled();
   options.onSelect("a1");
@@ -56,20 +55,25 @@ test("a person chosen takes the keyboard; a card closed leaves it", () => {
 test("the bell opens nothing of Paseo's, so the keyboard stays in the office", () => {
   const focus = vi.fn();
   const now = latest();
-  worldStartOptions(now, { focus, brand: BRAND, plan: "pro" }).onBell?.();
+  worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" }).onBell?.();
   expect(now.current.onBell).toHaveBeenCalledTimes(1);
   expect(focus).not.toHaveBeenCalled();
 });
 
 test("onOpen and onResources are given only where Paseo can open them", () => {
-  const without = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
+  const without = worldStartOptions(latest(), {
+    focus: vi.fn(),
+    ...ENGLISH,
+    brand: BRAND,
+    plan: "pro",
+  });
   expect("onOpen" in without).toBe(false);
   expect("onResources" in without).toBe(false);
   const openSession = vi.fn();
   const openResources = vi.fn();
   const focus = vi.fn();
   const now = latest({ onOpenSession: openSession, onOpenResources: openResources });
-  const given = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const given = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   given.onOpen?.("a1");
   given.onResources?.();
   expect(openSession).toHaveBeenCalledWith("a1");
@@ -78,7 +82,12 @@ test("onOpen and onResources are given only where Paseo can open them", () => {
 });
 
 test("the plan, the brand and the colours are the scene's start", () => {
-  const options = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(latest(), {
+    focus: vi.fn(),
+    ...ENGLISH,
+    brand: BRAND,
+    plan: "pro",
+  });
   expect({ plan: options.plan, brand: options.brand, dark: typeof options.dark }).toEqual({
     plan: "pro",
     brand: BRAND,
@@ -87,14 +96,25 @@ test("the plan, the brand and the colours are the scene's start", () => {
 });
 
 test("the scene is started with the plan it is given", () => {
-  const cozy = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "cozy" });
+  const cozy = worldStartOptions(latest(), {
+    focus: vi.fn(),
+    ...ENGLISH,
+    brand: BRAND,
+    plan: "cozy",
+  });
   expect(cozy.plan).toBe("cozy");
 });
 
 test("photo is passed through only when the caller says it", () => {
-  const web = worldStartOptions(latest(), { focus: vi.fn(), brand: BRAND, plan: "pro" });
+  const web = worldStartOptions(latest(), {
+    focus: vi.fn(),
+    ...ENGLISH,
+    brand: BRAND,
+    plan: "pro",
+  });
   const native = worldStartOptions(latest(), {
     focus: vi.fn(),
+    ...ENGLISH,
     brand: BRAND,
     plan: "pro",
     photo: false,
@@ -104,7 +124,7 @@ test("photo is passed through only when the caller says it", () => {
 
 test("a problem the scene reports goes to the latest handler", () => {
   const now = latest();
-  const options = worldStartOptions(now, { focus: vi.fn(), brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(now, { focus: vi.fn(), ...ENGLISH, brand: BRAND, plan: "pro" });
   const later = vi.fn();
   now.current = { ...now.current, onProblem: later };
   options.onProblem("the graphics context was lost");
@@ -114,7 +134,7 @@ test("a problem the scene reports goes to the latest handler", () => {
 test("a press on the scene's Sound button goes to the latest handler, and keeps no focus from the app", () => {
   const now = latest();
   const focus = vi.fn();
-  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   const later = vi.fn();
   now.current = { ...now.current, onSound: later };
   options.onSound?.(true);
@@ -122,10 +142,29 @@ test("a press on the scene's Sound button goes to the latest handler, and keeps 
   expect(focus).not.toHaveBeenCalled();
 });
 
+test("passes the street kit only for an enabled device", () => {
+  const extras = { ...ENGLISH, focus: vi.fn(), brand: BRAND, plan: "pro" as const };
+  expect(worldStartOptions(latest(), extras)).not.toHaveProperty("street");
+  expect(worldStartOptions(latest({ street: { kit: "{}" } }), extras).street).toEqual({
+    kit: "{}",
+  });
+});
+
+test("only a translated scene receives a language and words", () => {
+  const extras = { focus: vi.fn(), brand: BRAND, plan: "pro" as const };
+  const english = worldStartOptions(latest(), { ...extras, ...ENGLISH });
+  expect(english).not.toHaveProperty("language");
+  expect(english).not.toHaveProperty("words");
+  expect(worldStartOptions(latest(), { ...extras, language: "vi", words: "{}" })).toMatchObject({
+    language: "vi",
+    words: "{}",
+  });
+});
+
 test("a moment for the team chat goes to the latest handler, and keeps no focus from the app", () => {
   const now = latest();
   const focus = vi.fn();
-  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   const said = vi.fn();
   now.current = { ...now.current, onLife: said };
   options.onLife?.("parcel", { id: "a1" });
@@ -136,7 +175,7 @@ test("a moment for the team chat goes to the latest handler, and keeps no focus 
 test("a tenure write goes to the latest handler, and keeps no focus from the app", () => {
   const now = latest();
   const focus = vi.fn();
-  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
   const told = vi.fn();
   now.current = { ...now.current, onTenure: told };
   options.onTenure?.({ op: "farewell", name: "api" });

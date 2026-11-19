@@ -1,6 +1,6 @@
 // The stand-in of my-office's group chat (ui/group-chat.js): the office's people's moments go to the
 // host as a kind and a few words, once per period, as upstream's chatLife says them.
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 // @ts-expect-error vendored JavaScript has no declarations
 import { host } from "../../vendor/my-office/src/office/paseo-host.js";
 // @ts-expect-error vendored JavaScript has no declarations
@@ -14,8 +14,13 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 10, 19, 10));
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 test("a moment goes to the host as its kind and words, with no picture and nothing that is not a word", () => {
   chatLife("tea", { photo: chatPhoto({}), id: "a1", monday: false, n: 3, skip: undefined });
+  expect(chatPhoto({})).toBeNull();
   expect(said).toEqual([["tea", { id: "a1", monday: "false", n: "3" }]]);
 });
 

@@ -38,7 +38,6 @@ function input(overrides: Partial<WorldFeedInput> = {}): WorldFeedInput {
     incidents: undefined,
     sound: null,
     plan: "pro",
-    life: null,
     ...overrides,
   };
 }
@@ -190,6 +189,45 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   );
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
+  const headquarters = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={headquarters.api} feed={input({ model: crowd(45), plan: "hq" })} />),
+  );
+  expect(seated(headquarters.calls)).toBe(44);
+  expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
+});
+
+test("weather follows the host after seating the people", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input()} />));
+  expect(calls.indexOf('setWeather:[{"kind":"none"}]')).toBeGreaterThan(
+    calls.indexOf("setSessions:[[]]"),
+  );
+  const weather = { kind: "reading" as const, code: 63, temp: 14, cloud: 0.9 };
+  await act(async () => root.render(<Probe api={api} feed={input({ weather })} />));
+  expect(calls).toContain("setWeather:" + JSON.stringify([weather]));
+});
+
+test("life reaches each started scene once across equivalent lift readings", async () => {
+  const { api, calls } = fakeScene();
+  const life = {
+    type: "life" as const,
+    born: {},
+    tenure: { days: 30, choices: [30], projects: [] },
+    lift: { left: 1, total: 2, newBuild: false, sticker: null },
+  };
+  await act(async () => root.render(<Probe api={api} feed={input({ life })} />));
+  await act(async () =>
+    root.render(<Probe api={api} feed={input({ life: { ...life, lift: { ...life.lift } } })} />),
+  );
+  expect(calls.filter((call) => call.startsWith("setTenure:"))).toHaveLength(1);
+  expect(calls.filter((call) => call.startsWith("setLiftService:"))).toHaveLength(1);
+});
+
+test("the active floor explains a failed street kit", async () => {
+  const { api } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input({ streetNote: true })} />));
+  expect(note).toContain("The street's cars could not be loaded.");
 });
 
 const LIFE = {
@@ -228,4 +266,17 @@ test("a person carries their team's repository's first day once the server has r
   await act(async () => root.render(<Probe api={api} feed={input({ model, life })} />));
   const sessions = calls.find((call) => call.startsWith("setSessions:")) ?? "";
   expect(sessions).toContain('"git":{"repo":"shop-api","born":"2020-02-03"}');
+});
+
+test("the active lift servicing ends when the host supplies its completed snapshot", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input({ life: LIFE })} />));
+  const done = { ...LIFE.lift, left: 0 };
+  await act(async () =>
+    root.render(<Probe api={api} feed={input({ life: { ...LIFE, lift: done } })} />),
+  );
+  expect(calls.filter((call) => call.startsWith("setLiftService:"))).toEqual([
+    "setLiftService:" + JSON.stringify([LIFE.lift]),
+    "setLiftService:" + JSON.stringify([done]),
+  ]);
 });

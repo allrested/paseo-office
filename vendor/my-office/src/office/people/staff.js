@@ -1,5 +1,6 @@
+// PASEO: the courier carries a plain parcel mark.
 // PASEO: names of real shops, apps and products are made-up ones (scripts/genericise-street.mjs).
-// People who work here but aren't sessions: the receptionist, the evening cleaner, a Bazaarly courier with a parcel.
+// People who work here but aren't sessions: the receptionist, the evening cleaner, a courier with a parcel.
 import * as THREE from '../../../three/three.module.min.js';
 import { state } from '../core/state.js';
 import { PRO, officeNow, rand, reduceMotion, replay, short } from '../core/env.js';
@@ -19,7 +20,7 @@ import { t as tr } from '../../i18n/index.js';
 
 /* - The receptionist (company floor) stands behind the lobby counter from 7:45 to 18:15 on working days (src/shared/
      workdays.js: not at the weekend nor on a holiday; on a make-up Saturday, yes), up and down by the lift.
-   - A Bazaarly courier comes twice a day (late morning, mid afternoon) with a parcel for someone who is resting. On the
+   - A courier comes twice a day (late morning, mid afternoon) with a parcel for someone who is resting. On the
      company floor he leaves it on the counter and the receptionist calls out the name; in the small office he calls
      from the door. The one it is for walks over, takes the box back to the desk and opens it.
    - At 18:30 the cleaner comes up with her trolley, mops the main aisles one by one (a yellow "wet floor" sign at the
@@ -50,7 +51,7 @@ function depart(p, then) {
   });
 }
 
-/* ---------- the parcel: a brown carton, orange Bazaarly tape over the top, the label on the front ---------- */
+/* ---------- the parcel: a brown carton, orange tape over the top, the label on the front ---------- */
 let boxGeo, boxM, tapeM, labelM;
 function parcel() {
   const g = new THREE.Group(); g.visible = false; g.userData.dynamic = true;
@@ -303,7 +304,7 @@ export function setup() {
   boxM = mat('#C9955B', { roughness: 0.85 }); tapeM = mat('#EE4D2D', { roughness: 0.6 });
   labelM = new THREE.MeshBasicMaterial({ map: canvasTex(128, 128, (g, w, h) => {
     g.fillStyle = '#EE4D2D'; g.fillRect(0, 0, w, h);
-    g.save(); g.translate(w / 2, h / 2); g.scale(4, 4); g.translate(-12, -12); g.fillStyle = '#FFFFFF'; g.fillRect(3, 5, 18, 14); g.fillStyle = '#EE4D2D'; g.fillRect(10.5, 5, 3, 14); g.restore();   // PASEO: a plain box mark, not a company's
+    g.save(); g.translate(w / 2, h / 2); g.scale(4, 4); g.translate(-12, -12); g.fillStyle = '#FFFFFF'; g.fillRect(4, 5, 16, 14); g.clearRect(11, 5, 2, 14); g.restore();
   }) });
   courierBox = parcel(); homeBox = parcel(); counterBox = parcel(); scene.add(counterBox);
   buildCleaningKit();

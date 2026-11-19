@@ -10,6 +10,14 @@ import { WORLD_API_VERSION } from "./world-api.js";
 import { openWorldFrame } from "./world-frame.web.js";
 
 const h = vi.hoisted(() => ({
+  weather: vi.fn(),
+  photoRelease: vi.fn(),
+  lookForUpgrade: vi.fn(),
+  setTenure: vi.fn(),
+  setLiftService: vi.fn(),
+  onCommit: vi.fn(),
+  onPush: vi.fn(),
+  postAction: vi.fn(),
   sessions: new Map<string, Record<string, unknown>>(),
   workers: new Map<string, Record<string, unknown>>(),
   applauded: [] as string[],
@@ -24,10 +32,6 @@ const h = vi.hoisted(() => ({
   closePlace: vi.fn(),
   sound: [] as boolean[],
   soundAsked: [] as boolean[],
-  setTenure: vi.fn(),
-  setLiftService: vi.fn(),
-  tenureAsked: [] as unknown[],
-  lines: [] as unknown[][],
   /** How many times the wall clock's own act ran (upstream's cycleTime). */
   clockCycled: 0,
   /** What the camera bar's autoCam() answers: whether the camera may glide now. */
@@ -36,6 +40,27 @@ const h = vi.hoisted(() => ({
   panned: [] as string[],
 }));
 
+vi.mock("../../vendor/my-office/src/office/life/weather.js", () => ({ setWeather: h.weather }));
+vi.mock("../../vendor/my-office/src/office/life/post.js", () => ({
+  onCommit: h.onCommit,
+  onPush: h.onPush,
+  postAction: h.postAction,
+}));
+vi.mock("../../vendor/my-office/src/office/people/photobooth.js", () => ({
+  photoRelease: h.photoRelease,
+}));
+vi.mock("../../vendor/my-office/src/office/people/outings.js", () => ({
+  lookForUpgrade: h.lookForUpgrade,
+}));
+vi.mock("../../vendor/my-office/src/office/people/farewell.js", () => ({ setTenure: h.setTenure }));
+vi.mock("../../vendor/my-office/src/office/life/lift-service.js", () => ({
+  setLiftService: h.setLiftService,
+}));
+vi.mock("../../vendor/my-office/src/office/ui/activity.js", () => ({
+  everyFrame() {},
+  queueUi() {},
+  toast() {},
+}));
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
   MODULES: [
     [
@@ -136,12 +161,6 @@ vi.mock("../../vendor/my-office/src/office/world/props/shredder.js", () => ({
 vi.mock("../../vendor/my-office/src/office/life/tests.js", () => ({ clearRun() {}, onTest() {} }));
 vi.mock("../../vendor/my-office/src/office/life/your-turn.js", () => ({ onTurnDone() {} }));
 // The sounds need a page's audio: the test hears which one played.
-vi.mock("../../vendor/my-office/src/office/people/farewell.js", () => ({
-  setTenure: h.setTenure,
-}));
-vi.mock("../../vendor/my-office/src/office/life/lift-service.js", () => ({
-  setLiftService: h.setLiftService,
-}));
 vi.mock("../../vendor/my-office/src/office/audio/sfx.js", () => ({
   sfx: { play: (name: string) => h.played.push(name), set: (on: boolean) => h.sound.push(on) },
   setup() {},
@@ -162,12 +181,15 @@ interface World {
   setSessions(list: object[]): void;
   event(e: { sess: string; type: string }): void;
   setIncidents(list: object[]): void;
+  photoRelease(tag: string): void;
+  setClaudeVersion(reading: { version: string; at: number } | null): void;
+  setTenure(data: object): void;
+  setLiftService(data: object): void;
   setMachine(machine: object | null): void;
   meet(): void;
   gather(): void;
   setSound(on: boolean): void;
-  setTenure(data: object | null): void;
-  setLiftService(info: object | null): void;
+  setWeather(scene: object): void;
 }
 const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
 // A page with Web Audio whose context runs: the entry's probe finds it ready, and the switch can be
@@ -185,14 +207,20 @@ Object.assign(window, {
     }
   },
 });
+// @ts-expect-error vendored JavaScript has no declarations
+const { lang, locale, t: translate } = await import("../../vendor/my-office/src/i18n/index.js");
 world.start({
+  language: "vi",
+  words: JSON.stringify({ dict: { time: { day: { other: "{n} ngày" } } } }),
   brand: { name: "Acme" },
   onSound: (on: boolean) => h.soundAsked.push(on),
-  onTenure: (op: unknown) => h.tenureAsked.push(op),
-  onLife: (kind: string, vars: object) => h.lines.push([kind, vars]),
   onIncidents: () => {
     h.incidentsOpened += 1;
   },
+});
+test("the language is set before the scene builds its page", () => {
+  expect([lang(), locale(), document.documentElement.lang]).toEqual(["vi", "vi-VN", "vi"]);
+  expect(translate("time.day", { n: 2 })).toBe("2 ngày");
 });
 const atStart = [...h.sound];
 
@@ -494,11 +522,13 @@ test("the wall screen's tooltip says what it opens", async () => {
   expect(without.get("tv")?.hint).toBe("Open the Host panel");
 });
 
-test("the frame's page lets the office go full screen", () => {
+test("the frame leaves fullscreen to the office surface", () => {
   const container = document.createElement("div");
   const frame = openWorldFrame({ container, script: "", title: "Office in 3D" });
 
-  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe("fullscreen; autoplay");
+  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe(
+    "fullscreen 'none'; autoplay",
+  );
   frame.dispose();
 });
 
@@ -588,7 +618,7 @@ test("without onOpen the scene has nothing to open a session with", async () => 
   expect(fresh.open).toBeNull();
 });
 
-test("the plan the host names is the scene's floor; headquarters is not offered", async () => {
+test("the plan the host names is the scene's floor", async () => {
   const planOf = async (options: object) => {
     await startPage(options);
     // @ts-expect-error vendored JavaScript has no declarations
@@ -597,7 +627,7 @@ test("the plan the host names is the scene's floor; headquarters is not offered"
   };
   expect(await planOf({ plan: "cozy" })).toBe("cozy");
   expect(await planOf({ plan: "pro" })).toBe("pro");
-  expect(await planOf({ plan: "hq" })).toBe("pro");
+  expect(await planOf({ plan: "hq" })).toBe("hq");
   expect(await planOf({})).toBe("pro");
 });
 
@@ -706,27 +736,56 @@ test("no glide when the camera may not move, for a newcomer, or for a change tha
   expect(h.panned).toEqual([]);
 });
 
-test("the host's tenure list and the lift's servicing reach the scenes that read them", () => {
-  const tenure = { days: 30, choices: [30], projects: [] };
-  world.setTenure(tenure);
-  world.setTenure(null);
-  world.setLiftService({ left: 1000, total: 180000, newBuild: false, sticker: null });
-
-  expect(h.setTenure.mock.calls).toEqual([[tenure]]);
-  expect(h.setLiftService.mock.calls).toEqual([
-    [{ left: 1000, total: 180000, newBuild: false, sticker: null }],
-  ]);
+test("identical host readings draw once and clearing the sky draws none", () => {
+  const rain = { kind: "reading", code: 63, temp: 14, cloud: 0.9 };
+  world.setWeather(rain);
+  world.setWeather({ ...rain });
+  world.setWeather({ kind: "none" });
+  expect(h.weather.mock.calls).toEqual([[{ code: 63, temp: 14, cloud: 0.9 }], [null]]);
 });
 
-test("the scenes tell the host a farewell, a promotion and a chat line, and nothing else", () => {
-  host.tenure({ op: "farewell", name: "api" });
-  host.tenure({ op: "official", name: "web" });
-  host.tenure({ op: "config", days: 0 });
-  host.life("parcel", { id: "a1" });
+test("the host feeds the daily-life scenes", () => {
+  world.setTenure({ days: 30, projects: [] });
+  world.setLiftService({ left: 1 });
+  expect(h.setTenure).toHaveBeenCalledWith({ days: 30, projects: [] });
+  expect(h.setLiftService).toHaveBeenCalledWith({ left: 1 });
+});
 
-  expect(h.tenureAsked).toEqual([
-    { op: "farewell", name: "api" },
-    { op: "official", name: "web" },
+test("commit and push events feed the office post", () => {
+  world.setSessions([session("post")]);
+  world.event({ sess: "post", type: "commit" });
+  world.event({ sess: "post", type: "push" });
+  expect(h.onCommit).toHaveBeenCalled();
+  expect(h.onPush).toHaveBeenCalled();
+});
+
+test("the street entry delivers the tag to the photo booth and the CLI reading to outings", async () => {
+  await startPage({ street: { kit: null } });
+  const street = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { host: streetHost } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  street.photoRelease("v2.4.0");
+  street.setClaudeVersion({ version: "2.2.0", at: 123 });
+  expect(h.photoRelease).toHaveBeenCalledWith("v2.4.0");
+  expect(streetHost.claudeVersion()).toEqual({ version: "2.2.0", at: 123 });
+  expect(h.lookForUpgrade).toHaveBeenCalled();
+});
+
+test("only a farewell and promotion are sent to the host tenure ledger", async () => {
+  const onTenure = vi.fn(),
+    onLife = vi.fn();
+  await startPage({ onTenure, onLife });
+  // @ts-expect-error vendored JavaScript has no declarations
+  const { host: current } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  current.tenure({ op: "farewell", name: "api" });
+  current.tenure({ op: "official", name: "web", other: true });
+  current.tenure({ op: "config", days: 0 });
+  current.tenure({ op: "official", name: "x".repeat(300) });
+  current.life("parcel", { id: "a1" });
+  expect(onTenure.mock.calls).toEqual([
+    [{ op: "farewell", name: "api" }],
+    [{ op: "official", name: "web" }],
+    [{ op: "official", name: "x".repeat(200) }],
   ]);
-  expect(h.lines).toEqual([["parcel", { id: "a1" }]]);
+  expect(onLife).toHaveBeenCalledWith("parcel", { id: "a1" });
 });

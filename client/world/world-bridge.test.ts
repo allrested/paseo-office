@@ -41,12 +41,14 @@ test("the optional calls and the theme and the board rows go too", () => {
   api.setTheme({ dark: true, colors: {} as never });
   api.setBoardRows([]);
   api.setIncidents?.([]);
+  api.setWeather?.({ kind: "season" });
   api.meet?.();
   api.gather?.();
   expect(posted.map((message) => message.call)).toEqual([
     "setTheme",
     "setBoardRows",
     "setIncidents",
+    "setWeather",
     "meet",
     "gather",
   ]);
@@ -68,7 +70,10 @@ test("a callback the page posts calls the real one with its arguments", () => {
   const { api, receive } = bridge();
   const onSelect = vi.fn();
   const onBoard = vi.fn();
-  api.start(options({ onSelect, onBoard }));
+  const onLife = vi.fn();
+  api.start(options({ onSelect, onBoard, onLife }));
+  receive(JSON.stringify({ callback: "onLife", args: ["stairs", { id: "a1" }] }));
+  expect(onLife).toHaveBeenCalledWith("stairs", { id: "a1" });
   receive(JSON.stringify({ callback: "onSelect", args: ["a1"] }));
   receive(JSON.stringify({ callback: "onBoard", args: [null] }));
   expect(onSelect).toHaveBeenCalledWith("a1");
@@ -124,6 +129,20 @@ test("setSound goes to the page as a call, and the scene's onSound comes back as
   expect(started.callbacks).toContain("onSound");
   receive(JSON.stringify({ callback: "onSound", args: [true] }));
   expect(onSound).toHaveBeenCalledWith(true);
+});
+
+test("start sends the requested language and its JSON to the WebView", () => {
+  const { api, posted } = bridge();
+  const language = { language: "vi" as const, words: '{"dict":{}}' };
+  api.start(options(language));
+  expect(posted).toMatchObject([{ call: "start", args: [language] }]);
+});
+
+test("posts a full-sized street kit intact as start data", () => {
+  const kit = "x".repeat(430_000);
+  const { api, posted } = bridge();
+  api.start(options({ street: { kit } }));
+  expect(posted[0].args[0]).toMatchObject({ street: { kit } });
 });
 
 test("the tenure list and the lift go to the page as calls, and the scenes' lines come back as callbacks", () => {

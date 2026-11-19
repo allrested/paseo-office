@@ -53,6 +53,8 @@ export interface ChatEngineContext {
 }
 
 export interface SayOptions {
+  pin?: boolean;
+  answer?: { key: string; chance?: number }[];
   now?: boolean;
   delay?: number;
   long?: boolean;
@@ -62,8 +64,6 @@ export interface SayOptions {
   reacts?: number;
   key?: string;
   tag?: string;
-  pin?: boolean;
-  answer?: { key: string; chance?: number }[];
 }
 
 export interface ChatEngine {

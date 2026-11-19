@@ -4,10 +4,12 @@ import {
   JIRA_KEY,
   officeDeviceSettings,
   officeHostSettings,
+  officeLanguageSettings,
   parseKeys,
   SENTRY_SLUG,
 } from "./settings.js";
 
+const WEATHER_DEFAULTS = { weatherMode: "off", weatherManual: "season", weatherUrl: "" };
 const INCIDENT_DEFAULTS = {
   jiraProjects: "",
   sentryOrg: "",
@@ -29,7 +31,7 @@ async function upgraded(stored: Record<string, unknown>, fromVersion: number): P
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 
 /** A document from before the floor plan was a setting draws the company floor, as its scene always did. */
-const COMPANY = { floorPlan: "pro" };
+const COMPANY = { floorPlan: "pro", ...WEATHER_DEFAULTS };
 
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
   expect(await upgraded({ agentTools: false }, 1)).toEqual({
@@ -62,7 +64,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(4);
+  expect(officeHostSettings.version).toBe(5);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -81,8 +83,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  // An additive field with a default: no version bump.
-  expect(officeHostSettings.version).toBe(4);
+  expect(officeHostSettings.version).toBe(5);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -93,7 +94,7 @@ test("a host with no settings draws the company floor", () => {
 test("the cozy room is kept, and only these plans are offered yet", async () => {
   expect(hostIssues({ floorPlan: "cozy" })).toEqual([]);
   expect(await upgraded({ floorPlan: "cozy" }, 4)).toMatchObject({ floorPlan: "cozy" });
-  expect(FLOOR_PLANS).toEqual(["pro", "cozy"]);
+  expect(FLOOR_PLANS).toEqual(["pro", "cozy", "hq"]);
 });
 
 test("a plan this build does not know reads as the company floor and the rest is kept", async () => {
@@ -107,7 +108,7 @@ test("a plan this build does not know reads as the company floor and the rest is
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  for (const floorPlan of ["hq", "", 3, null]) {
+  for (const floorPlan of ["future-plan", "", 3, null]) {
     expect(await upgraded({ ...stored, floorPlan }, 4)).toEqual({ ...stored, ...COMPANY });
   }
 });
@@ -219,4 +220,56 @@ test("a device document without sound has it off, and one with it keeps it", asy
   expect(officeDeviceSettings.version).toBe(2);
   expect(officeDeviceSettings.schema.parse({ threeD: true })).toMatchObject({ sound: false });
   expect(officeDeviceSettings.schema.parse({ sound: true })).toMatchObject({ sound: true });
+});
+
+test("a host that never set the weather has it off, following the season, with no address", async () => {
+  expect(officeHostSettings.schema.parse({})).toMatchObject(WEATHER_DEFAULTS);
+  // A document of the version before this one (read its number in settings.ts) parses to the same.
+  expect(await upgraded({ agentTools: true }, officeHostSettings.version - 1)).toMatchObject(
+    WEATHER_DEFAULTS,
+  );
+});
+
+test("the weather mode and the hand-picked choice are from their lists", () => {
+  expect(hostIssues({ weatherMode: "radar" })).not.toEqual([]);
+  expect(hostIssues({ weatherManual: "snow" })).not.toEqual([]);
+  expect(hostIssues({ weatherMode: "service", weatherManual: "storm" })).toEqual([]);
+});
+
+test("the weather address is empty, https, or http on this machine", () => {
+  const refused = ["weatherUrl: not an https address (plain http only on this machine)"];
+  expect(hostIssues({ weatherUrl: "" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "https://weather.example.test/v1/forecast?x=1" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://127.0.0.1:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://localhost:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://[::1]:9000/weather.json" })).toEqual([]);
+  expect(hostIssues({ weatherUrl: "http://weather.example.test/x" })).toEqual(refused);
+  expect(hostIssues({ weatherUrl: "weather.example.test" })).toEqual(refused);
+  expect(hostIssues({ weatherUrl: "ftp://127.0.0.1/x" })).toEqual(refused);
+});
+
+test("the weather address is checked in every mode, and its refusal does not hold it", () => {
+  const secret = "http://weather.example.test/x?apikey=SECRET";
+  for (const weatherMode of ["off", "manual", "service"]) {
+    const issues = hostIssues({ weatherMode, weatherUrl: secret });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).not.toContain("SECRET");
+    expect(issues[0]).not.toContain("weather.example.test");
+  }
+});
+
+test("the language choice is a separate device document with Automatic as its default", () => {
+  const setting = officeLanguageSettings;
+  expect(setting.id).toBe("office-language");
+  expect(setting.scope).toBe("device");
+  expect(setting.schema.parse({})).toEqual({ choice: "auto" });
+  for (const choice of ["auto", "en", "vi", "th", "id"])
+    expect(setting.schema.parse({ choice })).toEqual({ choice });
+  for (const choice of ["fr", 1]) expect(setting.schema.safeParse({ choice }).success).toBe(false);
+});
+
+test("the street is optional and preserves either explicit device choice", () => {
+  expect(officeDeviceSettings.schema.parse({})).not.toHaveProperty("street");
+  for (const street of [false, true])
+    expect(officeDeviceSettings.schema.parse({ street }).street).toBe(street);
 });

@@ -26,23 +26,135 @@ export interface LifeLine {
 }
 
 type Vars = Readonly<Record<string, string>>;
-interface Row {
-  /** The staff member who says it; the person the scene names ("person": nobody else); or that person, else someone at rest, else reception ("anyone"). */
+interface Row extends Omit<LifeLine["options"], "key"> {
   from: "hr" | "reception" | "person" | "anyone";
-  /** The words, under chat.life. */
   key: string | ((vars: Vars) => string);
-  react?: string[];
-  reacts?: number;
-  pin?: boolean;
-  /** Lines others may answer with, under chat.reply. */
-  answer?: { key: string; chance?: number }[];
-  /** A line under chat.reply said after a delay: by the person the scene names, or by `who`. */
+  /** The words' key lives under this prefix (default chat.life.). */
+  prefix?: string;
   extra?: { from: "person" | "who"; key: string; delay: number };
 }
 
 const ask = (key: string, ...chances: number[]) => chances.map((chance) => ({ key, chance }));
 
 const ROWS: Readonly<Record<string, Row>> = {
+  lunchOrder: {
+    from: "reception",
+    key: "lunchOrder",
+    extra: { from: "person", key: "chat.reply.parcelGot", delay: 4000 },
+  },
+  store: { from: "person", key: "store", answer: ask("storeAsk", 0.7) },
+  plateau: {
+    from: "person",
+    key: (v) => (v.why === "morning" ? "plateauMorning" : "plateauCoffee"),
+    react: ["❤️", "👍"],
+    reacts: 2,
+    answer: ask("plateauAsk", 0.8),
+  },
+  handset: {
+    from: "anyone",
+    key: "handset",
+    react: ["😮", "❤️", "😆"],
+    reacts: 4,
+    answer: ask("handsetAsk", 0.9, 0.5),
+  },
+  frosty: {
+    from: "person",
+    key: (v) => (v.why === "treat" ? "frostyTreat" : "frostyHot"),
+    react: ["❤️", "😆"],
+    reacts: 3,
+    answer: ask("frostyAsk", 0.9, 0.5),
+  },
+  jadetea: {
+    from: "person",
+    key: "jadeteaTea",
+    react: ["❤️", "👍"],
+    reacts: 2,
+    answer: ask("jadeteaAsk", 0.8, 0.4),
+  },
+  navycafe: {
+    from: "person",
+    key: (v) => (v.why === "checkin" ? "navycafeCheckin" : "navycafeTea"),
+    react: ["❤️", "😆", "😮"],
+    reacts: 4,
+    answer: ask("navycafeAsk", 0.9, 0.5),
+  },
+  harbor: {
+    from: "person",
+    key: "harborHeadache",
+    react: ["😭", "❤️"],
+    reacts: 3,
+    answer: ask("harborAsk", 0.8),
+  },
+  olivecafe: {
+    from: "person",
+    key: (v) => (v.why === "olivecafeWeekend" ? "olivecafeWeekend" : "olivecafe"),
+    react: ["❤️", "😋"],
+    reacts: 3,
+    answer: ask("olivecafeAsk", 0.9, 0.5),
+  },
+  payday: {
+    from: "anyone",
+    key: "payday",
+    react: ["💸", "😆", "❤️"],
+    reacts: 5,
+    answer: ask("paydayAsk", 0.9, 0.6),
+  },
+  atm: { from: "person", key: "atm", answer: ask("atmAsk", 0.5) },
+  com: {
+    from: "anyone",
+    key: (v) => (v.friday === "true" ? "comFriday" : "com"),
+    react: ["😋", "👍"],
+    reacts: 3,
+    answer: ask("comAsk", 0.9, 0.6),
+  },
+  pickleAsk: {
+    from: "anyone",
+    key: "pickleAsk",
+    react: ["🏓", "👍", "😆"],
+    reacts: 4,
+    answer: ask("pickleAsk", 0.95, 0.8, 0.5),
+  },
+  pickleDone: {
+    from: "person",
+    key: "pickleDone",
+    react: ["🏓", "😆", "❤️"],
+    reacts: 4,
+    answer: ask("pickleDone", 0.9, 0.6),
+  },
+  photoGo: {
+    from: "anyone",
+    key: "photoGo",
+    react: ["📸", "🎉", "❤️"],
+    reacts: 4,
+    answer: ask("photoGo", 0.9, 0.5),
+  },
+  photoStrip: {
+    from: "person",
+    key: "photoStrip",
+    react: ["😆", "❤️", "📸"],
+    reacts: 5,
+    answer: ask("photoStrip", 0.9, 0.6),
+  },
+  photoQueue: { from: "person", key: "photoQueue", react: ["😭", "😆"], reacts: 3 },
+  evLow: {
+    from: "person",
+    key: "evLow",
+    react: ["🔋", "⚡"],
+    reacts: 2,
+    answer: ask("evLow", 0.6),
+  },
+  evDone: {
+    from: "person",
+    key: "evDone",
+    react: ["⚡", "👍"],
+    reacts: 2,
+    answer: ask("evDone", 0.4),
+  },
+  nhauInvite: { from: "person", key: "nhauInvite" },
+  nhauYes: { from: "person", key: "nhauYes" },
+  nhauCheers: { from: "person", key: "nhauCheers" },
+  nhauNoDrive: { from: "person", key: "nhauNoDrive" },
+  nhauRide: { from: "person", key: "nhauRide" },
   standup: {
     from: "hr",
     key: "standup",
@@ -56,7 +168,7 @@ const ROWS: Readonly<Record<string, Row>> = {
   parcel: {
     from: "reception",
     key: "parcel",
-    extra: { from: "person", key: "parcelGot", delay: 4500 },
+    extra: { from: "person", key: "chat.reply.parcelGot", delay: 4500 },
   },
   tea: {
     from: "anyone",
@@ -88,6 +200,7 @@ const ROWS: Readonly<Record<string, Row>> = {
     reacts: 5,
     answer: [{ key: "deploy", chance: 0.7 }],
   },
+  bye: { from: "person", key: "chat.work.bye", prefix: "", answer: [{ key: "bye", chance: 0.6 }] },
   official: {
     from: "hr",
     key: "official",
@@ -179,62 +292,39 @@ const ROWS: Readonly<Record<string, Row>> = {
     key: (v) => `duty_${v.chore}`,
     react: ["😤", "😆", "😭"],
     reacts: 3,
-    extra: { from: "who", key: "dutySorry", delay: 5000 },
+    extra: { from: "who", key: "chat.reply.dutySorry", delay: 5000 },
   },
 };
 
 export const LIFE_KINDS: readonly string[] = Object.keys(ROWS);
 
-const EVERY_MS = 20 * 60_000;
-
-/** Who says it: a staff key, or a person's id; null when the row needs a person the server does not know. */
-function senderOf(row: Row, id: string, ctx: LifeContext): string | null {
-  if (row.from === "hr" || row.from === "reception") return row.from;
-  const known = id !== "" && ctx.name(id) !== null ? id : null;
-  if (row.from === "person") return known;
-  const pool = ctx.resting();
-  return known ?? pool[Math.floor(Math.random() * pool.length)] ?? "reception";
+function sender(role: Row["from"], id: string, ctx: LifeContext): string | null {
+  if (role === "hr" || role === "reception") return role;
+  const person = id && ctx.name(id) !== null ? id : null;
+  if (role === "person" || person !== null) return person;
+  const resting = ctx.resting();
+  return resting[Math.floor(Math.random() * resting.length)] ?? "reception";
 }
 
-function optionsOf(
-  row: Row,
-  kind: string,
-  id: string,
-  vars: Vars,
-  now: number,
-): LifeLine["options"] {
-  const every = Number(vars.every) > 0 ? Number(vars.every) : EVERY_MS;
-  // Upstream's key: two pages telling the same moment in one period make one message.
-  const options: LifeLine["options"] = { key: `life:${kind}:${id}:${Math.floor(now / every)}` };
-  if (row.pin) options.pin = true;
-  if (row.react) options.react = row.react;
-  if (row.reacts) options.reacts = row.reacts;
-  if (row.answer) options.answer = row.answer;
-  return options;
-}
-
-function extraOf(row: Row, id: string, vars: Vars, ctx: LifeContext): LifeLine["extra"] {
-  if (row.extra === undefined) return undefined;
-  const to = row.extra.from === "who" ? (vars.who ?? "") : id;
-  if (to === "" || ctx.name(to) === null) return undefined;
-  return { from: to, key: `chat.reply.${row.extra.key}`, delay: row.extra.delay };
-}
-
-/** The line a kind of moment says, or null when it has no row or nobody to say it. */
+/** The office chooses the words, sender and a period key shared by all devices. */
 export function lifeLine(kind: string, vars: Vars, ctx: LifeContext): LifeLine | null {
   const row = Object.hasOwn(ROWS, kind) ? ROWS[kind] : undefined;
-  if (row === undefined) return null;
+  if (!row) return null;
+  const { from: role, key, prefix = "chat.life.", extra, ...options } = row;
   const id = vars.id ?? "";
-  const from = senderOf(row, id, ctx);
+  const from = sender(role, id, ctx);
   if (from === null) return null;
-  const words = typeof row.key === "function" ? row.key(vars) : row.key;
+  const every = Number(vars.every) > 0 ? Number(vars.every) : 20 * 60_000;
   const line: LifeLine = {
     from,
-    key: `chat.life.${words}`,
-    vars: { ...vars, name: vars.name ?? (id === "" ? "" : (ctx.name(id) ?? "")) },
-    options: optionsOf(row, kind, id, vars, ctx.now),
+    key: prefix + (typeof key === "function" ? key(vars) : key),
+    vars: { ...vars, name: vars.name ?? ctx.name(id) ?? "" },
+    options: { ...options, key: `life:${kind}:${id}:${Math.floor(ctx.now / every)}` },
   };
-  const extra = extraOf(row, id, vars, ctx);
-  if (extra !== undefined) line.extra = extra;
+  if (kind === "com" && vars.friday === "true") line.options.answer = ask("bunDauAsk", 0.9, 0.6);
+  if (extra) {
+    const to = extra.from === "who" ? vars.who : id;
+    if (to && ctx.name(to) !== null) line.extra = { ...extra, from: to };
+  }
   return line;
 }

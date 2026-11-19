@@ -52,7 +52,7 @@ export function blocked(x, z, r = 0.2) {
 }
 // PASEO: the floor's bounds, which ui/camera-bar.js fits the camera to.
 /** The floor people walk on, in the scene's units. */
-export const floorBounds = () => (PRO ? { x0: -7.85, x1: 15.3, z0: -7.85, z1: 11.3 } : { x0: -7.85, x1: 11.7, z0: -5.85, z1: 10.3 });
+export const floorBounds = () => HQ ? { x0: -7.85, x1: 15.3, z0: -7.85, z1: 28.3 } : PRO ? { x0: -7.85, x1: 15.3, z0: -7.85, z1: 11.3 } : { x0: -7.85, x1: 11.7, z0: -5.85, z1: 10.3 };
 export function makeAvatar() {
   // the name only seeds the face, and stays the same in every language so your character looks the same
   const { root, P } = makeChibi({ name: 'Bạn', look: state.LOOK, shirt: '#F2B33D', hair: '#2B2420', style: 'plain', outfit: 'hoodie', pants: '#33415C' });
@@ -63,8 +63,7 @@ export function makeAvatar() {
 // CSS2D labels ignore their parents' visibility, so the name tag is toggled with the body.
 function showAvatar() { const v = fp.on && fp.third; if (fp.avatar) fp.avatar.visible = v; if (fp.tag) fp.tag.visible = v; }
 /* ---------- out on the street ---------- */
-// PASEO: the street is not taken (world/backdrops/ is not), so there is no lift to it.
-const street = () => null;
+const street = () => (THEMES && THEME === THEMES.city && THEME.live?.street) || null;
 // the way out of the building, on the pavement: the side of the block nearest the lift (or the door)
 const wayOut = (S) => { const x = lift ? LIFT_X : DOOR_OUT.x; return S.exits(x, DZ)[0] || null; };
 let fade = null;
@@ -233,7 +232,8 @@ export function setup() {
   fp = { on: false, third: false, yaw: Math.PI / 2, pitch: -0.06, pos: new V2(DOOR_IN.x + 0.7, DOOR_IN.z), keys: new Set(),
     drag: null, joy: null, grid: null, avatar: null, P: null, near: null, moving: false, t: 0, street: false, carry: null, carryUntil: 0, basket: [], seat: null };
   fade = el('div', 'fp-fade'); $('stage-wrap').append(fade);
-  FPB = HQ ? { x0: -7.85, x1: 15.3, z0: -7.85, z1: 28.3 } : PRO ? { x0: -7.85, x1: 15.3, z0: -7.85, z1: 11.3 } : { x0: -7.85, x1: 11.7, z0: -5.85, z1: 10.3 };
+  // PASEO: the camera and the walk use the same bounds for each plan.
+  FPB = floorBounds();
   $('btn-fp').addEventListener('click', () => (fp.on ? exitFp() : enterFp()));
   $('fp-exit').addEventListener('click', exitFp);
   $('fp-near').addEventListener('click', interact);

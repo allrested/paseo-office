@@ -19,6 +19,7 @@ import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import {
   notesReadRpc,
   type ChatMessage,
+  type WeatherScene,
   type IncidentsState,
   type Machine,
 } from "../shared/contracts.js";
@@ -47,6 +48,7 @@ import {
   type ColumnView,
 } from "./column-model.js";
 import { IncidentsCard } from "./incidents-card.js";
+import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
@@ -68,7 +70,7 @@ import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./o
 import { SessionsPanel } from "./sessions-panel.js";
 import { PixelOffice } from "./pixel/pixel-office.js";
 import { StructureView } from "./structure-view.js";
-import { useOfficeStyles, type OfficeStyles } from "./styles.js";
+import { SESSION_RAIL_WIDTH, useOfficeStyles, type OfficeStyles } from "./styles.js";
 import { useAgentActions, type AgentActions } from "./use-agent-actions.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useColumn, type ColumnState } from "./use-column.js";
@@ -93,6 +95,7 @@ import { ViewSwitch } from "./view-switch.js";
 import { hasWebGL2 } from "./web-env.web.js";
 import { hasScriptFrame } from "./world/script-frame-kit.js";
 import { useFloorPlan } from "./world/use-floor-plan.js";
+import { useStreetSwitch } from "./use-street.js";
 import { WorldView } from "./world/world-view.js";
 import { WorldViewNative } from "./world/world-view-native.js";
 
@@ -495,6 +498,31 @@ function SceneProblem({ message, onRetry, styles }: SceneProblemProps) {
   );
 }
 
+function SurfaceNotices({
+  fullscreenError,
+  choice,
+  sceneProblem,
+  retryScene,
+  styles,
+}: {
+  fullscreenError: boolean;
+  choice: OfficeViewChoice | null;
+  sceneProblem: string | null;
+  retryScene(): void;
+  styles: OfficeStyles;
+}) {
+  return (
+    <>
+      {fullscreenError ? (
+        <ProblemBanner text="The browser could not switch full screen." styles={styles} />
+      ) : null}
+      {choice === "3d" && sceneProblem !== null ? (
+        <SceneProblem message={sceneProblem} onRetry={retryScene} styles={styles} />
+      ) : null}
+    </>
+  );
+}
+
 interface PanelButtonProps {
   /** What it opens, and what a screen reader calls it. */
   label: string;
@@ -611,6 +639,7 @@ interface SurfaceBodyProps {
   onOpenJanitor(): void;
   /** The stand-up is open. */
   meeting: boolean;
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** The 3D office's incidents banner. */
   onOpenIncidents(): void;
@@ -618,6 +647,7 @@ interface SurfaceBodyProps {
   platform: Platform;
   /** The device's Sound switch, which the 3D office follows and its button sets. */
   sound: SoundSwitch;
+  street: boolean | null;
 }
 
 function SurfaceBody({
@@ -644,11 +674,13 @@ function SurfaceBody({
   janitor,
   onOpenJanitor,
   meeting,
+  weather,
   incidents,
   onOpenIncidents,
   onSceneProblem,
   platform,
   sound,
+  street,
 }: SurfaceBodyProps) {
   const plan = useFloorPlan();
   if (office.subscription.status === "error") {
@@ -690,10 +722,12 @@ function SurfaceBody({
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
+        weather={weather}
         incidents={incidents}
         onOpenIncidents={onOpenIncidents}
         onProblem={onSceneProblem}
         sound={sound}
+        streetOn={street}
       />
     );
   }
@@ -768,6 +802,7 @@ function useCardOpening(live: boolean): CardOpening {
 }
 
 interface ViewControlsProps {
+  full: ReturnType<typeof useFullscreen>;
   /** True once a floor is drawn under them: they take its corner, else a row of the page. */
   floorDrawn: boolean;
   viewChoice: ViewChoiceState;
@@ -783,6 +818,7 @@ interface ViewControlsProps {
 
 /** The view switch and the settings button. */
 function ViewControls({
+  full,
   floorDrawn,
   viewChoice,
   soundUnsaved,
@@ -807,6 +843,17 @@ function ViewControls({
           onChange={onChange}
           styles={styles}
         />
+        {full.available ? (
+          <PanelButton
+            label={full.active ? "Exit full screen" : "Full screen"}
+            icon={full.active ? "Minimize" : "Maximize"}
+            screenId="fullscreen"
+            size={touchScreen ? 20 : 16}
+            color={color}
+            onOpen={full.toggle}
+            styles={styles}
+          />
+        ) : null}
         {onOpenSettings ? (
           <SettingsButton
             onOpen={onOpenSettings}
@@ -1090,6 +1137,7 @@ function PhoneBar({ compact, sheet, sessions, badges, color, styles }: PhoneBarP
 }
 
 interface WideColumnProps extends ColumnPanelProps {
+  hideSessions: boolean;
   sessions: readonly ColumnSession[];
   session: SessionContext;
   compact: boolean;
@@ -1106,6 +1154,7 @@ interface WideColumnProps extends ColumnPanelProps {
 
 /** On a wide surface, the column beside the floor; nothing on a compact one. */
 function WideColumn({
+  hideSessions,
   sessions,
   session,
   compact,
@@ -1122,6 +1171,7 @@ function WideColumn({
   if (compact) return null;
   return (
     <OfficeColumn
+      hideSessions={hideSessions}
       column={column}
       sessions={sessions}
       touch={touch}
@@ -1155,13 +1205,14 @@ function useSettingsEntry(state: OfficeState["state"], onOpenSettings: (() => vo
  * is compact on any device: a desktop's split pane gets the bar and the sheet. Until it is
  * measured the device decides.
  */
-function useSurfaceLayout(deviceCompact: boolean, styles: OfficeStyles) {
+function useSurfaceLayout(deviceCompact: boolean, styles: OfficeStyles, fullscreen: boolean) {
   const [surfaceWidth, setSurfaceWidth] = useState(0);
   const measure = useCallback(
     (event: LayoutChangeEvent) => setSurfaceWidth(event.nativeEvent.layout.width),
     [],
   );
-  const compact = deviceCompact || (surfaceWidth > 0 && surfaceWidth < COLUMN_MIN + FLOOR_MIN);
+  const compact =
+    (deviceCompact && !fullscreen) || (surfaceWidth > 0 && surfaceWidth < COLUMN_MIN + FLOOR_MIN);
   // While the column's handle is dragged over it, the floor takes no pointer: the web's 3D floor
   // is a frame, which would keep the moves and the release from the handle. A compact surface
   // has no handle, so a drag cut short by a flip to compact does not leave the floor dead.
@@ -1181,6 +1232,78 @@ export function createOfficeSurface(openSettings: () => void) {
   };
 }
 
+function useFullscreen(platform: Platform) {
+  const root = useRef<View>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState(false);
+  const canFullscreen =
+    platform === "web" && typeof document !== "undefined" && document.fullscreenEnabled;
+  useEffect(() => {
+    if (!canFullscreen) return;
+    const changed = () => setFullscreen(Object.is(document.fullscreenElement, root.current));
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, [canFullscreen]);
+  const toggleFullscreen = useCallback(async () => {
+    const element = root.current as unknown as HTMLElement | null;
+    if (!element) return;
+    setFullscreenError(false);
+    try {
+      if (document.fullscreenElement === element) await document.exitFullscreen();
+      else await element.requestFullscreen();
+    } catch {
+      setFullscreenError(true);
+    }
+  }, []);
+  return {
+    root,
+    active: fullscreen,
+    error: fullscreenError,
+    available: canFullscreen,
+    toggle: toggleFullscreen,
+  };
+}
+
+function useFullscreenPanels(
+  active: boolean,
+  compact: boolean,
+  surfaceWidth: number,
+  column: ColumnState,
+  sheet: ColumnSheetState,
+  select: (id: string | null) => void,
+  selectFromStrip: (id: string) => void,
+) {
+  const showRail =
+    active && !compact && surfaceWidth >= SESSION_RAIL_WIDTH + COLUMN_MIN + FLOOR_MIN;
+  const { openSession } = sheet;
+  const link = useMemo(
+    () => (active ? { select: openSession, openSession } : sheet.link),
+    [active, openSession, sheet.link],
+  );
+  const selectAgent = useCallback(
+    (id: string | null) => {
+      if (active && id !== null) openSession(id);
+      else select(id);
+    },
+    [active, openSession, select],
+  );
+  return {
+    showRail,
+    link,
+    selectAgent,
+    selectFromStrip: active ? openSession : selectFromStrip,
+    width: showRail ? surfaceWidth - SESSION_RAIL_WIDTH : surfaceWidth,
+    column: useMemo(
+      () =>
+        showRail && column.view.kind === "tab" && column.view.tab === "sessions"
+          ? { ...column, view: { kind: "tab", tab: "activity" } as const }
+          : column,
+      [column, showRail],
+    ),
+    sheet: useMemo(() => (active ? { ...sheet, sheetLink: link } : sheet), [sheet, link, active]),
+  };
+}
+
 /** One surface for both places: the sidebar screen and a workspace tab. */
 export function OfficeSurface(
   props: OfficeSurfaceProps & {
@@ -1197,6 +1320,7 @@ export function OfficeSurface(
     [layout.platform],
   );
   const styles = useOfficeStyles(theme, layout.compact, touchScreen);
+  const full = useFullscreen(layout.platform);
   const office = useOffice();
   const actions = useAgentActions();
   const boardActions = useBoardActions();
@@ -1213,11 +1337,13 @@ export function OfficeSurface(
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
   // One Sound switch for the floor: the 3D office follows it, and the corner shows a refused save.
+  const street = useStreetSwitch(layout);
   const sound = useSoundSwitch();
   const model = useMemo(() => buildOfficeModel(office.state), [office.state]);
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
     layout.compact,
     styles,
+    full.active,
   );
   const column = useColumn(compact);
   const machine = useMemo(() => namedMachine(reading, model.agents), [reading, model.agents]);
@@ -1265,7 +1391,16 @@ export function OfficeSurface(
   }, []);
   // Every way in to a session ends in the column: its tab, or the phone's sheet.
   const sheet = useColumnSheet(column, compact, setSelectedId);
-  const { openSession, link } = sheet;
+  const { openSession } = sheet;
+  const panels = useFullscreenPanels(
+    full.active,
+    compact,
+    surfaceWidth,
+    column,
+    sheet,
+    setSelectedId,
+    selectFromStrip,
+  );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
     (agentId: string) => {
@@ -1317,12 +1452,17 @@ export function OfficeSurface(
     [incidents, openIncidents],
   );
   const settingsStripEntry = useSettingsEntry(office.state, onOpenSettings);
+  const weatherStripEntry = useMemo(
+    () => weatherEntry(office.state.weather, onOpenSettings),
+    [office.state.weather, onOpenSettings],
+  );
   // The strip's cards, each only while it has something to say. An incident comes first.
   const cards = useMemo(
     () =>
       [
         incidentsStripEntry,
         settingsStripEntry,
+        weatherStripEntry,
         hostEntry,
         janitorEntry,
         standup.entry,
@@ -1333,6 +1473,7 @@ export function OfficeSurface(
     [
       incidentsStripEntry,
       settingsStripEntry,
+      weatherStripEntry,
       hostEntry,
       janitorEntry,
       standup.entry,
@@ -1349,7 +1490,7 @@ export function OfficeSurface(
     model,
     cards,
     chat: office.chat,
-    onSelect: selectFromStrip,
+    onSelect: panels.selectFromStrip,
     onLeave: sheet.closeSheet,
     styles,
   });
@@ -1369,26 +1510,46 @@ export function OfficeSurface(
     [model, replies, actions, navigation, closeSession],
   );
   const color = theme.colors.foreground;
+  const controls = (
+    <ViewControls
+      full={full}
+      floorDrawn={floorDrawn && !panels.showRail}
+      viewChoice={viewChoice}
+      soundUnsaved={sound.unsaved}
+      onChange={changeView}
+      compact={layout.compact}
+      touchScreen={touchScreen}
+      color={color}
+      onOpenSettings={onOpenSettings}
+      styles={styles}
+    />
+  );
   // One tree in both layouts, so a flip between them does not draw the floor again: compact adds
   // the sheet in the floor's box and the bar under the row, wide adds the column beside the floor.
   return (
-    <View style={styles.screen} onLayout={measure}>
-      {viewChoice.choice === "3d" && sceneProblem !== null ? (
-        <SceneProblem message={sceneProblem} onRetry={retryScene} styles={styles} />
-      ) : null}
+    <View ref={full.root} style={styles.screen} onLayout={measure}>
+      <SurfaceNotices
+        fullscreenError={full.error}
+        choice={viewChoice.choice}
+        sceneProblem={sceneProblem}
+        retryScene={retryScene}
+        styles={styles}
+      />
+      {panels.showRail && (
+        <View style={styles.fullscreenHeader}>
+          <Text style={styles.rowTitle}>Office 3D</Text>
+          {controls}
+        </View>
+      )}
       <View style={styles.officeRow}>
+        {panels.showRail ? (
+          <View style={styles.sessionRail}>
+            <Text style={styles.sessionRailTitle}>Sessions</Text>
+            <SessionsPanel {...panel} link={panels.link} />
+          </View>
+        ) : null}
         <View style={floorStyle}>
-          <ViewControls
-            floorDrawn={floorDrawn}
-            viewChoice={viewChoice}
-            soundUnsaved={sound.unsaved}
-            onChange={changeView}
-            compact={layout.compact}
-            touchScreen={touchScreen}
-            color={color}
-            onOpenSettings={onOpenSettings}
-            styles={styles}
-          />
+          {!panels.showRail && controls}
           <SurfaceBody
             office={office}
             model={model}
@@ -1402,7 +1563,7 @@ export function OfficeSurface(
             compact={layout.compact}
             actions={actions}
             name={name}
-            onSelectAgent={setSelectedId}
+            onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
             onOpenBoard={board.open}
             machine={machine}
@@ -1413,15 +1574,17 @@ export function OfficeSurface(
             janitor={janitorEntry?.note ?? null}
             onOpenJanitor={openJanitor}
             meeting={standup.open}
+            weather={office.state.weather?.scene}
             incidents={incidents}
             onOpenIncidents={openIncidents}
             onSceneProblem={setSceneProblem}
             platform={layout.platform}
             sound={sound}
+            street={street.on}
           />
           <PhoneSheet
             compact={compact}
-            sheet={sheet}
+            sheet={panels.sheet}
             column={column}
             sessions={sessions}
             session={session}
@@ -1433,14 +1596,15 @@ export function OfficeSurface(
           sessions={sessions}
           session={session}
           compact={compact}
-          column={column}
-          surfaceWidth={surfaceWidth}
+          column={panels.column}
+          hideSessions={panels.showRail}
+          surfaceWidth={panels.width}
           badges={badges}
           color={color}
           iconSize={touchScreen ? 20 : 16}
           touch={touchScreen}
           onDragging={setDragging}
-          link={link}
+          link={panels.link}
           {...panel}
         />
       </View>

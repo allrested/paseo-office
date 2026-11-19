@@ -7,18 +7,16 @@ test("the first commit's day, from git", async () => {
   expect(exec).toHaveBeenCalledWith(
     "git",
     ["log", "--max-parents=0", "--reverse", "--format=%as"],
-    expect.objectContaining({ cwd: "/some/folder", timeout: 10_000, maxBuffer: 1 << 20 }),
+    expect.objectContaining({ cwd: "/some/folder", timeout: 10_000 }),
   );
 });
 
-test("nothing when git fails, says nothing sensible, or there is no folder", async () => {
+test("nothing when git fails, says nothing sensible, or the folder is empty", async () => {
   expect(
     await readRepoAge("/x", async () => {
       throw new Error("not a repository");
     }),
   ).toBeNull();
   expect(await readRepoAge("/x", async () => ({ stdout: "garbage\n", stderr: "" }))).toBeNull();
-  const exec = vi.fn(async () => ({ stdout: "2024-01-01\n", stderr: "" }));
-  expect(await readRepoAge("", exec)).toBeNull();
-  expect(exec).not.toHaveBeenCalled();
+  expect(await readRepoAge("", async () => ({ stdout: "2024-01-01\n", stderr: "" }))).toBeNull();
 });

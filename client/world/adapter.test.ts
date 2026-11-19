@@ -620,6 +620,40 @@ describe("the lobby's sign", () => {
   });
 });
 
+it("sends spending without requiring context and includes the repository's first day", () => {
+  const model = buildOfficeModel(
+    office([agent("1", { costUsd: 1.5 }), agent("2", { workspaceId: "w2" })]),
+  );
+  const { sessions } = worldPeople(model, 12, { "shop-api": "2020-02-03" });
+  expect(sessions[0]).toMatchObject({
+    usage: { ctx: 0, ctxMax: 0, cost: 1.5 },
+    git: { repo: "shop-api", born: "2020-02-03" },
+  });
+  expect(sessions[1]?.usage).toBeUndefined();
+  expect(sessions[1]?.git).toEqual({ repo: "landing" });
+});
+
+it.each([
+  ["failure", "red"],
+  ["success", "green"],
+  ["pending", undefined],
+  ["none", undefined],
+] as const)("maps the workspace's %s forge checks to the seated agent", (checks, ci) => {
+  const state = office([agent("1")]);
+  state.workspaces[0]!.pullRequest = {
+    checks,
+    state: "open",
+    number: 1,
+    url: "",
+    base: null,
+    title: "PR",
+    review: null,
+    runs: [],
+    conflicts: false,
+  };
+  expect(worldPeople(buildOfficeModel(state), 12).sessions[0]?.git.ci).toBe(ci);
+});
+
 describe("what the staff scenes read of a person", () => {
   it("carries what the agent cost and the repository's first day", () => {
     const model = buildOfficeModel(office([agent("1", { costUsd: 1.5 })]));

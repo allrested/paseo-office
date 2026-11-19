@@ -163,7 +163,7 @@ test("E by a person opens their session and keeps walking", () => {
   page("fp-exit").click();
 });
 
-test("the door has no E action: the street is not taken", () => {
+test("the door offers the lift when the street is available", () => {
   // the door, within reach ahead of where the walk starts, with a city outside it
   const door = {
     id: "door",
@@ -175,14 +175,13 @@ test("the door has no E action: the street is not taken", () => {
   page("btn-fp").click();
   fpUpdate(0.016);
   expect(page("fp-near").hidden).toBe(false);
-  expect(page("fp-near").textContent).toContain("Door");
-  expect(page("fp-near").textContent).not.toContain("street");
+  expect(page("fp-near").textContent).toContain("street");
 
   key("KeyE");
-  expect(h.activateProp).toHaveBeenCalledWith(door);
+  expect(h.activateProp).not.toHaveBeenCalled();
   expect(h.openSession).not.toHaveBeenCalled();
   // (toStreet would have started its fade to black at once)
-  expect(document.querySelector(".fp-fade")?.classList.contains("on")).toBe(false);
+  expect(document.querySelector(".fp-fade")?.classList.contains("on")).toBe(true);
   expect(walk.fp.street).toBe(false);
   page("fp-exit").click();
 });

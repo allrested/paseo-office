@@ -10,7 +10,11 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeEvent } from "../shared/contracts.js";
-import { officeDeviceSettings, officeHostSettings } from "../shared/settings.js";
+import {
+  officeDeviceSettings,
+  officeHostSettings,
+  officeLanguageSettings,
+} from "../shared/settings.js";
 import { EMPTY_OFFICE } from "./office-state.js";
 import { stockSave } from "./stock-save.test.js";
 
@@ -29,6 +33,15 @@ const deviceValues = vi.hoisted(() => ({
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
   useSettings: (settings: { id: string }) => {
+    if (settings.id === "office-language")
+      return {
+        status: "ready",
+        revision: "lang-1",
+        values: officeLanguageSettings.schema.parse({}),
+        saving: false,
+        saveError: null,
+        save: stockSave(officeLanguageSettings),
+      };
     const device = settings.id === "office-device";
     return {
       status: "ready",
@@ -81,12 +94,13 @@ vi.mock("./web-env.web.js", async (importOriginal) => ({
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
+const { OfficeSettings } = await import("./office-settings.js");
+
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
 let container: HTMLElement;
 let root: Root;
 
 async function mount(): Promise<void> {
-  const { OfficeSettings } = await import("./office-settings.js");
   const props = {
     theme: THEME,
     layout: { compact: false, platform: "web" },
@@ -118,6 +132,7 @@ test("the screen holds the switches, the fields and the view", async () => {
   await mount();
   await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
 
+  expect(labelled("3D office language")?.getAttribute("role")).toBe("group");
   expect(labelled("Wake agents")?.getAttribute("role")).toBe("switch");
   expect(labelled("Agent tools")?.getAttribute("role")).toBe("switch");
   for (const field of ["Notes folder", "Time zone", "Jira projects", "Sentry organisation"]) {
@@ -189,4 +204,12 @@ test("the notes schedule's failure shows under the Time zone field", async () =>
   const field = container.querySelector('input[aria-label="Time zone"]');
   if (!failure || !field) throw new Error("The failure or the Time zone field is not drawn");
   expect(field.compareDocumentPosition(failure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("the wide device can turn off the street and keep its other settings", async () => {
+  await mount();
+  const row = container.querySelector<HTMLElement>('[aria-label^="The street outside"]');
+  expect(row?.getAttribute("aria-checked")).toBe("true");
+  await act(async () => row?.click());
+  expect(deviceSaves).toEqual([{ ...deviceValues.current, street: false }]);
 });

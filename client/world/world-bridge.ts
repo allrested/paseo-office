@@ -80,13 +80,16 @@ export function createWorldBridge(post: (text: string) => void): WorldBridge {
     select: sender("select"),
     focusProject: sender("focusProject"),
     setBoardRows: sender("setBoardRows"),
+    photoRelease: sender("photoRelease"),
+    setClaudeVersion: sender("setClaudeVersion"),
+    setTenure: sender("setTenure"),
+    setLiftService: sender("setLiftService"),
     setMachine: sender("setMachine"),
     meet: sender("meet"),
     gather: sender("gather"),
+    setWeather: sender("setWeather"),
     setIncidents: sender("setIncidents"),
     setSound: sender("setSound"),
-    setTenure: sender("setTenure"),
-    setLiftService: sender("setLiftService"),
   };
 
   return {

@@ -2,6 +2,7 @@ import type {
   ChatChange,
   ChatSnapshot,
   IncidentsState,
+  WeatherState,
   Checklists,
   NotesState,
   OfficeAgent,
@@ -24,10 +25,10 @@ export const DIRECTORY_FLUSH_MS = 300;
 export const DIRECTORY_RESTART_MS = 5000;
 
 export interface DirectoryView {
+  /** Server-only workspace paths for repository history. */
+  folders?: Readonly<Record<string, string>>;
   agents: readonly OfficeAgent[];
   workspaces: readonly OfficeWorkspace[];
-  /** Server only, never sent: each workspace's folder, by workspace id. */
-  folders?: Readonly<Record<string, string>>;
 }
 
 export interface HubSubscriber {
@@ -69,6 +70,8 @@ export interface Hub {
   setNotes(notes: NotesState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
+  /** A changed sky or service status is sent to every subscriber. */
+  setWeather(weather: WeatherState): void;
   /**
    * The conversation each snapshot carries from now on; null removes it. Every subscriber gets a
    * fresh snapshot.
@@ -133,6 +136,8 @@ export function createHub(ports: HubPorts): Hub {
   let notes: NotesState | null = null;
   let sentNotes = "";
   let incidents: IncidentsState | null = null;
+  let weather: WeatherState | null = null;
+  let sentWeather = "";
   let sentIncidents = "";
   let chatSource: (() => ChatSnapshot) | null = null;
   const watchers = new Set<(view: DirectoryView | null) => void>();
@@ -157,6 +162,7 @@ export function createHub(ports: HubPorts): Hub {
       boards: copy,
       wake: { paused: wake.paused, queued: { ...wake.queued } },
       ...(notes === null ? {} : { notes: { ...notes } }),
+      ...(weather === null ? {} : { weather }),
       ...(incidents === null ? {} : { incidents: { ...incidents } }),
       ...(chatSource === null ? {} : { chat: chatSource() }),
     };
@@ -283,7 +289,7 @@ export function createHub(ports: HubPorts): Hub {
     view = {
       agents: named(resets.size === 0 ? next.agents : settled.agents),
       workspaces: next.workspaces,
-      ...(next.folders === undefined ? {} : { folders: next.folders }),
+      folders: next.folders,
     };
     tell(view);
     // Until the start finished, the first snapshot carries the view.
@@ -475,6 +481,13 @@ export function createHub(ports: HubPorts): Hub {
       notes = { ...next };
       broadcast({ type: "snapshot", state: snapshot() });
     },
+    setWeather(next) {
+      const text = JSON.stringify(next);
+      if (text === sentWeather) return;
+      sentWeather = text;
+      weather = { ...next };
+      broadcast({ type: "snapshot", state: snapshot() });
+    },
     setIncidents(next) {
       const text = JSON.stringify(next);
       if (text === sentIncidents) return;
@@ -491,7 +504,7 @@ export function createHub(ports: HubPorts): Hub {
     },
     watch(listener) {
       watchers.add(listener);
-      if (stopDirectory !== null) tell(view, [listener]);
+      if (stopDirectory !== null && view !== EMPTY_VIEW) tell(view, [listener]);
       return () => {
         watchers.delete(listener);
       };

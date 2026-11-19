@@ -127,8 +127,17 @@ function SessionList({
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
         <View style={styles.panelTop}>
-          <View style={styles.actions}>
+          <View style={styles.sessionTools}>
+            <TextInput
+              accessibilityLabel={SEARCH_LABEL}
+              placeholder="Search"
+              placeholderTextColor={styles.placeholderColor}
+              value={query}
+              onChangeText={setQuery}
+              style={styles.sessionSearch}
+            />
             <ActionButton
+              primary
               label="New agent"
               pendingLabel="Opening..."
               onPress={onNewAgent}
@@ -136,28 +145,25 @@ function SessionList({
             />
           </View>
           <View role="group" aria-label="Sessions" style={styles.panelChips}>
-            {LIST_TABS.map(({ tab: each, label }) => (
-              <Pill<ListTab>
-                key={each}
-                value={each}
-                label={label}
-                name={`${label}, ${counts[each]}`}
-                count={counts[each]}
-                on={each === tab}
-                toggle={false}
-                onPress={setTab}
-                styles={styles}
-              />
+            {[LIST_TABS.slice(0, 2), LIST_TABS.slice(2)].map((pair) => (
+              <View key={pair[0].tab} style={styles.sessionFilterPair}>
+                {pair.map(({ tab: each, label }) => (
+                  <Pill<ListTab>
+                    key={each}
+                    compact
+                    value={each}
+                    label={label}
+                    name={`${label}, ${counts[each]}`}
+                    count={counts[each]}
+                    on={each === tab}
+                    toggle={false}
+                    onPress={setTab}
+                    styles={styles}
+                  />
+                ))}
+              </View>
             ))}
           </View>
-          <TextInput
-            accessibilityLabel={SEARCH_LABEL}
-            placeholder={SEARCH_LABEL}
-            placeholderTextColor={styles.placeholderColor}
-            value={query}
-            onChangeText={setQuery}
-            style={styles.pickerSearch}
-          />
         </View>
         {problem === null ? null : (
           <View style={styles.bannerSlot}>

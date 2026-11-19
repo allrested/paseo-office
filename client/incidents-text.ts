@@ -50,7 +50,7 @@ export function newestFirst(open: readonly Incident[]): Incident[] {
   return [...open].sort(byNewest);
 }
 
-function ageText(ms: number): string {
+export function ageText(ms: number): string {
   if (ms < MINUTE) return "just now";
   if (ms < HOUR) return `${Math.floor(ms / MINUTE)} min ago`;
   return `${Math.floor(ms / HOUR)} h ago`;

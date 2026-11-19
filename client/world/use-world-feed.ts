@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { IncidentsState, LifeEvent, Machine } from "../../shared/contracts.js";
+import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { onChatAct } from "../chat-acts.js";
 import type { FocusRequest } from "../focus-request.js";
@@ -12,6 +12,7 @@ import {
   teamOfRoom,
   worldBoardRows,
   worldChanges,
+  worldWeather,
   worldMachine,
   worldPeople,
   withRestTimes,
@@ -22,6 +23,7 @@ import { useIncidentAlarm } from "./use-incident-alarm.js";
 import type { WorldApi } from "./world-api.js";
 
 export interface WorldFeedInput {
+  life?: import("../../shared/contracts.js").LifeEvent | null;
   model: OfficeModel;
   theme: PluginTheme;
   /** The workspace tab's room; the view starts on its team's desks. */
@@ -33,13 +35,13 @@ export interface WorldFeedInput {
   machine: Machine | null;
   /** The stand-up is open: the bell on the meeting table rings once. */
   meeting: boolean;
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
+  streetNote?: boolean;
   sound: boolean | null;
   /** The floor plan the scene was started on: its desks seat the people. */
   plan: WorldPlan;
-  /** What the staff scenes read beyond the people; null until the server has said. */
-  life: LifeEvent | null;
 }
 
 /**
@@ -53,16 +55,18 @@ export function useWorldFeed(
   api: WorldApi | null,
   {
     model,
+    life,
     theme,
     focusRoomId,
     focusRequest,
     selectedAgentId,
     machine,
     meeting,
+    weather,
     incidents,
+    streetNote,
     sound,
     plan,
-    life,
   }: WorldFeedInput,
 ): { note: string | null } {
   // (a ref for useIncidentAlarm's RefObject; the [api] effect below must stay the first effect)
@@ -87,11 +91,9 @@ export function useWorldFeed(
     if (sound !== null) world.current?.setSound?.(sound);
   }, [sound, api]);
 
-  // Each team's repository's first day: HR's birthday cake (people/hr.js).
-  const born = life?.born;
   const people = useMemo(
-    () => worldPeople(model, PLAN_DESKS[plan], born ?? {}),
-    [model, plan, born],
+    () => worldPeople(model, PLAN_DESKS[plan], life?.born),
+    [model, plan, life?.born],
   );
   useEffect(() => {
     const scene = world.current;
@@ -104,17 +106,6 @@ export function useWorldFeed(
     memory.current = changes.memory;
   }, [people, model, api]);
 
-  // The farewells and the interns read the tenure list; the lift its servicing. A list the scene
-  // already has is not sent again; a new scene gets it again.
-  const tenure = life?.tenure;
-  useEffect(() => {
-    if (tenure !== undefined) world.current?.setTenure?.(tenure);
-  }, [tenure, api]);
-  const lift = life?.lift;
-  useEffect(() => {
-    if (lift !== undefined) world.current?.setLiftService?.(lift);
-  }, [lift, api]);
-
   // After the people: the alarm's bubbles go over whoever is seated at work.
   useIncidentAlarm({ world, started: api !== null, incidents });
 
@@ -123,6 +114,23 @@ export function useWorldFeed(
     world.current?.setMachine(worldReadings);
   }, [worldReadings, api]);
 
+  useEffect(() => {
+    world.current?.setWeather?.(worldWeather(weather));
+  }, [weather, api]);
+  useEffect(() => {
+    if (life?.tenure) api?.setTenure?.(life.tenure);
+  }, [life?.tenure, api]);
+  const lastLift = useRef<{ api: WorldApi; key: string } | null>(null);
+  useEffect(() => {
+    if (!api || !life) {
+      lastLift.current = null;
+      return;
+    }
+    const key = JSON.stringify(life.lift);
+    if (lastLift.current?.api === api && lastLift.current.key === key) return;
+    api.setLiftService?.(life.lift);
+    lastLift.current = { api, key };
+  }, [life, api]);
   const focusTeam = useMemo(() => teamOfRoom(model, focusRoomId), [model, focusRoomId]);
   useEffect(() => {
     if (focusTeam !== null) world.current?.focusProject(focusTeam);
@@ -152,5 +160,15 @@ export function useWorldFeed(
     world.current?.select(focusRequest.agentId);
   }, [focusRequest]);
 
-  return { note: api === null ? null : floorNote(model.agents.size, people.overflow) };
+  return {
+    note:
+      api === null
+        ? null
+        : [
+            floorNote(model.agents.size, people.overflow),
+            streetNote ? "The street's cars could not be loaded." : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
+  };
 }

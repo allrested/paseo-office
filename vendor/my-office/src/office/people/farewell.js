@@ -24,17 +24,17 @@ import { farewellParty, gatheringNow } from './gatherings.js';
 import { hrOnDuty } from './hr.js';
 import { later, line } from './errands.js';
 import { napOn } from '../life/nap.js';
+import { host } from '../paseo-host.js';
 import { areaOf, projOf, teamTags } from '../net/live.js';
 import { chatLife, chatPhoto } from '../ui/group-chat.js';
 import { toast } from '../ui/activity.js';
 import { sfx } from '../audio/sfx.js';
 import { t as tr } from '../../i18n/index.js';
-import { host } from '../paseo-host.js';   // PASEO: the host is told a farewell, not a server
 
 const P = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
 const DEMO = STATIC || P.has('demo'), FORCE = P.has('farewell');
 const FONT = '"Be Vietnam Pro", system-ui, sans-serif';
-let T = { days: 30, choices: [14, 30, 60, 90], projects: [] };   // the server's word (GET /api/tenure, { k: 'tenure' })
+let T = { days: 30, choices: [30], projects: [] };   // PASEO: the host pushes the ledger
 let F = null;            // the farewell under way: { name, u, desk, stage, … }
 let last = null;         // the one before (tests)
 const held = new Set();  // farewells held from this page (not again before the server has it)
@@ -257,7 +257,7 @@ function stepRoll() {
   const name = F.name;
   if (F.u >= 0) { rugReset(F.u); teamTags[F.u].rug && (teamTags[F.u].rug.visible = false); }
   held.add(name); rememberGone(name, F.u);
-  if (!DEMO) post({ op: 'farewell', name });   // PASEO: every page tells the host, which keeps the first
+  if (!DEMO) host.tenure({ op: 'farewell', name });
   const p = T.projects.find((x) => x.name === name); if (p) { p.farewell = Date.now(); p.due = false; } else T.projects.push({ name, farewell: Date.now(), due: false });
   last = { name, stage: 'done', u: F.u, carried: !!F.carried }; F = null;
   syncMarks(true);
@@ -326,8 +326,6 @@ export function updateFarewell() {
 }
 
 /* ---------- the server's list, and Settings → More ---------- */
-// PASEO: upstream posts to its own server; the host is told instead, and answers with setTenure().
-const post = (body) => { host.tenure(body); return Promise.resolve(null); };
 /** the server's list as it stands (people/interns.js reads it too) */
 export const tenureNow = () => T;
 /** the live stream's { k: 'tenure' } (demo/demo.js) */
@@ -335,17 +333,8 @@ export function setTenure(d) {
   if (!d) return;
   T = { days: d.days ?? T.days, choices: d.choices || T.choices, projects: Array.isArray(d.projects) ? d.projects : [] };
   for (const p of T.projects) if (p.farewell) held.delete(p.name);
-  drawSettings(); syncMarks(true);
+  syncMarks(true);
 }
-function drawSettings() {
-  const box = $('st-farewell'); if (!box || DEMO) return;
-  box.hidden = false;
-  box.querySelector('[data-fw-tgl]').setAttribute('aria-checked', String(T.days > 0));
-  for (const b of box.querySelectorAll('[data-fw-days]')) { b.setAttribute('aria-pressed', String(Number(b.dataset.fwDays) === T.days)); b.disabled = !T.days; }
-}
-// PASEO: the host pushes the list with setTenure(); nothing is fetched.
-function load() {}
-
 /* ---------- for tests (?debug) ---------- */
 const debug = {
   set: (list, days = 30) => setTenure({ days, projects: list }),   // [{ name, due, farewell, back }]
@@ -366,17 +355,5 @@ export function setup() {
   cardG.position.set(MEET.x + (PRO ? 0.15 : 0.25), 0.8, MEET.z + (PRO ? 0.22 : 0.25)); cardG.rotation.y = Math.PI / 5;
   put(cardG, new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.55), new THREE.MeshStandardMaterial({ map: cardTex, roughness: 0.8 })), 0, 0.27, 0).rotation.x = -0.18;
   put(cardG, new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.52), mat('#E8865F', { roughness: 0.8 })), 0, 0.25, -0.08).rotation.set(0.32, Math.PI, 0);
-  // Settings → More: on or off, after how many days
-  const box = $('st-farewell');
-  if (box && !DEMO) {
-    $('btn-look')?.addEventListener('click', () => { if (!$('pop-look').hidden) load(); });
-    box.addEventListener('click', async (e) => {
-      const t = e.target.closest('[data-fw-tgl]'), n = e.target.closest('[data-fw-days]');
-      if (!t && !n) return;
-      const days = t ? (T.days ? 0 : 30) : Number(n.dataset.fwDays);
-      const r = await post({ op: 'config', days });
-      if (r?.ok) setTenure(r); else toast(r?.message || tr('drawer.unreachable'), 6000);
-    });
-  }
-  load();
+  // PASEO: the host supplies the ledger through setTenure.
 }

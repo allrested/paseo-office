@@ -1,3 +1,4 @@
+import { lifeLine } from "../shared/life-lines.js";
 import type { PluginTurnOutcome } from "@getpaseo/plugin/server";
 import {
   CHAT_MESSAGE_MAX,
@@ -11,7 +12,6 @@ import {
   type OfficeAgent,
   type OfficeWorkspace,
 } from "../shared/contracts.js";
-import { lifeLine } from "../shared/life-lines.js";
 import { agentTitle } from "../shared/model.js";
 import {
   createChatEngine,
@@ -66,6 +66,7 @@ export interface ChatService {
 }
 
 const STAFF_NAMES: Readonly<Record<string, string>> = {
+  __director: "Director",
   __reception: "Receptionist",
   __hr: "HR",
   __cleaner: "Cleaner",
@@ -155,7 +156,6 @@ interface Waiting {
 }
 
 const OK: ChatResult = { ok: true };
-const NO_LINE: ChatResult = { ok: false, error: "There is no such line." };
 const NO_PERMISSIONS: ReadonlySet<string> = new Set();
 
 export async function createChatService(ports: ChatServicePorts): Promise<ChatService> {
@@ -329,16 +329,15 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
       name: (id) => roster.get(id)?.name ?? null,
       now: clock.now(),
     });
-    if (line === null) return NO_LINE;
+    if (line === null) return { ok: false, error: "There is no such line." };
     const text = tr(line.key, line.vars);
-    if (text === line.key) return NO_LINE;
+    if (text === line.key) return { ok: false, error: "There is no such line." };
     engine.say(line.from, text, line.options);
-    if (line.extra) {
+    if (line.extra)
       engine.say(line.extra.from, tr(line.extra.key), {
         delay: line.extra.delay,
         key: `${line.options.key}:${line.extra.key}`,
       });
-    }
     return OK;
   }
 
@@ -417,6 +416,8 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
 
     async request(input) {
       switch (input.op) {
+        case "life":
+          return life(input);
         case "send":
           return send(input);
         case "react":
@@ -430,8 +431,6 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
           return OK;
         case "recall":
           return recall(input.id);
-        case "life":
-          return life(input);
       }
     },
 

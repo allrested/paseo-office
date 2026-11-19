@@ -3,7 +3,7 @@
  */
 // The 3D office's native view, mounted with ScriptFrame faked: what it posts to the page, in
 // order, and what it does with what the page posts back.
-import { act, forwardRef, useImperativeHandle } from "react";
+import { act, forwardRef, useEffect, useImperativeHandle } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -12,7 +12,13 @@ import type { OfficeStyles } from "../styles.js";
 import type { WorldPlan } from "./adapter.js";
 import { WorldViewNative } from "./world-view-native.js";
 
+import type { SceneWords } from "./use-scene-words.js";
+const words = vi.hoisted(() => ({ current: {} as SceneWords }));
+vi.mock("./use-scene-words.js", () => ({ useSceneWords: () => words.current }));
+
 const h = vi.hoisted(() => ({
+  mounted: 0,
+  unmounted: 0,
   posted: [] as string[],
   props: null as {
     script: string;
@@ -23,21 +29,36 @@ const h = vi.hoisted(() => ({
   loaded: { status: "ready", script: "SCENE_SCRIPT" },
 }));
 
+let receiveStreet: (event: import("../../shared/contracts.js").StreetEvent) => void;
 vi.mock("@getpaseo/plugin/client", () => ({
-  useRpc: () => async () => ({}),
+  useRpc: () => async () => "car models",
+  useSubscription: (
+    contract: { name: string },
+    _input: unknown,
+    onEvent: (event: import("../../shared/contracts.js").StreetEvent) => void,
+  ) => {
+    if (contract.name === "office.street.events") receiveStreet = onEvent;
+    return { status: "live" };
+  },
   useSettings: () => ({ status: "loading" }),
-  useSubscription: () => ({ status: "connecting" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({ useToast: () => ({ error: () => undefined }) }));
 vi.mock("./script-frame-kit.js", async () => {
   const Frame = forwardRef((props: NonNullable<typeof h.props>, ref) => {
     h.props = props;
+    useEffect(() => {
+      h.mounted++;
+      return () => {
+        h.unmounted++;
+      };
+    }, []);
     useImperativeHandle(ref, () => ({ post: (text: string) => h.posted.push(text) }));
     return null;
   });
   return { kitScriptFrame: () => Frame, hasScriptFrame: () => true };
 });
-vi.mock("./world-loader.js", () => ({
+vi.mock("./world-loader.js", async (original) => ({
+  ...(await original<typeof import("./world-loader.js")>()),
   messageOf: (error: unknown) => String(error),
   sharedWorldLoader: {
     subscribe: () => () => undefined,
@@ -64,6 +85,9 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  words.current = { status: "ready", language: "en", words: undefined, note: null };
+  h.mounted = 0;
+  h.unmounted = 0;
   h.posted = [];
   h.props = null;
   container = document.createElement("div");
@@ -185,4 +209,53 @@ test("a changed plan stops the page and starts a new one on the new plan", async
   const start = calls().find((message) => message.call === "start");
   expect(start?.args[0]).toMatchObject({ plan: "cozy" });
   expect(names.filter((name) => name === "start")).toHaveLength(1);
+});
+
+test("starts a new phone frame with the car kit after the street is enabled", async () => {
+  await mount({ streetOn: false });
+  h.posted = [];
+  await mount({ streetOn: true });
+  const started = calls().find((m) => m.call === "start");
+  expect(started?.args[0]).toMatchObject({ street: { kit: "car models" } });
+  receiveStreet({ type: "release", tag: "v3.8.4" });
+  receiveStreet({ type: "claude", reading: { version: "2.2.0", at: 123 } });
+  expect(calls().slice(-2)).toEqual([
+    { call: "photoRelease", args: ["v3.8.4"] },
+    { call: "setClaudeVersion", args: [{ version: "2.2.0", at: 123 }] },
+  ]);
+});
+
+test("the phone waits for words and remounts its frame in each chosen language", async () => {
+  words.current.status = "loading";
+  await mount();
+  expect(h.mounted).toBe(0);
+  expect(calls()).toEqual([]);
+  words.current = { status: "ready", language: "vi", words: '{"dict":{}}', note: null };
+  await mount();
+  expect(calls()[0].args[0]).toMatchObject({ language: "vi", words: '{"dict":{}}' });
+  words.current = { ...words.current, language: "th", words: "{}" };
+  await mount();
+  expect([h.mounted, h.unmounted]).toEqual([2, 1]);
+  expect(
+    calls()
+      .filter((m) => m.call === "start")
+      .map((m) => m.args[0]),
+  ).toMatchObject([{ language: "vi" }, { language: "th", words: "{}" }]);
+});
+
+test("a language failure appears in the floor note after the phone starts", async () => {
+  words.current.note = "ไทย text could not be loaded; the scene is in English";
+  const agent = {
+    id: "a1",
+    title: "Agent",
+    provider: "claude",
+    model: null,
+    status: "idle" as const,
+    workspaceId: null,
+    parentAgentId: null,
+    permissions: [],
+    createdAt: "2026-11-16T00:00:00Z",
+  };
+  await mount({ model: { ...MODEL, agents: new Map([[agent.id, agent]]) } });
+  expect(container.textContent).toContain(words.current.note);
 });

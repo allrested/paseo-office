@@ -54,11 +54,18 @@ describe("the embedded scene", () => {
     expect(script).toContain("onOpen");
     // The bell tells Paseo, which has the stand-up notes written, and the label over the meeting
     // room's screen opens them.
+    // Seasons, rain and weather: upstream's decorations, umbrellas and rain, drawing what the host sends.
+    expect(script).toContain("setWeather");
+    expect(script).toContain("life.season.");
+    expect(script).toContain("WET");
+    // The scene asks nobody: upstream's weather call and its storage key are gone.
+    expect(script).not.toContain("open-meteo");
+    expect(script).not.toContain("office-wx");
     expect(script).toContain("onBell");
     expect(script).toContain("onNotes");
     expect(script).toContain("Stand-up notes");
     // The label stands on the screen's top edge, clear of the meeting room's chip.
-    expect(script).toContain(".set(.2,2.525,-7.95)");
+    expect(script).toMatch(/\.set\(\.2,\w+==="tet"\?4\.2:2\.525,-7\.95\)/);
     expect(script).toContain(".center.set(.5,1)");
     // A deploy that failed has its own line in the bubble.
     expect(script).toContain("paseo.deploy.failed");
@@ -76,10 +83,9 @@ describe("the embedded scene", () => {
       expect(script).toContain(`people.${line}.invite`);
     }
     // The scene with three.js r160; a jump means a module the port leaves out came back in.
-    // (Measured 1,144,567 after the camera extras.)
-    expect(script.length).toBeGreaterThan(1_000_000);
-    // 1,260,855 measured with piece 5's staff scenes (about 116,000 more); pieces 6 to 8 add more.
-    expect(script.length).toBeLessThan(1_400_000);
+    // (Measured about 1.52M with the street; the car kit travels separately.)
+    expect(script.length).toBeGreaterThan(1_350_000);
+    expect(script.length).toBeLessThan(1_750_000);
     // Node's globals would throw in the page: upstream's build flag was the one use.
     expect(script).not.toContain("process.env");
     expect(script).not.toMatch(/\brequire\(/);
@@ -133,6 +139,21 @@ describe("the embedded scene", () => {
     expect(bundle).not.toMatch(/\bfetch\(["'`]https?:/);
   });
 
+  it("bundles the staff scenes, with no network call and no real brand's mark", () => {
+    for (const line of [
+      "people.hr.",
+      "people.accountant.",
+      "people.duty.",
+      "life.liftService.",
+      "life.drill.",
+      "life.altar.",
+    ]) {
+      expect(WORLD_SCRIPT).toContain(line);
+    }
+    expect(WORLD_SCRIPT).not.toContain("fetch(");
+    expect(WORLD_SCRIPT).not.toContain("/api/");
+  });
+
   it("bundles upstream's first-person walk, with the street cut", () => {
     const walk = readFileSync(
       new URL("../vendor/my-office/src/office/interact/first-person.js", import.meta.url),
@@ -141,7 +162,7 @@ describe("the embedded scene", () => {
     const bundle = WORLD_SCRIPT;
 
     expect(walk).not.toContain("stand-in");
-    expect(walk).toMatch(/\/\/ PASEO:[^\n]*\n\s*const street = \(\) => null;/);
+    expect(walk).toContain("THEME.live?.street");
     expect(walk).toMatch(/export const floorBounds/);
     expect(walk).toContain("open: true");
     expect(bundle).toContain("fp-near");
@@ -166,27 +187,6 @@ describe("the embedded scene", () => {
     expect(script).not.toMatch(/\bfrosty:\(?\w*\)?=>/);
   });
 
-  it("bundles the staff scenes, which make no network call", () => {
-    const script = WORLD_SCRIPT;
-    for (const area of [
-      "people.hr.",
-      "people.accountant.",
-      "people.duty.",
-      "people.staff.",
-      "life.liftService.",
-      "life.drill.",
-      "life.altar.",
-    ]) {
-      expect(script).toContain(area);
-    }
-    // The tenure list and the lift come from the host, the chat lines go to it.
-    expect(script).toContain("setTenure");
-    expect(script).toContain("setLiftService");
-    expect(script).toContain("onTenure");
-    expect(script).toContain("onLife");
-    expect(script).not.toContain("fetch(");
-    expect(script).not.toContain("/api/");
-  });
   it("names no real shop, app or product: the names are made-up ones", () => {
     expect(leftIn(unescaped(WORLD_SCRIPT))).toEqual([]);
   });
@@ -199,4 +199,12 @@ describe("the embedded scene", () => {
       "Phúc Long",
     ]);
   });
+});
+
+it("sends the street models separately and makes no calls for the artwork", async () => {
+  const kit = await embeddedWorldScript().readStreet();
+  expect(JSON.parse(kit).models).toHaveProperty("sedan");
+  expect(WORLD_SCRIPT).not.toContain(kit.slice(0, 150));
+  for (const url of ["/assets/brands", "/assets/vehicles", "/api/claude-version"])
+    expect(WORLD_SCRIPT).not.toContain(url);
 });

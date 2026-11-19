@@ -1,8 +1,12 @@
 // PASEO: what the page's host, Paseo's office plugin, gives the scene and hears from it.
 // paseo-entry.js fills it in before any module is set up; the stand-ins read it.
 export const host = {
-  /** 'pro' (the company floor) or 'cozy' (one open room). */
+  /** 'pro' (the company floor), 'cozy' (one open room) or 'hq' (department rooms). */
   plan: 'pro',
+  street: false,
+  streetKit: null,
+  claudeReading: null,
+  claudeVersion: () => host.claudeReading,
   /** Paseo's dark theme draws the office by night. */
   night: false,
   /** The app's surface colour: the plain backdrop behind the floor. */
@@ -31,11 +35,11 @@ export const host = {
   /** False where Photo mode cannot keep a picture (a WebView has no download): no button, no P key. */
   photo: true,
   /** A short line the office says once. */
-  toast() {},
   /** The scene tells the host a tenure write: { op: 'farewell' | 'official', name }. */
   tenure() {},
   /** The scene says a line in the team chat: (kind, vars), as upstream's chatLife is called. */
   life() {},
+  toast() {},
   /** Usage windows, as upstream's plan card has them: [{ key, pct, resetsAt }]. */
   limits: () => [],
   /** The whiteboard's rows: [{ id, name, color, text, state: 'doing' | 'wait' | 'done' }]. */

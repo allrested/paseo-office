@@ -195,7 +195,7 @@ test("No agents yet. and No agent matches.", async () => {
 
   await type(SEARCH_LABEL, "nothing like it");
   expect(container.textContent).toContain(NO_MATCH);
-  expect(labelled(SEARCH_LABEL).getAttribute("placeholder")).toBe(SEARCH_LABEL);
+  expect(labelled(SEARCH_LABEL).getAttribute("placeholder")).toBe("Search");
 });
 
 test("a state that cannot load says so as the office does", async () => {

@@ -12,11 +12,20 @@ my-office's.
 
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
-  has two plans, a company floor and a cozy room, chosen in Settings.
+  offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
+- The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
+- The optional street outside has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
+- Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
+- Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
+  on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
+  none of the three non-English scene languages, so select one explicitly to use it.
 - Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
   the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
   starts an agent: a workspace, a provider and model, and a first prompt.
+- Select **Full screen** beside the view switch to work inside the office. On a wide screen,
+  Sessions sits on the left, the floor in the center, and activity or the open conversation
+  on the right. You can reply and answer permission requests while the floor stays open.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
@@ -27,9 +36,6 @@ my-office's.
 - Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
 - Plays my-office's sounds in the 3D floor: off until you turn on Sound in the settings or with the
   speaker button on the floor's toolbar.
-- Plays my-office's staff and daily life on the 3D floor's company plan: reception, HR, the
-  cleaner and the courier, lunch at the microwaves, the duty roster, the midday nap, the fire
-  drill, a team's farewell and its interns. What they say comes into the team chat.
 - Takes a photo of the 3D floor, in the app's light or held to day or night for the photo, and on
   a desktop or in a browser records a 15-second clip of it; a tour of the floor's things shows
   once on a desktop.
@@ -70,6 +76,7 @@ The settings are in Settings > Plugins > Office 3D. The gear over the floor open
 | The phone app with a script frame | The 3D floor without Photo mode, clips and the tour                                                                                                                                    |
 | The store phone app               | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
 | Sound                             | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
+| The street outside                | Available in 3D. Enabled by default on wide web layouts and disabled by default on phones.                                                                                             |
 | Stock Paseo 0.16                  | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.
@@ -78,36 +85,38 @@ The stand-up notes and the incidents check run on the plugin's own timers. After
 restart, a run waits until the office is opened or an agent opens or ends a turn. A run missed
 while the daemon was down is not made up.
 
+The column, agent cards, settings, team chat (including @Director), whiteboard rows and host
+notifications stay in English. Thai and Indonesian use the English karaoke songs. Vietnamese
+and Thai also use English for the port’s custom lines. The sound-unavailable message and
+photo lighting group title are English in every language.
+
 ## What it reads and where it sends it
 
-- It reads the host's agents and workspaces, their status, what each agent has cost so far, and
-  the kind of thing each agent does (a read, an edit, a command, a test run). The kind is worked
-  out on the host.
-- On the host it runs `git log` once in each workspace's folder, to learn the day of the
-  repository's first commit. It runs no other command for the scene.
-- The 3D scene is told who is there, what kind of thing each does, what each agent has cost, the
-  day each team's repository began, and how long each team has been in the office (when it last
-  worked, on how many days and turns, a farewell or a promotion held); a team is a workspace,
-  known by its name. For the lift's servicing it is told two things about the plugin itself: how
-  long ago its server started, as the time the servicing has left, and a short id of the scene's
-  build with the time the lift was first serviced for it. It is never told a folder, a file name,
-  a command or a prompt. The scene makes no network call.
-- The scene tells the plugin two things: a moment for the team chat (a birthday, the fire drill)
-  as a kind and a few words such as a name or a count, which the plugin turns into a staff
-  member's line; and a farewell or a promotion it held.
+- It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
+  of activity. On the host it runs Git once per workspace folder to read the first commit date.
+- The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
+  and the lift’s servicing time and build sticker. It receives no file names, commands or prompts and makes no
+  network calls. It sends chat moments with a name or count, and reports farewells and promotions.
+- With the street enabled, the device receives the bundled Kenney Car Kit (CC0). While a street
+  is open, the host checks local Git tags and the installed Claude CLI version. New tags can
+  trigger the photo booth. The pickleball scene uses check results already available to Paseo.
+- English travels with the scene. For each other language the host sends one dictionary on request
+  to the device that chose it (about 82–130 KB). The device keeps those words for the life of the page.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
-  plants, the graphics level, the Sound switch, that the tour was seen, the clip's shape and
-  music choice, and the staff scenes' own: which teams had their farewell or came back, the duty
-  roster with the names on it, and the fire drill's day. The column keeps when this device last
-  had the chat open (`office-chat-seen`).
+  plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
+  music choice, the duty roster with team members’ names, the fire drill day, and team farewells and returns. The column keeps when this device last had the chat open (`office-chat-seen`).
+- With Settings > Weather > From a service and an address set, the host reads that address while an
+  office is open, at most once in 15 minutes. The request sets only the `Accept` header. The
+  scene receives a weather code, temperature and cloud share. The host stores the address,
+  including any key in its query, in `<PASEO_HOME>/plugin-settings/office/office.json`.
+  Anyone who can open the settings page can see it there.
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
-  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
+  environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
 - The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
   notes' prompt to the host's own agents, and so to whichever provider runs them.
-- It stores boards, the chat, the stand-up notes' state, incidents, the tenure list
-  (`tenure.json`) and the lift's last build (`lift.json`) under the host's Paseo home, in
-  `office/`.
+- It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
+  in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
 
 ## Based on
 
@@ -115,6 +124,9 @@ The 3D scene is my-office at commit
 [`b68228871fe30cd2c759a2c919337a9a9d1f5644`](https://github.com/khanh020905/my-office/tree/b68228871fe30cd2c759a2c919337a9a9d1f5644)
 (v0.6.0), with three.js 0.160.0. [vendor/SOURCES.md](vendor/SOURCES.md) says what is taken, what
 stands in for the rest, and how to take a newer my-office.
+
+Upstream supplies the Vietnamese and Thai text, with real brand names replaced. The Indonesian
+text was written for this port in my-office’s locale format.
 
 ## Develop
 

@@ -1,12 +1,14 @@
+import type { WordsLanguage } from "../../shared/scene-language.js";
+import type { LifeEvent } from "../../shared/contracts.js";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { WorldLiftService, WorldTenure } from "../../shared/contracts.js";
-
-export type { WorldLiftService, WorldTenure };
 
 /**
  * The plugin's side of the page that draws the 3D office. The page's side is
  * vendor/my-office/src/office/paseo-entry.js, which sets `PaseoOfficeWorld` on its window.
  */
+
+/** The host can send a resolved sky or let the scene follow its own seasonal decorations. */
+export type WorldWeather = import("../../shared/contracts.js").WeatherScene;
 
 /** A person in the office, in the shape the vendored scene reads. */
 export interface WorldSession {
@@ -15,8 +17,7 @@ export interface WorldSession {
   title: string;
   /** The project's folder; the scene seats a project's people together. */
   dir: string;
-  /** `born`: the day of the repository's first commit, "YYYY-MM-DD"; HR brings a cake in its month. */
-  git: { repo: string; born?: string };
+  git: { repo: string; ci?: "red" | "green"; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
   /** Which mark the scene puts on the person's screen. */
@@ -125,12 +126,24 @@ export interface WorldBrand {
   logoUrl: string | null;
 }
 
+export type WorldTenure = LifeEvent["tenure"];
+export type WorldTenureProject = WorldTenure["projects"][number];
+export type WorldLiftService = LifeEvent["lift"];
+
 export interface WorldStartOptions {
+  /** Something the office's people would say in the team chat: a kind of moment and a few words. */
+  onLife?(kind: string, vars: Record<string, string>): void;
+  /** The tenure list's two writes: a farewell was held, an intern was made permanent. */
+  onTenure?(op: { op: "farewell" | "official"; name: string }): void;
+
+  street?: { kit: string | null };
+  language?: WordsLanguage;
+  words?: string;
   /**
-   * The floor plan: "pro" is the company floor, "cozy" one open room. A page starts once, so a new
+   * The floor plan: "pro" is the company floor, "cozy" one open room, and "hq" headquarters. A page starts once, so a new
    * plan is a new page.
    */
-  plan: "pro" | "cozy";
+  plan: "pro" | "cozy" | "hq";
   dark: boolean;
   colors: WorldColors;
   /** The lobby's sign. Absent: the scene's own. */
@@ -170,13 +183,6 @@ export interface WorldStartOptions {
    * answers with `setSound`; the scene has already applied it, since audio starts only inside a press.
    */
   onSound?(on: boolean): void;
-  /**
-   * A moment of the office's life for the team chat (a birthday, the fire drill): its kind and a
-   * few words, as upstream's chatLife is called. The office's server words it.
-   */
-  onLife?(kind: string, vars: Record<string, string>): void;
-  /** A farewell was held, or an intern made permanent: the server's tenure list keeps it. */
-  onTenure?(op: { op: "farewell" | "official"; name: string }): void;
   /** False hides Photo mode: a WebView cannot keep a download. Absent: Photo mode is offered. */
   photo?: boolean;
 }
@@ -196,6 +202,10 @@ export interface WorldApi {
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.
    */
+  photoRelease?(tag: string): void;
+  setClaudeVersion?(reading: { version: string; at: number } | null): void;
+  setTenure?(data: WorldTenure): void;
+  setLiftService?(info: WorldLiftService): void;
   setMachine(machine: WorldMachine | null): void;
   /**
    * Rings the bell on the meeting table for a stand-up: everyone free walks there and says what
@@ -214,16 +224,14 @@ export interface WorldApi {
    * that ring at once ring once.
    */
   setIncidents?(incidents: readonly WorldIncident[]): void;
+  /** The weather outside. Older scene versions omit this method. */
+  setWeather?(weather: WorldWeather): void;
   /**
    * The device's Sound switch. On plays the scene's sounds once a press has started audio; off, and
    * where the frame never lets audio start, plays none. The scene starts off. Absent on a page built
    * from before sounds.
    */
   setSound?(on: boolean): void;
-  /** The tenure list the farewells and the interns read. Absent on a page built before them. */
-  setTenure?(tenure: WorldTenure): void;
-  /** The lift's servicing after the office's server started. Absent on a page built before it. */
-  setLiftService?(info: WorldLiftService): void;
 }
 
 /** The version of the contract above; the page says which it speaks. */

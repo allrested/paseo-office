@@ -1,13 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { IncidentsState, Machine } from "../../shared/contracts.js";
+import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
 import type { FocusRequest } from "../focus-request.js";
 import type { OfficeModel } from "../../shared/model.js";
 import type { OfficeStyles } from "../styles.js";
 import type { SoundSwitch } from "../use-sound.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
+import { StreetEvents } from "./street-events.js";
 import { useLife } from "./use-life.js";
+import { useStreetStart } from "./use-street-kit.js";
+import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
@@ -22,6 +25,7 @@ import {
 } from "./world-view-shared.js";
 
 export interface WorldViewProps {
+  streetOn?: boolean | null;
   model: OfficeModel;
   theme: PluginTheme;
   styles: OfficeStyles;
@@ -64,6 +68,7 @@ export interface WorldViewProps {
   /** The stand-up is open: the bell on the meeting table rings once. */
   meeting: boolean;
   /** The host's incidents: the banner while any is open, and the alarm for one not rung for here. */
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** A tap on the incidents' banner. */
   onOpenIncidents(): void;
@@ -76,7 +81,10 @@ export interface WorldViewProps {
   sound: SoundSwitch;
 }
 
-type WorldSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+type WorldSceneProps = Omit<WorldViewProps, "plan"> & {
+  plan: WorldPlan;
+  street: { kit: string | null } | null;
+};
 
 /**
  * The office in 3D on one plan. Web only: office-surface.tsx renders it in a browser with WebGL2
@@ -91,6 +99,7 @@ function WorldScene({
   theme,
   styles,
   plan,
+  street,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -103,6 +112,7 @@ function WorldScene({
   onOpenLibrary,
   onOpenNotes,
   meeting,
+  weather,
   incidents,
   onOpenIncidents,
   onProblem,
@@ -110,7 +120,8 @@ function WorldScene({
 }: WorldSceneProps) {
   const containerId = useId();
   const onBell = useStandupBell();
-  const life = useLife();
+  const { life, say: onLife, tell: onTenure } = useLife();
+  const words = useSceneWords();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -128,9 +139,10 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
+    street,
     onSound: sound.set,
-    onLife: life.say,
-    onTenure: life.tell,
     onProblem,
   });
   useEffect(() => {
@@ -148,9 +160,10 @@ function WorldScene({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      onLife,
+      onTenure,
+      street,
       onSound: sound.set,
-      onLife: life.say,
-      onTenure: life.tell,
       onProblem,
     };
   }, [
@@ -167,9 +180,10 @@ function WorldScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
+    street,
     sound.set,
-    life.say,
-    life.tell,
     onProblem,
   ]);
 
@@ -188,7 +202,7 @@ function WorldScene({
 
   const script = useWorldScript(sized, onProblem);
   useEffect(() => {
-    if (script === null || !sized) return undefined;
+    if (words.status !== "ready" || script === null || !sized) return undefined;
     const container = document.getElementById(containerId);
     if (container === null) return undefined;
     let live = true;
@@ -201,6 +215,8 @@ function WorldScene({
             focus: focusApp,
             // Read when the office starts: a page's brand does not change while the page lives.
             brand: worldBrand(readBrand()),
+            language: words.language,
+            words: words.words,
             plan,
           }),
         );
@@ -218,23 +234,27 @@ function WorldScene({
       setApi(null);
       frame.dispose();
     };
-  }, [script, sized, containerId, plan]);
+  }, [script, sized, containerId, plan, words.status, words.language, words.words]);
 
-  const { note } = useWorldFeed(api, {
+  const { note: feedNote } = useWorldFeed(api, {
     model,
     theme,
     focusRoomId,
     focusRequest,
     selectedAgentId,
+    life,
     machine,
     meeting,
+    weather,
     incidents,
+    streetNote: street?.kit === null,
     sound: sound.on,
-    life: life.life,
     plan,
   });
+  const note = feedNote ?? words.note;
   return (
     <View id={containerId} style={styles.scene}>
+      {api && street ? <StreetEvents api={api} /> : null}
       {api === null ? <Text style={styles.sceneStatus}>Loading the 3D view...</Text> : null}
       {api !== null && note !== null ? (
         <View style={styles.sceneNote}>
@@ -249,7 +269,8 @@ function WorldScene({
  * The office in 3D, on the host's plan. A scene page starts once, so each plan is a scene of its
  * own: a changed plan takes the frame out and opens a new one.
  */
-export function WorldView({ plan, ...rest }: WorldViewProps) {
-  if (plan === null) return <WorldLoading styles={rest.styles} />;
-  return <WorldScene key={plan} plan={plan} {...rest} />;
+export function WorldView({ plan, streetOn = false, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(streetOn);
+  if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
+  return <WorldScene key={plan + String(street !== null)} street={street} plan={plan} {...rest} />;
 }

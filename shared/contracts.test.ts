@@ -12,6 +12,7 @@ import {
   OfficeSnapshotSchema,
   PostSchema,
   worldRpc,
+  worldWordsRpc,
   deleteRpc,
   incidentsDismissRpc,
   officeStateSubscription,
@@ -39,6 +40,7 @@ test("contract names follow the dotted request convention", () => {
     deleteRpc.name,
     setWakesPausedRpc.name,
     worldRpc.name,
+    worldWordsRpc.name,
     incidentsDismissRpc.name,
   ]).toEqual([
     "office.state",
@@ -47,6 +49,7 @@ test("contract names follow the dotted request convention", () => {
     "office.delete.request",
     "office.set_wakes_paused.request",
     "office.world.request",
+    "office.world.words",
     "office.incidents.dismiss.request",
   ]);
 });
@@ -214,4 +217,17 @@ test("a system line has no sender", () => {
   expect(
     ChatMessageSchema.parse({ id: "s", at: 1, kind: "sys", text: "created", reacts: {} }).from,
   ).toBeUndefined();
+});
+
+test("weather snapshots validate scene readings and accept an older server", () => {
+  const base = emptySnapshot();
+  const reading = { kind: "reading", code: 63, temp: 14.2, cloud: 0.9 };
+  const parse = (scene: unknown) =>
+    OfficeSnapshotSchema.safeParse({ ...base, weather: { scene, readAt: 100, problem: null } })
+      .success;
+  expect(OfficeSnapshotSchema.parse(base)).not.toHaveProperty("weather");
+  expect(parse(reading)).toBe(true);
+  for (const scene of [{ kind: "season" }, { kind: "none" }]) expect(parse(scene)).toBe(true);
+  for (const bad of [{ code: 100 }, { code: 1.5 }, { cloud: 1.1 }, { kind: "storm" }])
+    expect(parse({ ...reading, ...bad })).toBe(false);
 });

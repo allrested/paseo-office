@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
+import { StreetEvents } from "./street-events.js";
 import { useLife } from "./use-life.js";
+import { useStreetStart } from "./use-street-kit.js";
+import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { createWorldBridge, type WorldBridge } from "./world-bridge.js";
@@ -19,7 +22,10 @@ import type { WorldViewProps } from "./world-view.js";
 
 const noFocus = () => undefined;
 
-type WorldViewNativeSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+type WorldViewNativeSceneProps = Omit<WorldViewProps, "plan"> & {
+  plan: WorldPlan;
+  street: { kit: string | null } | null;
+};
 
 /**
  * The office in 3D where there is no DOM to open a frame in: a ScriptFrame of the kit runs the
@@ -35,6 +41,7 @@ function WorldViewNativeScene({
   theme,
   styles,
   plan,
+  street,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -47,6 +54,7 @@ function WorldViewNativeScene({
   onOpenLibrary,
   onOpenNotes,
   meeting,
+  weather,
   incidents,
   onOpenIncidents,
   onProblem,
@@ -54,7 +62,8 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
-  const life = useLife();
+  const { life, say: onLife, tell: onTenure } = useLife();
+  const words = useSceneWords();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -69,9 +78,10 @@ function WorldViewNativeScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
+    street,
     onSound: sound.set,
-    onLife: life.say,
-    onTenure: life.tell,
     onProblem,
   });
   useEffect(() => {
@@ -89,9 +99,10 @@ function WorldViewNativeScene({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      onLife,
+      onTenure,
+      street,
       onSound: sound.set,
-      onLife: life.say,
-      onTenure: life.tell,
       onProblem,
     };
   });
@@ -106,7 +117,7 @@ function WorldViewNativeScene({
   // order: start goes first, then whatever the feed sends once `api` is set.
   useEffect(() => {
     const handle = frame.current;
-    if (page === null || handle === null) return undefined;
+    if (words.status !== "ready" || page === null || handle === null) return undefined;
     const made = createWorldBridge((text) => handle.post(text));
     bridge.current = made;
     try {
@@ -115,6 +126,8 @@ function WorldViewNativeScene({
           focus: noFocus,
           brand: worldBrand(null),
           photo: false,
+          language: words.language,
+          words: words.words,
           plan,
         }),
       );
@@ -128,29 +141,33 @@ function WorldViewNativeScene({
       bridge.current = null;
       setApi(null);
     };
-  }, [page, plan]);
+  }, [page, plan, words.status, words.language, words.words]);
 
-  const { note } = useWorldFeed(api, {
+  const { note: feedNote } = useWorldFeed(api, {
     model,
     theme,
     focusRoomId,
     focusRequest,
     selectedAgentId,
+    life,
     machine,
     meeting,
+    weather,
     incidents,
+    streetNote: street?.kit === null,
     sound: sound.on,
-    life: life.life,
     plan,
   });
 
   const onMessage = useCallback((text: string) => bridge.current?.receive(text), []);
   const onError = useCallback((message: string) => latest.current.onProblem(message), []);
 
+  const note = feedNote ?? words.note;
   return (
     <View style={styles.scene}>
-      {Frame !== null && page !== null ? (
+      {Frame !== null && page !== null && words.status === "ready" ? (
         <Frame
+          key={words.language}
           ref={frame}
           script={page}
           title="Office in 3D"
@@ -158,6 +175,7 @@ function WorldViewNativeScene({
           onError={onError}
         />
       ) : null}
+      {api && street ? <StreetEvents api={api} /> : null}
       {api === null ? <Text style={styles.sceneStatus}>Loading the 3D view...</Text> : null}
       {api !== null && note !== null ? (
         <View style={styles.sceneNote}>
@@ -172,7 +190,15 @@ function WorldViewNativeScene({
  * The office in 3D on the phone's script frame, on the host's plan. A changed plan unmounts the
  * `ScriptFrame` and mounts a new one: the scene's page starts once.
  */
-export function WorldViewNative({ plan, ...rest }: WorldViewProps) {
-  if (plan === null) return <WorldLoading styles={rest.styles} />;
-  return <WorldViewNativeScene key={plan} plan={plan} {...rest} />;
+export function WorldViewNative({ plan, streetOn = false, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(streetOn);
+  if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
+  return (
+    <WorldViewNativeScene
+      key={plan + String(street !== null)}
+      street={street}
+      plan={plan}
+      {...rest}
+    />
+  );
 }

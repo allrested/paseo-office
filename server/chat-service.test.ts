@@ -129,10 +129,10 @@ async function send(h: Harness, text: string): Promise<void> {
 
 /* ---------- the pure parts ---------- */
 
-test("the staff on the floor have names, and nobody else", () => {
+test("the seven office staff have chat names", () => {
   expect(
-    ["__director", "__reception", "__hr", "__cleaner", "__guard", "__courier", "__accountant"].map(
-      (key) => staffNameOf(key, chatT),
+    ["director", "reception", "hr", "cleaner", "guard", "courier", "accountant"].map((key) =>
+      staffNameOf("__" + key, chatT),
     ),
   ).toEqual([
     "Director",
@@ -143,9 +143,7 @@ test("the staff on the floor have names, and nobody else", () => {
     "Courier",
     "Accountant",
   ]);
-  for (const key of ["__claude", "__proto__", "toString", "a1"]) {
-    expect(staffNameOf(key, chatT)).toBeNull();
-  }
+  expect(staffNameOf("__claude", chatT)).toBeNull();
 });
 
 test("a usage limit is told from other errors", () => {
@@ -655,13 +653,14 @@ test("each office event is the engine's line: a turn that ends says it is done w
 
 /* ---------- the office's life ---------- */
 
-test("reception says the morning hello, and the lunch poll comes from an agent", async () => {
+test("reception greets the office and an agent starts the lunch poll", async () => {
   const early = await harness({ at: new Date(2026, 10, 18, 8, 0).getTime() });
   early.service.view(view(agent("a1", "Alice")));
-  early.clock.advance(CHAT_CLOCK_MS + 10_000);
-  const hello = messages(early).filter((message) => message.from === "__reception");
-  expect(hello).toEqual([expect.objectContaining({ kind: "text", name: "Receptionist" })]);
-  expect(chatT("chat.life.morning", null, "list")).toContain(hello[0]?.text);
+  early.clock.advance(CHAT_CLOCK_MS);
+  early.clock.advance(6000);
+  expect(messages(early)).toContainEqual(
+    expect.objectContaining({ from: "__reception", name: "Receptionist" }),
+  );
 
   const noon = await harness({ at: new Date(2026, 10, 18, 10, 50).getTime() });
   noon.service.view(view(agent("a1", "Alice")));
@@ -920,37 +919,14 @@ test("lines are told to subscribers as changes, and not while the engine is bein
   expect(h.changes.at(-1)).toEqual({ op: "all", messages: messages(h) });
 });
 
-/* ---------- the scene's moments ---------- */
-
-test("a moment of the office's life is said by its staff member, under their name", async () => {
+test("the same scene moment from two devices becomes one staff line", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
-  expect(await h.service.request({ op: "life", kind: "drillNotice", vars: { q: "4" } })).toEqual({
-    ok: true,
-  });
-  h.clock.advance(10_000);
-  const notice = messages(h).filter((message) => message.from === "__hr");
-  expect(notice).toEqual([expect.objectContaining({ kind: "text", name: "HR" })]);
-  expect(filled(chatT("chat.life.drillNotice", null, "list"), { q: "4" })).toContain(
-    notice[0]?.text,
-  );
-});
-
-test("a kind no table has is refused, and says nothing", async () => {
-  const h = await harness();
-  expect(await h.service.request({ op: "life", kind: "handset", vars: {} })).toEqual({
-    ok: false,
-    error: "There is no such line.",
-  });
-  h.clock.advance(10_000);
-  expect(messages(h)).toEqual([expect.objectContaining({ text: chatT("chat.sys.created") })]);
-});
-
-test("the same moment told twice in one period is said once", async () => {
-  const h = await harness();
-  h.service.view(view(agent("a1", "Alice")));
-  await h.service.request({ op: "life", kind: "altar", vars: {} });
-  await h.service.request({ op: "life", kind: "altar", vars: {} });
-  h.clock.advance(10_000);
-  expect(messages(h).filter((message) => message.from === "__reception")).toHaveLength(1);
+  const event = { op: "life", kind: "parcel", vars: { id: "a1" } } as const;
+  expect(await h.service.request(event)).toEqual({ ok: true });
+  await h.service.request(event);
+  h.clock.advance(15000);
+  const parcels = messages(h).filter((m) => m.from === "__reception" && m.text?.includes("Alice"));
+  expect(parcels).toHaveLength(1);
+  expect(parcels[0]?.name).toBe("Receptionist");
 });

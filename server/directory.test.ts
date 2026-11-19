@@ -3,14 +3,13 @@ import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
 import {
   agentsFromSnapshot,
   applyAgentUpdate,
-  applyFolderUpdate,
   applyWorkspaceUpdate,
+  foldersOf,
   projectAgent,
   projectWorkspace,
   settleResets,
   sortAgents,
   sortWorkspaces,
-  foldersFromSnapshot,
   workspacesFromSnapshot,
   type DirectoryAgentInput,
   type DirectoryPermissionInput,
@@ -477,18 +476,37 @@ test("a long list of checks keeps what fails and what runs", () => {
   expect(runs?.slice(0, 3).map((run) => run.name)).toEqual(["broken", "slow", "pass 0"]);
 });
 
-test("a workspace's folder is its checkout, else its project's root, and never an archiving one's", () => {
-  const start = foldersFromSnapshot([
-    workspaceInput({ workspaceDirectory: "/work/main", projectRootPath: "/work" }),
-    workspaceInput({ id: "w2", projectRootPath: "/work/docs" }),
-    workspaceInput({ id: "w3", archivingAt: "2026-11-11T09:00:00.000Z", projectRootPath: "/x" }),
-    workspaceInput({ id: "w4" }),
-  ]);
-  expect(Object.fromEntries(start)).toEqual({ w1: "/work/main", w2: "/work/docs" });
-  const moved = applyFolderUpdate(start, {
-    kind: "upsert",
-    workspace: workspaceInput({ id: "w2", archivingAt: "2026-11-11T09:00:00.000Z" }),
+test("folder selection prefers the workspace, falls back to its root and skips archiving entries", () => {
+  expect(
+    foldersOf([
+      workspaceInput({ workspaceDirectory: "/tree", projectRootPath: "/root" }),
+      workspaceInput({ id: "w2", projectRootPath: "/project" }),
+      workspaceInput({ id: "w3", projectRootPath: "/gone", archivingAt: "today" }),
+    ]),
+  ).toEqual({ w1: "/tree", w2: "/project" });
+});
+
+test("the first complete directory view includes the workspace folder", async () => {
+  const { openPaseoDirectory } = await import("./paseo-directory.js");
+  const list = (entries: unknown[]) => async () => ({
+    subscription: {
+      subscribe(observer: { snapshot(value: { entries: unknown[] }): void }) {
+        observer.snapshot({ entries });
+        return () => {};
+      },
+      release: async () => {},
+    },
   });
-  expect(Object.fromEntries(moved)).toEqual({ w1: "/work/main" });
-  expect(Object.fromEntries(applyFolderUpdate(moved, { kind: "remove", id: "w1" }))).toEqual({});
+  const views: import("./hub.js").DirectoryView[] = [];
+  const stop = await openPaseoDirectory(
+    {
+      agents: { list: list([{ agent: agentInput({}) }]) },
+      workspaces: { list: list([workspaceInput({ workspaceDirectory: "/work" })]) },
+    } as unknown as import("./paseo-holder.js").Paseo,
+    (v) => views.push(v),
+    () => {},
+  );
+  expect(views).toHaveLength(1);
+  expect(views[0]?.folders).toEqual({ w1: "/work" });
+  await stop();
 });

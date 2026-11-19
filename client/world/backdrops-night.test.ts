@@ -5,9 +5,10 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { state } from "../../vendor/my-office/src/office/core/state.js";
 
 const h = vi.hoisted(() => ({
-  host: { night: false, surface: "#F4EFE6" },
+  host: { street: false, night: false, surface: "#F4EFE6" },
   setNight: vi.fn(),
-  scene: { background: null as unknown, fog: { color: { copy: () => undefined } } },
+  buildCity: vi.fn(() => ({ night: vi.fn(), street: {} })),
+  scene: { add: vi.fn(), background: null as unknown, fog: { color: { copy: () => undefined } } },
 }));
 
 vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({ host: h.host }));
@@ -17,9 +18,17 @@ vi.mock("../../vendor/my-office/src/office/world/windows.js", () => ({
   cityNight: {},
 }));
 vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({
+  night: false,
   setNight: h.setNight,
 }));
 
+vi.mock("../../vendor/my-office/src/office/world/backdrops/city.js", () => ({
+  buildCity: h.buildCity,
+}));
+vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
+  fp: {},
+  buildGrid: vi.fn(),
+}));
 import {
   applyNight,
   holdNight,
@@ -30,6 +39,8 @@ import {
 beforeEach(() => {
   h.setNight.mockReset();
   h.host.night = false;
+  h.host.street = false;
+  h.buildCity.mockClear();
   setup();
   h.setNight.mockReset();
 });
@@ -55,4 +66,17 @@ test("both keep the backdrop in the app's surface colour", () => {
   holdNight(true);
   const background = h.scene.background as { getHexString(): string };
   expect(background.getHexString()).toBe("f4efe6");
+});
+
+test("builds the city only when the street is enabled", () => {
+  expect(h.buildCity).not.toHaveBeenCalled();
+  h.host.street = true;
+  setup();
+  expect(h.buildCity).toHaveBeenCalledTimes(1);
+  expect(state.nightManual).toBe(false);
+  holdNight(true);
+  expect(state.nightManual).toBe(true);
+  applyNight(false);
+  expect(state.nightManual).toBe(false);
+  expect(h.setNight).toHaveBeenLastCalledWith(false);
 });

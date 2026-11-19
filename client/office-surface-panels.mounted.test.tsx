@@ -10,7 +10,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { AccessibilityInfo } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps, SettingsState } from "@getpaseo/plugin/client";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import type { ChatMessage, OfficeAgent, OfficeEvent } from "../shared/contracts.js";
 import { buildOfficeModel } from "../shared/model.js";
 import { officeHostSettings, officeDeviceSettings } from "../shared/settings.js";
@@ -210,8 +210,14 @@ let compact: boolean;
 let container: HTMLElement;
 let root: Root;
 
+let OfficeSurface: typeof import("./office-surface.js").OfficeSurface;
+
+// Import after the browser shims are installed, before timing the first interaction.
+beforeAll(async () => {
+  ({ OfficeSurface } = await import("./office-surface.js"));
+});
+
 async function mount(): Promise<void> {
-  const { OfficeSurface } = await import("./office-surface.js");
   const props = {
     theme: THEME,
     layout: { compact, platform: "web" },
@@ -1064,4 +1070,64 @@ test("a send still pending in one session does not stop another session's Send",
   await typeMessage("hi");
   await press("Send");
   expect(delivered).toEqual(["bo:hi"]);
+});
+
+test("the floor receives the weather and service failures appear in Attention", async () => {
+  compact = false;
+  floor.webgl = true;
+  view = "3d";
+  await mount();
+  const scene = { kind: "reading" as const, code: 63, temp: 14, cloud: 0.9 };
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: { ...EMPTY_OFFICE, weather: { scene, problem: null, readAt: 10 } },
+    }),
+  );
+  expect(floor.props).toHaveProperty("weather", scene);
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: {
+        ...EMPTY_OFFICE,
+        weather: { scene: { kind: "season" }, problem: "Weather service failed", readAt: null },
+      },
+    }),
+  );
+  await pressTab("Attention");
+  expect(container.textContent).toContain("Weather service failed");
+});
+
+test("wide fullscreen gives Sessions its own rail and opens the chosen conversation beside the floor", async () => {
+  compact = false;
+  view = "2d";
+  let target: Element | null = null;
+  Object.defineProperties(document, {
+    fullscreenEnabled: { configurable: true, value: true },
+    fullscreenElement: { configurable: true, get: () => target },
+  });
+  try {
+    await mount();
+    await seeAda();
+    await sizeSurface(1440);
+    const surface = container.firstElementChild as HTMLElement;
+    surface.requestFullscreen = async () => {
+      target = surface;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    await press("Full screen");
+    expect(labelled("Activity")?.getAttribute("aria-selected")).toBe("true");
+    expect(container.querySelector('[role="tab"][aria-label="Sessions"]')).toBeNull();
+    await pressFirst("Ada:");
+    expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+    expect(container.textContent).toContain("Reading the ledger");
+
+    target = null;
+    await act(async () => void document.dispatchEvent(new Event("fullscreenchange")));
+    expect(labelled("Full screen")).not.toBeNull();
+    expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+  } finally {
+    Reflect.deleteProperty(document, "fullscreenEnabled");
+    Reflect.deleteProperty(document, "fullscreenElement");
+  }
 });

@@ -1,9 +1,9 @@
 // PASEO: the lively floor. An agent at rest does not sleep the day away at its desk: after a gap it gets up for a game
 // (upstream's pool, foosball, TV match and karaoke, through their own starters), a nap on the sofa, the fish, the arcade,
 // a cup in the dining room or the restroom, with upstream's own moves (errand(), visitWc(), feedFish(), brewCoffee()).
-// paseo-leisure-plan.js decides who, when and what; this file moves the people. ui/activity.js's updateMarkers calls
-// updateLeisure every frame, once paseo-entry.js has set it there. It starts nothing during upstream's midday nap
-// (life/nap.js napOn).
+// paseo-leisure-plan.js decides who, when and what; this file moves the people. updateMarkers in ui/activity.js calls
+// updateLeisure every frame, once paseo-entry.js has set it there.
+import { napOn } from './life/nap.js';
 import { state } from './core/state.js';
 import { PRO, nowMs, officeNow, rand, reduceMotion, replay } from './core/env.js';
 import { AQ } from './world/props/aquarium.js';
@@ -21,7 +21,6 @@ import { tvMatch, tvState } from './people/gaming.js';
 import { karaoke, ktvState } from './people/karaoke.js';
 import { t as tr } from '../i18n/index.js';
 import { LEISURE, called, createPlan } from './paseo-leisure-plan.js';
-import { napOn } from './life/nap.js';
 
 const plan = createPlan();
 const solo = new Map();   // session id -> { w, kind, e (the errand; null in the restroom), seat (the cup's chair), sat }
