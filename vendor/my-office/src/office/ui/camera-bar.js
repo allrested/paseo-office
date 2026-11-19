@@ -5,6 +5,7 @@
 // and the other three are upstream's places at a factor of its zoom.
 // Photo mode's bar and the walk's overlay are built here too: upstream's PhotoBar.tsx and
 // FirstPersonHud.tsx are React, and ui/photo.js and interact/first-person.js find their elements by id.
+// The Sound button is Paseo's own: the switch is the host's device setting (paseo-sound.js).
 import * as THREE from '../../../three/three.module.min.js';
 import { state } from '../core/state.js';
 import { camera, controls, fpCam } from '../scene/renderer.js';
@@ -12,6 +13,7 @@ import { focusTarget } from '../core/loop.js';
 import { exitFp, floorBounds, fp } from '../interact/first-person.js';
 import { closeSession } from './session-drawer.js';
 import { host } from '../paseo-host.js';
+import { available, sound } from '../paseo-sound.js';
 
 /** The floor's plinth past its walkable bounds, the foot of the plinth and the top of the walls. */
 const PLINTH = 1.5, FOOT = -1.3, WALL = 3.4;
@@ -53,6 +55,7 @@ const BAR = `
       <div class="tb-tools">
         <button type="button" class="tb-full" id="btn-full" aria-label="Full screen" title="Full screen"><span data-icon="maximize"></span></button>
         <button type="button" class="tb-full" id="btn-photo" aria-label="Photo mode" title="Photo mode"><span data-icon="camera"></span></button>
+        <button type="button" class="tb-full" id="btn-sound" aria-pressed="false" aria-label="Sound" title="Sound"><span id="sound-ico"></span></button>
       </div>
       <button type="button" class="tb-fp" id="btn-fp" aria-pressed="false" aria-label="Walk in" title="Walk in"><span data-icon="walk"></span><span>Walk in</span></button>
     </div>
@@ -97,6 +100,8 @@ const STYLE = `
 .tb-zoom button, .tb-full { all: unset; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; color: #8D97AA; transition: background .15s, color .15s; }
 .tb-zoom button:hover, .tb-full:hover { background: rgba(255, 255, 255, .07); color: #E8ECF4; }
 .tb-full[aria-pressed="true"] { background: #263040; color: var(--o-accent, #EF8A5F); }
+.tb-full[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.tb-full[aria-disabled="true"]:hover { background: none; color: #8D97AA; }
 .tb-zoom button:focus-visible, .tb-full:focus-visible { outline: 2px solid var(--o-accent, #EF8A5F); }
 .tb-zoom button, .tb-full { position: relative; }
 .tb-zoom button::after, .tb-full::after { content: attr(aria-label); position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 7px; background: #0B1018; border: 1px solid rgba(255, 255, 255, .13); color: #E8ECF4; font: 600 .72rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s, transform .15s; box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
@@ -216,6 +221,17 @@ export function build() {
   wrap.insertAdjacentHTML('beforeend', BAR);
 }
 
+const SVG = 'http://www.w3.org/2000/svg';
+/** A speaker: with waves while sound is on, crossed out while it is off. Drawn here, since upstream's icon set has none. */
+function speaker(on) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ic'); svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<polygon points="3 9 7 9 12 5 12 19 7 15 3 15"/>' + (on
+    ? '<path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>'
+    : '<line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/>');
+  return svg;
+}
+
 /** Run by paseo-entry.js once the loop is set up. */
 export function setup() {
   /* ---------- camera toolbar ---------- */
@@ -251,6 +267,24 @@ export function setup() {
     else document.documentElement.requestFullscreen?.().catch(() => host.toast("This browser won't go full screen."));
   });
   document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
+  // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite,
+  // inside the press, which is what lets the page's audio start. Where audio cannot start it says so and does nothing.
+  const soundButton = $('btn-sound'), soundIcon = $('sound-ico');
+  soundIcon.style.display = 'inline-grid';
+  const showSound = () => {
+    const label = available() ? 'Sound' : 'Sound is not available here';
+    soundButton.setAttribute('aria-pressed', String(sound.on));
+    soundButton.setAttribute('aria-disabled', String(!available()));
+    soundButton.setAttribute('aria-label', label);
+    soundButton.title = label;
+    soundIcon.replaceChildren(speaker(sound.on));
+  };
+  soundButton.addEventListener('click', () => {
+    if (!available()) { host.toast('This app does not let the office play sound.'); return; }
+    sound.request(!sound.on);
+  });
+  sound.subscribe(showSound);
+  showSound();
   // (while walking, the percent is the field of view's zoom over the start's 70)
   setInterval(() => { const v = `${Math.round((fp.on ? 70 / fpCam.fov : camera.zoom / (fitZoom || 1)) * 100)}%`, z = $('zoom-val'); if (z.textContent !== v) z.textContent = v; }, 200);   // (written only when it changes: a write costs a style pass)
   // (made after the renderer's own observer, so the frustum already has the frame's new shape)

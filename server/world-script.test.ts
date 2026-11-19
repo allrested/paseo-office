@@ -125,6 +125,8 @@ describe("the embedded scene", () => {
     // Upstream's sound engine, all its sounds but one shop's tune (a real brand's, kept out by its key).
     expect(script).toContain("office-sound");
     expect(script).toContain("webkitAudioContext");
+    expect(script).toContain("setSound");
+    expect(script).toContain("btn-sound");
     expect(script).not.toMatch(/\bfrosty:\(?\w*\)?=>/);
   });
 

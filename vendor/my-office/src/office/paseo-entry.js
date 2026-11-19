@@ -39,6 +39,7 @@ import { clearRun, onTest } from './life/tests.js';
 import { onTurnDone } from './life/your-turn.js';
 import * as lifeIncidents from './life/incidents.js';
 import { sfx } from './audio/sfx.js';
+import { setOn, sound, watchAudio } from './paseo-sound.js';
 import { t as tr } from '../i18n/index.js';
 
 const VERSION = 1;
@@ -254,7 +255,7 @@ const api = {
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
    * chip and the bookshelf), onBell() (a click on the meeting table's bell), onNotes() (the label over
    * the meeting room's screen, on the company floor), onOpen(id) (E by a person while walking: their
-   * session), onIncidents() (the incidents' banner) and onToast(text).
+   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text).
    * Throws when the world cannot be built (no WebGL, a module failed).
    */
   start(options = {}) {
@@ -296,8 +297,13 @@ const api = {
     state.streamer = true;
     // (upstream gives a compaction its sparkle; what the person carries to the shredder is paper)
     TYPE_ICON.compact = 'file';
-    // PASEO: upstream's engine starts on unless its own page stored "off"; Paseo's scene starts off until the host says on.
+    // PASEO: upstream's engine starts on unless its own page stored "off"; Paseo's scene starts off until the host says
+    // on. The engine follows the switch (and so does karaoke, which reads `sfx.on`); a press on the toolbar's button plays
+    // at once, inside the press, and then asks the host to store it.
     sfx.set(false);
+    sound.subscribe(() => sfx.set(sound.on));
+    sound.request = (next) => { setOn(next); options.onSound?.(next); };
+    watchAudio(window);
     cameraBar.setup();
     // Escape closes the place card and gives the keyboard back to the chip that opened it.
     document.addEventListener('keydown', (event) => {
@@ -348,6 +354,8 @@ const api = {
     applyColors(colors || {}, host.night);
     backdrops.applyNight(host.night);
   },
+  /** The host's Sound switch. On plays upstream's sounds once a press has started audio; off, and anywhere audio cannot start, plays none. */
+  setSound(on) { if (!started || stopped) return; setOn(on === true); },
   /**
    * Everyone in the office now, in upstream's session shape: { id, name, title, dir, git: { repo },
    * status: 'work' | 'wait' | 'rest', agent, lastPrompt, doneAt, last, stuck, subs, usage: { ctx, ctxMax } }.

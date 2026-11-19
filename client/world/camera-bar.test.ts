@@ -51,6 +51,9 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
 // @ts-expect-error vendored JavaScript has no declarations
 import { build, goView, setView, setup } from "../../vendor/my-office/src/office/ui/camera-bar.js";
 
+// @ts-expect-error vendored JavaScript has no declarations
+import { setOn, sound } from "../../vendor/my-office/src/office/paseo-sound.js";
+
 const { camera, controls, fpCam } =
   // @ts-expect-error vendored JavaScript has no declarations
   await import("../../vendor/my-office/src/office/scene/renderer.js");
@@ -139,6 +142,9 @@ beforeEach(() => {
   h.exitFp.mockReset();
   fpCam.fov = 70;
   document.body.innerHTML = '<div id="stage-wrap"><div id="stage"></div></div>';
+  sound.audio = "idle";
+  sound.request = () => {};
+  setOn(false);
 });
 
 afterEach(() => {
@@ -151,7 +157,7 @@ afterEach(() => {
   delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
 });
 
-test("the bar has its nine controls with their labels", () => {
+test("the bar has its ten controls with their labels", () => {
   open();
 
   expect(
@@ -165,9 +171,57 @@ test("the bar has its nine controls with their labels", () => {
     "Zoom in",
     "Full screen",
     "Photo mode",
+    "Sound",
     "Walk in",
   ]);
   expect(document.querySelector(".toolbar")?.getAttribute("aria-label")).toBe("View");
+});
+
+test("the Sound button asks for the opposite of what it shows, inside the press", () => {
+  open();
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => asked.push(next);
+  expect(page("btn-sound").getAttribute("aria-pressed")).toBe("false");
+  click("#btn-sound");
+  expect(asked).toEqual([true]);
+  setOn(true);
+  expect(page("btn-sound").getAttribute("aria-pressed")).toBe("true");
+  click("#btn-sound");
+  expect(asked).toEqual([true, false]);
+});
+
+test("the button's icon is a speaker with waves while sound is on and a crossed one while it is off", () => {
+  open();
+  expect(page("sound-ico").querySelectorAll("line")).toHaveLength(2);
+  setOn(true);
+  expect(page("sound-ico").querySelectorAll("line")).toHaveLength(0);
+  expect(page("sound-ico").querySelectorAll("path")).toHaveLength(2);
+});
+
+test("where audio cannot start the button says so, is disabled, and a press says so in a toast", () => {
+  open();
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => asked.push(next);
+  // The bar re-reads the state when `sound` tells it: a real change of `on` does.
+  setOn(true);
+  sound.audio = "blocked";
+  setOn(false);
+  expect(page("btn-sound").getAttribute("aria-disabled")).toBe("true");
+  expect(page("btn-sound").getAttribute("aria-label")).toBe("Sound is not available here");
+  click("#btn-sound");
+  expect(asked).toEqual([]);
+  expect(h.toast).toHaveBeenCalledWith("This app does not let the office play sound.");
+});
+
+test("the disabled button is drawn dimmed, and its hover does not light it", () => {
+  build();
+  const css = document
+    .querySelector(".toolbar")
+    ?.parentElement?.querySelector("style")?.textContent;
+  expect(css).toContain('.tb-full[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }');
+  expect(css).toContain(
+    '.tb-full[aria-disabled="true"]:hover { background: none; color: #8D97AA; }',
+  );
 });
 
 test("Overview is pressed at the start, and a drag clears it", () => {

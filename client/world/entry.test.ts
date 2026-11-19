@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   /** Whether it was when the first of the scene's modules started (ui/photo.js wires it then). */
   builtBeforeModules: null as boolean | null,
   closePlace: vi.fn(),
+  sound: [] as boolean[],
+  soundAsked: [] as boolean[],
 }));
 
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
@@ -123,7 +125,7 @@ vi.mock("../../vendor/my-office/src/office/life/tests.js", () => ({ clearRun() {
 vi.mock("../../vendor/my-office/src/office/life/your-turn.js", () => ({ onTurnDone() {} }));
 // The sounds need a page's audio: the test hears which one played.
 vi.mock("../../vendor/my-office/src/office/audio/sfx.js", () => ({
-  sfx: { play: (name: string) => h.played.push(name), set() {} },
+  sfx: { play: (name: string) => h.played.push(name), set: (on: boolean) => h.sound.push(on) },
   setup() {},
 }));
 
@@ -134,6 +136,8 @@ await import("../../vendor/my-office/src/office/paseo-entry.js");
 const { updateIncident } = await import("../../vendor/my-office/src/office/life/incidents.js");
 // @ts-expect-error vendored JavaScript has no declarations
 const { host } = await import("../../vendor/my-office/src/office/paseo-host.js");
+// @ts-expect-error vendored JavaScript has no declarations
+const { sound } = await import("../../vendor/my-office/src/office/paseo-sound.js");
 
 interface World {
   start(options?: object): void;
@@ -143,14 +147,32 @@ interface World {
   setMachine(machine: object | null): void;
   meet(): void;
   gather(): void;
+  setSound(on: boolean): void;
 }
 const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
+// A page with Web Audio whose context runs: the entry's probe finds it ready, and the switch can be
+// on. (Earlier tests press Escape on the document; the probe hears that keydown on the window, and a
+// context left suspended would make it "blocked" and hold the switch off for every test after.)
+Object.assign(window, {
+  AudioContext: class {
+    state = "suspended";
+    resume() {
+      this.state = "running";
+      return Promise.resolve();
+    }
+    close() {
+      return Promise.resolve();
+    }
+  },
+});
 world.start({
   brand: { name: "Acme" },
+  onSound: (on: boolean) => h.soundAsked.push(on),
   onIncidents: () => {
     h.incidentsOpened += 1;
   },
 });
+const atStart = [...h.sound];
 
 const session = (id: string) => ({
   id,
@@ -188,6 +210,8 @@ beforeEach(() => {
   h.workers.clear();
   h.applauded.length = 0;
   h.played.length = 0;
+  h.sound.length = 0;
+  h.soundAsked.length = 0;
   h.incidentsOpened = 0;
   h.rung = 0;
   state.sim = 0;
@@ -536,4 +560,30 @@ test("a start that says photo: false turns the host's photo switch off", async (
   const { host: fresh } = await import("../../vendor/my-office/src/office/paseo-host.js");
 
   expect(fresh.photo).toBe(false);
+});
+
+test("the scene starts with sound off, whatever its page stored", () => {
+  expect(atStart).toEqual([false]);
+});
+
+test("the host's switch turns upstream's engine on and off", () => {
+  world.setSound(true);
+  world.setSound(false);
+  expect(h.sound).toEqual([true, false]);
+});
+
+test("a press on the Sound button plays at once and asks the host, which answers with the same value", () => {
+  sound.request(true);
+  expect(h.sound).toEqual([true]);
+  expect(h.soundAsked).toEqual([true]);
+  world.setSound(true);
+  expect(h.sound).toEqual([true]);
+  world.setSound(false);
+});
+
+test("a value that is not true is off", () => {
+  world.setSound(true);
+  // @ts-expect-error the page treats anything but true as off
+  world.setSound("yes");
+  expect(h.sound).toEqual([true, false]);
 });

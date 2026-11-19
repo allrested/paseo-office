@@ -118,7 +118,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command |
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
-| `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places; zoom and full screen, and Walk in with its overlay |
+| `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places; zoom and full screen, the Sound button, and Walk in with its overlay |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
 | `ui/activity.js`            | Passes the scene's toasts to Paseo                                     |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night            |
@@ -126,7 +126,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 
 Paseo's own files sit beside upstream's and are named for it: `paseo-entry.js` (the bundle's
 entry: builds the page, starts the modules in upstream's order, sets `PaseoOfficeWorld`),
-`paseo-host.js` (what the stand-ins read and call), `paseo-style.js` (the page's stylesheet, in
+`paseo-host.js` (what the stand-ins read and call), `paseo-sound.js` (the Sound switch's state and whether the page lets audio start), `paseo-style.js` (the page's stylesheet, in
 Paseo's design language), `paseo-modules.js` (generated: the kept modules in start-up order),
 `paseo-sign.js` (the picture on the lobby's sign and the reception's plaque, with the host's
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
