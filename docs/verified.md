@@ -13,6 +13,10 @@ A third look, on 2026-11-19, was of the session tabs and the New agent form (see
 the New agent form"). It used the same stock 0.16.2, with a folder under `/tmp` opened as a
 workspace, and was installed from the directory, not by Git: see that section.
 
+A fourth look, on 2026-11-19, was of the view switch's save and the made-up names (see "The view
+switch and the made-up names"). It was installed by Git, with three agents of the stock Mock
+provider in a workspace.
+
 ## Install
 
 `paseo plugin install file://<path to the clone>` cloned the repository, compiled the plugin and
@@ -65,7 +69,8 @@ no agents. Two things differed from the first look.
   has no `node_modules` for the build to find them in (type imports from `@getpaseo/plugin` and
   `@getpaseo/protocol` do resolve). The plugin was installed from the directory instead, where the
   repository's own `node_modules` supplies them, and it started in about three seconds with
-  `Loading plugin` and `Plugin ready` in its log. Installed by Git, the branch does not run.
+  `Loading plugin` and `Plugin ready` in its log. Installed by Git, the branch did not run. Those
+  types are now read off the SDK the host supplies, and the fourth look installed by Git.
 - The daemon had Claude, Codex and OpenCode installed but not signed in, and Paseo lists them as
   available. The form showed all three with their models, so "no provider" was seen on a second
   run with the three turned off in the daemon's config.
@@ -101,18 +106,83 @@ Seen at 390 px:
 The browser console held no error from the plugin. It held Paseo's own `useNativeDriver` warning,
 and one connection error when the daemon was restarted for the no-provider run.
 
+## The view switch and the made-up names
+
+The fourth look was on 2026-11-19 at commit tree `cf346d9d13159430f0f9e9df59bd7fe6ea8f8925`,
+installed by Git (`git:file://<clone>` at the commit) on the same stock 0.16.2. `paseo plugin ls`
+showed it `running`, from git, at that commit, and its log held `Loading plugin` and
+`Plugin ready`, about two seconds apart, and no error. A scratch folder was opened as the workspace
+"Acme shop", and three agents of Paseo's Mock provider were started in it: Acme checkout
+(working), Acme search (resting) and Acme billing (waiting on a plan approval). The mock runs no
+process and no model.
+
+The page was opened with fresh storage at each width: the device setting was not set beforehand.
+The view switch over the floor was pressed in the order List, 2D, 3D, and the page's
+localStorage key `@paseo:plugin-device-settings:office/office-device` was read before the first
+press and a few seconds after each. It read the same at both widths:
+
+| When       | The key's value                                                            |
+| ---------- | -------------------------------------------------------------------------- |
+| Before     | none                                                                       |
+| After List | `{"version":2,"values":{"threeD":false,"view":"list","rungIncidents":{}}}` |
+| After 2D   | `{"version":2,"values":{"threeD":true,"view":"2d","rungIncidents":{}}}`    |
+| After 3D   | `{"version":2,"values":{"threeD":true,"view":"3d","rungIncidents":{}}}`    |
+
+"Unable to save the view on this device" did not show after any press, at either width.
+
+Seen at 1280 px:
+
+- The 3D floor draws, with the Director, the Stand-up notes label, the team chip "Team Acme shop ·
+  3", and name tags for Acme checkout and Acme billing, the second under a "Needs approval" bubble.
+  Acme search, resting, has no name tag on the 3D floor: the scene shows the tag of a resting
+  person only while it walks, is hovered or is chosen. The floor's text counts it as "Dining room 1
+  resting".
+- List shows the Lobby (no agents, no to-dos) and the Acme shop card with the three agents: Acme
+  checkout running, Acme search at 0%, Acme billing with "Needs permission" and its plan.
+- 2D shows the three desks labelled Acme checkout, Acme search and Acme billing, a question mark
+  over Acme billing's.
+- 3D after the switch draws the floor again with the same tags.
+- The column's Sessions tab lists the three agents under the filters All 3, Needs you 1,
+  Working 1 and Resting 1. Attention holds Acme billing's request and the Host, Janitor, Stand-up
+  and Library cards. Activity shows Acme checkout's commands and searches. Chat shows the group's
+  empty-state line and the box with Send.
+- The plugin's settings page shows the switch on 3D, the setting a press over the floor saved.
+
+Seen at 390 px:
+
+- The 3D floor draws with the same tags and the bar of four tab icons under it. In the first
+  screenshot Acme checkout's tag covered the lower half of the Stand-up notes label; after the
+  switch back to 3D the two were clear of each other.
+- List shows the filters, the Lobby and the Acme shop card with the three agents; 2D shows the
+  three labelled desks.
+
+The names: the text a person can read at 1280 px was gathered into one string, about 3000
+characters: the scene frame's text (room names, chips, tags, the bubble), the page's text with the
+List open, then with each of the Attention, Sessions, Activity and Chat tabs open, and the
+plugin's settings page. The repository's `leftIn` (in `scripts/genericise-street.mjs`) returned an
+empty list for it, and for each part alone. The same call on a text holding two names from
+`scripts/street-brands.mjs` returned them. The page's text includes Paseo's own sidebar and
+settings menu; it does not include what is typed in a field.
+
+The browser console held no error or warning from the plugin at either width, and no Paseo error.
+It held Paseo's `useNativeDriver` warning and the frame's "GPU stall due to ReadPixels" notes,
+which come from the screenshots.
+
 ## Not seen, and why
 
 | What                                          | Why                                                                 |
 | --------------------------------------------- | ------------------------------------------------------------------- |
-| An agent at a desk, and the card for it       | No agents: the host has no provider sign-in, and none was created   |
+| The card for an agent                         | The fourth look had Mock agents at desks; no card was opened        |
+| A resting agent's tag on the 3D floor         | Shown only while it walks, is hovered or chosen; none of these done |
+| The view choice kept across a reload          | The fourth look read the key after each press, not after a reload   |
+| The names in text read at 390 px              | The text was gathered at 1280 px only                               |
 | The office's tools inside an agent's session  | No agent session. The page shows Agent tools on, nothing more       |
-| A stand-up run and the notes it writes        | Needs agents to report on, and the 8:00 run did not come due        |
+| A stand-up run and the notes it writes        | The 8:00 run did not come due, and the bell was not pressed         |
 | An incidents check                            | Needs Jira or Sentry tokens on the host, and none were set          |
 | The gear at 390 px                            | A click on it timed out with the sheet open. It was not tried again |
 | The phone app                                 | Only a browser was used                                             |
-| A session's tab, its conversation and a reply | No agent: no provider was signed in, and none was created           |
-| A permission answered, and Stop on a session  | No agent session to ask or to stop                                  |
+| A session's tab, its conversation and a reply | No session was opened; the first three looks had no agent           |
+| A permission answered, and Stop on a session  | Not tried; the fourth look's waiting plan approval was left alone   |
 | An agent created from the form                | Create was not pressed: it would start a real provider session      |
 | The session tab row scrolling when it is full | Needs several session tabs, so agents                               |
 | The agent card's Stop and the Host card close | 0.16.2 lacks `cancel()` and `closeRuntime()`; see the README        |
