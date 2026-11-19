@@ -225,7 +225,8 @@ Seen at 1280 px:
   it showed the stored value. The settings page opened in the same tab after the press showed it.
 - With no Web Audio in the frame (`AudioContext` and `webkitAudioContext` removed by a script before
   the scene started), the button was dimmed and crossed out, its label and tooltip "Sound is not
-  available here", and a press on it changed nothing: no stored value, and no toast. The button's
+  available here" (the dimming made the tooltip faint too; fixed after this look, to be seen again:
+  only the icon is dimmed now), and a press on it changed nothing: no stored value, and no toast. The button's
   toast ("This app does not let the office play sound.") is not shown anywhere: the client gives the
   scene no `onToast`, so every toast of the scene is dropped (fixed after this look, to be seen
   again: with no `onToast` the scene now shows the line itself, in a note over the toolbar; and a
@@ -260,7 +261,9 @@ a touch screen, which hides Walk in, so Walk in was shown by hand to measure it 
 not depend on the pointer). At `d98d46a` the bar's content was 400 px wide inside 378 px, and
 Walk in ended 16 px past the frame's right edge. `8d6399e` adds `.tb-tools { gap: 0; }` and
 28 px buttons to the 520 px rule; after it the content is 386 px inside 378 px, and Walk in ends
-2 px past the frame's edge and over the bar's border. It still does not fit, by 8 px.
+2 px past the frame's edge and over the bar's border. It still does not fit, by 8 px. Fixed after
+this look, to be seen again: the 520 px rule now puts 2 px between the groups and 6 px of padding in
+the views, which by the rules makes the content 366 px, the most the bar holds at 390 px.
 
 The browser console held no error or warning from the plugin and no Paseo error, at either width.
 

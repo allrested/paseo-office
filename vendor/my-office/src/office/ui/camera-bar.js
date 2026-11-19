@@ -100,7 +100,9 @@ const STYLE = `
 .tb-zoom button, .tb-full { all: unset; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; color: #8D97AA; transition: background .15s, color .15s; }
 .tb-zoom button:hover, .tb-full:hover { background: rgba(255, 255, 255, .07); color: #E8ECF4; }
 .tb-full[aria-pressed="true"] { background: #263040; color: var(--o-accent, #EF8A5F); }
-.tb-full[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+/* (the icon is dimmed, not the button: an opacity on it would dim its tooltip too) */
+.tb-full[aria-disabled="true"] { cursor: not-allowed; }
+.tb-full[aria-disabled="true"] > span { opacity: .45; }
 .tb-full[aria-disabled="true"]:hover { background: none; color: #8D97AA; }
 .tb-zoom button:focus-visible, .tb-full:focus-visible { outline: 2px solid var(--o-accent, #EF8A5F); }
 .tb-zoom button, .tb-full { position: relative; }
@@ -149,8 +151,9 @@ const STYLE = `
 /* (upstream's 720 px rule for Walk in and the views: with Walk in's name, or a view's sliding out on hover or focus, the bar
    ran past the right edge at 530 px) */
 @media (max-width: 720px) { .tb-fp span:last-child, .seg-btn > span:last-child { display: none !important; } .tb-fp { padding: 0 11px; } .seg-btn, .seg-btn:hover, .seg-btn[aria-pressed="true"] { padding: 0 10px; } }
-/* (with it, at 390 px with a mouse Walk in still ran 30 px past the right edge: the buttons and the groups sit closer) */
-@media (max-width: 520px) { .toolbar { gap: 4px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 7px; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
+/* (with it, at 390 px with a mouse Walk in still ran 30 px past the right edge: the buttons and the groups sit closer.
+   At 390 px the bar's content may be 366 px: views 4 x 28 + 3 x 2 + 6 = 124, zoom 108, tools 90, Walk in 38, 3 gaps of 2) */
+@media (max-width: 520px) { .toolbar { gap: 2px; } .seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 6px; } .tb-tools { gap: 0; } .tb-zoom button, .tb-full { width: 28px; } .fp-help { top: calc(var(--corner-clear) + 44px); max-width: calc(100% - 24px); } }
 body.is-photo .toolbar { display: none; }
 /* Photo mode: the office alone, with one bar to frame and take the picture */
 body.is-photo #stage-wrap > :not(#stage):not(#photo-bar) { display: none !important; }

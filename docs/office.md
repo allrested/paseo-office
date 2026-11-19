@@ -240,8 +240,8 @@ on the button plays at once, and a press anywhere in the scene starts the audio 
 on. A probe (`paseo-sound.js`) finds out whether the frame allows audio at all. It runs inside a
 real press only (not for Escape or a bare modifier key, and not while the page has no user
 activation), and makes and closes a context of its own. A page with no Web Audio is "not
-available" at once, for good: the button is dimmed, says "Sound is not available here", and does
-nothing. A press after which no context ran makes the button the same, and holds the scene's sound
+available" at once, for good: the button's icon is dimmed, it says "Sound is not available
+here", and does nothing. A press after which no context ran makes the button the same, and holds the scene's sound
 off without changing the setting; the next press tries again. Once a context runs the button can be
 used again and the scene follows the setting with no further press: on if the setting is on. A
 press on the button itself while audio is held off waits for the probe that press started: if audio

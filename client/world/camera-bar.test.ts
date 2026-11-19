@@ -286,12 +286,15 @@ test("a press while audio is blocked whose own probe ends blocked says so once i
   }
 });
 
-test("the disabled button is drawn dimmed, and its hover does not light it", () => {
+test("the disabled button's icon is drawn dimmed, not its tooltip, and its hover does not light it", () => {
   build();
   const css = document
     .querySelector(".toolbar")
     ?.parentElement?.querySelector("style")?.textContent;
-  expect(css).toContain('.tb-full[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }');
+  expect(css).toContain('.tb-full[aria-disabled="true"] { cursor: not-allowed; }');
+  expect(css).toContain('.tb-full[aria-disabled="true"] > span { opacity: .45; }');
+  // An opacity on the button would dim its ::after tooltip with it.
+  expect(css).not.toMatch(/\.tb-full\[aria-disabled="true"\] \{[^}]*opacity/);
   expect(css).toContain(
     '.tb-full[aria-disabled="true"]:hover { background: none; color: #8D97AA; }',
   );
@@ -539,11 +542,14 @@ test("from 720 px down Walk in and the views keep their names hidden, with upstr
 });
 
 test("at 520 px and narrower the bar's buttons and groups sit closer, so Walk in still fits at 390 px", () => {
-  // At 390 px with a mouse, Walk in still ran 30 px past the frame's right edge with the 720 px rule alone.
+  // At 390 px with a mouse, Walk in still ran 30 px past the frame's right edge with the 720 px rule alone,
+  // and 2 px past it with 4 px between the groups and 7 px of padding in the views. At 390 px the bar's
+  // content may be 366 px (100% - 24px): views 4 x (6 + 16 + 6) + 3 x 2 + 2 x 3 = 124, zoom 28 + 2 + 42 +
+  // 2 + 28 + 6 = 108, tools 3 x 28 + 6 = 90, Walk in 11 + 16 + 11 = 38, and 3 gaps of 2: 366.
   build();
-  expect(narrow(520)).toContain(".toolbar { gap: 4px; }");
+  expect(narrow(520)).toContain(".toolbar { gap: 2px; }");
   expect(narrow(520)).toContain(
-    '.seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 7px; }',
+    '.seg-btn, .seg-btn:hover, .seg-btn:focus-visible, .seg-btn[aria-pressed="true"] { padding: 0 6px; }',
   );
   expect(narrow(520)).toContain(".tb-tools { gap: 0; }");
   expect(narrow(520)).toContain(".tb-zoom button, .tb-full { width: 28px; }");
