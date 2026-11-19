@@ -44,6 +44,7 @@ interface PillProps<Value extends string> {
   /** Not pressable: a screen reader hears it as unavailable. */
   disabled?: boolean;
   /** A chip is a toggle and says it is pressed; a tab says it is the chosen one. */
+  compact?: boolean;
   toggle: boolean;
   onPress(value: Value): void;
   styles: OfficeStyles;
@@ -57,6 +58,7 @@ export function Pill<Value extends string>({
   count,
   on,
   disabled = false,
+  compact = false,
   toggle,
   onPress,
   styles,
@@ -83,7 +85,7 @@ export function Pill<Value extends string>({
       onPressOut={pressOut}
       onHoverIn={hoverIn}
       onHoverOut={hoverOut}
-      style={styles.segment}
+      style={compact ? [styles.segment, styles.sessionFilter] : styles.segment}
     >
       {fill === null ? null : <View style={fill} />}
       <Text style={on ? styles.segmentTextSelected : styles.segmentText}>

@@ -270,6 +270,10 @@ export interface OfficeStyles {
   sceneNote: ViewStyle;
   sceneNoteText: TextStyle;
   /** The Activity panel beside the floor: its top and its feed of cards. */
+  sessionTools: ViewStyle;
+  sessionSearch: TextStyle;
+  sessionFilterPair: ViewStyle;
+  sessionFilter: ViewStyle;
   panelTop: ViewStyle;
   /** The "Live" tag: the running dot and its word. */
   panelLive: ViewStyle;
@@ -579,8 +583,9 @@ export function useOfficeStyles(
         borderBottomColor: colors.border,
       },
       columnTabs: { ...segments, flexShrink: 1, flexWrap: "wrap" },
-      // At 44 the chosen tab's label pushes the row past 280 px and Chat wraps to a second row.
       columnTab: {
+        flexDirection: "row",
+        gap: 4,
         minHeight: controlHeight,
         minWidth: controlHeight,
         paddingHorizontal: 12,
@@ -1091,6 +1096,10 @@ export function useOfficeStyles(
         pointerEvents: "none",
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
+      sessionTools: { flexDirection: "row", alignItems: "center", gap: 8 },
+      sessionSearch: { ...lineInput, flex: 1, minWidth: 0 },
+      sessionFilterPair: { ...segments, flexGrow: 1, flexBasis: 146 },
+      sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       panelTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 8, gap: 8 },
       panelLive: { flexDirection: "row", alignItems: "center", gap: 8 },
       panelLiveText: { ...small, color: colors.foregroundMuted },
