@@ -34,6 +34,8 @@ export interface WorldSession {
    * it works, waits or is stopped on an error.
    */
   doneAt?: number;
+  /** Host revision for an idle session eligible for archive when its worker gets home. */
+  idleSince?: string;
   /** A red name tag: the agent ended in an error. */
   stuck: boolean;
   /**
@@ -155,6 +157,7 @@ export type WorldTenureProject = WorldTenure["projects"][number];
 export type WorldLiftService = LifeEvent["lift"];
 
 export interface WorldStartOptions {
+  onWentHome?(agentId: string, idleSince: string): void;
   /** Something the office's people would say in the team chat: a kind of moment and a few words. */
   onLife?(kind: string, vars: Record<string, string>): void;
   /** The tenure list's two writes: a farewell was held, an intern was made permanent. */

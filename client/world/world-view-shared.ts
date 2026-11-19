@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
-import { notesWriteRpc, worldRpc } from "../../shared/contracts.js";
+import { homeDepartureRpc, notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { isWordsLanguage, type SceneLanguage } from "../../shared/scene-language.js";
 import { failureText } from "../action-button.js";
@@ -32,6 +32,7 @@ export interface WorldLatest {
   /** A figure acted out a pretend duty: the host records it done by that agent. */
   onDutyActed?(id: string, agentId: string): void;
   onBell(): void | Promise<void>;
+  onWentHome?: WorldStartOptions["onWentHome"];
   onLife?: WorldStartOptions["onLife"];
   onTenure?: WorldStartOptions["onTenure"];
   onSound(on: boolean): void;
@@ -110,6 +111,7 @@ export function worldStartOptions(
             latest.current.onOpenAgentWorkspace?.(agentId);
           },
         }),
+    onWentHome: (id, idleSince) => latest.current.onWentHome?.(id, idleSince),
     onLife: (kind, vars) => latest.current.onLife?.(kind, vars),
     onTenure: (op) => latest.current.onTenure?.(op),
     onBell: () => void latest.current.onBell(),
@@ -165,6 +167,19 @@ export function useWorldScript(
     };
   }, [fetchScript, enabled]);
   return loadState.status === "ready" ? loadState.script : null;
+}
+
+export function useHomeDeparture() {
+  const archive = useRpc(homeDepartureRpc);
+  const toast = useToast();
+  return useCallback(
+    (agentId: string, idleSince: string) => {
+      void archive({ agentId, idleSince }).catch((error) =>
+        toast.error(failureText("Archive the departed session", error)),
+      );
+    },
+    [archive, toast],
+  );
 }
 
 /**

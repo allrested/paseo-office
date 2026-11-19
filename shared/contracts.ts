@@ -791,6 +791,11 @@ export const lifeSubscription = defineSubscription({
   input: z.object({}),
   event: LifeEventSchema,
 });
+export const homeDepartureRpc = defineRpc({
+  name: "office.home.departure",
+  input: z.object({ agentId: z.string().min(1), idleSince: z.string().min(1) }),
+  output: z.object({ archived: z.boolean() }),
+});
 export const tenureRpc = defineRpc({
   name: "office.tenure.request",
   input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),

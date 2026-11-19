@@ -14,6 +14,7 @@ import { bridgePageScript } from "./world-bridge-page.js";
 import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
+  useHomeDeparture,
   useStandupBell,
   useWorldScript,
   worldStartOptions,
@@ -68,6 +69,7 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
   const brand = useOfficeBrand();
@@ -88,6 +90,7 @@ function WorldViewNativeScene({
     onDutyActed,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
     scene,
     night,
@@ -113,6 +116,7 @@ function WorldViewNativeScene({
       onDutyActed,
       onBell,
       onLife,
+      onWentHome,
       onTenure,
       scene,
       night,

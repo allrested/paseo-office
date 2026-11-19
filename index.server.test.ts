@@ -774,6 +774,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.chat.request",
     "office.life",
     "office.street.events",
+    "office.home.departure",
     "office.tenure.request",
   ]);
   expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "duty-board", "incidents"]);

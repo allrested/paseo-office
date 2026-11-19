@@ -2,6 +2,7 @@
 import * as THREE from '../../../three/three.module.min.js';
 import { CSS2DObject } from '../../../three/addons/renderers/CSS2DRenderer.js';
 import { makeChibi, chibiPose, applyChibiPose, wearOuter, wearHat, wearLanyard, disposeChibi } from './chibi-rig.js';
+import { host } from '../paseo-host.js';
 import { state } from '../core/state.js';
 import { PRO, SEASON, V2, el, fmtAgo, nowMs, officeNow, rand, randInt, reduceMotion, replay, short, tint, wrapAngle } from '../core/env.js';
 import { ACT, ANIM_AT, bubbleText, verb } from '../ui/event-text.js';
@@ -489,12 +490,27 @@ export function setup() {
     }
     nightOut(s) {
       if (this.anim !== 'sleep' || this.want || this.chore || !this.lateRest(s)) return false;
-      this.goHomeNow();
+      this.goHomeNow(true);
       return true;
     }
-    goHomeNow() {
+    goHomeNow(endOfShift = false) {
       this.homeBound = true; this.hush(); this.restAt = Infinity; this.station = 'out';
-      this.walkOut(() => { this.homeBound = false; this.away = true; this.station = 'away'; this.hush(); if (this.spot?.by === this) this.spot.by = null; });
+      // PASEO: report a night departure before the viewer can close the floor mid-walk.
+      // An outing can still return to work, so report that departure only once home.
+      const idleSince = sessions.get(this.id)?.idleSince;
+      const reportDeparture = () => {
+        const s = sessions.get(this.id);
+        if (idleSince && s?.idleSince === idleSince && s.status === 'rest' && !s.stuck && !s.bg?.length &&
+            !this.want && !this.sub && !this.leaving && !replay.on && workers.get(this.id) === this) {
+          host.wentHome(this.id, idleSince);
+        }
+      };
+      if (endOfShift) reportDeparture();
+      this.walkOut(() => {
+        this.homeBound = false; this.away = true; this.station = 'away'; this.hush();
+        if (this.spot?.by === this) this.spot.by = null;
+        if (!endOfShift) reportDeparture();
+      });
     }
     comeBack() {
       this.away = false; this.station = 'arriving';

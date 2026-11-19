@@ -60,6 +60,7 @@ The following copied files include changes marked with `// PASEO:`.
   gap); the engine and every other sound are upstream's.
 - `src/office/core/env.js`: the build flag upstream reads from `process.env` is a constant, and
   the floor plan comes from Paseo, not from the page's address and storage.
+- `src/office/people/workers.js`: an idle worker reports its end-of-shift departure or completed evening trip to Paseo for session archiving.
 - `src/office/interact/first-person.js`: E at the lift enters the enabled street. E on a person passes `opts.open` to the session drawer, and `floorBounds` is
   exported for the camera bar.
 - `src/office/interact/place-cards.js`: the lounge's card has a cup for its icon, not a sparkle,

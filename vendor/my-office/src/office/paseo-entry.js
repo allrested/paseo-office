@@ -307,6 +307,7 @@ const api = {
     setLanguage(options.language, options.words);
     host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
+    host.wentHome = (id, idleSince) => { if (!stopped) options.onWentHome?.(id, idleSince); };
     host.select = (id) => options.onSelect?.(id);
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
     onMachine = typeof options.onMachine === 'function' ? options.onMachine : null;
