@@ -89,6 +89,15 @@ svg.ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .ptip { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; max-width: 260px; display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; border-radius: 8px; }
 .ptip b { font-size: 12px; font-weight: 600; }
 .ptip span { font-size: 11px; color: var(--o-muted); }
+.ptip:has(.ptip-rows:not([hidden])) { max-width: 320px; min-width: 200px; gap: 6px; }
+.ptip-rows { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--o-border); }
+.ptip-rows[hidden] { display: none; }
+.ptip-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.ptip .ptip-row-name { color: var(--o-fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptip .ptip-row-who { flex: none; font-weight: 600; color: var(--o-fg); white-space: nowrap; }
+.ptip .ptip-row--open .ptip-row-who { font-weight: 500; color: var(--o-muted); }
+.ptip .ptip-row--done .ptip-row-name, .ptip .ptip-row--done .ptip-row-who { color: var(--o-muted); }
+.ptip-row-owed { margin-left: 6px; padding: 0 5px; border: 1px solid var(--o-warning); border-radius: 4px; font-size: 10px; font-style: normal; font-weight: 600; color: var(--o-warning); }
 @media (hover: none) { .ptip { display: none; } }
 
 .plc { position: absolute; left: 0; top: 0; z-index: 3; width: min(330px, calc(100% - 24px)); max-height: min(520px, calc(100% - 48px)); display: flex; flex-direction: column; border-radius: 12px; }

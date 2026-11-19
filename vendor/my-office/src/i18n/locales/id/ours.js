@@ -62,4 +62,7 @@ export default {
   // (the pantry's board with the host's duties, people/duty.js: whom a duty has nobody for yet, and a day with none due)
   'paseo.duty.open': 'belum diambil',
   'paseo.duty.none': 'Tidak ada tugas piket hari ini',
+  // (the board's tooltip rows, interact/props.js: one left from an earlier day, and one done that nobody is named for)
+  'paseo.duty.owed': 'tertunda',
+  'paseo.duty.done': 'selesai',
 };

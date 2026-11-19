@@ -30,7 +30,7 @@ import { tableClick } from '../people/billiards.js';
 import { KTV } from '../world/props/karaoke.js';
 import { MW, mwMeshes, openOven } from '../world/props/microwave.js';
 import { boardMeshes } from '../world/props/duty-board.js';
-import { dutyText } from '../people/duty.js';
+import { dutyRows, dutyText } from '../people/duty.js';   // PASEO: dutyRows, the tooltip as rows
 import { boothClick } from '../people/karaoke.js';
 import { neonG, neonM } from '../world/props/neon.js';
 import { SOFA, cat, catGo, petCat } from '../world/props/cat.js';
@@ -173,7 +173,7 @@ export function buildProps() {
     if (BIL) prop('billiards', { name: tr('props.billiards.name'), hint: tr('props.billiards.hint'), place: 'lounge', meshes: [...meshesOf(BIL.g), ...meshesOf(BIL.rack)], act: tableClick });
     // the microwaves (people/comnha.js): a click opens a free one's door, or shuts it
     // the duty board in the pantry (people/duty.js): today's names under the pointer, and in a toast when tapped
-    if (boardMeshes().length) prop('dutyBoard', { name: tr('props.dutyBoard.name'), hintFn: dutyText, meshes: boardMeshes(), act: () => toast(dutyText()) });
+    if (boardMeshes().length) prop('dutyBoard', { name: tr('props.dutyBoard.name'), hintFn: dutyText, rowsFn: dutyRows, meshes: boardMeshes(), act: () => toast(dutyText()) });
     if (MW.g) prop('microwave', { name: tr('props.microwave.name'), hint: tr('props.microwave.hint'), place: 'coffee', meshes: mwMeshes(), act: () => { const O = MW.ovens.find((o) => o.stage === 'idle' && !o.by); if (O) { openOven(O, O.openGoal < 1); sfx.play('click'); } } });
     if (KTV) prop('karaoke', { name: tr('props.karaoke.name'), hint: tr('props.karaoke.hint'), meshes: meshesOf(KTV.g), act: boothClick });
   }
@@ -230,6 +230,15 @@ export function updateProps(dt, t) {
 let ptip;
 let ptipT;
 let ptipH;
+let ptipR;   // PASEO: the tooltip's rows
+// PASEO: one row of the tooltip: the duty, then who has it ("open" when nobody), a tick once done, "owed" from an earlier day
+function tipRow(r) {
+  const row = el('div', `ptip-row ptip-row--${r.state}`);
+  const name = el('span', 'ptip-row-name', r.name);
+  if (r.owed) name.append(el('i', 'ptip-row-owed', tr('paseo.duty.owed')));
+  row.append(name, el('span', 'ptip-row-who', `${r.state === 'done' ? '✓ ' : ''}${r.who || (r.state === 'done' ? tr('paseo.duty.done') : tr('paseo.duty.open'))}`));
+  return row;
+}
 export let hoverProp = null;
 export function setHoverProp(p, ev) {
   if (p !== hoverProp) {
@@ -238,7 +247,10 @@ export function setHoverProp(p, ev) {
     for (const [id, pl] of Object.entries(PLACES)) pl.el?.classList.toggle('zone--hot', !!p && p.place === id);
   }
   if (!p || !ev) { ptip.hidden = true; return; }
-  ptipT.textContent = p.name; ptipH.textContent = propHint(p);
+  // PASEO: a prop with rows (the duty board) lists them, a duty a row, in place of one long line
+  const rows = p.rowsFn?.() || null;
+  ptipT.textContent = p.name; ptipH.textContent = rows ? '' : propHint(p); ptipH.hidden = !!rows;
+  ptipR.hidden = !rows; ptipR.replaceChildren(...(rows || []).map(tipRow));
   const r = $('stage-wrap').getBoundingClientRect();
   ptip.hidden = false;
   const x = ev.clientX - r.left + 16, y = ev.clientY - r.top + 18, w = ptip.offsetWidth, h = ptip.offsetHeight;
@@ -279,8 +291,8 @@ export function setup() {
   ptip = el('div', 'ptip');
    ptip.hidden = true;
    ptip.setAttribute('role', 'tooltip');
-  ptipT = el('b'); ptipH = el('span');
-   ptip.append(ptipT, ptipH);
+  ptipT = el('b'); ptipH = el('span'); ptipR = el('div', 'ptip-rows');   // PASEO: ptipR
+   ptip.append(ptipT, ptipH, ptipR);
    $('stage-wrap').append(ptip);
   state.hoverPlace = null;
 }

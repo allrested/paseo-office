@@ -23,7 +23,17 @@ export function boardRows(duties, busyId) {
   }));
 }
 
-/** The tooltip: each duty and who has it, `open` for one nobody has, a tick once done. */
+/** The tooltip's rows, one duty each: { name, who (the holder's name, '' when nobody), state: open | held | done, owed }. */
+export function tipRows(duties) {
+  return duties.map((d) => ({
+    name: d.name,
+    who: d.holder?.name ?? '',
+    state: d.state === 'done' ? 'done' : d.holder ? 'held' : 'open',
+    owed: !!d.owed && d.state !== 'done',
+  }));
+}
+
+/** The duties in a line (a toast when the board is tapped, the walk-in's label, HR's morning list). */
 export function dutyLine(duties, open) {
   return duties.map((d) => {
     const who = d.holder?.name || (d.state === 'done' ? '—' : open);

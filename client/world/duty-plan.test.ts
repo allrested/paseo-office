@@ -3,6 +3,7 @@ import {
   BOARD_WINDOW,
   boardRows,
   dutyLine,
+  tipRows,
   nextJob,
   // @ts-expect-error vendored JavaScript has no declarations
 } from "../../vendor/my-office/src/office/paseo-duty-plan.js";
@@ -56,6 +57,22 @@ test("the tooltip says each duty and who has it: open, the name, or done", () =>
       "open",
     ),
   ).toBe("Cups: open · Build: Planner · Bin: — ✓");
+});
+
+test("the tooltip's rows: one duty a row, who has it, done, and owed on its own row", () => {
+  expect(
+    tipRows([
+      duty("p1", { name: "Cups" }),
+      duty("p2", { name: "Build", holder: HOLDER, state: "claimed", pretend: false }),
+      duty("p3", { name: "Bin", holder: HOLDER, state: "done" }),
+      duty("p4", { name: "Plants", owed: true }),
+    ]),
+  ).toEqual([
+    { name: "Cups", who: "", state: "open", owed: false },
+    { name: "Build", who: "Planner", state: "held", owed: false },
+    { name: "Bin", who: "Planner", state: "done", owed: false },
+    { name: "Plants", who: "", state: "open", owed: true },
+  ]);
 });
 
 test("a pretend duty in its hours goes to the free figure that has done fewest today", () => {

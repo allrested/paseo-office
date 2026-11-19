@@ -34,7 +34,7 @@ import { t as tr } from '../../i18n/index.js';
 // and who has each are the host's, not this rota's. A free figure acts out a pretend duty and the host is told it is
 // done; an agent's duty is acted out once by its holder's figure. The cups in the sink are still counted here.
 import { host } from '../paseo-host.js';
-import { boardRows, dutyLine, nextJob } from '../paseo-duty-plan.js';
+import { boardRows, dutyLine, nextJob, tipRows } from '../paseo-duty-plan.js';
 
 const FORCE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('duty');
 const KEY = 'office-duty', TABLES = [[10.4, -4.9], [12.8, -4.9], [10.4, -0.9], [12.8, -0.9]];
@@ -230,6 +230,15 @@ export function dutyText() {
   if (!Object.keys(st.who).length) return tr('people.duty.board.nobody');
   const list = CHORES.map((c) => `${tr(`people.duty.chores.${c}`)}: ${st.names[st.who[c]] || '—'}${st.done[c] != null ? ' ✓' : ''}`).join(' · ');
   return st.owe.length ? `${list} · ${tr('people.duty.board.owe', { list: st.owe.map((o) => tr(`people.duty.chores.${o.chore}`)).join(', ') })}` : list;
+}
+
+// PASEO: the tooltip as rows, a duty each (interact/props.js draws them); null where a line says it better (no duty
+// today, nobody here). Upstream's own rota gives the same rows, so the tooltip reads the same on a host with no list.
+export function dutyRows() {
+  if (hosted()) return host.duties.length ? tipRows(host.duties) : null;
+  if (!isWorkday(officeNow()) || !Object.keys(st.who).length) return null;
+  const owed = new Set(st.owe.map((o) => o.chore));
+  return CHORES.map((c) => ({ name: tr(`people.duty.chores.${c}`), who: st.names[st.who[c]] || '', state: st.done[c] != null ? 'done' : st.who[c] ? 'held' : 'open', owed: owed.has(c) }));
 }
 
 /* ---------- each frame (a look every two seconds) ---------- */
