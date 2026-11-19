@@ -199,6 +199,24 @@ test("a live item arriving out of order is placed by its sequence number", async
   expect(texts()).toEqual(["Hi", "three", "four"]);
 });
 
+test("a live piece past the last held entry is appended without sorting the list", async () => {
+  await mount();
+  await answer(0, page([entry(1, you("Hi")), entry(2, say("Hello", "m1"), 4)]));
+  const sort = vi.spyOn(Array.prototype, "sort");
+  try {
+    await push(live(5, you("five")));
+    await push(live(6, you("six")));
+    // An out of order piece still lands in place, also without a sort.
+    await push(live(8, you("eight")));
+    await push(live(7, you("seven")));
+    await push(live(3, you("inside the merged range")));
+    expect(sort).not.toHaveBeenCalled();
+  } finally {
+    sort.mockRestore();
+  }
+  expect(texts()).toEqual(["Hi", "Hello", "five", "six", "seven", "eight"]);
+});
+
 test("live events without a timeline item or sequence number add nothing", async () => {
   await mount();
   await answer(0, page([entry(1, you("Hi"))]));

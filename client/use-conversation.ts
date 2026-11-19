@@ -80,12 +80,18 @@ function fromPage(page: Page): Held[] {
   }));
 }
 
-/** Adds a live piece in sequence order, unless a held entry already covers its number. */
+/**
+ * Adds a live piece in sequence order, unless a held entry already covers its number. A piece
+ * past the last held entry, which is nearly always, is appended with no scan and no sort.
+ */
 function withLive(held: Held[], seq: number, item: AgentTimelineItem): Held[] {
+  const piece: Held = { seq, end: seq, item };
+  const last = held[held.length - 1];
+  if (last === undefined || seq > last.end) return held.concat(piece);
   if (held.some((h) => h.seq <= seq && seq <= h.end)) return held;
-  const next = held.concat({ seq, end: seq, item });
-  next.sort((a, b) => a.seq - b.seq);
-  return next;
+  let at = held.length;
+  while (at > 0 && held[at - 1]!.seq > seq) at -= 1;
+  return [...held.slice(0, at), piece, ...held.slice(at)];
 }
 
 function liveItem(event: unknown): { seq: number; item: AgentTimelineItem } | null {
