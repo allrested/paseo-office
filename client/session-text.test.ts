@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { OfficeAgent } from "../shared/contracts.js";
-import { GONE_LINE, composerPlaceholder, rowLabel, statusLine } from "./session-text.js";
+import { UNLISTED_LINE, composerPlaceholder, rowLabel, statusLine } from "./session-text.js";
 
 const AGENT: OfficeAgent = {
   id: "a1",
@@ -46,6 +46,8 @@ test("a row's accessible name starts with who spoke", () => {
   );
 });
 
-test("an agent that left the office has a line of its own", () => {
-  expect(GONE_LINE).toBe("This agent has left the office.");
+test("an agent the office does not list has a line that is true of closed, archived and starting", () => {
+  expect(UNLISTED_LINE).toBe(
+    "The office does not list this agent: it may be closed, archived or still starting.",
+  );
 });

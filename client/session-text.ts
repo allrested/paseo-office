@@ -3,7 +3,9 @@ import { agentTitle } from "../shared/model.js";
 import { stateLabel } from "./agent-card.js";
 import type { ConversationRow } from "./conversation-model.js";
 
-export const GONE_LINE = "This agent has left the office.";
+/** True of an agent that is closed, archived, or created and not yet in the office's list. */
+export const UNLISTED_LINE =
+  "The office does not list this agent: it may be closed, archived or still starting.";
 
 /** The header's second line: the room, then the state in the words the card and the rows use. */
 export function statusLine(agent: OfficeAgent, room: string | null): string {

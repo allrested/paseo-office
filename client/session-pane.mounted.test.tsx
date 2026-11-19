@@ -10,7 +10,12 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent } from "../shared/contracts.js";
 import type { OfficeModel } from "../shared/model.js";
-import { SessionPane, sessionOf, type SessionPaneProps } from "./session-pane.js";
+import {
+  SessionPane,
+  sessionOf,
+  type SessionContext,
+  type SessionPaneProps,
+} from "./session-pane.js";
 import { useOfficeStyles } from "./styles.js";
 
 let draws: number;
@@ -66,7 +71,10 @@ const context = { actions, navigation: undefined, closeSession: () => undefined 
 let container: HTMLElement;
 let root: Root;
 
-type Shown = Pick<SessionPaneProps, "agent" | "room"> & { reply?: string };
+type Shown = Pick<SessionPaneProps, "agent" | "room"> & {
+  reply?: string;
+  context?: SessionPaneProps["context"];
+};
 
 const setReply = () => undefined;
 
@@ -107,6 +115,25 @@ test("an agent that came again unchanged does not draw the pane; a change to its
   await draw({ agent: agent("a1", "running"), room: "Acme shop" });
   await draw({ agent: agent("a1", "running"), room: "Acme lab" });
   expect(draws).toBe(3);
+});
+
+test("a tab opened before its agent is listed becomes the normal panel when the agent appears", async () => {
+  const navigation = { openAgent: vi.fn() } as unknown as SessionContext["navigation"];
+  const withNavigation = { ...context, navigation };
+  const box = () => container.querySelector('[aria-label="Message"]');
+  const open = () => container.querySelector('[aria-label="Open in workspace"]');
+  const show = (listed: OfficeAgent | null) =>
+    act(async () =>
+      root.render(createElement(Harness, { agent: listed, room: null, context: withNavigation })),
+    );
+  await show(null);
+  expect(container.textContent).toContain("The office does not list this agent");
+  expect(open()).not.toBeNull();
+  expect(box()).toBeNull();
+  await show(agent("a1"));
+  expect(container.textContent).not.toContain("does not list");
+  expect(box()).not.toBeNull();
+  expect(open()).not.toBeNull();
 });
 
 test("a change to the reply's text draws the pane", async () => {

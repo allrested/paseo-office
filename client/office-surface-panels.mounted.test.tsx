@@ -762,7 +762,7 @@ test("an agent that leaves keeps its tab, which says so; Close removes it", asyn
   await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
 
   expect(container.querySelector('[role="tab"][aria-label^="Agent "]')).not.toBeNull();
-  expect(container.textContent).toContain("This agent has left the office.");
+  expect(container.textContent).toContain("The office does not list this agent");
 
   const close = container.querySelector<HTMLElement>('[aria-label^="Close Agent "]');
   if (!close) throw new Error("The tab has no Close");

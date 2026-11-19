@@ -327,13 +327,22 @@ test("Stop is drawn while the agent runs and the host can stop a turn", async ()
   expect(cancel).toHaveBeenCalledWith("a1");
 });
 
-test("an agent that left the office: the line and Close, no composer", async () => {
+test("an agent the office does not list: the line and Close, no composer", async () => {
   await draw({ agent: null, room: null });
-  expect(container.textContent).toContain("This agent has left the office.");
+  expect(container.textContent).toContain("The office does not list this agent");
   expect(maybe("Message")).toBeNull();
   expect(maybe("Send")).toBeNull();
   await press("Close");
   expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("an agent the office does not list still has Open in workspace where the app gives one", async () => {
+  await draw({ agent: null, room: null });
+  await press("Open in workspace");
+  expect(onOpenWorkspace).toHaveBeenCalledTimes(1);
+  await draw({ agent: null, room: null, onOpenWorkspace: undefined });
+  expect(maybe("Open in workspace")).toBeNull();
+  expect(maybe("Close")).not.toBeNull();
 });
 
 test("with a keyboard Enter sends and Shift+Enter does not", async () => {

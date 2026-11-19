@@ -129,8 +129,10 @@ tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clear
 question is answered in the workspace, where the app gives one: the panel then says "Answer this in the workspace." and offers
 "Open in workspace"; in an app that gives none it says "This cannot be answered here."
 Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
-there. A tab leaves only when it is closed: an agent that leaves the office keeps its tab,
-which says so. On a compact layout the sheet shows the session with a Back to Sessions button;
+there. A tab leaves only when it is closed: an agent the office does not list (closed, archived, or
+created a moment ago and not yet in the list) keeps its tab, which says so, with "Open in
+workspace" where the app gives one and no reply box; the tab is the normal panel once the agent is
+listed. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 Open sessions and the chosen tab last while the office is mounted, not across a reload.
 

@@ -28,9 +28,9 @@ import {
   ANSWER_IN_WORKSPACE,
   CANNOT_ANSWER_HERE,
   EARLIER_FAILED,
-  GONE_LINE,
   LOADING,
   NOTHING_SAID,
+  UNLISTED_LINE,
   composerPlaceholder,
   rowLabel,
   statusLine,
@@ -47,7 +47,7 @@ export interface ReplyDraft {
 }
 
 export interface SessionPanelProps {
-  /** Null once the agent has left the office: the panel says so and offers Close. */
+  /** Null while the office does not list the agent: the panel says so, with Close and the way on. */
   agent: OfficeAgent | null;
   agentId: string;
   /** The reply box's text: the surface's, so it outlives the panel. */
@@ -78,7 +78,7 @@ function Header({ agent, room, onOpenWorkspace, onClose, styles }: HeaderProps) 
   return (
     <View style={styles.sessionHead}>
       {agent === null ? (
-        <Text style={styles.muted}>{GONE_LINE}</Text>
+        <Text style={styles.muted}>{UNLISTED_LINE}</Text>
       ) : (
         <>
           <Text style={styles.rowTitle} numberOfLines={1}>
@@ -88,7 +88,7 @@ function Header({ agent, room, onOpenWorkspace, onClose, styles }: HeaderProps) 
         </>
       )}
       <View style={styles.actions}>
-        {onOpenWorkspace && agent !== null ? (
+        {onOpenWorkspace ? (
           <ActionButton
             label="Open in workspace"
             pendingLabel="Opening..."
