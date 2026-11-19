@@ -70,9 +70,11 @@ import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./o
 import { SessionsPanel } from "./sessions-panel.js";
 import { PixelOffice } from "./pixel/pixel-office.js";
 import { StructureView } from "./structure-view.js";
-import { SESSION_RAIL_WIDTH, useOfficeStyles, type OfficeStyles } from "./styles.js";
+import { SESSION_RAIL_MIN, useOfficeStyles, type OfficeStyles } from "./styles.js";
 import { useAgentActions, type AgentActions } from "./use-agent-actions.js";
 import { useBoardActions } from "./use-board-actions.js";
+import { useDeviceSwitch } from "./use-device-switch.js";
+import { FullscreenHeader, type SidebarControls } from "./fullscreen-header.js";
 import { useColumn, type ColumnState } from "./use-column.js";
 import { LibraryCard } from "./library-card.js";
 import { NotesCard } from "./notes-card.js";
@@ -802,6 +804,8 @@ function useCardOpening(live: boolean): CardOpening {
 }
 
 interface ViewControlsProps {
+  badges: ColumnBadges;
+  sidebars?: SidebarControls;
   full: ReturnType<typeof useFullscreen>;
   /** True once a floor is drawn under them: they take its corner, else a row of the page. */
   floorDrawn: boolean;
@@ -818,6 +822,8 @@ interface ViewControlsProps {
 
 /** The view switch and the settings button. */
 function ViewControls({
+  badges,
+  sidebars,
   full,
   floorDrawn,
   viewChoice,
@@ -830,45 +836,73 @@ function ViewControls({
   styles,
 }: ViewControlsProps) {
   const problem = deviceProblemOf(viewChoice.unsaved, soundUnsaved);
+  const modes = useMemo(
+    () => (
+      <ViewSwitch
+        options={viewChoice.options}
+        value={viewChoice.choice}
+        onChange={onChange}
+        styles={styles}
+      />
+    ),
+    [viewChoice.options, viewChoice.choice, onChange, styles],
+  );
+  const actions = (
+    <>
+      {full.available ? (
+        <PanelButton
+          label={full.active ? "Exit full screen" : "Full screen"}
+          icon={full.active ? "Minimize" : "Maximize"}
+          screenId="fullscreen"
+          size={touchScreen ? 20 : 16}
+          color={color}
+          onOpen={full.toggle}
+          styles={styles}
+        />
+      ) : null}
+      {onOpenSettings ? (
+        <SettingsButton
+          onOpen={onOpenSettings}
+          compact={compact}
+          touchScreen={touchScreen}
+          color={color}
+          styles={styles}
+        />
+      ) : null}
+    </>
+  );
+  const notice =
+    problem === null ? null : (
+      <Text accessibilityRole="alert" style={styles.actionError}>
+        {problem}
+      </Text>
+    );
+  if (sidebars) {
+    return (
+      <>
+        <FullscreenHeader
+          sidebars={sidebars}
+          badges={badges}
+          modes={modes}
+          color={color}
+          styles={styles}
+        >
+          {actions}
+        </FullscreenHeader>
+        {notice}
+      </>
+    );
+  }
   return (
-    // The controls show in the row first and move to the corner once the floor is drawn.
     <View
       testID={floorDrawn ? "office-view-corner" : "office-view-row"}
       style={floorDrawn ? styles.viewCorner : styles.viewRow}
     >
       <View style={styles.viewControls}>
-        <ViewSwitch
-          options={viewChoice.options}
-          value={viewChoice.choice}
-          onChange={onChange}
-          styles={styles}
-        />
-        {full.available ? (
-          <PanelButton
-            label={full.active ? "Exit full screen" : "Full screen"}
-            icon={full.active ? "Minimize" : "Maximize"}
-            screenId="fullscreen"
-            size={touchScreen ? 20 : 16}
-            color={color}
-            onOpen={full.toggle}
-            styles={styles}
-          />
-        ) : null}
-        {onOpenSettings ? (
-          <SettingsButton
-            onOpen={onOpenSettings}
-            compact={compact}
-            touchScreen={touchScreen}
-            color={color}
-            styles={styles}
-          />
-        ) : null}
+        {modes}
+        {actions}
       </View>
-      {problem === null ? null : (
-        <Text accessibilityRole="alert" style={styles.actionError}>
-          {problem}
-        </Text>
-      )}
+      {notice}
     </View>
   );
 }
@@ -877,6 +911,32 @@ function ViewControls({
 function useUnread(chat: OfficeState["chat"]): string | null {
   const seenAt = useChatSeen();
   return unreadLabel(unreadCount(chat?.messages ?? [], seenAt));
+}
+
+function SessionsSidebar({
+  open,
+  size,
+  styles,
+  ...panel
+}: ColumnPanelProps & { open: boolean; size: { width: number } }) {
+  return (
+    <View style={open ? size : styles.hidden} testID="office-sessions-sidebar">
+      <View style={styles.sessionRail}>
+        <View style={styles.sessionRailHeading}>
+          <Text accessibilityRole="header" style={styles.sessionRailTitle}>
+            Sessions
+          </Text>
+          {panel.office.loaded && panel.office.subscription.status === "live" ? (
+            <View style={styles.liveLabel}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
+          ) : null}
+        </View>
+        <SessionsPanel {...panel} styles={styles} />
+      </View>
+    </View>
+  );
 }
 
 interface ColumnPanelSwitchProps extends ColumnPanelProps {
@@ -1168,7 +1228,7 @@ function WideColumn({
   attention,
   ...panel
 }: WideColumnProps) {
-  if (compact) return null;
+  if (compact || (hideSessions && column.collapsed)) return null;
   return (
     <OfficeColumn
       hideSessions={hideSessions}
@@ -1211,8 +1271,8 @@ function useSurfaceLayout(deviceCompact: boolean, styles: OfficeStyles, fullscre
     (event: LayoutChangeEvent) => setSurfaceWidth(event.nativeEvent.layout.width),
     [],
   );
-  const compact =
-    (deviceCompact && !fullscreen) || (surfaceWidth > 0 && surfaceWidth < COLUMN_MIN + FLOOR_MIN);
+  const minimum = COLUMN_MIN + FLOOR_MIN + (fullscreen ? SESSION_RAIL_MIN : 0);
+  const compact = (deviceCompact && !fullscreen) || (surfaceWidth > 0 && surfaceWidth < minimum);
   // While the column's handle is dragged over it, the floor takes no pointer: the web's 3D floor
   // is a frame, which would keep the moves and the release from the handle. A compact surface
   // has no handle, so a drag cut short by a flip to compact does not leave the floor dead.
@@ -1273,8 +1333,18 @@ function useFullscreenPanels(
   select: (id: string | null) => void,
   selectFromStrip: (id: string) => void,
 ) {
-  const showRail =
-    active && !compact && surfaceWidth >= SESSION_RAIL_WIDTH + COLUMN_MIN + FLOOR_MIN;
+  const docked = active && !compact && surfaceWidth > 0;
+  const { on: sessionsHidden, set: hideSessions } = useDeviceSwitch("sessionsHidden", false);
+  const sessionsOpen = sessionsHidden !== true;
+  const sidebarWidth = Math.max(SESSION_RAIL_MIN, Math.min(312, Math.round(surfaceWidth * 0.24)));
+  const railSize = useMemo(() => ({ width: sidebarWidth }), [sidebarWidth]);
+  const sidebars: SidebarControls | undefined = docked
+    ? {
+        sessionsOpen,
+        column,
+        hideSessions,
+      }
+    : undefined;
   const { openSession } = sheet;
   const link = useMemo(
     () => (active ? { select: openSession, openSession } : sheet.link),
@@ -1288,17 +1358,20 @@ function useFullscreenPanels(
     [active, openSession, select],
   );
   return {
-    showRail,
+    docked,
+    sidebars,
+    sessionsOpen,
+    railSize,
     link,
     selectAgent,
     selectFromStrip: active ? openSession : selectFromStrip,
-    width: showRail ? surfaceWidth - SESSION_RAIL_WIDTH : surfaceWidth,
+    width: docked && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
     column: useMemo(
       () =>
-        showRail && column.view.kind === "tab" && column.view.tab === "sessions"
+        docked && column.view.kind === "tab" && column.view.tab === "sessions"
           ? { ...column, view: { kind: "tab", tab: "activity" } as const }
           : column,
-      [column, showRail],
+      [column, docked],
     ),
     sheet: useMemo(() => (active ? { ...sheet, sheetLink: link } : sheet), [sheet, link, active]),
   };
@@ -1512,8 +1585,10 @@ export function OfficeSurface(
   const color = theme.colors.foreground;
   const controls = (
     <ViewControls
+      badges={badges}
       full={full}
-      floorDrawn={floorDrawn && !panels.showRail}
+      sidebars={panels.sidebars}
+      floorDrawn={floorDrawn}
       viewChoice={viewChoice}
       soundUnsaved={sound.unsaved}
       onChange={changeView}
@@ -1535,21 +1610,18 @@ export function OfficeSurface(
         retryScene={retryScene}
         styles={styles}
       />
-      {panels.showRail && (
-        <View style={styles.fullscreenHeader}>
-          <Text style={styles.rowTitle}>Office 3D</Text>
-          {controls}
-        </View>
-      )}
+      {panels.docked && controls}
       <View style={styles.officeRow}>
-        {panels.showRail ? (
-          <View style={styles.sessionRail}>
-            <Text style={styles.sessionRailTitle}>Sessions</Text>
-            <SessionsPanel {...panel} link={panels.link} />
-          </View>
+        {panels.docked ? (
+          <SessionsSidebar
+            {...panel}
+            link={panels.link}
+            open={panels.sessionsOpen}
+            size={panels.railSize}
+          />
         ) : null}
         <View style={floorStyle}>
-          {!panels.showRail && controls}
+          {!panels.docked && controls}
           <SurfaceBody
             office={office}
             model={model}
@@ -1597,7 +1669,7 @@ export function OfficeSurface(
           session={session}
           compact={compact}
           column={panels.column}
-          hideSessions={panels.showRail}
+          hideSessions={panels.docked}
           surfaceWidth={panels.width}
           badges={badges}
           color={color}

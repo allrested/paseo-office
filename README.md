@@ -25,7 +25,8 @@ my-office's.
   starts an agent: a workspace, a provider and model, and a first prompt.
 - Select **Full screen** beside the view switch to work inside the office. On a wide screen,
   Sessions sits on the left, the floor in the center, and activity or the open conversation
-  on the right. You can reply and answer permission requests while the floor stays open.
+  on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.
+  Hide both for an edge-to-edge floor, or open a conversation to reply and answer permission requests.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an

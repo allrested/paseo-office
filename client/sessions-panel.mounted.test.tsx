@@ -153,10 +153,10 @@ test("a row shows the room's name and the doing-now line; a press selects", asyn
   const rowA = labelled("A: Running");
   expect(rowA.textContent).toContain("shop-api");
   expect(rowA.textContent).toContain("Editing files");
-  // A resting agent has no doing-now line: its state's word stands there.
+  // The Resting heading already conveys the state.
   const rowB = labelled("B: Idle");
   expect(rowB.textContent).toContain("blog");
-  expect(rowB.textContent).toContain("Idle");
+  expect(rowB.textContent).not.toContain("Idle");
   // Working comes before Resting.
   expect(rowA.compareDocumentPosition(rowB) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // No Open session on a Sessions row: the press and the card it opens are the way in.
@@ -186,7 +186,7 @@ test("No agents yet. and No agent matches.", async () => {
   expect(container.textContent).toContain(NO_MATCH);
   expect(maybe("A: Running")).toBeNull();
 
-  await press("All, 2");
+  await press("Clear filters");
   await type(SEARCH_LABEL, "blog");
   expect(maybe("A: Running")).toBeNull();
   expect(maybe("B: Idle")).not.toBeNull();
@@ -195,7 +195,10 @@ test("No agents yet. and No agent matches.", async () => {
 
   await type(SEARCH_LABEL, "nothing like it");
   expect(container.textContent).toContain(NO_MATCH);
-  expect(labelled(SEARCH_LABEL).getAttribute("placeholder")).toBe("Search");
+  expect(labelled(SEARCH_LABEL).getAttribute("placeholder")).toBe("Search sessions");
+  await press("Clear filters");
+  expect(maybe("A: Running")).not.toBeNull();
+  expect(labelled("All, 2").getAttribute("aria-selected")).toBe("true");
 });
 
 test("a state that cannot load says so as the office does", async () => {
@@ -208,4 +211,22 @@ test("a state that cannot load says so as the office does", async () => {
   expect(container.textContent).toContain(
     "Unable to show live agents: the host closed the office. Reopen it.",
   );
+});
+
+test("approvals lead the list and update when the live request clears", async () => {
+  const reviewer = agent("review", {
+    permissions: [{ id: "p", kind: "tool", title: "Run tests" }],
+  });
+  await show([...AGENTS, reviewer]);
+  const headings = () =>
+    Array.from(
+      container.querySelectorAll('[role="heading"],h1,h2,h3,h4,h5,h6'),
+      (node) => node.textContent,
+    );
+  expect(headings()).toEqual(["Needs your approval", "Working", "Resting"]);
+  expect(container.textContent).toContain("Needs permission: Run tests");
+  expect(maybe("Needs you, 1")).not.toBeNull();
+  await show([...AGENTS, { ...reviewer, permissions: [] }]);
+  expect(headings()).toEqual(["Working", "Resting"]);
+  expect(container.textContent).not.toContain("Run tests");
 });

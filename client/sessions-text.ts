@@ -1,3 +1,6 @@
+import { ACTIVITY_KINDS } from "../shared/names.js";
+import { eventText } from "./activity-feed-text.js";
+import { agentTask, agentTitle } from "../shared/model.js";
 import type { OfficeModel, OfficeRoom, OfficeRow } from "../shared/model.js";
 import { matchesQuery, tabOf, type ListTab } from "./list-text.js";
 
@@ -70,4 +73,68 @@ export function sessionRows(model: OfficeModel, tab: ListTab, query: string): Se
   // A parent chain that loops has no top row; its rows stand on their own rather than vanish.
   for (const entry of matching) visit({ ...entry, row: { ...entry.row, depth: 0 } });
   return shown;
+}
+
+export type SessionGroup = Exclude<ListTab, "all">;
+export interface GroupedSession extends SessionRow {
+  /** Levels of visible parents in this same status section. */
+  level: number;
+  parentTitle: string | null;
+}
+
+/** Keep approvals ahead of other work even when a sub-agent's parent has a different status. */
+export function sessionSections(model: OfficeModel, tab: ListTab, query: string) {
+  const sections: Record<SessionGroup, GroupedSession[]> = {
+    attention: [],
+    working: [],
+    resting: [],
+  };
+  const levels = new Map<string, { group: SessionGroup; level: number }>();
+  for (const entry of sessionRows(model, tab, query)) {
+    const group = tabOf(entry.row);
+    const parentId = entry.row.agent.parentAgentId;
+    const parent =
+      parentId && parentId !== entry.row.agent.id ? model.agents.get(parentId) : undefined;
+    const above = parent ? levels.get(parent.id) : undefined;
+    const level = above?.group === group ? above.level + 1 : 0;
+    const parentTitle = parent && level === 0 ? agentTitle(parent) : null;
+    sections[group].push({ ...entry, level, parentTitle });
+    levels.set(entry.row.agent.id, { group, level });
+  }
+  return sections;
+}
+
+/** A request, current activity or task is more useful than repeating "Idle" under Resting. */
+export function sessionDetail({ row, room, parentTitle }: GroupedSession): string {
+  const { agent } = row;
+  const request = agent.permissions[0];
+  if (request)
+    return eventText("permission", { permissionKind: request.kind, title: request.title });
+  if (agent.status === "error") return "Session error";
+  if (row.waitingOn)
+    return `Waiting on ${row.waitingOn} sub-agent${row.waitingOn === 1 ? "" : "s"}`;
+  if (row.step) return eventText(row.step.kind, { failed: row.step.result === "failed" });
+  if (row.activity) {
+    const kind = ACTIVITY_KINDS.find((name) => name === row.activity);
+    return kind ? eventText(kind) : row.activity;
+  }
+  if (parentTitle) return `Sub-agent of ${parentTitle}`;
+  const task = agentTask(agent);
+  if (task) return task;
+  if (agent.status === "initializing") return "Starting session";
+  if (agent.status === "closed") return "Closed";
+  return room.workspace?.branch || agent.model || "";
+}
+
+export function avatarInitials(name: string): string {
+  const words = name
+    .trim()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => Array.from(word)[0])
+      .join("") || "•"
+  ).toUpperCase();
 }

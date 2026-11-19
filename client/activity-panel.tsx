@@ -45,6 +45,8 @@ interface PillProps<Value extends string> {
   disabled?: boolean;
   /** A chip is a toggle and says it is pressed; a tab says it is the chosen one. */
   compact?: boolean;
+  activityChip?: boolean;
+  attention?: boolean;
   toggle: boolean;
   onPress(value: Value): void;
   styles: OfficeStyles;
@@ -59,6 +61,8 @@ export function Pill<Value extends string>({
   on,
   disabled = false,
   compact = false,
+  activityChip = false,
+  attention = false,
   toggle,
   onPress,
   styles,
@@ -70,10 +74,14 @@ export function Pill<Value extends string>({
   const [pressed, setPressed] = useState(false);
   const pressIn = useCallback(() => setPressed(true), []);
   const pressOut = useCallback(() => setPressed(false), []);
-  const pillStyle = useMemo(
-    () => (compact ? [styles.segment, styles.sessionFilter] : styles.segment),
-    [compact, styles],
-  );
+  const pillStyle = useMemo(() => {
+    if (activityChip) return [styles.segment, styles.activityChip];
+    return compact ? [styles.segment, styles.sessionFilter] : styles.segment;
+  }, [activityChip, compact, styles]);
+  const textStyle = useMemo(() => {
+    const labelStyle = on ? styles.segmentTextSelected : styles.segmentText;
+    return activityChip ? [labelStyle, styles.activityChipText] : labelStyle;
+  }, [activityChip, on, styles]);
   let fill = null;
   if (on) fill = styles.segmentFill;
   else if (hovered || pressed) fill = styles.segmentHoverFill;
@@ -92,9 +100,14 @@ export function Pill<Value extends string>({
       style={pillStyle}
     >
       {fill === null ? null : <View style={fill} />}
-      <Text style={on ? styles.segmentTextSelected : styles.segmentText}>
+      <Text style={textStyle}>
         {label}
-        {count === undefined ? null : <Text style={styles.panelCount}> {count}</Text>}
+        {count === undefined ? null : (
+          <Text style={attention && count > 0 ? styles.activityCount : styles.panelCount}>
+            {" "}
+            {count}
+          </Text>
+        )}
       </Text>
     </Pressable>
   );
@@ -120,9 +133,18 @@ function CardRow({ card, agent, link, styles }: CardRowProps) {
   const pressOut = useCallback(() => setPressed(false), []);
   const tone: DotTone = agent === undefined ? "idle" : dotTone(agent);
   const time = clock(card.at);
+  const working = agent?.status === "running";
+  const cardStyle = useMemo(
+    () => [
+      styles.activityCard,
+      working && styles.activityWorkingCard,
+      card.alert && styles.activityAlert,
+    ],
+    [card.alert, styles, working],
+  );
   // Open session sits under the card's pressable, not in it, so its press is its own.
   return (
-    <View style={styles.rowDivider}>
+    <View style={cardStyle}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${card.title}, ${time}`}
@@ -131,26 +153,22 @@ function CardRow({ card, agent, link, styles }: CardRowProps) {
         onPressOut={pressOut}
         onHoverIn={hoverIn}
         onHoverOut={hoverOut}
-        style={styles.row}
+        style={styles.activityCardBody}
       >
         {pressed || hovered ? <View style={styles.pressedFill} /> : null}
-        <View style={styles.lead}>
-          <View style={styles.dot[tone]} />
-        </View>
-        <View style={styles.rowBody}>
+        <View style={styles.activityEntries}>
           <View style={styles.rowHeading}>
-            <Text style={styles.rowTitle} numberOfLines={1}>
+            <View style={styles.dot[tone]} />
+            <Text style={styles.activityCardTitle} numberOfLines={2}>
               {card.title}
             </Text>
-            {agent?.status === "running" ? (
-              <Text style={styles.rowState.running}>Working</Text>
-            ) : null}
+            {working ? <Text style={styles.activityWorking}>Working</Text> : null}
             <Text style={styles.panelTime}>{time}</Text>
           </View>
           {card.lines.map((line, index) => (
             // A card's lines repeat ("Editing" twice), so their place is their key.
             // oxlint-disable-next-line react/no-array-index-key
-            <Text key={index} style={styles.rowActivity} numberOfLines={2}>
+            <Text key={index} style={styles.activityLine}>
               {line}
             </Text>
           ))}
@@ -158,7 +176,7 @@ function CardRow({ card, agent, link, styles }: CardRowProps) {
         </View>
       </Pressable>
       {card.alert ? (
-        <View style={styles.panelActions}>
+        <View style={styles.activityActions}>
           <ActionButton
             label="Open session"
             pendingLabel="Opening..."
@@ -208,18 +226,24 @@ export function ActivityPanel({ office, styles, link }: ColumnPanelProps) {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
-        <View style={styles.panelTop}>
-          {subscription.status === "live" ? (
-            <View style={styles.panelLive}>
-              <View style={styles.dot.running} />
-              <Text style={styles.panelLiveText}>Live</Text>
-            </View>
-          ) : null}
-          <View role="group" aria-label="Feed" style={styles.segments}>
+        <View style={styles.activityTop}>
+          <View style={styles.activityHeading}>
+            <Text accessibilityRole="header" style={styles.activityTitle}>
+              Activity
+            </Text>
+            {subscription.status === "live" ? (
+              <View style={styles.panelLive}>
+                <View style={styles.dot.running} />
+                <Text style={styles.panelLiveText}>Live</Text>
+              </View>
+            ) : null}
+          </View>
+          <View role="group" aria-label="Feed" style={styles.activityTabs}>
             <Pill<FeedTab>
               value="all"
               label="All"
               on={tab === "all"}
+              compact
               toggle={false}
               onPress={setTab}
               styles={styles}
@@ -229,16 +253,19 @@ export function ActivityPanel({ office, styles, link }: ColumnPanelProps) {
               label="Needs you"
               name={`Needs you, ${needsYou}`}
               count={needsYou}
+              attention
               on={tab === "attention"}
+              compact
               toggle={false}
               onPress={setTab}
               styles={styles}
             />
           </View>
-          <View role="group" aria-label="Kinds" style={styles.panelChips}>
+          <View role="group" aria-label="Kinds" style={styles.activityChips}>
             {CHIPS.map(({ chip, label }) => (
               <Pill
                 key={chip}
+                activityChip
                 label={label}
                 on={chips.has(chip)}
                 toggle

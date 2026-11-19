@@ -2,7 +2,13 @@ import { expect, test } from "vitest";
 import type { OfficeAgent, OfficeSnapshot } from "../shared/contracts.js";
 import { buildOfficeModel } from "../shared/model.js";
 import { EMPTY_OFFICE } from "./office-state.js";
-import { NO_AGENTS, sessionRows } from "./sessions-text.js";
+import {
+  NO_AGENTS,
+  avatarInitials,
+  sessionDetail,
+  sessionRows,
+  sessionSections,
+} from "./sessions-text.js";
 
 function agent(id: string, overrides: Partial<OfficeAgent> = {}): OfficeAgent {
   return {
@@ -133,4 +139,41 @@ test("a parent loop across rooms keeps each of its rows once", () => {
     ]),
   );
   expect(ids(sessionRows(model, "all", ""))).toEqual(["y:0", "x:1"]);
+});
+
+test("sections keep reviews prominent and indent children within the same group", () => {
+  const model = buildOfficeModel(
+    office([
+      agent("parent", { status: "running" }),
+      agent("worker", { parentAgentId: "parent", status: "running" }),
+      agent("review", { parentAgentId: "parent", permissions: ASK }),
+      agent("rest"),
+    ]),
+  );
+  const sections = sessionSections(model, "all", "");
+  expect(sections.working.map(({ level }) => level)).toEqual([0, 1]);
+  expect(sections.attention[0]?.parentTitle).toBe("PARENT");
+  expect(sessionDetail(sections.attention[0]!)).toBe("Needs permission: Run the tests");
+  expect(sessionDetail(sections.resting[0]!)).toBe("");
+  expect(avatarInitials("café-修正")).toBe("C修");
+});
+
+test("session details share the feed's activity wording and permission title policy", () => {
+  const snapshot = office([agent("a", { status: "running" })]);
+  const entry = sessionSections(buildOfficeModel(snapshot), "all", "").working[0]!;
+  expect(sessionDetail({ ...entry, row: { ...entry.row, activity: "search" } })).toBe("Searching");
+  expect(
+    sessionDetail({
+      ...entry,
+      row: { ...entry.row, activity: "search", step: { kind: "command", key: "a" } },
+    }),
+  ).toBe("Running a command");
+  for (const kind of ["plan", "question", "other"] as const) {
+    const review = office([
+      agent("a", { permissions: [{ id: "p", kind, title: "Private prose" }] }),
+    ]);
+    expect(
+      sessionDetail(sessionSections(buildOfficeModel(review), "all", "").attention[0]!),
+    ).not.toContain("Private prose");
+  }
 });

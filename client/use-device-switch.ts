@@ -23,7 +23,10 @@ interface Tried {
  * tried again on the revision a reload shows; a refusal that moved nothing is not, and the switch
  * then holds the tap until the next tap or the surface closes (`unsaved`).
  */
-export function useDeviceSwitch(field: "street" | "sound", fallback: boolean): DeviceSwitch {
+export function useDeviceSwitch(
+  field: "street" | "sound" | "sessionsHidden",
+  fallback: boolean,
+): DeviceSwitch {
   const settings = useSettings(officeDeviceSettings);
   const stored = settings.status === "ready" ? settings : null;
   const [wanted, setWanted] = useState<boolean | null>(null);

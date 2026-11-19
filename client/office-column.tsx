@@ -430,14 +430,16 @@ export function OfficeColumn({
             onClose={closeSession}
             styles={styles}
           />
-          <IconButton
-            label="Collapse the column"
-            icon="PanelRightClose"
-            color={color}
-            iconSize={iconSize}
-            onPress={collapse}
-            styles={styles}
-          />
+          {hideSessions ? null : (
+            <IconButton
+              label="Collapse the column"
+              icon="PanelRightClose"
+              color={color}
+              iconSize={iconSize}
+              onPress={collapse}
+              styles={styles}
+            />
+          )}
         </View>
         <View style={styles.columnBody}>{children}</View>
       </View>

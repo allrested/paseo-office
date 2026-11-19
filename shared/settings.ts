@@ -164,6 +164,7 @@ export const officeDeviceSettings = defineSettings({
   schema: z.object({
     threeD: z.boolean().default(true),
     street: z.boolean().optional(),
+    sessionsHidden: z.boolean().optional(),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),
     lastAgent: z.object({ provider: z.string(), model: z.string() }).optional(),

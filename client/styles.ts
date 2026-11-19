@@ -1,3 +1,4 @@
+import { sessionStyles } from "./session-styles.js";
 import { useMemo } from "react";
 import { Platform, type TextStyle, type ViewStyle } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -7,10 +8,26 @@ import type { AttentionReason, DotTone } from "../shared/model.js";
 /** A log is read in a fixed-width face, as in the terminal it comes from. */
 const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 
-export const SESSION_RAIL_WIDTH = 336;
+export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
+  sessions: ReturnType<typeof sessionStyles>;
   fullscreenHeader: ViewStyle;
+  headerTools: ViewStyle;
+  headerBrand: ViewStyle;
+  brandText: TextStyle;
+  brandIcon: { color: string };
+  headerModes: ViewStyle;
+  headerDivider: ViewStyle;
+  sidebarButton: ViewStyle;
+  sidebarButtonActive: ViewStyle;
+  sidebarButtonHover: ViewStyle;
+  sidebarButtonText: TextStyle;
+  hidden: ViewStyle;
+  sessionRailHeading: ViewStyle;
+  liveLabel: ViewStyle;
+  liveDot: ViewStyle;
+  liveText: TextStyle;
   sessionRail: ViewStyle;
   sessionRailTitle: TextStyle;
   screen: ViewStyle;
@@ -275,10 +292,24 @@ export interface OfficeStyles {
   sceneNote: ViewStyle;
   sceneNoteText: TextStyle;
   /** The Activity panel beside the floor: its top and its feed of cards. */
-  sessionTools: ViewStyle;
-  sessionSearch: TextStyle;
-  sessionFilterPair: ViewStyle;
   sessionFilter: ViewStyle;
+  activityTop: ViewStyle;
+  activityHeading: ViewStyle;
+  activityTitle: TextStyle;
+  activityTabs: ViewStyle;
+  activityChips: ViewStyle;
+  activityChip: ViewStyle;
+  activityChipText: TextStyle;
+  activityCard: ViewStyle;
+  activityWorking: TextStyle;
+  activityWorkingCard: ViewStyle;
+  activityCount: TextStyle;
+  activityAlert: ViewStyle;
+  activityCardBody: ViewStyle;
+  activityEntries: ViewStyle;
+  activityCardTitle: TextStyle;
+  activityLine: TextStyle;
+  activityActions: ViewStyle;
   panelTop: ViewStyle;
   /** The "Live" tag: the running dot and its word. */
   panelLive: ViewStyle;
@@ -290,7 +321,6 @@ export interface OfficeStyles {
   panelFeed: ViewStyle;
   panelTime: TextStyle;
   /** An alert card's Open session, on the card's text rail. */
-  panelActions: ViewStyle;
   /** The team chat: its list, a message's row, its avatar and bubble, and the lines in it. */
   chatList: ViewStyle;
   chatRow: ViewStyle;
@@ -520,22 +550,64 @@ export function useOfficeStyles(
       overflow: "hidden",
     };
     const chatActions: ViewStyle = { flexDirection: "row", gap: 8 };
+    const headerTools: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 };
+    const sidebarButton: ViewStyle = {
+      ...headerTools,
+      minHeight: controlHeight,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      borderColor: colors.border,
+      borderWidth: 1,
+    };
     return {
       fullscreenHeader: {
-        flexDirection: "row",
-        alignItems: "center",
+        ...headerTools,
         justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingBottom: 6,
+        minHeight: 52,
+        paddingVertical: 6,
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
+        backgroundColor: colors.surface0,
       },
+      headerTools,
+      headerBrand: { ...headerTools, marginRight: 8 },
+      brandText: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
+      brandIcon: { color: colors.statusWarning },
+      headerModes: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 10,
+        padding: 2,
+        backgroundColor: colors.surface1,
+      },
+      headerDivider: { marginHorizontal: 2, height: 20, width: 1, backgroundColor: colors.border },
+      sidebarButton,
+      sidebarButtonActive: { ...sidebarButton, backgroundColor: colors.surface2 },
+      sidebarButtonHover: {
+        ...sidebarButton,
+        backgroundColor: colors.surface2,
+        borderColor: colors.foregroundMuted,
+      },
+      sidebarButtonText: { color: colors.foreground, fontSize: 12, fontWeight: "600" },
+      hidden: { display: "none" },
       sessionRail: {
-        width: SESSION_RAIL_WIDTH,
+        flex: 1,
         borderRightWidth: 1,
         borderRightColor: colors.border,
+        backgroundColor: colors.surface0,
       },
-      sessionRailTitle: { color: colors.foreground, fontWeight: "600", padding: 12 },
+      sessionRailHeading: {
+        ...headerTools,
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 6,
+      },
+      sessionRailTitle: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
+      liveLabel: { ...headerTools, gap: 5 },
+      liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.statusSuccess },
+      liveText: { ...small, color: colors.foregroundMuted },
       screen: { flex: 1, backgroundColor: colors.surface0 },
       // No side padding here: the strip scrolls to the screen edge, and each row pads itself.
       header: { paddingTop: 8, gap: 8 },
@@ -1116,10 +1188,49 @@ export function useOfficeStyles(
         pointerEvents: "none",
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
-      sessionTools: { flexDirection: "row", alignItems: "center", gap: 8 },
-      sessionSearch: { ...lineInput, flex: 1, minWidth: 0 },
-      sessionFilterPair: { ...segments, flexGrow: 1, flexBasis: 146 },
+      sessions: sessionStyles(colors, touch),
       sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
+      activityTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 12, gap: 10 },
+      activityHeading: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+      },
+      activityTitle: { fontSize: 19, lineHeight: 25, fontWeight: "600", color: colors.foreground },
+      activityTabs: {
+        ...segments,
+        padding: 3,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+      },
+      activityChips: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+      activityChip: {
+        minHeight: touch ? TOUCH_CONTROL : 26,
+        paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+      },
+      activityChipText: { ...small },
+      activityCard: {
+        marginHorizontal: pad,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderRadius: 10,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        overflow: "hidden",
+      },
+      activityWorking: { ...small, color: colors.statusSuccess, fontWeight: "600" },
+      activityWorkingCard: { borderLeftWidth: 3, borderLeftColor: colors.statusSuccess },
+      activityCount: { ...small, color: colors.statusWarning, fontWeight: "700" },
+      activityAlert: { borderLeftWidth: 3, borderLeftColor: colors.statusWarning },
+      activityCardBody: { padding: 12 },
+      activityEntries: { gap: 5 },
+      activityCardTitle: { ...base, flex: 1, fontWeight: "600", color: colors.foreground },
+      activityLine: { ...base, lineHeight: 20, color: colors.foreground },
+      activityActions: { paddingHorizontal: 12, paddingBottom: 12, alignItems: "flex-start" },
       panelTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 8, gap: 8 },
       panelLive: { flexDirection: "row", alignItems: "center", gap: 8 },
       panelLiveText: { ...small, color: colors.foregroundMuted },
@@ -1127,7 +1238,6 @@ export function useOfficeStyles(
       panelCount: { color: colors.foregroundMuted },
       panelFeed: { paddingBottom: 24 },
       panelTime: { ...small, flexShrink: 0, color: colors.foregroundMuted },
-      panelActions: { paddingLeft: pad + TEXT_RAIL, paddingRight: pad, paddingBottom: 12 },
       chatList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
       chatRow,
       chatRowMine: { ...chatRow, justifyContent: "flex-end" },
