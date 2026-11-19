@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile, rename } from "node:fs/promises";
 import { z } from "zod";
 import { DutySchema, type Duty, type DutyBoard } from "../shared/contracts.js";
 import {
@@ -21,9 +22,50 @@ const DUTIES: OfficeSchedule = { name: DUTY_SCHEDULE, label: "Duty board", logNa
 export const DutiesFileSchema = z.object({ version: z.literal(1), duties: z.array(DutySchema) });
 export type DutiesFile = z.output<typeof DutiesFileSchema>;
 
-/** The file; a missing, unreadable or newer one loads as null, and the list is the starting one. */
-export function dutiesFileStore(file: string): LifeFile<DutiesFile> {
-  return createLifeFile(file, DutiesFileSchema);
+function isMissing(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+/**
+ * The kept list. Missing, it is null. Anything else that cannot be read (a broken, newer or
+ * unreadable file) is moved aside to `duties.json.corrupt-<time>`, so a save never replaces it,
+ * and is null; one that cannot even be moved aside rejects.
+ */
+async function loadDuties(
+  file: string,
+  ports: { now(): number; log(message: string): void },
+): Promise<DutiesFile | null> {
+  let reason: string;
+  try {
+    const parsed = DutiesFileSchema.safeParse(JSON.parse(await readFile(file, "utf8")));
+    if (parsed.success) return parsed.data;
+    reason = "unexpected shape, or a newer version";
+  } catch (error) {
+    if (isMissing(error)) return null;
+    reason = errorMessage(error);
+  }
+  const target = `${file}.corrupt-${ports.now()}`;
+  try {
+    await rename(file, target);
+  } catch (error) {
+    throw new Error(
+      `${file} is unreadable (${reason}) and could not be moved aside (${errorMessage(error)})`,
+      { cause: error },
+    );
+  }
+  ports.log(
+    `[office] ${file} is unreadable (${reason}); moved to ${target}, starting from the pantry chores`,
+  );
+  return null;
+}
+
+/** The file. It is loaded once, as the service starts, before any save. */
+export function dutiesFileStore(
+  file: string,
+  ports: { now(): number; log(message: string): void },
+): LifeFile<DutiesFile> {
+  const kept = createLifeFile(file, DutiesFileSchema);
+  return { load: () => loadDuties(file, ports), save: kept.save };
 }
 
 /** The duty board's day at an instant: from 08:00 in the zone it is that date, before it the day before. */
@@ -103,6 +145,8 @@ function keptDuty(draft: DutyDraft, current: readonly Duty[]): Duty {
 export function createDutyService(ports: DutyServicePorts): DutyService {
   let duties: readonly Duty[] = STARTING_DUTIES;
   let day: string | null = null;
+  // Why the kept file could not be read nor moved aside: a save would replace it, so none is made.
+  let unreadable: string | null = null;
   let chain: Promise<unknown> = Promise.resolve();
   const follower = createScheduleFollower({
     schedules: ports.schedules,
@@ -139,7 +183,8 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
     start: () =>
       exclusive(async () => {
         const kept = await ports.file.load().catch((error: unknown) => {
-          ports.log(`[office] duty list unreadable: ${errorMessage(error)}`);
+          unreadable = errorMessage(error);
+          ports.log(`[office] duty list unreadable: ${unreadable}`);
           return null;
         });
         if (kept !== null) duties = kept.duties;
@@ -151,6 +196,12 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
       exclusive(async (): Promise<DutySaveResult> => {
         const problem = dutyListProblem(drafts);
         if (problem !== null) return { ok: false, error: problem };
+        if (unreadable !== null) {
+          return {
+            ok: false,
+            error: `Unable to save the duty list: the kept one could not be read, and a save would replace it (${unreadable})`,
+          };
+        }
         const next = drafts.map((draft) => keptDuty(draft, duties));
         try {
           await ports.file.save({ version: 1, duties: next });

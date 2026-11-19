@@ -399,7 +399,9 @@ notifications are held in memory.
 The pantry's duty board is kept on the host. You choose its duties: up to 12, each with a name (up
 to 40 characters), the weekdays it is due and, if an agent should do it, instructions (up to 2,000
 characters). A host starts with the four pantry chores, Monday to Friday, without instructions. The
-list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`).
+list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`). A file the office
+cannot read, or one written by a newer version, is moved aside to `duties.json.corrupt-<time>` and
+the list starts again from the four chores; your old list is in that file.
 
 At 8:00 in the notes' time zone ("Time zone", the host's when empty) each duty due that day is
 posted as a task on the board `duty`, a host-wide board like the lobby's. The run also takes the

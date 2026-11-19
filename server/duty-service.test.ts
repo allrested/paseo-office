@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, expect, test } from "vitest";
@@ -28,11 +28,15 @@ afterAll(async () => {
   for (const dir of dirs) await rm(dir, { recursive: true, force: true });
 });
 
-function memoryFile(initial: DutiesFile | null = null) {
+/** `unreadable`: the load rejects with it, as a kept file that can be neither read nor moved aside. */
+function memoryFile(initial: DutiesFile | null = null, unreadable?: string) {
   let kept = initial;
   let failure: string | null = null;
   const file: LifeFile<DutiesFile> & { kept(): DutiesFile | null; fail(message: string): void } = {
-    load: async () => kept,
+    load: async () => {
+      if (unreadable !== undefined) throw new Error(unreadable);
+      return kept;
+    },
     save: async (data) => {
       if (failure !== null) {
         const message = failure;
@@ -56,6 +60,8 @@ function setup(
     zone?: string;
     /** The schedule engine's timers fire a millisecond before their time, as a real one can. */
     early?: boolean;
+    /** The kept file's load rejects with this. */
+    unreadable?: string;
   } = {},
 ) {
   const clock = createFakeClock(options.start ?? WED_7AM);
@@ -79,7 +85,7 @@ function setup(
     onBoard: () => undefined,
     onBoardRemoved: () => undefined,
   });
-  const file = memoryFile(options.file ?? null);
+  const file = memoryFile(options.file ?? null, options.unreadable);
   const schedules = createLocalSchedules({ clock: timers, log: () => undefined });
   const told: DutyBoard[] = [];
   const listed: (readonly Duty[])[] = [];
@@ -256,11 +262,17 @@ test("the 08:00 schedule follows the notes zone", async () => {
   expect(service.error()).toBeNull();
 });
 
-test("the file keeps its own versioned shape and a broken one reads as none", async () => {
+async function tempPath(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "office-duties-"));
   dirs.push(dir);
-  const path = join(dir, "office", "duties.json");
-  const store = dutiesFileStore(path);
+  return join(dir, "office", "duties.json");
+}
+
+test("the file keeps its own versioned shape; a broken or newer one is moved aside, not lost", async () => {
+  const path = await tempPath();
+  const logs: string[] = [];
+  let now = 1000;
+  const store = dutiesFileStore(path, { now: () => now, log: (line) => logs.push(line) });
   expect(await store.load()).toBeNull();
   await store.save({ version: 1, duties: [...STARTING_DUTIES] });
   expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
@@ -268,6 +280,61 @@ test("the file keeps its own versioned shape and a broken one reads as none", as
     duties: STARTING_DUTIES,
   });
   expect(await store.load()).toEqual({ version: 1, duties: STARTING_DUTIES });
+  expect(logs).toEqual([]);
   await writeFile(path, JSON.stringify({ version: 2, duties: [] }));
   expect(await store.load()).toBeNull();
+  expect(JSON.parse(await readFile(`${path}.corrupt-1000`, "utf8"))).toEqual({
+    version: 2,
+    duties: [],
+  });
+  await expect(stat(path)).rejects.toThrow("ENOENT");
+  now = 2000;
+  await writeFile(path, "{ not json");
+  expect(await store.load()).toBeNull();
+  expect(await readFile(`${path}.corrupt-2000`, "utf8")).toBe("{ not json");
+  expect(logs).toEqual([
+    `[office] ${path} is unreadable (unexpected shape, or a newer version); moved to ${path}.corrupt-1000, starting from the pantry chores`,
+    expect.stringMatching(
+      /^\[office\] .* is unreadable \(.*JSON.*\); moved to .*\.corrupt-2000, starting/,
+    ),
+  ]);
+});
+
+test("a duty file that cannot be read is not taken for a missing one: it is moved aside", async () => {
+  const path = await tempPath();
+  const logs: string[] = [];
+  const store = dutiesFileStore(path, { now: () => 3000, log: (line) => logs.push(line) });
+  await store.save({ version: 1, duties: [...STARTING_DUTIES] });
+  await chmod(path, 0o000);
+  expect(await store.load()).toBeNull();
+  expect(logs).toEqual([expect.stringContaining("EACCES")]);
+  await chmod(`${path}.corrupt-3000`, 0o600);
+  expect(JSON.parse(await readFile(`${path}.corrupt-3000`, "utf8"))).toEqual({
+    version: 1,
+    duties: STARTING_DUTIES,
+  });
+});
+
+test("one that cannot even be moved aside rejects, and the list is then never saved over it", async () => {
+  const path = await tempPath();
+  const store = dutiesFileStore(path, { now: () => 4000, log: () => undefined });
+  await store.save({ version: 1, duties: [...STARTING_DUTIES] });
+  await chmod(path, 0o000);
+  await chmod(join(path, ".."), 0o500);
+  try {
+    await expect(store.load()).rejects.toThrow("could not be moved aside");
+  } finally {
+    await chmod(join(path, ".."), 0o700);
+    await chmod(path, 0o600);
+  }
+  const { begin, service, file, logs } = setup({ unreadable: "it could not be moved aside" });
+  await begin();
+  expect(service.list()).toEqual(STARTING_DUTIES);
+  expect(logs).toContain("[office] duty list unreadable: it could not be moved aside");
+  expect(await service.save([{ name: "A", instructions: "", days: [] }])).toEqual({
+    ok: false,
+    error:
+      "Unable to save the duty list: the kept one could not be read, and a save would replace it (it could not be moved aside)",
+  });
+  expect(file.kept()).toBeNull();
 });

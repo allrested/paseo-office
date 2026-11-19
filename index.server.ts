@@ -702,7 +702,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
-    dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir())),
+    dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),
