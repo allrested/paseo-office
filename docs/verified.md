@@ -494,7 +494,9 @@ The office scene started with the shipped car kit in Chromium with software WebG
 
 On this host the narrow frame reported 137 MiB of JavaScript heap with the street off and 179 MiB with it on. Each ten-second sampling window produced only one animation callback (25.9 seconds off, 17.4 seconds on) under competing CPU load and software rendering. These timings include the first frame and do not measure steady-state performance.
 
-The measurements used standalone plugin frames. Physical phone memory, the car payload through a real native bridge, timed staff outings, audio, shop interiors and the version-triggered shopping trip still need observation. The evening chip alone does not establish that an office worker joined the tables.
+In a separate 1280 px Chromium frame, Walk mode and the lift reached the street. Inspection after the first city update found twelve shop fronts. Ten had walk-in doors and exposed indoor interaction spots. Corner Kiosk and Daily Stop were the two painted fronts. This check exercised the in-memory shop interface. A visual walkthrough of the interiors is still pending.
+
+The measurements used standalone plugin frames. Physical phone memory, the car payload through a real native bridge, timed staff outings, audio and the version-triggered shopping trip still need observation. The evening chip alone does not establish that an office worker joined the tables.
 
 ## Staff and daily life, indoors
 
