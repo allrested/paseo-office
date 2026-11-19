@@ -123,9 +123,11 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
   /** `dueAt`: a timer can fire a little before its 08:00, which is then the board's instant. */
   async function bringUp(dueAt?: number): Promise<void> {
     try {
-      const clock = dutyClock(Math.max(ports.now(), dueAt ?? 0), await ports.zone());
+      const zone = await ports.zone();
+      const clock = dutyClock(Math.max(ports.now(), dueAt ?? 0), zone);
       const due = clock.open ? duties.filter((duty) => duty.days.includes(clock.weekday)) : [];
-      await ports.board.syncDuties({ duties, day: clock.day, due });
+      const dayOf = (at: number) => dutyClock(at, zone).day;
+      await ports.board.syncDuties({ duties, day: clock.day, due, dayOf });
       day = clock.day;
     } catch (error) {
       ports.log(`[office] duty board sync failed: ${errorMessage(error)}`);

@@ -403,9 +403,10 @@ list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`).
 
 At 8:00 in the notes' time zone ("Time zone", the host's when empty) each duty due that day is
 posted as a task on the board `duty`, a host-wide board like the lobby's. The run also takes the
-done duties of earlier days off the board. When the office starts, and when you save the list, a
-duty due today that has no post yet is posted at once if it is past 8:00. A duty still open or
-claimed when its day ends is owed: it stays on the board and is not posted again. Removing a duty
+duties finished on earlier days off the board. When the office starts, and when you save the list,
+a duty due today that has no post yet is posted at once if it is past 8:00. A duty still open or
+claimed when its day ends is owed: it stays on the board and is not posted again. An owed duty
+finished today counts for today, so it is not posted again until its next day. Removing a duty
 takes its open post off the board, and a claimed one stays until it is done. A new name or new
 instructions change today's open post.
 

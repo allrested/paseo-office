@@ -59,8 +59,10 @@ export interface DutySync {
   duties: readonly Duty[];
   /** The board's day (YYYY-MM-DD): done duties of earlier days leave the board. */
   day: string;
-  /** Posted for `day` unless the duty has a post of that day or an owed one. */
+  /** Posted for `day` unless the duty has a post of that day, an owed one, or one finished that day. */
   due: readonly Duty[];
+  /** The board's day an instant falls on: a done duty is judged by the day it was finished. */
+  dayOf(at: number): string;
 }
 
 export interface BoardService {
@@ -133,10 +135,15 @@ function isDutyTask(post: Post): boolean {
   return post.board === DUTY && post.kind === "task" && post.duty !== undefined;
 }
 
-/** Off the board at a sync: a duty done on an earlier day, and an open duty no longer listed. */
+/** The board's day a done duty was finished on: an owed one is finished on a later day than its own. */
+function finishedDay(post: Post, plan: DutySync): string {
+  return plan.dayOf(Date.parse(post.updatedAt));
+}
+
+/** Off the board at a sync: a duty finished on an earlier day, and an open duty no longer listed. */
 function leavesAtSync(post: Post, plan: DutySync, listed: ReadonlySet<string>): boolean {
   if (!isDutyTask(post) || post.duty === undefined) return false;
-  if (post.state === "done") return post.duty.day < plan.day;
+  if (post.state === "done") return finishedDay(post, plan) < plan.day;
   return post.state === "open" && post.claimedBy === undefined && !listed.has(post.duty.id);
 }
 
@@ -285,7 +292,9 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         (post) =>
           isDutyTask(post) &&
           post.duty?.id === duty.id &&
-          (post.state !== "done" || post.duty.day === plan.day),
+          (post.state !== "done" ||
+            post.duty.day === plan.day ||
+            finishedDay(post, plan) === plan.day),
       );
     return plan.due
       .filter((duty) => !held(duty))

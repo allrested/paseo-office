@@ -176,6 +176,42 @@ test("a start after 08:00 on a due day catches up; a Saturday posts nothing and 
   expect(left.every((post) => post.duty?.day === "2026-11-18")).toBe(true);
 });
 
+test("an owed duty finished today is not posted again the same day, and leaves the board the next", async () => {
+  const build = { id: "build", name: "Build", instructions: "Run the build", days: [1, 2, 3] };
+  // Monday 16 November 2026, 07:00 in Riyadh.
+  const monday = Date.parse("2026-11-16T04:00:00.000Z");
+  const { begin, board, clock, service } = setup({
+    start: monday,
+    file: { version: 1, duties: [build] },
+  });
+  await begin();
+  clock.advance(HOUR);
+  await settle();
+  expect(board.postsOf("duty").map((post) => post.duty)).toEqual([
+    { id: "build", day: "2026-11-16" },
+  ]);
+  await board.update({ id: "p1", action: "claim", actor: "a" });
+  // Tuesday 08:00: the claimed Monday post is owed, so no second post.
+  clock.advance(24 * HOUR);
+  await settle();
+  expect(board.postsOf("duty").map((post) => post.id)).toEqual(["p1"]);
+  // Finished at 10:00 on Tuesday; then a settings save, a save of the list and a restart's catch-up.
+  clock.advance(2 * HOUR);
+  await board.update({ id: "p1", action: "done", actor: "a" });
+  await service.settingsChanged();
+  expect(await service.save([build])).toEqual({ ok: true });
+  await service.sync();
+  expect(board.postsOf("duty").map((post) => [post.id, post.state, post.duty?.day])).toEqual([
+    ["p1", "done", "2026-11-16"],
+  ]);
+  // Wednesday 08:00: done on an earlier day, it leaves, and Wednesday's is posted.
+  clock.advance(22 * HOUR);
+  await settle();
+  expect(board.postsOf("duty").map((post) => [post.state, post.duty?.day])).toEqual([
+    ["open", "2026-11-18"],
+  ]);
+});
+
 test("a save is checked, keeps ids and chores, names new duties, and posts one due today at once", async () => {
   const { begin, board, service, file, listed, told } = setup({ start: WED_7AM + 2 * HOUR });
   await begin();

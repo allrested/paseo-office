@@ -452,12 +452,13 @@ test("a session without its board tool can confirm just its current assignment",
 const CUPS = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const };
 const BUILD = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
 const TODAY = "2026-11-11";
+const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
 
 test("an instructed duty goes to an idle agent as a lobby task does; a pretend one never does", async () => {
   const { office, clock, store, prompts, sources } = start();
   await office.ready;
   office.setDuties([CUPS, BUILD]);
-  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD] });
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
   office.setPickupEnabled(true);
   clock.advance(0);
   await settle();
@@ -486,7 +487,7 @@ test("an agent cannot claim a pretend duty; the 3D office's report of one acted 
   const { office } = start();
   await office.ready;
   office.setDuties([CUPS, BUILD]);
-  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD] });
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
   const update = office.tools.find((tool) => tool.name === "office_update");
   const claimed = await update?.execute(
     { id: "p1", action: "claim" },

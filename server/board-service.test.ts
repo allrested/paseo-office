@@ -497,10 +497,12 @@ function dutyPost(seq: number, id: string, day: string, fields: Partial<Post> = 
 
 const CUPS: Duty = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" };
 const BUILD: Duty = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
+/** The board's day of an instant, in UTC for these tests. */
+const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
 
 test("the day's sync posts each due duty once, keyed by duty and day", async () => {
   const { service, store, events } = await harness();
-  const plan = { duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD] };
+  const plan = { duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD], dayOf };
   await service.syncDuties(plan);
   expect(service.postsOf("duty")).toMatchObject([
     {
@@ -525,13 +527,18 @@ test("an open or claimed duty of an earlier day is owed: no second post; done on
     file([
       dutyPost(1, "cups", "2026-11-10", { text: "Cups" }),
       dutyPost(2, "build", "2026-11-10", { state: "claimed", claimedBy: "a" }),
-      dutyPost(3, "cups", "2026-11-09", { state: "done" }),
+      dutyPost(3, "cups", "2026-11-09", { state: "done", updatedAt: "2026-11-09T10:00:00.000Z" }),
       dutyPost(4, "build", "2026-11-11", { state: "done" }),
     ]),
   );
-  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-11", due: [CUPS, BUILD] });
+  await service.syncDuties({
+    duties: [CUPS, BUILD],
+    day: "2026-11-11",
+    due: [CUPS, BUILD],
+    dayOf,
+  });
   expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2", "p4"]);
-  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-12", due: [] });
+  await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-12", due: [], dayOf });
   expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2"]);
 });
 
@@ -545,7 +552,7 @@ test("a duty that leaves the list takes its open post; an edit changes its open 
     ]),
   );
   const edited = { ...BUILD, name: "Build it", instructions: "Run the full build" };
-  await service.syncDuties({ duties: [edited], day: "2026-11-11", due: [] });
+  await service.syncDuties({ duties: [edited], day: "2026-11-11", due: [], dayOf });
   const posts = service.postsOf("duty");
   expect(posts.map((item) => item.id)).toEqual(["p3", "p2"]);
   expect(posts[1]).toMatchObject({ text: "Build it\n\nRun the full build", seq: 5 });
