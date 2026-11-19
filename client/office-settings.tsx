@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { OfficeModal } from "./office-modal.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
+import { settingsLayout } from "./settings-sections.js";
 import { LanguageSetting } from "./language-switch.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
@@ -47,23 +48,27 @@ interface FieldsProps {
 }
 
 function OfficeSettingsFields({ office, styles, actions, view, street, sound }: FieldsProps) {
+  const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   return (
-    <View style={styles.header}>
-      <HostSwitches
-        wake={office.loaded && live ? office.state.wake : null}
-        actions={actions}
-        styles={styles}
-        deviceProblem={
-          deviceProblemOf(view.unsaved, sound.unsaved) ??
-          (street.unsaved ? "Unable to save the scene on this device." : null)
-        }
-        scheduleError={office.state.notes?.scheduleError ?? null}
-        weather={office.state.weather}
-        incidents={office.state.incidents}
-      >
-        <>
+    <HostSwitches
+      language={language}
+      wake={office.loaded && live ? office.state.wake : null}
+      actions={actions}
+      styles={styles}
+      deviceProblem={
+        deviceProblemOf(view.unsaved, sound.unsaved) ??
+        (street.unsaved ? "Unable to save the scene on this device." : null)
+      }
+      scheduleError={office.state.notes?.scheduleError ?? null}
+      weather={office.state.weather}
+      incidents={office.state.incidents}
+    >
+      <>
+        <SceneChoices choice={street} styles={styles} />
+        <View style={settingsLayout.strip}>
+          <Text style={styles.sheetLabel}>Office view</Text>
           <ViewSwitch
             options={view.options}
             value={view.choice}
@@ -71,11 +76,9 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
             styles={styles}
           />
           <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
-          <SceneChoices choice={street} styles={styles} />
-        </>
-      </HostSwitches>
-      <LanguageSetting styles={styles} />
-    </View>
+        </View>
+      </>
+    </HostSwitches>
   );
 }
 
@@ -88,8 +91,8 @@ export function FullscreenSettings({
   onClose(): void;
 }) {
   return (
-    <OfficeModal title="Office settings" open={open} onOpenChange={onClose}>
-      <OfficeModal.Content>
+    <OfficeModal title="Office settings" size="settings" open={open} onOpenChange={onClose}>
+      <OfficeModal.Content scrollable={false} contentContainerStyle={settingsLayout.flush}>
         <OfficeSettingsFields {...fields} />
       </OfficeModal.Content>
     </OfficeModal>

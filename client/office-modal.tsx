@@ -28,7 +28,10 @@ interface DialogAppearance {
   styles: OfficeStyles;
 }
 
-type OfficeModalProps = ModalProps & { size?: "standard" | "wide"; headerActions?: ReactNode };
+type OfficeModalProps = ModalProps & {
+  size?: "standard" | "wide" | "settings";
+  headerActions?: ReactNode;
+};
 
 // The stock modal owns its header; on that surface the workspace toolbar belongs in the body.
 export function useFullscreenDialog(): boolean {
@@ -48,6 +51,7 @@ const dialogCss = `
 }
 .paseo-office-dialog[data-size="wide"] { width: min(1120px, calc(100% - 32px)); }
 .paseo-office-dialog[data-size="wide"] .office-dialog-bounded { height: min(84dvh, 880px); }
+.paseo-office-dialog[data-size="settings"] .office-dialog-bounded { height: min(620px, calc(100dvh - 110px)); }
 .paseo-office-dialog .office-dialog-tools { min-width: 0; }
 .paseo-office-dialog::backdrop { background: rgba(6,10,16,.5); backdrop-filter: blur(3px); }
 .paseo-office-dialog .office-dialog-frame {
