@@ -1091,3 +1091,37 @@ test("the floor receives the weather and service failures appear in Attention", 
   await pressTab("Attention");
   expect(container.textContent).toContain("Weather service failed");
 });
+
+test("wide fullscreen gives Sessions its own rail and opens the chosen conversation beside the floor", async () => {
+  compact = false;
+  view = "2d";
+  let target: Element | null = null;
+  Object.defineProperties(document, {
+    fullscreenEnabled: { configurable: true, value: true },
+    fullscreenElement: { configurable: true, get: () => target },
+  });
+  try {
+    await mount();
+    await seeAda();
+    await sizeSurface(1440);
+    const surface = container.firstElementChild as HTMLElement;
+    surface.requestFullscreen = async () => {
+      target = surface;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    await press("Full screen");
+    expect(labelled("Activity")?.getAttribute("aria-selected")).toBe("true");
+    expect(container.querySelector('[role="tab"][aria-label="Sessions"]')).toBeNull();
+    await pressFirst("Ada:");
+    expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+    expect(container.textContent).toContain("Reading the ledger");
+
+    target = null;
+    await act(async () => void document.dispatchEvent(new Event("fullscreenchange")));
+    expect(labelled("Full screen")).not.toBeNull();
+    expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+  } finally {
+    Reflect.deleteProperty(document, "fullscreenEnabled");
+    Reflect.deleteProperty(document, "fullscreenElement");
+  }
+});

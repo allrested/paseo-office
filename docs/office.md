@@ -110,6 +110,12 @@ The list's bar filters the room cards by tab (All, Needs you, Working, Resting) 
 that `/` focuses on the web. Each row adds its context, its turn's clock or how long it has
 rested, and its cost (`client/list-text.ts`).
 
+In browsers that support fullscreen, the Full screen button beside the view switch expands the
+office. Wide screens show Sessions on the left, the floor in the center, and Activity, Chat, and
+open conversations on the right. Select an agent to read the conversation, reply, or answer a
+permission request. Narrow screens use the column or its compact sheet. Exit full screen or
+press Escape to return to Paseo.
+
 ## The column
 
 The office draws its own column beside the floor (`client/office-column.tsx`), with Attention,
@@ -309,8 +315,7 @@ turn the scene's sound on before the button hears of the press, and the press mu
 off again. The speaker's drawing takes no presses itself, so a press on it is a press on the button
 even when the probe redraws it meanwhile. The scene shows such a line itself, on the floor and not
 as a toast of the app: a note over the floor's toolbar, read out politely by a screen reader, for
-four seconds, a new one replacing it (a refused full screen, and my-office's own lines from its
-games and karaoke, show the same way).
+four seconds, a new one replacing it. The games and karaoke show their lines the same way.
 
 A Sound save the device refuses is said where the switch was used: under the settings page's
 switches, or in the floor's view corner, where the view switch's own refusal shows (that one first

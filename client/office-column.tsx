@@ -177,6 +177,7 @@ function SessionTab({
 }
 
 export interface ColumnTabsProps {
+  hideSessions?: boolean;
   /** What shows as chosen; null where none does (the rail, the phone's bar while closed). */
   view: ColumnView | null;
   badges: ColumnBadges;
@@ -197,6 +198,7 @@ export interface ColumnTabsProps {
 
 /** The column's tabs: a row in the open column, a stack on its rail. */
 export function ColumnTabs({
+  hideSessions = false,
   view,
   badges,
   sessions,
@@ -220,6 +222,7 @@ export function ColumnTabs({
       style={vertical ? styles.columnTabsVertical : styles.columnTabs}
     >
       {COLUMN_TABS.map((each) => {
+        if (hideSessions && each.tab === "sessions") return null;
         let count: string | null = null;
         let countNote = "new";
         if (each.tab === "attention") count = badges.attention;
@@ -305,6 +308,7 @@ function IconButton({ label, icon, color, iconSize, onPress, styles }: IconButto
 }
 
 export interface OfficeColumnProps {
+  hideSessions?: boolean;
   column: ColumnState;
   /** The open sessions with their titles and status, in `column.sessions`' order. */
   sessions: readonly ColumnSession[];
@@ -332,6 +336,7 @@ export interface OfficeColumnProps {
  * there in an app with no side area of its own.
  */
 export function OfficeColumn({
+  hideSessions = false,
   column,
   sessions,
   touch,
@@ -382,6 +387,7 @@ export function OfficeColumn({
     return (
       <View style={styles.columnRail}>
         <ColumnTabs
+          hideSessions={hideSessions}
           view={null}
           badges={badges}
           sessions={sessions}
@@ -409,6 +415,7 @@ export function OfficeColumn({
       <View style={sized}>
         <View style={styles.columnHead}>
           <ColumnTabs
+            hideSessions={hideSessions}
             view={view}
             badges={badges}
             sessions={sessions}

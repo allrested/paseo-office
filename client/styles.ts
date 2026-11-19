@@ -7,7 +7,12 @@ import type { AttentionReason, DotTone } from "../shared/model.js";
 /** A log is read in a fixed-width face, as in the terminal it comes from. */
 const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 
+export const SESSION_RAIL_WIDTH = 260;
+
 export interface OfficeStyles {
+  fullscreenHeader: ViewStyle;
+  sessionRail: ViewStyle;
+  sessionRailTitle: TextStyle;
   screen: ViewStyle;
   header: ViewStyle;
   /** Holds the floor and what lies over its corner. */
@@ -516,6 +521,21 @@ export function useOfficeStyles(
     };
     const chatActions: ViewStyle = { flexDirection: "row", gap: 8 };
     return {
+      fullscreenHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingBottom: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      sessionRail: {
+        width: SESSION_RAIL_WIDTH,
+        borderRightWidth: 1,
+        borderRightColor: colors.border,
+      },
+      sessionRailTitle: { color: colors.foreground, fontWeight: "600", padding: 12 },
       screen: { flex: 1, backgroundColor: colors.surface0 },
       // No side padding here: the strip scrolls to the screen edge, and each row pads itself.
       header: { paddingTop: 8, gap: 8 },
