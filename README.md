@@ -2,7 +2,7 @@
 
 Office 3D puts your Paseo agents on a shared floor. Each workspace has a room. Pick a desk to see what its agent is doing, open the agent’s workbench over the floor, or leave the office in view while you watch for permission requests.
 
-![Fullscreen Office 3D with the Sessions sidebar, office floor and activity panel](docs/fullscreen-office.png)
+![Fullscreen Office 3D with the Sessions sidebar, office floor and activity panel](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-office.png)
 
 ## Install on a host
 
@@ -31,13 +31,13 @@ Office 3D requires Paseo **0.16.0 or newer**. The plugin has been tested on stoc
 | Schedule recurring work    | On the pantry **Duty board**, choose the days and add instructions for an agent. Duties with instructions enter the pickup queue at 08:00 on their scheduled days. Duties without instructions are acted out on the floor.                                |
 | Read a stand-up            | Open **Stand-up notes** at the meeting screen to browse entries by date. Set the notes folder, days and time zone to have an agent write scheduled entries.                                                                                               |
 
-On wide screens, **Sessions** and **Details** toggle the sidebars independently. Hide both for a full-width floor. [Workspace screenshot](docs/fullscreen-workspace.webp) · [Team chat screenshot](docs/fullscreen-team-chat.webp)
+On wide screens, **Sessions** and **Details** toggle the sidebars independently. Hide both for a full-width floor. [Workspace screenshot](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-workspace.webp) · [Team chat screenshot](https://raw.githubusercontent.com/allrested/paseo-office/main/docs/fullscreen-team-chat.webp)
 
 ## Make the office yours
 
 In **Office settings → Appearance**, choose Company floor, Cozy room or Headquarters. Choose City for streets and shops, Countryside, Beach or Plain for the backdrop, and App theme, Day or Night for lighting. The scene offers English, Vietnamese, Thai and Indonesian. The Office panels and team chat use English.
 
-Under **Branding**, set the office name, logo URL and mark color. Blank fields inherit their host defaults. To change one agent’s name, character or avatar, open their session and choose **Customize agent**. [Branding environment variables](docs/office.md#custom-branding)
+Under **Branding**, set the office name, logo URL and mark color. Blank fields inherit their host defaults. To change one agent’s name, character or avatar, open their session and choose **Customize agent**. [Branding environment variables](https://github.com/allrested/paseo-office/blob/main/docs/office.md#custom-branding)
 
 ## Platform support
 
@@ -47,7 +47,7 @@ Under **Branding**, set the office name, logo URL and mark color. Blank fields i
 | Mobile app                     | 2D and List. Mobile builds with a script-capable frame also support 3D. Use Office session controls for replies and approvals. |
 | Stock Paseo 0.16               | Stop and idle-runtime cleanup depend on host SDK support. The stock 0.16 SDK lacks these operations.                           |
 
-The Linux Host panel shows memory, CPU and processes. The floor also reflects reported agent spending, repository birthdays and team tenure. Git tags, pull-request checks and the installed Claude CLI version can trigger city activities. Weather and Jira or Sentry alerts are optional. [Feature guide](docs/office.md) · [Compatibility checks](docs/verified.md)
+The Linux Host panel shows memory, CPU and processes. The floor also reflects reported agent spending, repository birthdays and team tenure. Git tags, pull-request checks and the installed Claude CLI version can trigger city activities. Weather and Jira or Sentry alerts are optional. [Feature guide](https://github.com/allrested/paseo-office/blob/main/docs/office.md) · [Compatibility checks](https://github.com/allrested/paseo-office/blob/main/docs/verified.md)
 
 ## Data and integrations
 
@@ -55,7 +55,7 @@ Boards, duties, team chat and stand-up state are stored under `$PASEO_HOME/offic
 
 Agent prompts, tool results and scheduled assignments go through the agent’s configured provider. A **Whole group** chat message can go to one available session with up to six recent group or scene messages for context. **To**, mentions and replies address a particular session.
 
-Jira and Sentry use project settings and credentials from the host environment. A configured weather service receives requests while Office is open, at most once every 15 minutes. Its URL is visible in host settings. On stock hosts using fallback timers, scheduled work resumes after daemon restart when Office or an agent activates the plugin. Missed runs are skipped. [Plugin overview](OVERVIEW.md) · [Implementation and storage](docs/office.md)
+Jira and Sentry use project settings and credentials from the host environment. A configured weather service receives requests while Office is open, at most once every 15 minutes. Its URL is visible in host settings. On stock hosts using fallback timers, scheduled work resumes after daemon restart when Office or an agent activates the plugin. Missed runs are skipped. [Plugin overview](https://github.com/allrested/paseo-office/blob/main/OVERVIEW.md) · [Implementation and storage](https://github.com/allrested/paseo-office/blob/main/docs/office.md)
 
 ## Development
 
@@ -73,4 +73,4 @@ After editing the vendored scene, run `npm run build:world` and commit the regen
 
 ## Credits and license
 
-This is an independent community port of **my-office** by **khanh020905**, used with the author’s permission. The scene is based on upstream v0.6.0 at `b682288` and uses three.js 0.160.0. Report Paseo-specific issues in this repository. [Upstream project](https://github.com/khanh020905/my-office) · [Vendored sources and credits](vendor/SOURCES.md) · [Issue tracker](https://github.com/allrested/paseo-office/issues) · [MIT license](LICENSE)
+This is an independent community port of **my-office** by **khanh020905**, used with the author’s permission. The scene is based on upstream v0.6.0 at `b682288` and uses three.js 0.160.0. Report Paseo-specific issues in this repository. [Upstream project](https://github.com/khanh020905/my-office) · [Vendored sources and credits](https://github.com/allrested/paseo-office/blob/main/vendor/SOURCES.md) · [Issue tracker](https://github.com/allrested/paseo-office/issues) · [MIT license](https://github.com/allrested/paseo-office/blob/main/LICENSE)
