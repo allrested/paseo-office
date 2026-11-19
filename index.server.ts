@@ -1,3 +1,4 @@
+import { hostBrand } from "./shared/branding.js";
 import { createHash } from "node:crypto";
 import { execCommand } from "@getpaseo/plugin/server";
 import { createTenure, TenureLedgerSchema, type TenureLedger } from "./server/tenure.js";
@@ -175,6 +176,7 @@ export function createOfficePlugin(
   const { log } = deps;
   const holder = createPaseoHolder();
   const hub = createHub(liveHubPorts(holder, deps.clock, log));
+  hub.setBrand(hostBrand({}, deps.env));
   const office = createOffice({
     store: deps.store,
     clock: deps.clock,
@@ -385,6 +387,7 @@ export function createOfficePlugin(
       settingsUnreadable(state.error);
       return;
     }
+    hub.setBrand(hostBrand(state.values, deps.env));
     agentToolsOn = state.values.agentTools;
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);

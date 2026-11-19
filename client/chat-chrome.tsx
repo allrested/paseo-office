@@ -1,3 +1,4 @@
+import { useOfficeBrand } from "./office-brand-context.js";
 import type { Appearance } from "../shared/appearance.js";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -107,6 +108,7 @@ export function ChatHeader({
   onClose?(): void;
   styles: OfficeStyles;
 }) {
+  const brand = useOfficeBrand();
   const count = members.length + 1;
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((value) => !value), []);
@@ -140,7 +142,7 @@ export function ChatHeader({
           style={styles.rowBody}
         >
           <Text accessibilityRole="header" style={styles.messenger.title}>
-            Office team
+            {brand.name ? `${brand.name} team` : "Office team"}
           </Text>
           <Text style={styles.messenger.subtitle}>
             {count === 1 ? "1 member" : `${count} members`}

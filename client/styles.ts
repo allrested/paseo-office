@@ -168,6 +168,10 @@ export interface OfficeStyles {
   standupPeople: ViewStyle;
   /** The month's notes: the rest of the card's height, scrolled on its own. */
   notesScroll: ViewStyle;
+  notesMonthBar: ViewStyle;
+  notesPaper: ViewStyle;
+  notesDateStrip: ViewStyle;
+  notesMonthTitle: TextStyle;
   /** The Contents' links to the month's entries, as a list. */
   notesLinks: ViewStyle;
   notesLinkRow: ViewStyle;
@@ -587,7 +591,13 @@ export function useOfficeStyles(
       workspaceAction: { ...sidebarButton, borderColor: "transparent" },
       workspaceAccent: colors.accent,
       headerBrand: { ...headerTools, marginRight: 8 },
-      brandText: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
+      brandText: {
+        maxWidth: compact ? 100 : 240,
+        flexShrink: 1,
+        color: colors.foreground,
+        fontSize: 16,
+        fontWeight: "700",
+      },
       brandIcon: { color: colors.statusWarning },
       headerModes: {
         borderWidth: 1,
@@ -932,6 +942,22 @@ export function useOfficeStyles(
       standupHeading: { ...base, color: colors.foreground, fontWeight: "500" },
       standupBlocker: { ...base, color: colors.statusWarning },
       standupPeople: { gap: 6 },
+      notesMonthBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+      },
+      notesMonthTitle: { ...base, color: colors.foreground, fontWeight: "700", fontSize: 19 },
+      notesDateStrip: { alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 2 },
+      notesPaper: {
+        padding: touch ? 12 : 20,
+        backgroundColor: colors.surface1,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 12,
+        gap: 8,
+      },
       notesScroll: { flex: 1, minHeight: 0 },
       notesLinks: { paddingBottom: 8 },
       notesLinkRow: { alignSelf: "flex-start", paddingVertical: touch ? 8 : 2 },

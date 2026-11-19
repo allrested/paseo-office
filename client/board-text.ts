@@ -1,5 +1,5 @@
 import type { ChecklistStep, OfficeAgent, Post, WakeState } from "../shared/contracts.js";
-import { USER_AUTHOR } from "../shared/names.js";
+import { LOBBY, USER_AUTHOR } from "../shared/names.js";
 import { agentTitle } from "../shared/model.js";
 
 /** How many posts a room card shows before it counts the rest. The board sheet shows them all. */
@@ -20,11 +20,19 @@ export function postStateLabel(post: Post, name: (author: string) => string): st
   return `Task · ${post.state ?? "open"}`;
 }
 
+/** Where a claimed lobby task's copy is, or which lobby task a copy came from; null for neither. */
+export function linkLabel(post: Post, name: (author: string) => string): string | null {
+  if (post.link === undefined) return null;
+  if (post.board !== LOBBY) return `from lobby task ${post.link}`;
+  return post.claimedBy === undefined ? null : `on ${name(post.claimedBy)}'s board`;
+}
+
 /** Spec: a post that names an agent shows "from → to". */
 export function postMeta(post: Post, name: (author: string) => string): string {
   const people =
     post.to === undefined ? name(post.author) : `${name(post.author)} → ${name(post.to)}`;
-  return `${postStateLabel(post, name)} · ${people}`;
+  const link = linkLabel(post, name);
+  return `${postStateLabel(post, name)} · ${people}${link === null ? "" : ` · ${link}`}`;
 }
 
 /** Who claimed a to-do and whom it names; null when neither. A done to-do is no longer claimed. */
@@ -34,6 +42,8 @@ export function todoMeta(post: Post, name: (author: string) => string): string |
     parts.push(`claimed by ${name(post.claimedBy)}`);
   }
   if (post.to !== undefined) parts.push(`for ${name(post.to)}`);
+  const link = linkLabel(post, name);
+  if (link !== null) parts.push(link);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 

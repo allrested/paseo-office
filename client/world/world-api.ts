@@ -144,6 +144,7 @@ export type WorldColors = PluginTheme["colors"];
 
 /** What the lobby's sign and the reception's plaque show. */
 export interface WorldBrand {
+  color?: string;
   name: string;
   /** The logo's address in full; null draws the scene's own mark. */
   logoUrl: string | null;

@@ -129,6 +129,18 @@ test("a to-do's meta names who claimed it and whom it names", () => {
   expect(todoMeta(open, person)).toBeNull();
 });
 
+test("a lobby task and its copy each say where the other is", () => {
+  const task = post(1, { board: "lobby", state: "claimed", claimedBy: "a1", link: "p5" });
+  const copy = post(5, { state: "claimed", claimedBy: "a1", link: "p1" });
+  expect(todoMeta(task, person)).toBe("claimed by Ali · on Ali's board");
+  expect(todoMeta({ ...task, state: "done" }, person)).toBe("on Ali's board");
+  expect(postMeta(task, person)).toBe("Task · claimed by Ali · user · on Ali's board");
+  expect(postMeta(copy, person)).toBe("Task · claimed by Ali · user · from lobby task p1");
+  expect(postMeta({ ...copy, state: "done" }, person)).toBe(
+    "Task · done · user · from lobby task p1",
+  );
+});
+
 test("the clear question counts finished to-dos", () => {
   expect(clearQuestion(1)).toBe("Delete 1 finished to-do?");
   expect(clearQuestion(3)).toBe("Delete 3 finished to-dos?");

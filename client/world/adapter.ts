@@ -418,7 +418,11 @@ const PRODUCT_NAME = "Paseo";
 
 /** What the lobby's sign shows: the host's brand, or the product's name over the scene's mark. */
 export function worldBrand(brand: OfficeBrand | null): WorldBrand {
-  return { name: brand?.name ?? PRODUCT_NAME, logoUrl: brand?.logoUrl ?? null };
+  return {
+    name: brand?.name ?? PRODUCT_NAME,
+    logoUrl: brand?.logoUrl ?? null,
+    ...(brand?.color ? { color: brand.color } : {}),
+  };
 }
 
 /** What the scene is told of the weather: the host's scene, or none while the host has not said. */

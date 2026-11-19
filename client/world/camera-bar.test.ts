@@ -207,11 +207,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("the bar has its ten controls with their labels", () => {
+test("the bar keeps the workspace restore button hidden until a window is minimized", () => {
   open();
+  expect(document.querySelector(".tb-tools #btn-workspace")?.hasAttribute("hidden")).toBe(true);
 
   expect(
-    [...document.querySelectorAll(".toolbar button")].map((b) => b.getAttribute("aria-label")),
+    [...document.querySelectorAll(".toolbar button:not(#btn-workspace)")].map((b) =>
+      b.getAttribute("aria-label"),
+    ),
   ).toEqual([
     "Overview",
     "Desks",

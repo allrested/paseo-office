@@ -611,6 +611,12 @@ test("notes show under the list only when there are notes", async () => {
   ]);
 });
 
+test("a claimed lobby to-do says it is on its claimer's board", async () => {
+  const todo = post(1, { text: "Rotate keys", state: "claimed", claimedBy: "a1", link: "p7" });
+  await mount({ rooms: lobbyRooms([todo]), roomId: "lobby" });
+  expect(lines()).toContain("claimed by a1 · on a1's board");
+});
+
 test("agent tasks show each agent's steps, or say there are none", async () => {
   const agentTasks: AgentTaskGroup[] = [
     {

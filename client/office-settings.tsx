@@ -1,3 +1,4 @@
+import { OfficeBrandContext } from "./office-brand-context.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { OfficeModal } from "./office-modal.js";
@@ -52,33 +53,35 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   return (
-    <HostSwitches
-      language={language}
-      wake={office.loaded && live ? office.state.wake : null}
-      actions={actions}
-      styles={styles}
-      deviceProblem={
-        deviceProblemOf(view.unsaved, sound.unsaved) ??
-        (street.unsaved ? "Unable to save the scene on this device." : null)
-      }
-      scheduleError={office.state.notes?.scheduleError ?? null}
-      weather={office.state.weather}
-      incidents={office.state.incidents}
-    >
-      <>
-        <SceneChoices choice={street} styles={styles} />
-        <View style={settingsLayout.strip}>
-          <Text style={styles.sheetLabel}>Office view</Text>
-          <ViewSwitch
-            options={view.options}
-            value={view.choice}
-            onChange={view.choose}
-            styles={styles}
-          />
-          <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
-        </View>
-      </>
-    </HostSwitches>
+    <OfficeBrandContext.Provider value={office.state.brand}>
+      <HostSwitches
+        language={language}
+        wake={office.loaded && live ? office.state.wake : null}
+        actions={actions}
+        styles={styles}
+        deviceProblem={
+          deviceProblemOf(view.unsaved, sound.unsaved) ??
+          (street.unsaved ? "Unable to save the scene on this device." : null)
+        }
+        scheduleError={office.state.notes?.scheduleError ?? null}
+        weather={office.state.weather}
+        incidents={office.state.incidents}
+      >
+        <>
+          <SceneChoices choice={street} styles={styles} />
+          <View style={settingsLayout.strip}>
+            <Text style={styles.sheetLabel}>Office view</Text>
+            <ViewSwitch
+              options={view.options}
+              value={view.choice}
+              onChange={view.choose}
+              styles={styles}
+            />
+            <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
+          </View>
+        </>
+      </HostSwitches>
+    </OfficeBrandContext.Provider>
   );
 }
 

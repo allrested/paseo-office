@@ -84,6 +84,7 @@ function setup(
     label: (author) => author,
     onBoard: () => undefined,
     onBoardRemoved: () => undefined,
+    workspaceOf: async () => null,
   });
   const file = memoryFile(options.file ?? null, options.unreadable);
   const schedules = createLocalSchedules({ clock: timers, log: () => undefined });

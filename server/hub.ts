@@ -76,6 +76,7 @@ export interface Hub {
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
+  setBrand(brand: OfficeSnapshot["brand"]): void;
   setWeather(weather: WeatherState): void;
   /**
    * The conversation each snapshot carries from now on; null removes it. Every subscriber gets a
@@ -144,6 +145,7 @@ export function createHub(ports: HubPorts): Hub {
   let duties: DutyBoard | null = null;
   let sentDuties = "";
   let incidents: IncidentsState | null = null;
+  let brand: OfficeSnapshot["brand"];
   let weather: WeatherState | null = null;
   let sentWeather = "";
   let sentIncidents = "";
@@ -171,6 +173,7 @@ export function createHub(ports: HubPorts): Hub {
         ? { checklistProgress: { ...checklistProgress } }
         : {}),
       boards: copy,
+      ...(brand ? { brand } : {}),
       wake: { paused: wake.paused, queued: { ...wake.queued } },
       ...(notes === null ? {} : { notes: { ...notes } }),
       ...(weather === null ? {} : { weather }),
@@ -513,6 +516,11 @@ export function createHub(ports: HubPorts): Hub {
       if (text === sentDuties) return;
       sentDuties = text;
       duties = { ...next, duties: [...next.duties] };
+      broadcast({ type: "snapshot", state: snapshot() });
+    },
+    setBrand(next) {
+      if (JSON.stringify(brand) === JSON.stringify(next)) return;
+      brand = next;
       broadcast({ type: "snapshot", state: snapshot() });
     },
     setWeather(next) {

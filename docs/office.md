@@ -267,8 +267,7 @@ prompt.
 
 Opening the stand-up rings the bell on the meeting table: everyone the scene counts as free walks
 there and says what they are on. A click on the bell does the same and also starts the stand-up
-notes writer; opening the stand-up writes nothing. A "Stand-up notes" label on the meeting room's
-screen opens the notes card.
+notes writer; opening the stand-up writes nothing. Click or tap the meeting room’s **Sprint review** screen to read the stand-up notes. Its **Stand-up notes** label also opens the reader from the keyboard.
 
 From 08:00 to 21:00 by the device's clock an agent at rest does not stay asleep at its desk: after
 30 to 90 seconds there it gets up for a game of pool, foosball or the games TV with another resting
@@ -375,6 +374,8 @@ done or reopened. Choose a specific agent to send it the task when idle. Turning
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
 
+New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
+
 The lobby also shows each agent's unfinished checklist steps, text included, which the
 "doing now" read takes from the newest `todo` item among the agent's newest timeline items. The
 steps stay after the agent stops and go when it is archived or closed. The server keeps them in
@@ -417,7 +418,8 @@ task or duty at a time per agent, the wake limits, **Wake agents** and **Agent t
 starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
 completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
 a duty with `office_update`. An agent finishes or reopens only a duty it holds; from the duty board
-you mark any. Nobody posts to the duty board, not even from the office.
+you mark any. Nobody posts to the duty board, not even from the office. A duty is never addressed
+to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
 
 A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor
 finish it. On the 3D floor a free person acts it out during that chore's hours, and the view tells
@@ -438,6 +440,18 @@ note. The four starting duties keep the cups, bin, plants and tables chores. For
 person walks to the board and back. The person of an agent that holds a duty acts its chore out
 once. HR posts the day's list in the chat in the morning. The scene's part is `paseo-duty-plan.js`
 and `people/duty.js`.
+
+## Custom branding
+
+Open **Office settings → Appearance → Branding** to preview the current brand and change the office name, logo URL or mark color for everyone on this host. Each field saves on Enter or when you leave it. Clear a field to restore its host default. Branding appears in the fullscreen header and on the 3D floor. The office name also appears in team chat.
+
+| Office setting | Daemon environment variable | Example                                 |
+| -------------- | --------------------------- | --------------------------------------- |
+| Office name    | `PASEO_BRAND_NAME`          | `Acme Studio`                           |
+| Logo URL       | `PASEO_BRAND_LOGO_URL`      | `https://assets.example.org/office.png` |
+| Brand color    | `PASEO_BRAND_COLOR`         | `#e8865f`                               |
+
+Each saved value overrides its environment variable. On web, the name and logo can also come from the Paseo page when both values for that field are empty. Otherwise Office uses its built-in defaults. The mark color tints the built-in icon. Use an HTTPS image URL that clients can reach and enable cross-origin image access on its server so the 3D sign and photos can use it.
 
 ## Settings
 
@@ -528,9 +542,7 @@ archives the writer. A writer that fails, is stopped or closed, or ends without 
 it is and stays named, with an "Open the writer" button that opens its session in the office's
 column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
-notes card: a month's file as Markdown at its newest entry, read only. A list line that is only a
-link to one of the file's own headers, such as the Contents' `- [18 November 2026](#18-november-2026)`,
-scrolls the card to that entry; the app's Markdown would hand the link to its file opener. The
+notes reader at the month’s newest entry. Select a date to read that entry, or use the month arrows to browse earlier files. The entry strip also includes the file’s introduction and Contents when present. Contents links open their entries. The
 server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
 ## Schedules
@@ -690,7 +702,7 @@ For most agent lines, reception can speak when nobody is resting. Chat photos ar
 
 ## The street
 
-Choose **Change outdoor scene** (the mountains button) in 3D or open Office settings. Select **City**, **Countryside**, **Beach** or **Plain**. **Lighting** offers **App theme**, **Day** and **Night**. Countryside with Day lighting gives the green landscape shown in my-office. Choosing a different environment rebuilds the floor; changing the lighting keeps the camera. Each device remembers its choices. Older devices retain their saved street preference as City or Plain. The city supports taking the lift to the pavement in Walk mode.
+Open **Outdoor scene** in Office settings. Select **City**, **Countryside**, **Beach** or **Plain**. **Lighting** offers **App theme**, **Day** and **Night**. Countryside with Day lighting gives the green landscape shown in my-office. Choosing a different environment rebuilds the floor; changing the lighting keeps the camera. Each device remembers its choices. Older devices retain their saved street preference as City or Plain. The city supports taking the lift to the pavement in Walk mode.
 
 The device requests the CC0 car models from `office.world.street` and passes the string to the isolated scene in the `street.kit` start option. A failed request leaves procedural traffic and shops available and shows a floor note. The day’s street activities include shopping trips, the guard, lunch, evening drinks, the photo studio and pickleball. The upstream chain modules and branded artwork are excluded. Plain canvas signs carry the names from `scripts/street-brands.mjs`. See the street section of [the source inventory](../vendor/SOURCES.md) when importing upstream changes.
 

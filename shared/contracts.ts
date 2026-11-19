@@ -1,3 +1,4 @@
+import { BrandingSchema } from "./branding.js";
 import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
@@ -157,10 +158,14 @@ export const PostSchema = z.object({
   /** Tasks only. */
   state: TaskStateSchema.optional(),
   claimedBy: z.string().optional(),
+  /** Named lobby tasks created with tracked pickup. Older named posts may already have woken their agent. */
+  namedPickup: z.literal(true).optional(),
   /** Persisted until Paseo acknowledges an automatic lobby assignment. */
   pickupMessageId: z.string().optional(),
   /** On the duty board: the duty of the list it was posted for, and its day (YYYY-MM-DD). */
   duty: z.object({ id: z.string(), day: z.string() }).optional(),
+  /** A claimed lobby task's copy on the claimer's board, and the copy's lobby task: each other's id. */
+  link: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -438,6 +443,7 @@ export const ChatResultSchema = z.union([
 export type ChatResult = z.output<typeof ChatResultSchema>;
 
 export const OfficeSnapshotSchema = z.object({
+  brand: BrandingSchema.optional(),
   agents: z.array(OfficeAgentSchema),
   workspaces: z.array(OfficeWorkspaceSchema),
   /** The "doing now" line of each running agent that has one. */

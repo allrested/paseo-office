@@ -1,3 +1,4 @@
+import { useOfficeBrand } from "./office-brand-context.js";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -44,6 +45,7 @@ function previewText(message: ChatMessage): string {
 
 /** A newly arrived group message can open the messenger without changing the camera or rail. */
 export function TeamChatPreview({ chat, onOpen }: { chat: ChatSnapshot | null; onOpen(): void }) {
+  const brand = useOfficeBrand();
   const newest = chat?.messages.at(-1);
   const id = newest?.id ?? "";
   const last = useRef<string | null>(null);
@@ -79,7 +81,7 @@ export function TeamChatPreview({ chat, onOpen }: { chat: ChatSnapshot | null; o
         <Icon name="MessagesSquare" size={18} color="#20599a" />
       </View>
       <View style={copy}>
-        <Text style={title}>Office team</Text>
+        <Text style={title}>{brand.name ? `${brand.name} team` : "Office team"}</Text>
         <Text numberOfLines={1} style={text}>
           {caption}
         </Text>

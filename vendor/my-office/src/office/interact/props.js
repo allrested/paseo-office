@@ -1,5 +1,6 @@
 // Furniture you can point at: highlight, tooltip, click actions.
 import * as THREE from '../../../three/three.module.min.js';
+import { host } from '../paseo-host.js';
 import { state } from '../core/state.js';
 import { $, PRO, SEASON, el, rand, reduceMotion } from '../core/env.js';
 import { STATUS_LABEL } from '../ui/event-text.js';
@@ -152,6 +153,7 @@ export function buildProps() {
   if (lift) prop('door', { name: tr('props.lift.name'), hint: tr('props.lift.hint'), place: 'door', meshes: meshesOf(lift.g), act: () => { liftCall(3); sfx.play('click'); } });
   else prop('door', { name: tr('props.door.name'), hint: tr('props.door.hint'), place: 'door', meshes: [...meshesOf(doorPivot), ...meshesIn([-8.1, 0, DZ - 1.0, -7.8, 2.75, DZ + 1.0])], act: () => { doorKick = state.sim + 2.2; } });
   prop('coffee', { name: tr(PRO ? 'props.coffee.namePro' : 'props.coffee.name'), hint: tr('props.coffee.hint'), place: 'coffee', meshes: PRO ? [...meshesOf(coffeeG), ...meshesIn([11.9, 0, -8.1, 14.1, 2.2, -7.1])] : meshesOf(coffeeG), act: () => { brewCoffee(); coffeeMade(); } });
+  if (host.notes && PRO_FX.notesScreen) prop('notes', { name: tr('paseo.notes'), hint: '', meshes: PRO_FX.notesScreen, act: () => host.notes() });
   prop('meeting', { name: tr('props.meeting.name'), hint: tr('props.meeting.hint'), place: 'meeting', meshes: meshesIn(REG.meeting) });
   prop('printer', { name: tr('props.printer.name'), hint: tr('props.printer.hint'), place: 'printer', meshes: [...meshesIn([PRN.x - 0.4, 0, PRN.z - 0.35, PRN.x + 0.4, 1.05, PRN.z + 0.35]), paper], act: () => { printPage(); pagePrinted(); } });
   prop('arcade', { name: tr('props.arcade.name'), hint: tr('props.arcade.hint'), place: PRO ? 'lounge' : undefined, meshes: meshesIn([ARC.x - 0.45, 0, ARC.z - 0.42, ARC.x + 0.45, 1.85, ARC.z + 0.53]), act: () => { state.arcCoin = state.sim + 3; sfx.play('coin'); toast(tr('props.arcade.soon')); } });

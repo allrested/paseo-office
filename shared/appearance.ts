@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const APPEARANCE_KEY = "office.appearance";
 export const COLORS = ["Red", "Orange", "Green", "Teal", "Blue", "Violet", "Pink", "Gold"] as const;
+export const GENDERS = ["Male", "Female"] as const;
 export const AVATARS = { glasses: "👓", headphones: "🎧", cap: "🧢", beanie: "🧶" } as const;
 export const AppearanceSchema = z.object({
   name: z
@@ -11,6 +12,7 @@ export const AppearanceSchema = z.object({
     .max(60)
     .regex(/^[^\r\n]+$/)
     .optional(),
+  gender: z.enum(GENDERS).optional(),
   avatar: z.enum(["glasses", "headphones", "cap", "beanie"]).optional(),
   color: z.enum(COLORS).optional(),
 });

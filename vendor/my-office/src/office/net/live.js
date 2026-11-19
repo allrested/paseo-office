@@ -98,7 +98,7 @@ export function upsertSession(s, walkIn = true) {
   let w = workers.get(s.id);
   if (!w && !leavingIds.has(s.id)) w = addWorker(s, walkIn && had === false && state.connectedOnce);
   if (w) {
-    if (previous && (previous.shirt !== s.shirt || previous.appearance?.avatar !== s.appearance?.avatar || previous.name !== s.name)) {
+    if (previous && (previous.appearance?.gender !== s.appearance?.gender || previous.shirt !== s.shirt || previous.appearance?.avatar !== s.appearance?.avatar || previous.name !== s.name)) {
       Object.assign(w.cfg, lookOf(s), { name: s.name });
       w.tagDot.style.background = w.cfg.shirt;
       if (s.desk >= 0) chairs[s.desk].color.set(w.cfg.shirt);

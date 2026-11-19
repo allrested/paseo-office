@@ -1,3 +1,4 @@
+import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
   useEffect,
@@ -57,7 +58,6 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
-import { SceneChoices } from "./scene-picker.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -77,7 +77,7 @@ import {
 } from "./session-pane.js";
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
-import { OfficeDialogs, OfficeModal } from "./office-modal.js";
+import { OfficeDialogs } from "./office-modal.js";
 import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
@@ -862,7 +862,6 @@ interface ViewControlsProps {
   /** The device refused to store a press on the 3D floor's Sound button. */
   soundUnsaved: boolean;
   toolbarLabels: boolean;
-  onScene(): void;
   onTeam(): void;
   machine: Machine | null;
   onMachine(): void;
@@ -907,7 +906,6 @@ function ViewControls({
   viewChoice,
   soundUnsaved,
   toolbarLabels,
-  onScene,
   onTeam,
   machine,
   onMachine,
@@ -947,18 +945,6 @@ function ViewControls({
           count={badges.chat}
           color={color}
           onOpen={onTeam}
-          styles={styles}
-        />
-      )}
-      {viewChoice.choice === "3d" && (
-        <PanelButton
-          label="Change outdoor scene"
-          caption={toolbarLabels ? "Scene" : undefined}
-          icon="Mountain"
-          screenId="scene"
-          size={18}
-          color={color}
-          onOpen={onScene}
           styles={styles}
         />
       )}
@@ -1538,6 +1524,7 @@ function useFullscreenPanels(
   sheet: ColumnSheetState,
   select: (id: string | null) => void,
   selectFromStrip: (id: string) => void,
+  openWorkspace: (agentId: string) => void,
 ) {
   const docked = active && !compact && surfaceWidth > 0;
   const sessionsAvailable = docked && fullscreen;
@@ -1554,9 +1541,13 @@ function useFullscreenPanels(
       }
     : undefined;
   const { openSession } = sheet;
+  // A Sessions row's own button goes straight to the agent's workspace, past its details.
   const link = useMemo(
-    () => (active ? { select: openSession, openSession } : sheet.link),
-    [active, openSession, sheet.link],
+    (): OfficeLink => ({
+      ...(active ? { select: openSession, openSession } : sheet.link),
+      openWorkspace,
+    }),
+    [active, openSession, sheet.link, openWorkspace],
   );
   const selectAgent = useCallback(
     (id: string | null) => {
@@ -1671,30 +1662,6 @@ function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void
   return { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard };
 }
 
-function SceneDialog({
-  open,
-  setOpen,
-  choice,
-  styles,
-}: {
-  open: boolean;
-  setOpen(open: boolean): void;
-  choice: ReturnType<typeof useOfficeScene>;
-  styles: OfficeStyles;
-}) {
-  const icon = useMemo(
-    () => <Icon name="Mountain" size={18} color={styles.workspaceAccent} />,
-    [styles.workspaceAccent],
-  );
-  return (
-    <OfficeModal title="Scene" icon={icon} open={open} onOpenChange={setOpen}>
-      <OfficeModal.Content>
-        <SceneChoices choice={choice} styles={styles} />
-      </OfficeModal.Content>
-    </OfficeModal>
-  );
-}
-
 /** One surface for both places: the sidebar screen and a workspace tab. */
 export function OfficeSurface(
   props: OfficeSurfaceProps & {
@@ -1734,8 +1701,6 @@ export function OfficeSurface(
     full.integrated || viewChoice.choice === "3d",
     onOpenSettings,
   );
-  const [sceneOpen, setSceneOpen] = useState(false);
-  const chooseScene = useCallback(() => setSceneOpen(true), []);
   const [teamOpen, setTeamOpen] = useState(false);
   const openTeam = useCallback(() => setTeamOpen((value) => !value), []);
   const closeTeam = useCallback(() => setTeamOpen(false), []);
@@ -1812,6 +1777,7 @@ export function OfficeSurface(
     sheet,
     setSelectedId,
     selectFromStrip,
+    showAgentWorkspace,
   );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
@@ -1957,7 +1923,6 @@ export function OfficeSurface(
       viewChoice={viewChoice}
       soundUnsaved={sound.unsaved}
       toolbarLabels={surfaceWidth >= 1100}
-      onScene={chooseScene}
       onTeam={openTeam}
       machine={machine}
       onMachine={openMachine}
@@ -2173,7 +2138,6 @@ export function OfficeSurface(
           onClose={closeTeam}
         />
       )}
-      <SceneDialog open={sceneOpen} setOpen={setSceneOpen} choice={street} styles={styles} />
       <OfficeWorkspace
         selection={workspace}
         hostId={props.host.id}
@@ -2197,8 +2161,10 @@ export function OfficeSurface(
     </View>
   );
   return (
-    <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
-      {surface}
-    </OfficeDialogs>
+    <OfficeBrandContext.Provider value={office.state.brand}>
+      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+        {surface}
+      </OfficeDialogs>
+    </OfficeBrandContext.Provider>
   );
 }

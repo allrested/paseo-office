@@ -32,6 +32,8 @@ export interface OfficeAgentPorts {
   status(agentId: string): Promise<WakeTarget>;
   /** The full id of the agent that `agentId` names or starts, or null when it can get no post. */
   resolve(agentId: string): Promise<string | null>;
+  /** The agent's workspace id, or null when it has none. */
+  workspaceOf(agentId: string): Promise<string | null>;
   /** `source` is the agent whose posts the prompt carries, or null for a prompt as from the user. */
   send(agentId: string, prompt: string, source: string | null, messageId?: string): Promise<void>;
 }
@@ -123,6 +125,7 @@ export function createOffice(deps: OfficeDeps): Office {
       if (board === LOBBY || board === DUTY) pickup?.refresh();
     },
     onBoardRemoved: (board) => hub.removeBoard(board),
+    workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
   });
 
@@ -133,7 +136,7 @@ export function createOffice(deps: OfficeDeps): Office {
   }
 
   function mentioned(post: Post): void {
-    if (post.to === undefined || queue === null) return;
+    if (post.to === undefined || post.namedPickup || queue === null) return;
     queue.enqueue(post.to, {
       postId: post.id,
       author: post.author,
@@ -172,7 +175,7 @@ export function createOffice(deps: OfficeDeps): Office {
         agents: deps.agents,
         queue,
         clock,
-        enabled: () => pickupEnabled && !service.wakesPaused(),
+        enabled: () => pickupEnabled,
         instructed,
         log,
       });
@@ -265,14 +268,14 @@ export function createOffice(deps: OfficeDeps): Office {
     },
     async checkCompletion(agentId, lastAnswer) {
       await ready;
-      const claim = [...service.postsOf(LOBBY), ...service.postsOf(DUTY)].find(
+      const claims = [...service.postsOf(LOBBY), ...service.postsOf(DUTY)].filter(
         (p) => p.state === "claimed" && p.claimedBy === agentId,
       );
-      if (!claim) return;
+      if (!claims.length) return;
       const text = await lastAnswer();
-      if (text?.trimEnd().split("\n").at(-1)?.trim() === completionLine(claim)) {
-        await service.finishLobbyClaim(claim);
-      }
+      const line = text?.trimEnd().split("\n").at(-1)?.trim();
+      const claim = claims.find((p) => completionLine(p) === line);
+      if (claim) await service.finishLobbyClaim(claim);
     },
     agentGone(agentId) {
       queue?.agentGone(agentId);

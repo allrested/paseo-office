@@ -58,7 +58,11 @@ interface PostActionsProps {
 }
 
 export function PostWithActions({ post, name, actions, styles }: PostActionsProps) {
-  const done = useCallback(() => actions.markDone(post.id), [actions, post.id]);
+  const finished = post.state === "done";
+  const toggleDone = useCallback(
+    () => (finished ? actions.reopen(post.id) : actions.markDone(post.id)),
+    [actions, finished, post.id],
+  );
   const remove = useCallback(() => actions.remove(post.id), [actions, post.id]);
   // A deleted post is gone for good, so Delete asks once more. The question moves the buttons
   // down a line: a second tap in the same place lands on the words, not on a button.
@@ -85,9 +89,9 @@ export function PostWithActions({ post, name, actions, styles }: PostActionsProp
         <View style={styles.actions}>
           {post.kind === "task" ? (
             <ActionButton
-              label="Mark done"
+              label={finished ? "Reopen" : "Mark done"}
               pendingLabel="Saving..."
-              onPress={done}
+              onPress={toggleDone}
               styles={styles}
             />
           ) : null}
