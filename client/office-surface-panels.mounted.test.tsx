@@ -1183,13 +1183,6 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
           this.setAttribute("open", "");
         },
       },
-      // A dialog shown without the top layer, as the office shows one under a minimized workspace.
-      show: {
-        configurable: true,
-        value() {
-          this.setAttribute("open", "");
-        },
-      },
       close: {
         configurable: true,
         value() {
@@ -1255,7 +1248,6 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     } finally {
       Reflect.deleteProperty(proto, "show");
       Reflect.deleteProperty(proto, "showModal");
-      Reflect.deleteProperty(proto, "show");
       Reflect.deleteProperty(proto, "close");
     }
 
