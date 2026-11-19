@@ -210,8 +210,9 @@ let compact: boolean;
 let container: HTMLElement;
 let root: Root;
 
+const { OfficeSurface } = await import("./office-surface.js");
+
 async function mount(): Promise<void> {
-  const { OfficeSurface } = await import("./office-surface.js");
   const props = {
     theme: THEME,
     layout: { compact, platform: "web" },
