@@ -1,24 +1,21 @@
-import { useMemo } from "react";
-import { View } from "react-native";
+import { OfficeBrandContext } from "./office-brand-context.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Text, View } from "react-native";
+import { OfficeModal } from "./office-modal.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
+import { settingsLayout } from "./settings-sections.js";
 import { LanguageSetting } from "./language-switch.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
-import { useOfficeStyles } from "./styles.js";
+import { useOfficeStyles, type OfficeStyles } from "./styles.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
-import { UNSAVED_STREET, useStreetSwitch } from "./use-street.js";
+import { useOfficeScene } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
+import { SceneChoices } from "./scene-picker.js";
 import { ViewSwitch } from "./view-switch.js";
 
-/**
- * The office's settings, under the app's Settings: what the host holds (wakes, agent tools, the
- * stand-up notes, the incident trackers, the 3D floor's plan) and this device's view and Sound
- * switch. The office's page shows none of them, so a phone's floor is not covered. The screen
- * follows the office's state for the wakes and the schedules' failures, so the host does its "an
- * office surface is open" work while it is open.
- */
 export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
   const touchScreen = useMemo(
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
@@ -28,41 +25,89 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
   const office = useOffice();
   const actions = useBoardActions();
   const view = useViewChoice(layout.platform);
-  const street = useStreetSwitch(layout);
+  const street = useOfficeScene(layout);
   const sound = useSoundSwitch();
+  return (
+    <OfficeSettingsFields
+      office={office}
+      styles={styles}
+      actions={actions}
+      view={view}
+      street={street}
+      sound={sound}
+    />
+  );
+}
+
+interface FieldsProps {
+  office: ReturnType<typeof useOffice>;
+  styles: OfficeStyles;
+  actions: ReturnType<typeof useBoardActions>;
+  view: ReturnType<typeof useViewChoice>;
+  street: ReturnType<typeof useOfficeScene>;
+  sound: ReturnType<typeof useSoundSwitch>;
+}
+
+function OfficeSettingsFields({ office, styles, actions, view, street, sound }: FieldsProps) {
+  const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   return (
-    <View style={styles.header}>
+    <OfficeBrandContext.Provider value={office.state.brand}>
       <HostSwitches
+        language={language}
         wake={office.loaded && live ? office.state.wake : null}
         actions={actions}
         styles={styles}
         deviceProblem={
-          deviceProblemOf(view.unsaved, sound.unsaved) ?? (street.unsaved ? UNSAVED_STREET : null)
+          deviceProblemOf(view.unsaved, sound.unsaved) ??
+          (street.unsaved ? "Unable to save the scene on this device." : null)
         }
         scheduleError={office.state.notes?.scheduleError ?? null}
         weather={office.state.weather}
         incidents={office.state.incidents}
       >
         <>
-          <ViewSwitch
-            options={view.options}
-            value={view.choice}
-            onChange={view.choose}
-            styles={styles}
-          />
-          <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
-          <LabeledSwitch
-            label="The street outside"
-            note="Draw shops and traffic. Off by default on a phone."
-            value={street.on}
-            onChange={street.set}
-            styles={styles}
-          />
+          <SceneChoices choice={street} styles={styles} />
+          <View style={settingsLayout.strip}>
+            <Text style={styles.sheetLabel}>Office view</Text>
+            <ViewSwitch
+              options={view.options}
+              value={view.choice}
+              onChange={view.choose}
+              styles={styles}
+            />
+            <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
+          </View>
         </>
       </HostSwitches>
-      <LanguageSetting styles={styles} />
-    </View>
+    </OfficeBrandContext.Provider>
   );
+}
+
+export function FullscreenSettings({
+  open,
+  onClose,
+  ...fields
+}: FieldsProps & {
+  open: boolean;
+  onClose(): void;
+}) {
+  return (
+    <OfficeModal title="Office settings" size="settings" open={open} onOpenChange={onClose}>
+      <OfficeModal.Content scrollable={false} contentContainerStyle={settingsLayout.flush}>
+        <OfficeSettingsFields {...fields} />
+      </OfficeModal.Content>
+    </OfficeModal>
+  );
+}
+
+export function useOfficeSettingsDialog(fullscreen: boolean, nativeSettings?: () => void) {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  useEffect(() => {
+    if (!fullscreen) close();
+  }, [fullscreen, close]);
+  return { open: fullscreen && open, show: fullscreen ? show : nativeSettings, close };
 }

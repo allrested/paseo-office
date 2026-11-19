@@ -1,4 +1,6 @@
+import type { Appearance } from "../shared/appearance.js";
 import {
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -6,10 +8,12 @@ import {
   useReducer,
   useRef,
   useState,
+  type ComponentRef,
   type ReactNode,
 } from "react";
 import {
   Pressable,
+  Image,
   Text,
   View,
   type NativeSyntheticEvent,
@@ -19,8 +23,14 @@ import {
 import { useRpc } from "@getpaseo/plugin/client";
 import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { CHAT_TEXT_MAX, chatRpc, type ChatMessage, type ChatRequest } from "../shared/contracts.js";
-import { buildOfficeModel } from "../shared/model.js";
-import { ActionButton, failureText } from "./action-button.js";
+import { agentTitle, buildOfficeModel } from "../shared/model.js";
+import { failureText } from "./action-button.js";
+import { ChatHeader } from "./chat-chrome.js";
+import { PromptCoach } from "./prompt-coach.js";
+import { tabOf } from "./list-text.js";
+import type { ChatShortcuts } from "./chat-more.js";
+import { ComposeTools } from "./chat-compose-tools.js";
+import { messengerTheme } from "./messenger-styles.js";
 import { loadProblem } from "./activity-panel.js";
 import {
   CHAT_EMPTY,
@@ -46,11 +56,11 @@ import {
   typingText,
   type MentionOption,
 } from "./chat-text.js";
-import { markChatSeen } from "./chat-seen.js";
+import { getChatSeen, markChatSeen } from "./chat-seen.js";
 import { useFollowEnd } from "./follow-end.js";
 import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
-import type { OfficeStyles } from "./styles.js";
+import { useOfficeStyles, type OfficeStyles } from "./styles.js";
 
 /** Sends a request to the chat; false when it failed, and the error is then under the box. */
 type Run = (input: ChatRequest) => Promise<boolean>;
@@ -207,41 +217,19 @@ interface BodyProps {
   styles: OfficeStyles;
 }
 
-/** Words, clipped at eight lines until Show more; an agent's have Open session under them. */
-function TextBody({ message, onFloor, link, keep, styles }: BodyProps) {
+/** Words, clipped at eight lines until Show more. */
+function TextBody({ message, keep, styles }: BodyProps) {
   const [expanded, setExpanded] = useState(false);
   const expand = useCallback(() => setExpanded(true), []);
-  const { from } = message;
-  const open = useCallback(() => {
-    if (from !== undefined) link.openSession(from);
-  }, [from, link]);
   const clipped = !expanded && isLong(message.text);
-  const openable = onFloor && !isYours(message);
   return (
     <>
       <Text style={styles.chatText} numberOfLines={clipped ? SHOW_MORE_LINES : 0}>
         {message.text}
       </Text>
-      {clipped || openable ? (
+      {clipped ? (
         <View style={styles.chatActions}>
-          {clipped ? (
-            <ChatButton
-              label="Show more"
-              value="more"
-              onPress={expand}
-              keep={keep}
-              styles={styles}
-            />
-          ) : null}
-          {openable ? (
-            <ChatButton
-              label="Open session"
-              value="open"
-              onPress={open}
-              keep={keep}
-              styles={styles}
-            />
-          ) : null}
+          <ChatButton label="Show more" value="more" onPress={expand} keep={keep} styles={styles} />
         </View>
       ) : null}
     </>
@@ -309,10 +297,24 @@ function RemindBody({ message, run, keep, styles }: BodyProps) {
   );
 }
 
+function OfficePhoto({ photo, styles }: { photo: string; styles: OfficeStyles }) {
+  const source = useMemo(() => ({ uri: photo }), [photo]);
+  return (
+    <Image
+      accessibilityLabel="Office photo"
+      accessible
+      source={source}
+      resizeMode="contain"
+      style={styles.messenger.photo}
+    />
+  );
+}
 function Body(props: BodyProps) {
   const { message, styles } = props;
   if (message.recalled === true) return <Text style={styles.chatMeta}>{CHAT_RECALLED}</Text>;
   switch (message.kind) {
+    case "photo":
+      return message.photo ? <OfficePhoto photo={message.photo} styles={styles} /> : null;
     case "sticker":
       return (
         <View style={styles.chatChip}>
@@ -353,6 +355,7 @@ function Reactions({ message, run, keep, styles }: BodyProps) {
 
 interface ActionsProps extends BodyProps {
   shown: boolean;
+  inline: boolean;
   recallable: boolean;
   picking: boolean;
   onPicking(): void;
@@ -366,14 +369,17 @@ function Actions({
   keep,
   styles,
   shown,
+  inline,
   recallable,
   picking,
   onPicking,
   onReply,
 }: ActionsProps) {
   const { id } = message;
+  const floating = shown ? styles.messenger.tools : styles.messenger.toolsHidden;
   const reply = useCallback(() => onReply(message), [onReply, message]);
   const recall = useCallback(() => void run({ op: "recall", id }), [run, id]);
+  const pin = useCallback(() => void run({ op: "pin", id }), [run, id]);
   const choose = useCallback(
     (emoji: string) => {
       onPicking();
@@ -383,7 +389,7 @@ function Actions({
   );
   return (
     <>
-      <View style={shown ? styles.chatActions : styles.chatActionsHidden}>
+      <View style={inline ? styles.chatActions : floating}>
         <ChatButton
           label="React"
           value="react"
@@ -393,6 +399,9 @@ function Actions({
           styles={styles}
         />
         <ChatButton label="Reply" value="reply" onPress={reply} keep={keep} styles={styles} />
+        <ChatButton label="Pin message" value="pin" onPress={pin} keep={keep} styles={styles}>
+          <Icon name="Pin" size={13} color={styles.iconColor} />
+        </ChatButton>
         {recallable ? (
           <ChatButton label="Recall" value="recall" onPress={recall} keep={keep} styles={styles} />
         ) : null}
@@ -429,6 +438,7 @@ function useRecallable(message: ChatMessage): boolean {
 }
 
 interface ChatRowProps {
+  appearance?: Appearance;
   message: ChatMessage;
   onFloor: boolean;
   /** A touch screen, where nothing hovers. */
@@ -444,6 +454,7 @@ interface ChatRowProps {
  * actions show on hover and focus on the web, and always on a touch screen.
  */
 const ChatRow = memo(function ChatRow({
+  appearance,
   message,
   onFloor,
   always,
@@ -453,7 +464,7 @@ const ChatRow = memo(function ChatRow({
   styles,
 }: ChatRowProps) {
   const mine = isYours(message);
-  const avatar = avatarOf(message);
+  const avatar = avatarOf(message, appearance);
   const time = timeLabel(message.at, Date.now());
   const recallable = useRecallable(message);
   const [hovered, setHovered] = useState(false);
@@ -462,6 +473,14 @@ const ChatRow = memo(function ChatRow({
   const [inner, setInner] = useState(false);
   const [focused, setFocused] = useState(false);
   const keep = useMemo<Keep>(() => ({ hover: setInner, focus: setFocused }), []);
+  const openSender = useCallback(() => {
+    if (message.from !== undefined) link.openSession(message.from);
+  }, [link, message.from]);
+  const senderName = (
+    <Text style={styles.chatName} numberOfLines={1}>
+      {message.name ?? ""}
+    </Text>
+  );
   const [picking, setPicking] = useState(false);
   const togglePicking = useCallback(() => setPicking((open) => !open), []);
   const body: BodyProps = { message, onFloor, link, run, keep, styles };
@@ -477,24 +496,36 @@ const ChatRow = memo(function ChatRow({
         <Avatar initials={avatar.initials} color={avatar.color} styles={styles} />
       )}
       <View style={mine ? styles.chatBubbleMine : styles.chatBubble}>
-        {mine ? null : (
+        {!mine && (
           <View style={styles.boardHeading}>
-            <Text style={styles.chatName} numberOfLines={1}>
-              {message.name ?? ""}
-            </Text>
-            <Text style={styles.chatMeta}>{time}</Text>
+            {onFloor ? (
+              <ChatButton
+                label="Open session"
+                value="sender"
+                onPress={openSender}
+                keep={keep}
+                style={styles.boardHeading}
+                styles={styles}
+              >
+                {senderName}
+                <Icon name="ArrowUpRight" size={11} color={styles.iconColor} />
+              </ChatButton>
+            ) : (
+              senderName
+            )}
           </View>
         )}
         {message.reply ? (
           <Quote name={message.reply.name} text={message.reply.text} styles={styles} />
         ) : null}
         <Body {...body} />
-        {mine ? <Text style={styles.chatMeta}>{time}</Text> : null}
+        <Text style={styles.chatMeta}>{time}</Text>
         {message.recalled === true ? null : <Reactions {...body} />}
         {message.recalled === true ? null : (
           <Actions
             {...body}
             shown={always || hovered || inner || focused || picking}
+            inline={always || picking}
             recallable={recallable}
             picking={picking}
             onPicking={togglePicking}
@@ -508,8 +539,10 @@ const ChatRow = memo(function ChatRow({
 
 interface MessagesProps {
   messages: readonly ChatMessage[];
+  emptyLabel: string;
+  firstUnread?: string;
   /** The agents on the floor. */
-  agents: ReadonlyMap<string, unknown>;
+  agents: ReadonlyMap<string, { appearance?: Appearance }>;
   problem: string | null;
   always: boolean;
   link: OfficeLink;
@@ -521,6 +554,8 @@ interface MessagesProps {
 /** The conversation, oldest first; a state that cannot load says so in its place. */
 function Messages({
   messages,
+  emptyLabel,
+  firstUnread,
   agents,
   problem,
   always,
@@ -538,25 +573,34 @@ function Messages({
       </View>
     );
   }
-  if (messages.length === 0) return <Text style={styles.muted}>{CHAT_EMPTY}</Text>;
-  return messages.map((message) =>
-    message.kind === "sys" ? (
-      <Text key={message.id} testID={`chat-${message.id}`} style={styles.chatSystem}>
-        {message.text}
-      </Text>
-    ) : (
-      <ChatRow
-        key={message.id}
-        message={message}
-        onFloor={message.from !== undefined && agents.has(message.from)}
-        always={always}
-        link={link}
-        run={run}
-        onReply={onReply}
-        styles={styles}
-      />
-    ),
-  );
+  if (messages.length === 0) return <Text style={styles.messenger.empty}>{emptyLabel}</Text>;
+  return messages.map((message) => (
+    <Fragment key={message.id}>
+      {message.id === firstUnread && (
+        <View style={styles.messenger.unread}>
+          <View style={styles.messenger.unreadRule} />
+          <Text style={styles.messenger.unreadText}>New messages</Text>
+          <View style={styles.messenger.unreadRule} />
+        </View>
+      )}
+      {message.kind === "sys" ? (
+        <Text testID={`chat-${message.id}`} style={styles.chatSystem}>
+          {message.text}
+        </Text>
+      ) : (
+        <ChatRow
+          appearance={message.from ? agents.get(message.from)?.appearance : undefined}
+          message={message}
+          onFloor={message.from !== undefined && agents.has(message.from)}
+          always={always}
+          link={link}
+          run={run}
+          onReply={onReply}
+          styles={styles}
+        />
+      )}
+    </Fragment>
+  ));
 }
 
 interface ReplyBarProps {
@@ -641,6 +685,92 @@ function StickerTray({ onPick, styles }: { onPick(index: number): void; styles: 
  * The Chat tab of the office's column, fed by the surface's subscription: the team conversation,
  * which the surface keeps apart from the floor's state.
  */
+function readyToSend({ images, recipient, text }: ChatDraft, reading: boolean): boolean {
+  return !reading && (images.length ? recipient !== null : text.trim() !== "");
+}
+
+function SendButton({
+  like,
+  canSend,
+  send,
+  sendLike,
+  styles,
+  color,
+  muted,
+  size,
+}: {
+  like: boolean;
+  canSend: boolean;
+  send(): void;
+  sendLike(): void;
+  styles: OfficeStyles;
+  color: string;
+  muted: string;
+  size: number;
+}) {
+  const enabled = like || canSend;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={like ? "Send thumbs up" : "Send"}
+      onPress={like ? sendLike : send}
+      disabled={!enabled}
+      style={enabled ? styles.messenger.send : styles.messenger.sendOff}
+    >
+      <Icon name={like ? "ThumbsUp" : "Send"} size={size} color={enabled ? color : muted} />
+    </Pressable>
+  );
+}
+
+function canLike(draft: ChatDraft, reading: boolean): boolean {
+  return !reading && draft.images.length === 0 && draft.text.trim() === "";
+}
+
+function Pinned({
+  message,
+  active,
+  onPress,
+  styles,
+}: {
+  message: ChatMessage | undefined;
+  active: boolean;
+  onPress(): void;
+  styles: OfficeStyles;
+}) {
+  if (!message) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Pinned message"
+      aria-pressed={active}
+      onPress={onPress}
+      style={styles.messenger.pin}
+    >
+      <Icon name="Pin" size={15} color={styles.iconColor} />
+      <View style={styles.rowBody}>
+        <Text style={styles.chatName}>Pinned message</Text>
+        <Text numberOfLines={1} style={styles.chatMeta}>
+          {quotedText(message)}
+        </Text>
+      </View>
+      <Icon name={active ? "X" : "ChevronRight"} size={14} color={styles.iconColor} />
+    </Pressable>
+  );
+}
+
+const memberStatuses = { attention: "Needs you", working: "Working", resting: "Resting" } as const;
+type ChatPanelProps = ColumnPanelProps & ChatShortcuts & { draft: ChatDraft; onClose?(): void };
+
+export function FloatingTeamChat(props: ChatPanelProps & { onClose(): void }) {
+  const theme = useMemo(() => messengerTheme(props.theme), [props.theme]);
+  const styles = useOfficeStyles(theme, props.layout.compact, props.layout.platform !== "web");
+  return (
+    <View role="region" aria-label="Team chat" style={styles.messenger.floating}>
+      <ChatPanel {...props} theme={theme} styles={styles} />
+    </View>
+  );
+}
+
 export function ChatPanel({
   office,
   styles,
@@ -648,16 +778,68 @@ export function ChatPanel({
   layout,
   link,
   draft,
-}: ColumnPanelProps & { draft: ChatDraft }) {
+  onClose,
+  onBoard,
+  onDuties,
+  onNewAgent,
+  onGroupPhoto,
+}: ChatPanelProps) {
   const { state, subscription, chat } = office;
   const call = useRpc(chatRpc);
   const model = useMemo(() => buildOfficeModel(state), [state]);
   // The surface holds what is typed, so a look at another tab or a closed sheet keeps it.
-  const { text, setText, replyTo, setReplyTo } = draft;
+  const { text, setText, replyTo, setReplyTo, recipient, images, setImages } = draft;
+  const [reading, setReading] = useState(false);
+  const canSend = readyToSend(draft, reading);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const toggleSearch = useCallback(() => {
+    setSearching((value) => !value);
+    setQuery("");
+  }, []);
+  const [openedAt] = useState(getChatSeen);
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const togglePin = useCallback(() => {
+    setPinnedOnly((value) => !value);
+    setQuery("");
+  }, []);
+  const members = useMemo(
+    () =>
+      model.rooms.flatMap((room) =>
+        room.rows.map((row) => ({
+          id: row.agent.id,
+          name: agentTitle(row.agent),
+          room: room.name,
+          appearance: row.agent.appearance,
+          status: memberStatuses[tabOf(row)],
+        })),
+      ),
+    [model],
+  );
   const [error, setError] = useState<string | null>(null);
   const [stickersOpen, setStickersOpen] = useState(false);
   const all = chat?.messages;
   const messages = useMemo(() => (all ?? []).filter(shows), [all]);
+  const pinned = messages.find((m) => m.id === chat?.pinned && !m.recalled);
+  const needle = query.trim().toLowerCase();
+  const visible = useMemo(
+    () =>
+      needle
+        ? messages.filter((message) =>
+            [message.name, quotedText(message), message.reply?.text].some((part) =>
+              part?.toLowerCase().includes(needle),
+            ),
+          )
+        : messages,
+    [needle, messages],
+  );
+  const shownMessages = useMemo(
+    () => (pinnedOnly && pinned && !needle ? [pinned] : visible),
+    [pinnedOnly, pinned, needle, visible],
+  );
+  const firstUnread = messages.find(
+    (message) => message.at > openedAt && !isYours(message) && message.kind !== "sys",
+  )?.id;
   const problem = loadProblem(subscription);
   // Asked once, as the surface does. A phone, or a browser on a touch screen, has nothing to hover
   // with and no Enter that sends: the actions always show and the Send button sends.
@@ -668,8 +850,8 @@ export function ChatPanel({
   // The chat is seen up to its newest message while it is open.
   const newest = messages.at(-1)?.at ?? 0;
   useEffect(() => {
-    if (newest > 0) markChatSeen(newest);
-  }, [newest]);
+    if (newest > 0 && needle === "") markChatSeen(newest);
+  }, [newest, needle]);
   // Stays at the bottom while you are there.
   const { scroller, onScroll, followEnd } = useFollowEnd();
 
@@ -689,30 +871,43 @@ export function ChatPanel({
   );
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
-  const send = useCallback(async () => {
-    const sent = text.trim();
-    if (sent === "" || sending.current) return;
-    sending.current = true;
-    const ok = await run(
-      replyTo === null
-        ? { op: "send", text: sent }
-        : { op: "send", text: sent, replyTo: replyTo.id },
-    );
-    sending.current = false;
-    if (!ok) return;
-    setText((current) => textAfterSend(current, sent));
-    setReplyTo(null);
-  }, [text, replyTo, run, setText, setReplyTo]);
+  const post = useCallback(
+    async (like: boolean) => {
+      const sent = like ? "👍" : text.trim();
+      if ((!like && !canSend) || sending.current) return;
+      sending.current = true;
+      const ok = await run({
+        op: "send",
+        text: sent,
+        ...(replyTo ? { replyTo: replyTo.id } : {}),
+        ...(recipient ? { to: recipient } : {}),
+        ...(images.length
+          ? { images: images.map(({ data, mimeType }) => ({ data, mimeType })) }
+          : {}),
+      });
+      sending.current = false;
+      if (!ok) return;
+      setText((current) => textAfterSend(current, sent));
+      if (images.length) setImages((current) => current.filter((image) => !images.includes(image)));
+      setReplyTo(null);
+    },
+    [text, replyTo, recipient, images, setImages, canSend, run, setText, setReplyTo],
+  );
+  const send = useCallback(() => post(false), [post]);
+  const sendLike = useCallback(() => post(true), [post]);
   const sendSticker = useCallback(
     async (sticker: number) => {
-      const ok = await run(
-        replyTo === null ? { op: "send", sticker } : { op: "send", sticker, replyTo: replyTo.id },
-      );
+      const ok = await run({
+        op: "send",
+        sticker,
+        ...(replyTo ? { replyTo: replyTo.id } : {}),
+        ...(recipient ? { to: recipient } : {}),
+      });
       if (!ok) return;
       setStickersOpen(false);
       setReplyTo(null);
     },
-    [replyTo, run, setReplyTo],
+    [replyTo, recipient, run, setReplyTo],
   );
 
   const options = useMemo(() => {
@@ -720,12 +915,25 @@ export function ChatPanel({
     return mention === null ? [] : mentionOptions(model, mention.query);
   }, [text, model]);
   const first = options[0];
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const useQuick = useCallback(
+    (message: string) => {
+      setText(message);
+      input.current?.focus();
+    },
+    [setText],
+  );
+  const insertMention = useCallback(() => {
+    setText((value) => (value.trimEnd() ? value.trimEnd() + " @" : "@"));
+    input.current?.focus();
+  }, [setText]);
   const pick = useCallback(
     (name: string) => {
       setText((current) => {
         const mention = mentionAt(current);
         return mention === null ? current : putMention(current, mention, name);
       });
+      input.current?.focus();
     },
     [setText],
   );
@@ -756,6 +964,28 @@ export function ChatPanel({
   const iconSize = layout.compact ? 20 : 16;
   return (
     <View style={styles.screen}>
+      <ChatHeader
+        members={members}
+        onOpenSession={link.openSession}
+        searching={searching}
+        onSearch={toggleSearch}
+        onClose={onClose}
+        styles={styles}
+      />
+      <Pinned message={pinned} active={pinnedOnly} onPress={togglePin} styles={styles} />
+      {searching && (
+        <View style={styles.messenger.searchRow}>
+          <TextInput
+            autoFocus
+            accessibilityLabel="Search messages"
+            placeholder="Search messages"
+            placeholderTextColor={styles.placeholderColor}
+            value={query}
+            onChangeText={setQuery}
+            style={styles.fieldInput}
+          />
+        </View>
+      )}
       <ScrollView
         ref={scroller}
         contentContainerStyle={styles.chatList}
@@ -766,7 +996,9 @@ export function ChatPanel({
         keyboardShouldPersistTaps="handled"
       >
         <Messages
-          messages={messages}
+          messages={shownMessages}
+          emptyLabel={needle ? "No matching messages" : CHAT_EMPTY}
+          firstUnread={needle ? undefined : firstUnread}
           agents={model.agents}
           problem={problem}
           always={touchScreen}
@@ -776,8 +1008,8 @@ export function ChatPanel({
           styles={styles}
         />
       </ScrollView>
-      <Text style={styles.chatTyping}>{typing}</Text>
-      <View style={styles.chatBox}>
+      {typing && <Text style={styles.chatTyping}>{typing}</Text>}
+      <View style={styles.messenger.composer}>
         {replyTo === null ? null : (
           <ReplyBar
             message={replyTo}
@@ -787,44 +1019,57 @@ export function ChatPanel({
             styles={styles}
           />
         )}
-        <TextInput
-          accessibilityLabel="Message"
-          value={text}
-          onChangeText={setText}
-          onKeyPress={onKeyPress}
-          multiline
-          maxLength={CHAT_TEXT_MAX}
-          style={styles.input}
+        <ComposeTools
+          draft={draft}
+          members={members}
+          web={layout.platform === "web"}
+          run={run}
+          styles={styles}
+          onBoard={onBoard}
+          onDuties={onDuties}
+          onNewAgent={onNewAgent}
+          onGroupPhoto={onGroupPhoto}
+          openSession={link.openSession}
+          onUse={useQuick}
+          insertMention={insertMention}
+          setReading={setReading}
+          stickersOpen={stickersOpen}
+          toggleStickers={toggleStickers}
         />
         {options.length > 0 ? (
           <MentionList options={options} onPick={pick} styles={styles} />
         ) : null}
         {counter === null ? null : <Text style={styles.chatMeta}>{counter}</Text>}
+        <PromptCoach draft={draft} styles={styles} />
+        <View style={styles.messenger.composerRow}>
+          <TextInput
+            ref={input}
+            accessibilityLabel="Message"
+            placeholder="Write a message"
+            placeholderTextColor={styles.placeholderColor}
+            value={text}
+            onChangeText={setText}
+            onKeyPress={onKeyPress}
+            multiline
+            maxLength={CHAT_TEXT_MAX}
+            style={styles.messenger.field}
+          />
+          <SendButton
+            like={canLike(draft, reading)}
+            canSend={canSend}
+            send={send}
+            sendLike={sendLike}
+            styles={styles}
+            color={theme.colors.accentForeground}
+            muted={theme.colors.foregroundMuted}
+            size={iconSize}
+          />
+        </View>
         {error === null ? null : (
           <Text accessibilityRole="alert" style={styles.actionError}>
             {error}
           </Text>
         )}
-        <View style={styles.boardTitleRow}>
-          <ChatButton
-            label="Stickers"
-            value="stickers"
-            onPress={toggleStickers}
-            on={stickersOpen}
-            style={styles.segment}
-            styles={styles}
-          >
-            <Icon name="Smile" size={iconSize} color={theme.colors.foreground} />
-          </ChatButton>
-          <ActionButton
-            label="Send"
-            pendingLabel="Sending..."
-            onPress={send}
-            disabled={text.trim() === ""}
-            primary
-            styles={styles}
-          />
-        </View>
         {stickersOpen ? <StickerTray onPick={sendSticker} styles={styles} /> : null}
       </View>
     </View>

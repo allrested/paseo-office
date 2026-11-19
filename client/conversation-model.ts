@@ -8,7 +8,7 @@ import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
 export type ConversationRow =
   | { kind: "you"; key: string; text: string }
   | { kind: "agent"; key: string; text: string }
-  | { kind: "tool"; key: string; text: string }
+  | { kind: "tool"; key: string; text: string; outcome?: "failed" | "canceled" }
   | { kind: "notice"; key: string; text: string; tone: "muted" | "danger" };
 
 /** One timeline entry as the hook keeps it: the item and the sequence number it arrived with. */
@@ -59,6 +59,13 @@ export function toolLine(item: ToolCall): string {
   return line.length > TOOL_LINE_MAX ? `${line.slice(0, TOOL_LINE_MAX - 1).trimEnd()}…` : line;
 }
 
+function toolRow(key: string, item: ToolCall): Extract<ConversationRow, { kind: "tool" }> {
+  const row = { kind: "tool" as const, key, text: toolLine(item) };
+  return item.status === "failed" || item.status === "canceled"
+    ? { ...row, outcome: item.status }
+    : row;
+}
+
 function rowFor(entry: TimelineEntry): ConversationRow | null {
   const { item } = entry;
   const key = String(entry.seq);
@@ -68,7 +75,7 @@ function rowFor(entry: TimelineEntry): ConversationRow | null {
     case "assistant_message":
       return item.text.trim() ? { kind: "agent", key, text: item.text } : null;
     case "tool_call":
-      return { kind: "tool", key, text: toolLine(item) };
+      return toolRow(key, item);
     case "error":
       return item.message.trim()
         ? { kind: "notice", key, text: item.message, tone: "danger" }
@@ -130,7 +137,7 @@ export function conversationRows(entries: readonly TimelineEntry[]): Conversatio
     if (known && item.type === "tool_call" && sameTurn(entry.turnId, known.turnId)) {
       const merged = mergedCall(known.item, item);
       calls.set(item.callId, { index: known.index, item: merged, turnId: known.turnId });
-      rows[known.index] = { kind: "tool", key: rows[known.index].key, text: toolLine(merged) };
+      rows[known.index] = toolRow(rows[known.index].key, merged);
       open = false;
       continue;
     }

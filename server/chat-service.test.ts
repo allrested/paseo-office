@@ -2,10 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { ChatChange, ChatMessage, OfficeAgent } from "../shared/contracts.js";
+import type { ChatChange, ChatImage, ChatMessage, OfficeAgent, Post } from "../shared/contracts.js";
 import { chatT } from "../shared/chat-words.js";
 import {
   CHAT_CLOCK_MS,
+  GroupSessionUnavailable,
   PROMPT_PREFIX,
   RECALL_WINDOW_MS,
   clipAnswer,
@@ -60,15 +61,19 @@ function deferred() {
   return { promise, finish };
 }
 
-async function harness(options: { at?: number; store?: ChatStore } = {}) {
+async function harness(options: { at?: number; store?: ChatStore; posts?: Post[] } = {}) {
   const clock = createFakeClock(options.at ?? MORNING);
   const sent: [string, string][] = [];
+  const attachments: ChatImage[][] = [];
   const asked: string[] = [];
   const turns: (string | null)[] = [];
   const changes: ChatChange[] = [];
   const saved: ChatData[] = [];
   const logs: string[] = [];
   const answers = new Map<string, string | null>();
+  const deliveredGroup = new Map<string, string>();
+  const unrelatedTurns = new Set<string>();
+  const privateTurns = new Set<string>();
   // `hold`: each send waits in `held` until the test finishes it. `answerGate`: a read waits for it.
   const failure = {
     send: null as Error | null,
@@ -87,7 +92,8 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
     store,
     clock,
     tr: chatT,
-    send: async (id, prompt) => {
+    lobbyPosts: () => options.posts ?? [],
+    send: async (id, prompt, images, group) => {
       if (failure.hold) {
         const wait = deferred();
         held.push(wait.finish);
@@ -95,18 +101,40 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
       }
       if (failure.send) throw failure.send;
       sent.push([id, prompt]);
+      if (group?.group) deliveredGroup.set(id, group.messageId);
+      if (images) attachments.push(images);
     },
-    lastAnswer: async (id, turnId) => {
+    readTurn: async (id, turnId, group) => {
       asked.push(id);
       turns.push(turnId);
       if (failure.answerGate) await failure.answerGate;
       if (failure.answer) throw failure.answer;
-      return answers.get(id) ?? null;
+      return {
+        matches:
+          !group || (deliveredGroup.get(id) === group.messageId && !unrelatedTurns.has(turnId!)),
+        text: answers.get(id) ?? null,
+        privateTurn: turnId !== null && privateTurns.has(turnId),
+      };
     },
     emit: (change) => changes.push(change),
     log: (message) => logs.push(message),
   });
-  return { service, clock, sent, asked, turns, changes, saved, logs, answers, failure, held };
+  return {
+    service,
+    clock,
+    sent,
+    attachments,
+    asked,
+    turns,
+    changes,
+    saved,
+    logs,
+    answers,
+    unrelatedTurns,
+    privateTurns,
+    failure,
+    held,
+  };
 }
 type Harness = Awaited<ReturnType<typeof harness>>;
 
@@ -118,7 +146,6 @@ const said = (h: Harness, name: string): string[] =>
 const mine = (h: Harness): ChatMessage[] => messages(h).filter((message) => message.from === "me");
 const typing = (h: Harness): string[] => h.service.snapshot().typing;
 const WORK = (key: string): string[] => chatT(`chat.work.${key}`, null, "list");
-const REST = chatT("chat.reply.statusRest", null, "list");
 /** Upstream's lines for `key` with their `{name}` parts filled, as the engine says them. */
 const filled = (lines: string[], vars: Record<string, string>): string[] =>
   lines.map((line) => line.replace(/\{(\w+)\}/g, (part, name: string) => vars[name] ?? part));
@@ -196,23 +223,146 @@ test("a new conversation starts with upstream's first line and says so to nobody
   expect(h.changes).toEqual([]);
 });
 
-test("an @mention is answered with what the agent is on, from the team of the last view", async () => {
+test("completion questions use the lobby board and never schedule a simulated reply", async () => {
+  const post: Post = {
+    id: "p1",
+    seq: 1,
+    kind: "task",
+    board: "lobby",
+    author: "user",
+    state: "done",
+    text: "Fix the export",
+    createdAt: "",
+    updatedAt: "",
+  };
+  const h = await harness({
+    posts: [post, { ...post, id: "p2", state: "claimed", text: "Still working" }],
+  });
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "what is done?");
+  h.clock.advance(10_000);
+  expect(said(h, "Director")).toEqual(["1 lobby task marked done.\np1 — Fix the export"]);
+  expect(said(h, "Alice")).toEqual([]);
+  expect(h.sent).toEqual([]);
+});
+
+test("board questions are answered locally and free-form follow-ups get a quoted session reply", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice"), agent("a2", "Bea")));
+  await send(h, "@Director what's done?");
+  expect(said(h, "Director")).toEqual(["No lobby tasks are marked done."]);
+  const director = messages(h).at(-1)!;
+  await h.service.request({ op: "send", text: "What is open?", replyTo: director.id });
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    text: "No lobby tasks are open.",
+  });
+  expect(h.sent).toEqual([]);
+  for (const text of ["What happened at the meeting?", "I ask who is going back"]) {
+    await send(h, text);
+    expect(h.sent.at(-1)).toEqual(["a1", expect.stringContaining(text)]);
+    expect(typing(h)).toEqual(["Alice"]);
+    expect(mine(h).at(-1)).toMatchObject({ text, tag: "group" });
+    h.answers.set("a1", "Pat said she was heading back.");
+    await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+    expect(messages(h).at(-1)).toMatchObject({
+      from: "a1",
+      text: "Pat said she was heading back.",
+      reply: { id: mine(h).at(-1)!.id },
+      tag: "group-reply",
+    });
+  }
+  expect(h.sent).toHaveLength(2);
+  expect(h.changes.filter((change) => change.op === "act")).toEqual([]);
+});
+
+test("a repeated lobby request reports its real assignment and does not duplicate the work", async () => {
+  const text = "Can we integrate our two boards";
+  const h = await harness({
+    posts: [
+      {
+        id: "p34",
+        seq: 34,
+        board: "lobby",
+        kind: "task",
+        state: "claimed",
+        claimedBy: "a1",
+        author: "user",
+        text,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ],
+  });
+  h.service.view(view(agent("a1", "Taufik")));
+  await send(h, text);
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    text: "Lobby task p34 is claimed by Taufik.",
+    reply: { id: mine(h)[0].id },
+  });
+  expect(h.sent).toHaveLength(0);
+});
+
+test("only a free top-level session can answer the group, and one waiting for a reply stays reserved", async () => {
   const h = await harness();
   h.service.view(
-    view(agent("a1", "Alice", { status: "running" }), agent("a2", "Bea", { status: "running" })),
+    view(
+      agent("parent", "Parent"),
+      agent("child", "Child", { parentAgentId: "parent", status: "running" }),
+      agent("busy", "Busy", { status: "running" }),
+      agent("needs", "Needs approval", {
+        permissions: [{ id: "permission", kind: "tool", title: "Run" }],
+      }),
+      agent("writer", "Stand-up notes"),
+      agent("a1", "Alice"),
+    ),
   );
-  h.service.view(view(agent("a1", "Alice"), agent("a2", "Bea", { status: "running" })));
-  await send(h, "@Alice what are you on?");
-  h.clock.advance(10_000);
-  const [question] = mine(h);
-  const last = messages(h).at(-1);
-  expect(last).toMatchObject({
-    from: "a1",
-    name: "Alice",
-    reply: { id: question?.id, name: "Boss", text: "@Alice what are you on?" },
+  await send(h, "Hello team");
+  expect(typing(h)).toEqual(["Alice"]);
+  await send(h, "Anyone else around");
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    tag: "delivery",
+    text: expect.stringContaining("No session is available"),
+    reply: { id: mine(h).at(-1)!.id },
   });
-  expect(REST).toContain(last?.text);
-  expect(said(h, "Bea")).toEqual([]);
+  expect(h.sent.map(([id]) => id)).toEqual(["a1"]);
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+  h.service.view(null);
+  await send(h, "Still there");
+  expect(h.sent).toHaveLength(1);
+  expect(messages(h).at(-1)?.reply?.id).toBe(mine(h).at(-1)?.id);
+});
+
+test("only a confirmed unavailable group recipient can be replaced before delivery", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice"), agent("a2", "Bea")));
+  h.failure.hold = true;
+  await send(h, "Who was at the office today");
+  expect(typing(h)).toEqual(["Alice"]);
+  h.held[0](new GroupSessionUnavailable("busy"));
+  await settle();
+  expect(typing(h)).toEqual(["Bea"]);
+  h.held[1](null);
+  await settle();
+  expect(h.sent.map(([id]) => id)).toEqual(["a2"]);
+  expect(said(h, "Director")).toEqual([]);
+});
+
+test("mentions and replies to an agent wait for that session's actual answer", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "@Alice what is done?");
+  h.clock.advance(10_000);
+  expect(said(h, "Alice")).toEqual([]);
+  h.answers.set("a1", "The export is fixed.");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+  h.clock.advance(10_000);
+  const reply = messages(h).at(-1)!;
+  expect(reply.text).toBe("The export is fixed.");
+  await h.service.request({ op: "send", text: "Which export?", replyTo: reply.id });
+  expect(h.sent.at(-1)).toEqual(["a1", PROMPT_PREFIX + "Which export?"]);
 });
 
 test("one message to two agents is two prompts that steer, and both show typing", async () => {
@@ -241,7 +391,57 @@ test("a prompt names a member that is a prefix of a longer one once", async () =
   expect(typing(h)).toEqual(["Mjd-1"]);
 });
 
-test("an archived agent matches nobody: no prompt, no answer", async () => {
+test("choosing To sends the named session by id even when several agents share its title", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Builder"), agent("a2", "Builder")));
+  const text = "Check whether @Builder already fixed the date links.";
+  expect(await h.service.request({ op: "send", text, to: "a2" })).toEqual({ ok: true });
+  expect(h.sent).toEqual([["a2", PROMPT_PREFIX + text]]);
+  expect(mine(h)).toEqual([expect.objectContaining({ text })]);
+  h.service.view(view(agent("a1", "Builder")));
+  expect(await h.service.request({ op: "send", text, to: "a2" })).toMatchObject({ ok: false });
+  expect(h.sent).toHaveLength(1);
+  expect(mine(h)).toHaveLength(1);
+});
+
+test("an image-only prompt reaches the chosen session and the shared chat contains only its count", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Builder")));
+  const images: ChatImage[] = [{ mimeType: "image/jpeg", data: "YXR0YWNobWVudA==" }];
+  expect(await h.service.request({ op: "send", images })).toMatchObject({ ok: false });
+  expect(h.sent).toHaveLength(0);
+  expect(await h.service.request({ op: "send", images, to: "a1" })).toEqual({ ok: true });
+  expect(h.attachments).toEqual([images]);
+  expect(h.sent).toEqual([["a1", PROMPT_PREFIX + "1 image"]]);
+  expect(mine(h)).toEqual([expect.objectContaining({ text: "1 image" })]);
+  expect(JSON.stringify(h.service.snapshot())).not.toContain(images[0].data);
+});
+
+test("a custom poll pins itself, takes a vote, and another message can replace the pin", async () => {
+  const h = await harness();
+  expect(
+    await h.service.request({
+      op: "poll",
+      question: "Which release?",
+      options: ["Today", "Tomorrow"],
+    }),
+  ).toEqual({ ok: true });
+  const poll = messages(h).find((m) => m.kind === "poll")!;
+  expect(poll.poll?.opts.map((o) => o.t)).toEqual(["Today", "Tomorrow"]);
+  expect(h.service.snapshot().pinned).toBe(poll.id);
+  await h.service.request({ op: "vote", id: poll.id, index: 1 });
+  expect(messages(h).find((m) => m.id === poll.id)?.poll?.opts[1].by).toEqual(["me"]);
+  await send(h, "Read the changelog.");
+  const message = mine(h).at(-1)!;
+  expect(await h.service.request({ op: "pin", id: message.id })).toEqual({ ok: true });
+  expect(h.changes.at(-1)).toMatchObject({ op: "all", pinned: message.id });
+  await h.service.request({ op: "recall", id: message.id });
+  expect(h.service.snapshot().pinned).toBeUndefined();
+  expect(await h.service.request({ op: "pin", id: message.id })).toMatchObject({ ok: false });
+  expect(await h.service.request({ op: "pin", id: "gone" })).toMatchObject({ ok: false });
+});
+
+test("a mention of an archived agent reports the missing recipient and cannot route to another session", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   await send(h, "@Alice look at this");
@@ -256,17 +456,24 @@ test("an archived agent matches nobody: no prompt, no answer", async () => {
     text: chatT("chat.sys.left", { name: "Alice" }),
   });
 
+  h.service.view(view(agent("b", "Bea")));
+  h.clock.advance(10_000); // Bea joins the office before the next message.
   const before = messages(h).length;
   await send(h, "@Alice hi");
   h.clock.advance(10_000);
   expect(h.sent).toEqual([["a1", `${PROMPT_PREFIX}@Alice look at this`]]);
   expect(messages(h).slice(before)).toEqual([
     expect.objectContaining({ from: "me", text: "@Alice hi" }),
+    expect.objectContaining({
+      from: "__director",
+      tag: "delivery",
+      reply: expect.objectContaining({ id: mine(h).at(-1)?.id }),
+    }),
   ]);
   expect(typing(h)).toEqual([]);
 });
 
-test("an agent closed mid-turn stops typing and answers nothing", async () => {
+test("a closed session reports the undelivered reply against the user’s message", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   h.answers.set("a1", "Never posted.");
@@ -276,6 +483,11 @@ test("an agent closed mid-turn stops typing and answers nothing", async () => {
 
   h.service.closed("a1");
   expect(typing(h)).toEqual([]);
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    reply: { id: mine(h)[0]?.id },
+    text: expect.stringContaining("session closed"),
+  });
   // A closed agent's turn end never comes; one that came anyway finds nothing waiting.
   await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
   h.clock.advance(10_000);
@@ -327,11 +539,12 @@ test("an answer is clipped and keeps its whole length up to 1,200", async () => 
   expect(whole?.text).toBe("y".repeat(1200));
 });
 
-test("a turn that ends in an error posts no answer: fail speaks, the answer is not read, typing stops", async () => {
+test("a failed addressed turn quotes each unanswered prompt and stops typing", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   h.answers.set("a1", "Never posted.");
   await send(h, "@Alice run the tests");
+  await send(h, "@Alice check this too");
   h.clock.advance(10_000);
   const before = messages(h).length;
 
@@ -339,10 +552,85 @@ test("a turn that ends in an error posts no answer: fail speaks, the answer is n
   expect(typing(h)).toEqual([]);
   h.clock.advance(10_000);
   const after = messages(h).slice(before);
-  expect(after).toHaveLength(1);
-  expect(after[0]).toMatchObject({ from: "a1", reply: null });
-  expect(WORK("fail")).toContain(after[0]?.text);
+  expect(after.map((message) => message.reply?.id)).toEqual(mine(h).map((message) => message.id));
+  expect(
+    after.every(
+      (message) => message.from === "__director" && message.text.includes("session failed"),
+    ),
+  ).toBe(true);
   expect(h.asked).toEqual([]);
+  expect(typing(h)).toEqual([]);
+});
+
+test("a turn answering both group and directed messages stays out of subsequent group prompts", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "Who booked the meeting room?");
+  await send(h, "@Alice please include my private agenda");
+  h.answers.set("a1", "The private agenda is ready.");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+  const reply = messages(h).find((message) => message.text === "The private agenda is ready.");
+  expect(reply?.from).toBe("a1");
+  expect(reply?.tag).toBeUndefined();
+
+  h.service.view(view(agent("a1", "Alice", { status: "running" }), agent("a2", "Bea")));
+  await send(h, "What time can we meet?");
+  const [recipient, prompt] = h.sent.at(-1)!;
+  expect(recipient).toBe("a2");
+  expect(prompt).toContain("Who booked the meeting room?");
+  expect(prompt).not.toContain("private agenda");
+});
+
+test("an earlier turn ending while the group request is pending cannot answer it or clear its wait", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "Who is coming back?");
+  h.unrelatedTurns.add("old");
+  h.answers.set("a1", "Unrelated workspace answer");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "old");
+  await h.service.turnEnded(
+    { id: "a1" },
+    { kind: "failed", error: { message: "Old failure" } },
+    "old",
+  );
+  expect(typing(h)).toEqual(["Alice"]);
+  expect(messages(h).filter((message) => message.reply?.id === mine(h)[0].id)).toEqual([]);
+
+  h.answers.set("a1", "Pat is coming back.");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "group");
+  expect(messages(h).at(-1)).toMatchObject({
+    text: "Pat is coming back.",
+    from: "a1",
+    tag: "group-reply",
+    reply: { id: mine(h)[0].id },
+  });
+  expect(typing(h)).toEqual([]);
+});
+
+test("a group turn with a workspace steer or unreadable timeline releases the session with a quoted notice", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  await send(h, "When can we meet?");
+  h.privateTurns.add("mixed");
+  h.answers.set("a1", "Private workspace content");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "mixed");
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    tag: "delivery",
+    text: expect.stringContaining("workspace message"),
+    reply: { id: mine(h)[0].id },
+  });
+  expect(said(h, "Alice")).toEqual([]);
+  expect(typing(h)).toEqual([]);
+
+  await send(h, "What's the next meeting?");
+  h.failure.answer = new Error("timeline unavailable");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "new");
+  expect(messages(h).at(-1)).toMatchObject({
+    tag: "delivery",
+    text: expect.stringContaining("could not read"),
+    reply: { id: mine(h)[1].id },
+  });
   expect(typing(h)).toEqual([]);
 });
 
@@ -361,28 +649,37 @@ test("a usage limit speaks its own line", async () => {
   h.clock.advance(10_000);
   const after = messages(h).slice(before);
   expect(after).toHaveLength(1);
-  expect(after[0]?.from).toBe("a1");
-  expect(WORK("limit")).toContain(after[0]?.text);
+  expect(after[0]).toMatchObject({
+    from: "__director",
+    reply: { id: mine(h)[0]?.id },
+    text: expect.stringContaining("usage limit"),
+  });
   expect(typing(h)).toEqual([]);
 });
 
-test("a cancelled turn posts nothing and stops the typing", async () => {
+test("a canceled turn quotes the original message and stops typing", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   h.answers.set("a1", "Never posted.");
   await send(h, "@Alice run the tests");
   h.clock.advance(10_000);
   expect(typing(h)).toEqual(["Alice"]);
-  const before = messages(h);
+  const before = messages(h).length;
 
   await h.service.turnEnded({ id: "a1" }, { kind: "canceled", reason: "interrupted" }, "t1");
   h.clock.advance(10_000);
-  expect(messages(h)).toEqual(before);
+  expect(messages(h).slice(before)).toEqual([
+    expect.objectContaining({
+      from: "__director",
+      reply: expect.objectContaining({ id: mine(h)[0]?.id }),
+      text: expect.stringContaining("turn was canceled"),
+    }),
+  ]);
   expect(h.asked).toEqual([]);
   expect(typing(h)).toEqual([]);
 });
 
-test("an answer that cannot be read posts nothing, logs, and the agent stops typing", async () => {
+test("a timeline read failure is reported against its prompt and the agent stops typing", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   h.failure.answer = new Error("timeline gone");
@@ -395,11 +692,14 @@ test("an answer that cannot be read posts nothing, logs, and the agent stops typ
   expect(h.logs).toEqual([expect.stringContaining("timeline gone")]);
   expect(typing(h)).toEqual([]);
   h.clock.advance(10_000);
-  // Only the engine's own line for a turn that ended; no answer.
+  // Report the missing answer without claiming the work is done.
   const after = messages(h).slice(before);
   expect(after).toHaveLength(1);
-  expect(after[0]).toMatchObject({ from: "a1", reply: null });
-  expect(filled(WORK("done"), { task: "Alice" })).toContain(after[0]?.text);
+  expect(after[0]).toMatchObject({
+    from: "__director",
+    reply: { id: mine(h)[0]?.id },
+    text: "Alice: Office could not read the session’s reply.",
+  });
 });
 
 test("a prompt that cannot be sent says so and stops the typing", async () => {
@@ -408,8 +708,11 @@ test("a prompt that cannot be sent says so and stops the typing", async () => {
   h.failure.send = new Error("agent is gone");
   await send(h, "@Alice hi");
   await settle();
-  const system = messages(h).filter((message) => message.kind === "sys");
-  expect(system.at(-1)?.text).toBe("Could not reach Alice: agent is gone.");
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    reply: { id: mine(h)[0]?.id },
+    text: "Alice: Message delivery failed: agent is gone.",
+  });
   expect(typing(h)).toEqual([]);
   // Nothing waits for an answer any more.
   await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
@@ -426,8 +729,11 @@ test("a prompt that cannot be sent keeps the earlier one waiting, and its answer
   h.failure.send = new Error("cannot steer");
   await send(h, "@Alice second");
   await settle();
-  const system = messages(h).filter((message) => message.kind === "sys");
-  expect(system.at(-1)?.text).toBe("Could not reach Alice: cannot steer.");
+  expect(messages(h).at(-1)).toMatchObject({
+    from: "__director",
+    reply: { id: mine(h)[1]?.id },
+    text: "Alice: Message delivery failed: cannot steer.",
+  });
   expect(typing(h)).toEqual(["Alice"]);
 
   await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
@@ -451,7 +757,7 @@ test("two prompts in flight that both fail leave nobody typing", async () => {
   await settle();
   expect(typing(h)).toEqual([]);
   const failures = messages(h).filter(
-    (message) => message.text === "Could not reach Alice: agent is gone.",
+    (message) => message.text === "Alice: Message delivery failed: agent is gone.",
   );
   expect(failures).toHaveLength(2);
 });
@@ -486,14 +792,14 @@ test("a prompt sent while an answer is read, which then fails, leaves nothing wa
   expect(messages(h).filter((message) => message.text === "Later.")).toEqual([]);
 });
 
-test("a newer prompt that fails while the turn end is read: the answer quotes it and typing stops", async () => {
+test("the reply skips a prompt that fails while the turn end is being read", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));
   h.answers.set("a1", "Both read.");
   await send(h, "@Alice A");
   h.failure.hold = true;
   await send(h, "@Alice B");
-  const second = mine(h).at(-1);
+  const first = mine(h)[0];
   const read = deferred();
   h.failure.answerGate = read.promise;
   const ended = h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
@@ -503,8 +809,46 @@ test("a newer prompt that fails while the turn end is read: the answer quotes it
   read.finish(null);
   await ended;
   const answer = messages(h).find((message) => message.text === "Both read.");
-  expect(answer?.reply).toEqual({ id: second?.id, name: "Boss", text: "@Alice B" });
+  expect(answer?.reply).toEqual({ id: first?.id, name: "Boss", text: "@Alice A" });
   expect(typing(h)).toEqual([]);
+});
+
+test.each(["closed", "archived"] as const)(
+  "a %s session settles a pending read once",
+  async (event) => {
+    const h = await harness();
+    h.service.view(view(agent("a1", "Alice")));
+    await send(h, "@Alice test the build");
+    h.answers.set("a1", "Old answer.");
+    const read = deferred();
+    h.failure.answerGate = read.promise;
+    const ended = h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
+    h.service[event]("a1");
+    read.finish(null);
+    await ended;
+    const replies = messages(h).filter((message) => message.reply?.id === mine(h)[0]?.id);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ from: "__director", text: expect.stringContaining(event) });
+    expect(typing(h)).toEqual([]);
+  },
+);
+
+test("stopping Office saves an interruption notice for pending chat and ignores a late send failure", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  h.failure.hold = true;
+  await send(h, "@Alice run the tests");
+  await h.service.stop();
+  h.held[0]?.(new Error("disconnected"));
+  await settle();
+  expect(typing(h)).toEqual([]);
+  const replies = h.saved.at(-1)?.msgs.filter((message) => message.reply?.id === mine(h)[0]?.id);
+  expect(replies).toHaveLength(1);
+  expect(replies?.[0]).toMatchObject({
+    from: "__director",
+    tag: "delivery",
+    text: expect.stringContaining("Office stopped"),
+  });
 });
 
 test("a turn that ends with no office open still gets its answer", async () => {
@@ -829,6 +1173,7 @@ test("a save that fails is logged and the next change saves again", async () => 
   expect(h.logs).toEqual([expect.stringContaining("disk full")]);
   expect(saved).toEqual([]);
 
+  h.service.view(view(agent("a1", "Alice")));
   await send(h, "hello");
   await settle();
   expect(saved.at(-1)?.msgs.map((message) => message.text)).toEqual([
@@ -861,6 +1206,7 @@ test("saves in flight collapse to the newest one", async () => {
       },
     },
   });
+  h.service.view(view(agent("a1", "Alice")));
   await send(h, "hello"); // a save starts and waits
   expect(calls).toHaveLength(1);
 
@@ -910,13 +1256,19 @@ test("lines are told to subscribers as changes, and not while the engine is bein
   ]);
 
   h.clock.advance(10_000);
+  h.answers.set("a1", "Hello!");
+  await h.service.turnEnded({ id: "a1" }, { kind: "completed" }, "t1");
   const reply = messages(h).at(-1);
   expect(reply?.from).toBe("a1");
   expect(h.changes).toContainEqual({ op: "add", message: reply });
 
   // A pinned poll tells the whole conversation again.
   await send(h, "lunch?");
-  expect(h.changes.at(-1)).toEqual({ op: "all", messages: messages(h) });
+  expect(h.changes.at(-1)).toEqual({
+    op: "all",
+    messages: messages(h),
+    pinned: h.service.snapshot().pinned,
+  });
 });
 
 test("the same scene moment from two devices becomes one staff line", async () => {
@@ -929,4 +1281,79 @@ test("the same scene moment from two devices becomes one staff line", async () =
   const parcels = messages(h).filter((m) => m.from === "__reception" && m.text?.includes("Alice"));
   expect(parcels).toHaveLength(1);
   expect(parcels[0]?.name).toBe("Receptionist");
+});
+
+/** JPEG frame and scan markers with the office thumbnail dimensions. */
+function jpegFrame(width = 480): string {
+  const image = Buffer.from([
+    0xff,
+    0xd8,
+    0xff,
+    0xc0,
+    0,
+    11,
+    8,
+    1,
+    104,
+    width >> 8,
+    width & 255,
+    1,
+    1,
+    0x11,
+    0,
+    0xff,
+    0xda,
+    0,
+    8,
+    1,
+    1,
+    0,
+    0,
+    63,
+    0,
+    0x7f,
+    0xff,
+    0xd9,
+  ]);
+  return `data:image/jpeg;base64,${image.toString("base64")}`;
+}
+
+test("group photos reach every chat once, survive a retry after restart, and never prompt an agent", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a", "Ada")));
+  const shot = { op: "photo", requestId: "click-1", data: jpegFrame() } as const;
+  const replies = await Promise.all([h.service.request(shot), h.service.request(shot)]);
+  expect(replies).toEqual([{ ok: true }, { ok: true }]);
+  const photos = () => h.service.snapshot().messages.filter((m) => m.kind === "photo");
+  expect(photos()).toMatchObject([{ photo: shot.data, from: "me" }]);
+  expect(h.changes.filter((c) => c.op === "add" && c.message.kind === "photo")).toHaveLength(1);
+  expect(h.sent).toHaveLength(0);
+  for (let i = 2; i <= 8; i++) await h.service.request({ ...shot, requestId: `click-${i}` });
+  expect(photos().filter((m) => m.photo)).toHaveLength(6);
+  expect(
+    h.changes.filter((c) => c.op === "update" && c.message.kind === "photo" && !c.message.photo),
+  ).toHaveLength(2);
+  await h.service.stop();
+  const saved = h.saved.at(-1)!;
+  expect(saved.msgs.filter((m) => m.photo)).toHaveLength(6);
+  const restarted = await harness({ store: { load: async () => saved, save: async () => {} } });
+  await restarted.service.request(shot);
+  expect(restarted.service.snapshot().messages.filter((m) => m.kind === "photo")).toHaveLength(8);
+  await restarted.service.stop();
+});
+
+test("a malformed or oversized group photo or a JPEG with different dimensions cannot enter the chat", async () => {
+  const h = await harness();
+  for (const data of [
+    jpegFrame(481),
+    jpegFrame().slice(0, -4),
+    "data:image/jpeg;base64," + "A".repeat(96_000),
+    "https://host/image.jpg",
+  ]) {
+    expect(await h.service.request({ op: "photo", requestId: "fixture", data })).toMatchObject({
+      ok: false,
+    });
+  }
+  expect(h.service.snapshot().messages.some((m) => m.kind === "photo")).toBe(false);
+  await h.service.stop();
 });

@@ -1,6 +1,9 @@
+import { useOfficeBrand } from "./office-brand-context.js";
+import { OfficeMark } from "./office-mark.js";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
+import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
@@ -17,6 +20,9 @@ type HostSettings = SettingsState<typeof officeHostSettings.schema>;
 export type HostValues = Extract<HostSettings, { status: "ready" }>["values"];
 /** A host setting, as its control is labelled. */
 type HostSetting =
+  | "Office name"
+  | "Logo URL"
+  | "Brand color"
   | "Agent tools"
   | "Notes folder"
   | "Time zone"
@@ -70,6 +76,7 @@ export interface HostSwitchesProps {
   incidents: TrackerState | undefined;
   /** The device's own switch: last in the row, so on a phone it wraps to the line above the view. */
   weather?: import("../shared/contracts.js").WeatherState | undefined;
+  language?: ReactNode;
   children?: ReactNode;
 }
 
@@ -87,6 +94,7 @@ export function HostSwitches({
   scheduleError,
   incidents,
   weather,
+  language,
   children,
 }: HostSwitchesProps) {
   const settings = useSettings(officeHostSettings);
@@ -175,82 +183,107 @@ export function HostSwitches({
     wakeProblem,
     settings.status === "error" ? failureText("Read the office settings", settings.error) : null,
     saveProblem("Agent tools"),
-    deviceProblem,
   ].filter((problem): problem is string => problem !== null);
   return (
-    <>
-      <View style={styles.headerControls}>
-        <LabeledSwitch
-          label="Wake agents"
-          note={summary}
-          value={wantedWakes ?? wakesOn}
-          onChange={toggleWakes}
-          styles={styles}
-        />
-        <LabeledSwitch
-          label="Agent tools"
-          value={wantedTools ?? stored?.agentTools ?? null}
-          onChange={toggleTools}
-          styles={styles}
-        />
-        {children}
-      </View>
-      <View style={styles.headerFields}>
-        <FloorPlanRow
-          value={storedPlan(stored)}
-          onSave={savePlan}
-          problem={saveProblem(FLOOR_PLAN_LABEL)}
-          styles={styles}
-        />
-      </View>
-      <View style={styles.headerFields}>
-        <SettingField
-          label="Notes folder"
-          hint="Where the stand-up notes are written. Empty turns them off."
-          value={stored?.notesFolder ?? null}
-          onSave={saveFolder}
-          problem={saveProblem("Notes folder")}
-          styles={styles}
-        />
-        <SettingField
-          label="Time zone"
-          hint="For the 8:00 run. Empty uses this host's."
-          value={stored?.notesTimeZone ?? null}
-          onSave={saveTimeZone}
-          problem={timeZoneProblem}
-          styles={styles}
-        />
-        <NotesDays
-          value={stored?.notesDays ?? null}
-          onSave={saveDays}
-          problem={saveProblem(NOTES_DAYS_LABEL)}
-          styles={styles}
-        />
-      </View>
-      <TrackerFields
-        values={stored}
-        incidents={incidents}
-        change={change}
-        saveProblem={saveProblem}
-        styles={styles}
-      />
-      <WeatherFields
-        values={stored}
-        weather={weather}
-        change={change}
-        saveProblem={saveProblem}
-        styles={styles}
-      />
-      {problems.length > 0 ? (
-        <View style={styles.headerProblems}>
-          {problems.map((problem) => (
-            <Text key={problem} accessibilityRole="alert" style={styles.actionError}>
-              {problem}
+    <SettingsSections
+      styles={styles}
+      appearance={
+        <>
+          {children}
+          <BrandFields values={stored} change={change} saveProblem={saveProblem} styles={styles} />
+          <View style={styles.headerFields}>
+            <FloorPlanRow
+              value={storedPlan(stored)}
+              onSave={savePlan}
+              problem={saveProblem(FLOOR_PLAN_LABEL)}
+              styles={styles}
+            />
+          </View>
+          <View style={styles.headerFields}>{language}</View>
+          {deviceProblem && (
+            <Text accessibilityRole="alert" style={styles.actionError}>
+              {deviceProblem}
             </Text>
-          ))}
-        </View>
-      ) : null}
-    </>
+          )}
+        </>
+      }
+      automation={
+        <>
+          <View style={settingsLayout.block}>
+            <Text style={styles.sheetLabel}>Agents</Text>
+            <View style={settingsLayout.strip}>
+              <LabeledSwitch
+                label="Wake agents"
+                note={summary}
+                value={wantedWakes ?? wakesOn}
+                onChange={toggleWakes}
+                styles={styles}
+              />
+              <LabeledSwitch
+                label="Agent tools"
+                value={wantedTools ?? stored?.agentTools ?? null}
+                onChange={toggleTools}
+                styles={styles}
+              />
+            </View>
+          </View>
+          <Text style={styles.sheetLabel}>Stand-up schedule</Text>
+          <View style={styles.headerFields}>
+            <SettingField
+              label="Notes folder"
+              hint="Where the stand-up notes are written. Empty turns them off."
+              value={stored?.notesFolder ?? null}
+              onSave={saveFolder}
+              problem={saveProblem("Notes folder")}
+              styles={styles}
+            />
+            <SettingField
+              label="Time zone"
+              hint="For the 8:00 run. Empty uses this host's."
+              value={stored?.notesTimeZone ?? null}
+              onSave={saveTimeZone}
+              problem={timeZoneProblem}
+              styles={styles}
+            />
+            <NotesDays
+              value={stored?.notesDays ?? null}
+              onSave={saveDays}
+              problem={saveProblem(NOTES_DAYS_LABEL)}
+              styles={styles}
+            />
+          </View>
+          {problems.length > 0 ? (
+            <View style={styles.headerProblems}>
+              {problems.map((problem) => (
+                <Text key={problem} accessibilityRole="alert" style={styles.actionError}>
+                  {problem}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </>
+      }
+      services={
+        <>
+          <Text style={styles.sheetLabel}>Issue trackers</Text>
+          <TrackerFields
+            values={stored}
+            incidents={incidents}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
+          <Text style={styles.sheetLabel}>Weather service</Text>
+          <WeatherFields
+            values={stored}
+            weather={weather}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -353,5 +386,54 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         </View>
       )}
     </>
+  );
+}
+
+function BrandFields({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const brand = useOfficeBrand();
+  const saveName = useCallback((v: string) => change("Office name", { brandName: v }), [change]);
+  const saveLogo = useCallback((v: string) => change("Logo URL", { brandLogoUrl: v }), [change]);
+  const saveColor = useCallback((v: string) => change("Brand color", { brandColor: v }), [change]);
+  return (
+    <View style={settingsLayout.block}>
+      <Text style={styles.sheetLabel}>Branding</Text>
+      <View style={settingsLayout.strip}>
+        <OfficeMark brand={brand} fallbackColor={styles.brandIcon.color} />
+        <Text numberOfLines={1} style={styles.brandText}>
+          {brand.name ?? "Office 3D"}
+        </Text>
+      </View>
+      <View style={styles.headerFields}>
+        <SettingField
+          label="Office name"
+          value={stored ? (stored.brandName ?? "") : null}
+          hint="Display name. Leave blank to use the host default."
+          onSave={saveName}
+          problem={saveProblem("Office name")}
+          styles={styles}
+        />
+        <SettingField
+          label="Brand color"
+          value={stored ? (stored.brandColor ?? "") : null}
+          hint="Hex color for the office mark, such as #e8865f."
+          onSave={saveColor}
+          problem={saveProblem("Brand color")}
+          styles={styles}
+        />
+        <SettingField
+          label="Logo URL"
+          value={stored ? (stored.brandLogoUrl ?? "") : null}
+          hint="HTTPS image URL. Allow cross-origin images for the 3D sign."
+          onSave={saveLogo}
+          problem={saveProblem("Logo URL")}
+          styles={styles}
+        />
+      </View>
+    </View>
   );
 }

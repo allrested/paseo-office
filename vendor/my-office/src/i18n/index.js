@@ -74,6 +74,10 @@ export const OURS = {
   'props.karaoke.idle': 'The box is free',
   // the lively floor (paseo-leisure.js): what someone says on the way to a rest of their own
   'paseo.leisure.nap': 'Quick nap',
+  'paseo.lounge.assigned': '{name} is on the way · {action}',
+  'paseo.lounge.noAgent': 'No idle agent is available on the floor.',
+  'paseo.lounge.inProgress': 'An agent is already doing that.',
+  'paseo.lounge.unreachable': 'No agent can reach that spot.',
   'paseo.leisure.fish': 'Feeding the fish',
   'paseo.leisure.arcade': 'One round at the arcade',
   'paseo.leisure.cup': 'Making a coffee',
@@ -81,6 +85,12 @@ export const OURS = {
   // (an incident is one Paseo's office found in a tracker, not three failures in five minutes: the newest on the banner)
   'incident.banner': 'Incident: {key} {title}',
   'incident.more': '+{n} more',
+  // (the pantry's board with the host's duties, people/duty.js: whom a duty has nobody for yet, and a day with none due)
+  'paseo.duty.open': 'open',
+  'paseo.duty.none': 'No duty is due today',
+  // (the board's tooltip rows, interact/props.js: one left from an earlier day, and one done that nobody is named for)
+  'paseo.duty.owed': 'owed',
+  'paseo.duty.done': 'done',
 };
 
 const get = (dict, key) => { let o = dict; for (const k of key.split('.')) { if (o == null || typeof o !== 'object' || !own(o, k)) return undefined; o = o[k]; } return o; };

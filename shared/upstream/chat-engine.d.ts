@@ -79,7 +79,11 @@ export interface ChatEngine {
   system(text: string): EngineMessage;
   send(input: { text?: string; sticker?: number | null; replyTo?: string | null }): void;
   working(from: string, on: boolean): void;
+  fresh(key: string): boolean;
+  photo(dataUrl: string): void;
   react(id: string, by: string, emoji: string): void;
+  poll(from: string, question: string, options: string[]): void;
+  pin(id: string, byName: string): void;
   vote(id: string, by: string, index: number): void;
   rsvp(id: string, by: string, yes: boolean): void;
   recall(id: string): void;

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { ExternalLink, Modal, copyText, useToast } from "@getpaseo/plugin/client/ui";
+import { ExternalLink, copyText, useToast } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import type { NotesState } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { WriterLine } from "./notes-card.js";

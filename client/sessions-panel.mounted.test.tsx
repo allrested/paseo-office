@@ -22,7 +22,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { TextInput, View } = await import("react-native");
   const ScrollView = (props: { children: ReactNode }) =>
     createElement("div", { "data-scroll": "vertical" }, createElement(View, null, props.children));
-  return { ScrollView, TextInput };
+  return { ScrollView, TextInput, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -77,12 +77,17 @@ function useDraft(): NewAgentDraft {
   return useMemo(() => ({ open, setOpen, choice, change }), [open, choice, change]);
 }
 
+/** Whether the surface this panel is drawn in can show an agent's workspace. */
+let withWorkspace = false;
+const workspaces: string[] = [];
+
 function Harness({ value }: { value: OfficeState }) {
   const styles = useOfficeStyles(THEME, LAYOUT.compact, false);
   const newAgent = useDraft();
   const link: OfficeLink = {
     select: (agentId) => void selected.push(agentId),
     openSession: (agentId) => void opened.push(agentId),
+    ...(withWorkspace && { openWorkspace: (agentId: string) => void workspaces.push(agentId) }),
   };
   return createElement(SessionsPanel, {
     office: value,
@@ -168,6 +173,30 @@ test("a row shows the room's name and the doing-now line; a press selects", asyn
   expect(opened).toEqual([]);
 });
 
+test("a row's own button opens the agent's workspace without opening its details", async () => {
+  withWorkspace = true;
+  workspaces.length = 0;
+  selected.length = 0;
+  try {
+    await show(AGENTS);
+    await press("Open A's workspace");
+    expect(workspaces).toEqual(["a"]);
+    expect(selected).toEqual([]);
+    expect(opened).toEqual([]);
+    // The row itself still opens the details.
+    await press("A: Running");
+    expect(selected).toEqual(["a"]);
+    expect(workspaces).toEqual(["a"]);
+  } finally {
+    withWorkspace = false;
+  }
+});
+
+test("a surface that cannot show a workspace draws no such button", async () => {
+  await show(AGENTS);
+  expect(maybe("Open A's workspace")).toBeNull();
+});
+
 test("No agents yet. and No agent matches.", async () => {
   // Before the first state the office is not known to be empty.
   await mount(office({}, { loaded: false }));
@@ -229,4 +258,23 @@ test("approvals lead the list and update when the live request clears", async ()
   await show([...AGENTS, { ...reviewer, permissions: [] }]);
   expect(headings()).toEqual(["Working", "Resting"]);
   expect(container.textContent).not.toContain("Run tests");
+});
+
+test("session rows show reported task counts and context separately, and resting rows can collapse", async () => {
+  await mount(
+    office({
+      agents: [AGENTS[0], { ...AGENTS[1], context: { usedTokens: 45, maxTokens: 100 } }],
+      checklistProgress: { a: { completed: 1, total: 4 } },
+    }),
+  );
+  const progress = labelled("A: Running").querySelector('[role="progressbar"]');
+  expect(progress?.getAttribute("aria-label")).toBe("1/4 tasks");
+  expect(progress?.getAttribute("aria-valuenow")).toBe("25");
+  expect(labelled("B: Idle").textContent).toContain("Context 45%");
+  expect(labelled("A: Running").textContent).toMatch(/\d+:\d{2}/);
+  await press("Resting sessions");
+  expect(labelled("Resting sessions").getAttribute("aria-expanded")).toBe("false");
+  expect(maybe("B: Idle")).toBeNull();
+  await press("Resting sessions");
+  expect(maybe("B: Idle")).not.toBeNull();
 });

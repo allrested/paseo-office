@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type {
   ChecklistStep,
+  ChecklistCounts,
   Checklists,
   OfficeAgent,
   OfficeEvent,
@@ -77,7 +78,12 @@ interface FakeActivity {
   starts: number;
   stops: number;
   running(): readonly string[];
-  emit(activity: ActivityLines, doing?: ActivitySteps, checklists?: Checklists): void;
+  emit(
+    activity: ActivityLines,
+    doing?: ActivitySteps,
+    checklists?: Checklists,
+    progress?: ChecklistCounts,
+  ): void;
 }
 
 interface Harness {
@@ -92,7 +98,12 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
   let directoryListener: ((view: DirectoryView) => void) | null = null;
   let endListener: (() => void) | null = null;
   let activityListener:
-    | ((activity: ActivityLines, doing: ActivitySteps, checklists: Checklists) => void)
+    | ((
+        activity: ActivityLines,
+        doing: ActivitySteps,
+        checklists: Checklists,
+        progress?: ChecklistCounts,
+      ) => void)
     | null = null;
   let runningList: () => readonly string[] = () => [];
   const directory: FakeDirectory = {
@@ -109,7 +120,8 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
     starts: 0,
     stops: 0,
     running: () => runningList(),
-    emit: (next, doing = {}, checklists = {}) => activityListener?.(next, doing, checklists),
+    emit: (next, doing = {}, checklists = {}, progress) =>
+      activityListener?.(next, doing, checklists, progress),
   };
   const ports: HubPorts = {
     async openDirectory(listener, onEnd) {
@@ -1212,6 +1224,19 @@ test("a watcher joining an open directory waits for its first measured roster", 
   expect(seen).toEqual([]);
   answer?.({ agents: [], workspaces: [{ id: "w1", name: "empty", projectName: "shop" }] });
   expect(seen[0]?.workspaces[0]?.name).toBe("empty");
+  subscriber.controller.abort();
+  await subscriber.done;
+});
+
+test("completed checklist totals survive rest and snapshots and leave with their agent", async () => {
+  const harness = startHarness({ agents: [agent("a", "running")], workspaces: [] });
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  harness.activity.emit({}, {}, { a: [] }, { a: { completed: 89, total: 89 } });
+  harness.directory.emit({ agents: [agent("a", "idle")], workspaces: [] });
+  expect((await harness.hub.read()).checklistProgress).toEqual({ a: { completed: 89, total: 89 } });
+  harness.directory.emit({ agents: [], workspaces: [] });
+  expect((await harness.hub.read()).checklistProgress).toBeUndefined();
   subscriber.controller.abort();
   await subscriber.done;
 });

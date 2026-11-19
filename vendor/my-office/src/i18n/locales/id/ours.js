@@ -52,6 +52,10 @@ export default {
   'props.karaoke.idle': 'Bilik karaoke sedang kosong',
   // the lively floor (paseo-leisure.js): what someone says on the way to a rest of their own
   'paseo.leisure.nap': 'Tidur sebentar',
+  'paseo.lounge.assigned': '{name} sedang menuju lokasi · {action}',
+  'paseo.lounge.noAgent': 'Tidak ada agen yang sedang luang di kantor.',
+  'paseo.lounge.inProgress': 'Seorang agen sedang melakukannya.',
+  'paseo.lounge.unreachable': 'Tidak ada agen yang bisa mencapai tempat itu.',
   'paseo.leisure.fish': 'Lagi kasih makan ikan',
   'paseo.leisure.arcade': 'Main satu ronde di arkade',
   'paseo.leisure.cup': 'Lagi bikin kopi',
@@ -59,4 +63,10 @@ export default {
   // (an incident is one Paseo's office found in a tracker, not three failures in five minutes: the newest on the banner)
   'incident.banner': 'Insiden: {key} {title}',
   'incident.more': '+{n} lagi',
+  // (the pantry's board with the host's duties, people/duty.js: whom a duty has nobody for yet, and a day with none due)
+  'paseo.duty.open': 'belum diambil',
+  'paseo.duty.none': 'Tidak ada tugas piket hari ini',
+  // (the board's tooltip rows, interact/props.js: one left from an earlier day, and one done that nobody is named for)
+  'paseo.duty.owed': 'tertunda',
+  'paseo.duty.done': 'selesai',
 };

@@ -1,3 +1,4 @@
+import { shirtColor } from "../../shared/appearance.js";
 import type { OfficeBrand } from "../brand.js";
 import {
   agentTitle,
@@ -16,12 +17,16 @@ import type {
   TestResult,
 } from "../../shared/contracts.js";
 import { machineTitle, memoryPercent, memoryTone } from "../../shared/machine-text.js";
+import { shortHolder } from "../../shared/duties.js";
+import { USER_AUTHOR } from "../../shared/names.js";
+import { dutyRowTitle } from "../duty-text.js";
 import { relativeLuminance } from "../luminance.js";
 import type {
   WorldWeather,
   WorldBoardRow,
   WorldBrand,
   WorldColors,
+  WorldDuty,
   WorldEvent,
   WorldEventType,
   WorldMachine,
@@ -74,6 +79,9 @@ function toSession(
   return {
     id: agent.id,
     name: title,
+    ...(agent.appearance
+      ? { appearance: agent.appearance, shirt: shirtColor(agent.appearance) }
+      : {}),
     title,
     dir: team,
     git: {
@@ -85,7 +93,9 @@ function toSession(
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
-    ...(status === "rest" && !stuck && Number.isFinite(idle) ? { doneAt: idle } : {}),
+    ...(status === "rest" && !stuck && Number.isFinite(idle)
+      ? { doneAt: idle, idleSince: agent.idleSince }
+      : {}),
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: [],
@@ -410,7 +420,11 @@ const PRODUCT_NAME = "Paseo";
 
 /** What the lobby's sign shows: the host's brand, or the product's name over the scene's mark. */
 export function worldBrand(brand: OfficeBrand | null): WorldBrand {
-  return { name: brand?.name ?? PRODUCT_NAME, logoUrl: brand?.logoUrl ?? null };
+  return {
+    name: brand?.name ?? PRODUCT_NAME,
+    logoUrl: brand?.logoUrl ?? null,
+    ...(brand?.color ? { color: brand.color } : {}),
+  };
 }
 
 /** What the scene is told of the weather: the host's scene, or none while the host has not said. */
@@ -418,4 +432,25 @@ export function worldWeather(scene: WeatherScene | undefined): WorldWeather {
   if (scene === undefined || scene.kind === "none") return { kind: "none" };
   if (scene.kind === "season") return { kind: "season" };
   return { kind: "reading", code: scene.code, temp: scene.temp, cloud: scene.cloud };
+}
+
+/** Who has a duty, as the pantry's board names them: the agent's title cut short. */
+function dutyHolder(model: OfficeModel, claimedBy: string | undefined): WorldDuty["holder"] {
+  if (claimedBy === undefined || claimedBy === USER_AUTHOR) return null;
+  const agent = model.agents.get(claimedBy);
+  const title = agent ? agentTitle(agent) : `Agent ${claimedBy.slice(0, 8)}`;
+  return { id: claimedBy, name: shortHolder(title) };
+}
+
+/** The day's duties for the pantry's board: names, holders and states, never instructions. */
+export function worldDuties(model: OfficeModel): WorldDuty[] {
+  return model.duties.map((row) => ({
+    id: row.post.id,
+    name: dutyRowTitle(row),
+    chore: row.duty?.chore ?? null,
+    pretend: (row.duty?.instructions.trim() ?? "") === "",
+    holder: dutyHolder(model, row.post.claimedBy),
+    state: row.post.state ?? "open",
+    owed: row.owed,
+  }));
 }

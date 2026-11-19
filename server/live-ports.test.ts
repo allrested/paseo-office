@@ -1,12 +1,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { GroupSessionUnavailable } from "./chat-service.js";
 import { liveAgentPorts, liveChatPorts, liveNotesPorts } from "./live-ports.js";
 import type { Paseo, PaseoHolder } from "./paseo-holder.js";
 
 interface FakeAgent {
   id: string;
+  workspaceId?: string;
   status: string;
   archivedAt: string | null;
   pendingPermissions: unknown[];
@@ -18,12 +20,18 @@ function agent(id: string, overrides: Partial<FakeAgent> = {}): FakeAgent {
 
 /** The daemon finds an agent by its id or by a start of it, archived agents too. */
 const KNOWN = new Map([
-  ["b-full-id", agent("b-full-id")],
+  ["b-full-id", agent("b-full-id", { workspaceId: "w1" })],
   ["b-fu", agent("b-full-id")],
   ["run", agent("run", { status: "running" })],
   ["old", agent("old", { archivedAt: "2026-11-10T08:00:00.000Z" })],
   ["shut", agent("shut", { status: "closed" })],
 ]);
+
+const GROUP = {
+  group: true,
+  messageId: "office-group-x",
+  sentAt: Date.parse("2026-11-18T05:00:00Z"),
+};
 
 interface Sent {
   agentId: string;
@@ -68,6 +76,74 @@ test("an agent's wake state is read from the daemon; one it does not know is gon
   expect(await ports.status("nobody")).toBe("gone");
 });
 
+test("lobby pickup reads every page of idle agents, oldest idle first, and rechecks the live state", async () => {
+  const waiting = {
+    ...agent("waiting"),
+    labels: {},
+    requiresAttention: true,
+    attentionReason: "finished",
+  };
+  const unavailable = [
+    { status: "running" },
+    { status: "initializing" },
+    { status: "error" },
+    { archivedAt: "2026-11-18T08:00:00Z" },
+    { activeTurn: { turnId: "t" } },
+    { backgroundWork: { count: 1 } },
+    { pendingPermissions: [{ id: "request" }] },
+    { attentionReason: "permission" },
+    { attentionReason: "error" },
+    { requiresAttention: true, attentionReason: null },
+    { background: true },
+    { internal: true },
+    { providerUnavailable: true },
+    { labels: { "paseo.parent-agent-id": "parent" } },
+    { title: "Stand-up notes" },
+  ].map((fields, i) => Object.assign({}, waiting, fields, { id: String(i) }));
+  const next = { ...waiting, id: "second", requiresAttention: false, attentionReason: null };
+  const list = vi
+    .fn()
+    .mockResolvedValueOnce({
+      entries: [waiting, ...unavailable].map((entry) => ({ agent: entry })),
+      pageInfo: { nextCursor: "next" },
+    })
+    .mockResolvedValueOnce({ entries: [{ agent: next }], pageInfo: { nextCursor: null } });
+  const refresh = vi
+    .fn()
+    .mockResolvedValueOnce({ agent: waiting })
+    .mockResolvedValueOnce({ agent: { ...waiting, activeTurn: { turnId: "new" } } })
+    .mockResolvedValueOnce(null);
+  const holder = {
+    held: () => true,
+    require: () => ({ agents: { list, ref: () => ({ refresh }) } }),
+  } as unknown as PaseoHolder;
+  const ports = liveAgentPorts(holder);
+  expect(await ports.lobbyCandidates()).toEqual(["waiting", "second"]);
+  const options = {
+    filter: { statuses: ["idle"] },
+    sort: [{ key: "updated_at", direction: "asc" }],
+  };
+  expect(list.mock.calls).toEqual([
+    [{ ...options, page: { limit: 200, cursor: undefined } }],
+    [{ ...options, page: { limit: 200, cursor: "next" } }],
+  ]);
+  expect(await ports.lobbyEligible("waiting")).toBe(true);
+  expect(await ports.lobbyEligible("waiting")).toBe(false);
+  expect(await ports.lobbyEligible("gone")).toBe(false);
+});
+
+test("a cold office waits until a hook or handler has supplied its Paseo API", async () => {
+  const holder = { held: () => false } as PaseoHolder;
+  expect(await liveAgentPorts(holder).lobbyCandidates()).toEqual([]);
+});
+
+test("an agent's workspace is read from the daemon; an agent it does not know has none", async () => {
+  const { ports } = setup();
+  expect(await ports.workspaceOf("b-full-id")).toBe("w1");
+  expect(await ports.workspaceOf("run")).toBeNull();
+  expect(await ports.workspaceOf("nobody")).toBeNull();
+});
+
 test("a start of an id resolves to the full id; an agent that can get no post resolves to none", async () => {
   const { ports } = setup();
   expect(await ports.resolve("b-fu")).toBe("b-full-id");
@@ -96,6 +172,12 @@ test("a wake names its source agent; a wake as from the user names none and neve
   ]);
 });
 
+test("a retried lobby assignment forwards the same client message id", async () => {
+  const { ports, sent } = setup();
+  await ports.send("b-full-id", "Lobby task p4", null, "assignment-id");
+  expect(sent[0]?.options).toEqual({ activeTurnBehavior: "steer", messageId: "assignment-id" });
+});
+
 test("a chat prompt steers a running turn", async () => {
   const sent: Sent[] = [];
   const ports = liveChatPorts(fakeHolder(sent));
@@ -107,6 +189,35 @@ test("a chat prompt steers a running turn", async () => {
       options: { activeTurnBehavior: "steer" },
     },
   ]);
+});
+
+test("a group prompt goes only to a session that is still available on the daemon", async () => {
+  const sent: Sent[] = [];
+  const ports = liveChatPorts(fakeHolder(sent));
+  for (const id of ["run", "old", "shut", "nobody"]) {
+    await expect(ports.send(id, "Reply to the group", undefined, GROUP)).rejects.toBeInstanceOf(
+      GroupSessionUnavailable,
+    );
+  }
+  await ports.send("b-full-id", "Reply to the group", undefined, GROUP);
+  expect(sent).toEqual([
+    {
+      agentId: "b-full-id",
+      text: "Reply to the group",
+      options: { activeTurnBehavior: "steer", messageId: GROUP.messageId },
+    },
+  ]);
+});
+
+test("a send error after the eligibility check keeps its original delivery error", async () => {
+  const error = new Error("Disconnected after send");
+  const send = vi.fn().mockRejectedValue(error);
+  const ref = { refresh: async () => ({ agent: agent("session") }), send };
+  const holder = { require: () => ({ agents: { ref: () => ref } }) } as unknown as PaseoHolder;
+  await expect(
+    liveChatPorts(holder).send("session", "Group question", undefined, GROUP),
+  ).rejects.toBe(error);
+  expect(send).toHaveBeenCalledTimes(1);
 });
 
 test("the answer is the last assistant message of the turn the hook names", async () => {
@@ -130,11 +241,69 @@ test("the answer is the last assistant message of the turn the hook names", asyn
   };
   const holder = { remember: () => undefined, require: () => paseo } as unknown as PaseoHolder;
   const ports = liveChatPorts(holder);
-  expect(await ports.lastAnswer("a", "t1")).toBe("Done.");
+  expect(await ports.readTurn("a", "t1")).toEqual({ matches: true, text: "Done." });
   expect(options).toEqual({ direction: "tail", limit: 1, wholeTurns: true });
-  expect(await ports.lastAnswer("a", null)).toBeNull();
-  expect(await ports.lastAnswer("a", "t9")).toBeNull();
+  expect((await ports.readTurn("a", null)).text).toBeNull();
+  expect((await ports.readTurn("a", "t9")).text).toBeNull();
 });
+
+test.each(["messageId", "clientMessageId"])(
+  "the group answer follows its %s in the hook's turn",
+  async (key) => {
+    const cursor = { seq: 10, epoch: "epoch" };
+    const newer = {
+      turnId: "new",
+      timestamp: "2026-11-18T05:05:00Z",
+      item: { type: "assistant_message", text: "Unrelated" },
+    };
+    const older = {
+      turnId: "group",
+      item: { type: "assistant_message", text: "Private text before the group steer" },
+    };
+    const user = {
+      turnId: "group",
+      item: { type: "user_message", text: "hi", [key]: GROUP.messageId },
+    };
+    const answer = { turnId: "group", item: { type: "assistant_message", text: "Hello group!" } };
+    const otherUser = {
+      turnId: "group",
+      item: { type: "user_message", text: "An additional request", [key]: "another-id" },
+    };
+    const refetch = vi
+      .fn()
+      .mockResolvedValueOnce({ entries: [newer] })
+      .mockResolvedValueOnce({ entries: [newer], hasOlder: true, startCursor: cursor })
+      .mockResolvedValueOnce({ entries: [older, user, answer] })
+      .mockResolvedValueOnce({ entries: [older, user] })
+      .mockResolvedValueOnce({ entries: [user, otherUser, answer] })
+      .mockResolvedValueOnce({ entries: [otherUser, user, answer] })
+      .mockResolvedValueOnce({ entries: [user, otherUser, answer] });
+    const holder = {
+      require: () => ({ agents: { ref: () => ({ timeline: { refetch } }) } }),
+    } as unknown as PaseoHolder;
+    const ports = liveChatPorts(holder);
+    expect(await ports.readTurn("a", "new", GROUP)).toEqual({ matches: false, text: null });
+    expect(await ports.readTurn("a", "group", GROUP)).toEqual({
+      matches: true,
+      text: "Hello group!",
+    });
+    expect(refetch.mock.calls[2]).toEqual([
+      { direction: "before", cursor, limit: 1, wholeTurns: true },
+    ]);
+    expect(await ports.readTurn("a", "group", GROUP)).toEqual({ matches: true, text: null });
+    for (let i = 0; i < 2; i++) {
+      expect(await ports.readTurn("a", "group", GROUP)).toEqual({
+        matches: true,
+        privateTurn: true,
+        text: null,
+      });
+    }
+    expect(await ports.readTurn("a", "group", GROUP, ["another-id"])).toEqual({
+      matches: true,
+      text: "Hello group!",
+    });
+  },
+);
 
 interface Created {
   cwd: string;

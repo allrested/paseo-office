@@ -1,3 +1,5 @@
+import { OfficeMark } from "./office-mark.js";
+import { useOfficeBrand } from "./office-brand-context.js";
 import { useCallback, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -6,6 +8,7 @@ import type { ColumnState } from "./use-column.js";
 import type { OfficeStyles } from "./styles.js";
 
 export interface SidebarControls {
+  sessionsAvailable: boolean;
   sessionsOpen: boolean;
   column: ColumnState;
   hideSessions(hidden: boolean): void;
@@ -53,6 +56,7 @@ interface FullscreenHeaderProps {
   badges: ColumnBadges;
   sidebars: SidebarControls;
   modes: ReactNode;
+  onOffice(): void;
   children: ReactNode;
   color: string;
   styles: OfficeStyles;
@@ -63,10 +67,12 @@ export function FullscreenHeader({
   sidebars,
   badges,
   modes,
+  onOffice,
   children,
   color,
   styles,
 }: FullscreenHeaderProps) {
+  const brand = useOfficeBrand();
   const { sessionsOpen, hideSessions, column } = sidebars;
   const { collapsed, setCollapsed } = column;
   const sessions = useCallback(() => hideSessions(sessionsOpen), [hideSessions, sessionsOpen]);
@@ -74,21 +80,30 @@ export function FullscreenHeader({
   return (
     <View style={styles.fullscreenHeader}>
       <View style={styles.headerTools}>
-        <View style={styles.headerBrand}>
-          <Icon name="Building2" size={20} color={styles.brandIcon.color} />
-          <Text style={styles.brandText}>Office 3D</Text>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={brand.name ?? "Office 3D"}
+          onPress={onOffice}
+          style={styles.headerBrand}
+        >
+          <OfficeMark brand={brand} fallbackColor={styles.brandIcon.color} />
+          <Text numberOfLines={1} style={styles.brandText}>
+            {brand.name ?? "Office 3D"}
+          </Text>
+        </Pressable>
         <View style={styles.headerModes}>{modes}</View>
       </View>
       <View style={styles.headerTools}>
-        <SidebarButton
-          name="Sessions"
-          icon={sessionsOpen ? "PanelLeftClose" : "PanelLeftOpen"}
-          expanded={sessionsOpen}
-          toggle={sessions}
-          color={color}
-          styles={styles}
-        />
+        {sidebars.sessionsAvailable && (
+          <SidebarButton
+            name="Sessions"
+            icon={sessionsOpen ? "PanelLeftClose" : "PanelLeftOpen"}
+            expanded={sessionsOpen}
+            toggle={sessions}
+            color={color}
+            styles={styles}
+          />
+        )}
         {collapsed && (
           <ColumnTabs
             hideSessions

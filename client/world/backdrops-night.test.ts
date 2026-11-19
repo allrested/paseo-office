@@ -5,9 +5,12 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { state } from "../../vendor/my-office/src/office/core/state.js";
 
 const h = vi.hoisted(() => ({
-  host: { street: false, night: false, surface: "#F4EFE6" },
+  host: { scene: "plain", night: false, surface: "#F4EFE6" },
   setNight: vi.fn(),
   buildCity: vi.fn(() => ({ night: vi.fn(), street: {} })),
+  buildCountry: vi.fn(() => ({ night: vi.fn() })),
+  buildBeach: vi.fn(() => ({ night: vi.fn() })),
+  viewTex: vi.fn((view: string, night: boolean) => ({ view, night })),
   scene: { add: vi.fn(), background: null as unknown, fog: { color: { copy: () => undefined } } },
 }));
 
@@ -16,6 +19,7 @@ vi.mock("../../vendor/my-office/src/office/scene/renderer.js", () => ({ scene: h
 vi.mock("../../vendor/my-office/src/office/world/windows.js", () => ({
   cityDay: {},
   cityNight: {},
+  viewTex: h.viewTex,
 }));
 vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({
   night: false,
@@ -25,6 +29,12 @@ vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({
 vi.mock("../../vendor/my-office/src/office/world/backdrops/city.js", () => ({
   buildCity: h.buildCity,
 }));
+vi.mock("../../vendor/my-office/src/office/world/backdrops/countryside.js", () => ({
+  buildCountry: h.buildCountry,
+}));
+vi.mock("../../vendor/my-office/src/office/world/backdrops/beach.js", () => ({
+  buildBeach: h.buildBeach,
+}));
 vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
   fp: {},
   buildGrid: vi.fn(),
@@ -32,6 +42,7 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
 import {
   applyNight,
   holdNight,
+  setScene,
   setup,
   // @ts-expect-error vendored JavaScript has no declarations
 } from "../../vendor/my-office/src/office/world/backdrops/index.js";
@@ -39,8 +50,11 @@ import {
 beforeEach(() => {
   h.setNight.mockReset();
   h.host.night = false;
-  h.host.street = false;
+  h.host.scene = "plain";
   h.buildCity.mockClear();
+  h.buildCountry.mockClear();
+  h.buildBeach.mockClear();
+  h.viewTex.mockClear();
   setup();
   h.setNight.mockReset();
 });
@@ -70,7 +84,7 @@ test("both keep the backdrop in the app's surface colour", () => {
 
 test("builds the city only when the street is enabled", () => {
   expect(h.buildCity).not.toHaveBeenCalled();
-  h.host.street = true;
+  h.host.scene = "city";
   setup();
   expect(h.buildCity).toHaveBeenCalledTimes(1);
   expect(state.nightManual).toBe(false);
@@ -80,3 +94,23 @@ test("builds the city only when the street is enabled", () => {
   expect(state.nightManual).toBe(false);
   expect(h.setNight).toHaveBeenLastCalledWith(false);
 });
+
+test.each([
+  ["countryside", "country", h.buildCountry, h.buildBeach],
+  ["beach", "beach", h.buildBeach, h.buildCountry],
+] as const)(
+  "builds the chosen %s landscape once with day and night window views",
+  (scene, view, build, other) => {
+    h.host.scene = scene;
+    setup();
+    setScene("plain");
+    setScene(scene);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+    expect(h.buildCity).not.toHaveBeenCalled();
+    expect(h.viewTex.mock.calls).toEqual([
+      [view, false],
+      [view, true],
+    ]);
+  },
+);

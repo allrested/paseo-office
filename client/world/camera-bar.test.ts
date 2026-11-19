@@ -144,17 +144,15 @@ function pointer(fine: boolean) {
 }
 
 /**
- * Builds the bar and wires it, as paseo-entry.js does; `fullscreen` is what the frame's browser offers,
+ * Builds the bar and wires it, as paseo-entry.js does; `fullscreen` is what the host surface offers,
  * `fine` whether its pointer is fine (a mouse). Returns the pointer, to change it.
  */
-function open({ fullscreen = true, refuse = false, fine = true } = {}) {
-  Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: fullscreen });
-  document.documentElement.requestFullscreen = refuse
-    ? vi.fn(() => Promise.reject(new Error("not allowed")))
-    : vi.fn(() => Promise.resolve());
+const toggleFullscreen = vi.fn();
+
+function open({ fullscreen = true, fine = true } = {}) {
   const handle = pointer(fine);
   build();
-  setup();
+  setup(fullscreen ? toggleFullscreen : undefined);
   return handle;
 }
 
@@ -174,6 +172,7 @@ beforeEach(() => {
     h.calls.push("set");
   });
   h.copy.mockReset();
+  toggleFullscreen.mockClear();
   h.clone.mockClear();
   h.toast.mockReset();
   h.plan = "pro";
@@ -206,14 +205,16 @@ afterEach(() => {
   onDocument.mockClear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
 });
 
-test("the bar has its ten controls with their labels", () => {
+test("the bar keeps the workspace restore button hidden until a window is minimized", () => {
   open();
+  expect(document.querySelector(".tb-tools #btn-workspace")?.hasAttribute("hidden")).toBe(true);
 
   expect(
-    [...document.querySelectorAll(".toolbar button")].map((b) => b.getAttribute("aria-label")),
+    [...document.querySelectorAll(".toolbar button:not(#btn-workspace)")].map((b) =>
+      b.getAttribute("aria-label"),
+    ),
   ).toEqual([
     "Overview",
     "Desks",
@@ -534,18 +535,11 @@ test("full screen is hidden where the browser has it off", () => {
   expect(page("btn-full").hidden).toBe(true);
 });
 
-test("full screen is offered where the browser has it", () => {
+test("the camera bar calls the office surface during the fullscreen button press", () => {
   open();
   expect(page("btn-full").hidden).toBe(false);
-});
-
-test("a refused full screen says so", async () => {
-  open({ refuse: true });
   page("btn-full").click();
-  await Promise.resolve();
-  await Promise.resolve();
-
-  expect(h.toast).toHaveBeenCalledWith("This browser won't go full screen.");
+  expect(toggleFullscreen).toHaveBeenCalledTimes(1);
 });
 
 test("a resize refits only on Overview", () => {

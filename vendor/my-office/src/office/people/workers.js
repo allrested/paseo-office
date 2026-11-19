@@ -2,6 +2,7 @@
 import * as THREE from '../../../three/three.module.min.js';
 import { CSS2DObject } from '../../../three/addons/renderers/CSS2DRenderer.js';
 import { makeChibi, chibiPose, applyChibiPose, wearOuter, wearHat, wearLanyard, disposeChibi } from './chibi-rig.js';
+import { host } from '../paseo-host.js';
 import { state } from '../core/state.js';
 import { PRO, SEASON, V2, el, fmtAgo, nowMs, officeNow, rand, randInt, reduceMotion, replay, short, tint, wrapAngle } from '../core/env.js';
 import { ACT, ANIM_AT, bubbleText, verb } from '../ui/event-text.js';
@@ -34,7 +35,7 @@ export const clockHooks = {};
 export const lunchHooks = {};
 const viaClock = (kind, w, then) => (clockHooks[kind] ? clockHooks[kind](w, then) : then());
 export function hash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-export const colorOf = (s) => (s.desk >= 0 ? PALETTE[s.desk] : PALETTE[hash(s.name) % PALETTE.length]);
+export const colorOf = (s) => s.shirt || (s.desk >= 0 ? PALETTE[s.desk] : PALETTE[hash(s.name) % PALETTE.length]);
 // What to call a session on screen: the chat's title (your rename, else Claude's), else its short name.
 // The short name stays the identity: looks, colours and the timeline are keyed by it.
 export const dn = (s) => (s ? s.title || s.name : '');
@@ -67,7 +68,11 @@ export function updateZs(dt) {
     if (z.life <= 0) { scene.remove(z.s); z.s.material.dispose(); zs.splice(i, 1); }
   }
 }
-function lookOf(s) { const h = hash(s.name); return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
+const genderStyles = { Male: ['plain', 'spiky', 'curly'], Female: ['bob', 'ponytail', 'bun'] };
+export function lookOf(s) {
+  const h = hash(s.name);
+  const styles = genderStyles[s.appearance?.gender] || STYLES;
+  return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: styles[(h >>> 3) % styles.length], acc: s.appearance?.avatar || ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
 export const workers = new Map();   // session id -> Worker
 export const npcs = [];             // people who aren't sessions: the director on the company floor
 export const subs = new Map();      // subagent id -> Worker
@@ -485,12 +490,27 @@ export function setup() {
     }
     nightOut(s) {
       if (this.anim !== 'sleep' || this.want || this.chore || !this.lateRest(s)) return false;
-      this.goHomeNow();
+      this.goHomeNow(true);
       return true;
     }
-    goHomeNow() {
+    goHomeNow(endOfShift = false) {
       this.homeBound = true; this.hush(); this.restAt = Infinity; this.station = 'out';
-      this.walkOut(() => { this.homeBound = false; this.away = true; this.station = 'away'; this.hush(); if (this.spot?.by === this) this.spot.by = null; });
+      // PASEO: report a night departure before the viewer can close the floor mid-walk.
+      // An outing can still return to work, so report that departure only once home.
+      const idleSince = sessions.get(this.id)?.idleSince;
+      const reportDeparture = () => {
+        const s = sessions.get(this.id);
+        if (idleSince && s?.idleSince === idleSince && s.status === 'rest' && !s.stuck && !s.bg?.length &&
+            !this.want && !this.sub && !this.leaving && !replay.on && workers.get(this.id) === this) {
+          host.wentHome(this.id, idleSince);
+        }
+      };
+      if (endOfShift) reportDeparture();
+      this.walkOut(() => {
+        this.homeBound = false; this.away = true; this.station = 'away'; this.hush();
+        if (this.spot?.by === this) this.spot.by = null;
+        if (!endOfShift) reportDeparture();
+      });
     }
     comeBack() {
       this.away = false; this.station = 'arriving';

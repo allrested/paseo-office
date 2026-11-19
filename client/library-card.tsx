@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { Modal, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import type { SkillInfo, SkillsResult } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";

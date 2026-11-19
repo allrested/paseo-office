@@ -3,6 +3,7 @@
 export const host = {
   /** 'pro' (the company floor), 'cozy' (one open room) or 'hq' (department rooms). */
   plan: 'pro',
+  scene: 'plain',
   street: false,
   streetKit: null,
   claudeReading: null,
@@ -15,6 +16,7 @@ export const host = {
   brandName: '',
   /** A person was chosen; null when nobody is. */
   select() {},
+  wentHome() {},
   /** A team's chip was chosen (its project), or the whiteboard (nothing). */
   board() {},
   /** The server racks, or the wall screen while `resources` is null, were chosen; null while Paseo has nothing to open for them. */
@@ -44,4 +46,13 @@ export const host = {
   limits: () => [],
   /** The whiteboard's rows: [{ id, name, color, text, state: 'doing' | 'wait' | 'done' }]. */
   boardRows: () => [],
+  /**
+   * The day's duties the host keeps (paseo-duty-plan.js): [{ id, name, chore, pretend, holder: { id, name } | null,
+   * state, owed }]. Null while the host has given none: people/duty.js keeps upstream's rota then.
+   */
+  duties: null,
+  /** The pantry's duty board was chosen; null while Paseo has nothing to open for it. */
+  dutyBoard: null,
+  /** A figure acted out a pretend duty (its id, the agent's): the host records it done. */
+  dutyDone() {},
 };

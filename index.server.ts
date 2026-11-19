@@ -1,3 +1,4 @@
+import { hostBrand } from "./shared/branding.js";
 import { createHash } from "node:crypto";
 import { execCommand } from "@getpaseo/plugin/server";
 import { createTenure, TenureLedgerSchema, type TenureLedger } from "./server/tenure.js";
@@ -8,7 +9,13 @@ import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
 import { liftFile, tenureFile } from "./server/paths.js";
-import { lifeSubscription, tenureRpc, type LifeEvent } from "./shared/contracts.js";
+import { createDepartureArchiver } from "./server/home-departure.js";
+import {
+  lifeSubscription,
+  homeDepartureRpc,
+  tenureRpc,
+  type LifeEvent,
+} from "./shared/contracts.js";
 import { embeddedWorldWords, type WorldWords } from "./server/world-words.js";
 import { homedir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
@@ -59,11 +66,18 @@ import {
 } from "./server/notes-schedule.js";
 import { createNotesStore, createNotesWriter, type NotesStore } from "./server/notes-writer.js";
 import { createLocalSchedules, type LocalSchedules } from "./server/local-schedules.js";
+import {
+  DUTY_SCHEDULE,
+  createDutyService,
+  dutiesFileStore,
+  type DutiesFile,
+} from "./server/duty-service.js";
 import { createOffice } from "./server/office.js";
 import { createPaseoHolder } from "./server/paseo-holder.js";
 import {
   boardsFile,
   chatFile,
+  dutiesFile,
   hostSkillFolders,
   incidentsFile,
   notesWriterFile,
@@ -77,6 +91,8 @@ import {
   cleanupRpc,
   clearDoneRpc,
   deleteRpc,
+  dutiesSaveRpc,
+  dutyActedRpc,
   incidentsDismissRpc,
   janitorRpc,
   machineSubscription,
@@ -107,6 +123,8 @@ export interface OfficePluginDeps {
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
   liftFile: LifeFile<LiftKept>;
+  /** The owner's duty list. */
+  dutiesFile: LifeFile<DutiesFile>;
   /** The daemon's environment: the trackers' tokens are read from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -136,6 +154,16 @@ export interface MachineHost {
   sleep(ms: number): Promise<void>;
 }
 
+/** `zone`, or `hostTimeZone` when this host's Intl does not know it. */
+function knownZone(zone: string, hostTimeZone: string): string {
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return zone;
+  } catch {
+    return hostTimeZone;
+  }
+}
+
 /** Why a turn did not complete, for the notes writer; null for one that did. */
 function turnProblem(outcome: PluginTurnOutcome): string | null {
   switch (outcome.kind) {
@@ -156,6 +184,7 @@ export function createOfficePlugin(
   const { log } = deps;
   const holder = createPaseoHolder();
   const hub = createHub(liveHubPorts(holder, deps.clock, log));
+  hub.setBrand(hostBrand({}, deps.env));
   const office = createOffice({
     store: deps.store,
     clock: deps.clock,
@@ -230,6 +259,23 @@ export function createOfficePlugin(
     changed: (state) => hub.setNotes({ ...state, scheduleError: notesSchedule.error() }),
     log,
   });
+  // The duty list, posted on the duty board at 08:00 in the notes' zone, and caught up at the
+  // start and at each save. A zone that cannot be read, or that Intl does not know, is the host's.
+  const duties = createDutyService({
+    file: deps.dutiesFile,
+    board: office,
+    schedules: deps.schedules,
+    zone: () =>
+      readHostSettings().then(
+        (values) => knownZone(notesTimeZone(values, deps.hostTimeZone), deps.hostTimeZone),
+        () => deps.hostTimeZone,
+      ),
+    now: () => deps.clock.now(),
+    listed: (list) => office.setDuties(list),
+    changed: (state) => hub.setDuties(state),
+    log,
+  });
+  void duties.start();
   // Every 5 minutes while a tracker is on; it follows the settings as the 8:00 schedule does.
   const incidentsSchedule = createIncidentsSchedule({ schedules: deps.schedules, log });
   // The check's last state, kept so a save that changes the schedule's error pushes it again.
@@ -310,12 +356,14 @@ export function createOfficePlugin(
   // then the chat call waits, and a snapshot has no chat.
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
+  const chatPorts = liveChatPorts(holder);
   async function startChat(): Promise<void> {
     const service = await createChatService({
       store: deps.chatStore,
+      lobbyPosts: office.lobbyPosts,
       clock: deps.clock,
       tr: chatT,
-      ...liveChatPorts(holder),
+      ...chatPorts,
       emit: (change) => hub.chatChange(change),
       log,
     });
@@ -326,14 +374,20 @@ export function createOfficePlugin(
   const chatReady = startChat().catch((error: unknown) =>
     log(`[office] chat unavailable: ${errorMessage(error)}`),
   );
+  let agentToolsOn = false;
+  void holder.wait().then(() => office.setPickupEnabled(agentToolsOn));
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {
+    agentToolsOn = false;
+    office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
     notesSchedule.fail(message);
     incidentsSchedule.fail(message);
     hub.setNotes({ ...writer.state(), scheduleError: notesSchedule.error() });
     pushIncidents();
+    // The duty board's zone is then the host's, so its 8:00 run still comes.
+    void duties.settingsChanged();
   }
   async function followSettings(
     state: PluginSettingsState<typeof officeHostSettings.schema>,
@@ -342,8 +396,12 @@ export function createOfficePlugin(
       settingsUnreadable(state.error);
       return;
     }
+    hub.setBrand(hostBrand(state.values, deps.env));
+    agentToolsOn = state.values.agentTools;
+    office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
+    await duties.settingsChanged();
     // The writer reads the folder again, and its push carries the schedule's error with it.
     await writer
       .settingsChanged()
@@ -444,6 +502,14 @@ export function createOfficePlugin(
     holder.remember(context.paseo);
     return guarded("pause", () => office.setWakesPaused(input.paused));
   });
+  server.handle(dutiesSaveRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("duties save", () => duties.save(input.duties));
+  });
+  server.handle(dutyActedRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("duty acted", () => office.actDuty(input.id, input.agentId));
+  });
   // The bell. A start never rejects: why none started is in the snapshot's notes.
   server.handle(notesWriteRpc, (_input, context) => {
     holder.remember(context.paseo);
@@ -477,6 +543,8 @@ export function createOfficePlugin(
     }
     await writer.start();
   });
+  // The duty board's day: what is due is posted, and done duties of earlier days leave.
+  const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
   );
@@ -509,6 +577,13 @@ export function createOfficePlugin(
     });
   });
   server.handle(streetSubscription, (_input, context) => streets.attach(context));
+  const archiveDeparture = createDepartureArchiver(() => hub.read());
+  server.handle(homeDepartureRpc, (input, context) =>
+    guarded("home departure", async () => {
+      holder.remember(context.paseo);
+      return { archived: await archiveDeparture(context.paseo, input.agentId, input.idleSince) };
+    }),
+  );
   server.handle(tenureRpc, async (input, context) => {
     holder.remember(context.paseo);
     return (await lifeReady)?.write(input) ?? { ok: false };
@@ -545,6 +620,16 @@ export function createOfficePlugin(
         holder.remember(context.paseo);
         office.noteAgent(agent);
         office.turnEnded(agent.id);
+        if (outcome.kind === "completed" && turnId !== null) {
+          await office
+            .checkCompletion(
+              agent.id,
+              async () => (await chatPorts.readTurn(agent.id, turnId)).text,
+            )
+            .catch((error: unknown) =>
+              log(`[office] lobby completion check failed: ${errorMessage(error)}`),
+            );
+        }
         await (
           await lifeReady
         )?.turnEnded(agent.id, async () => {
@@ -614,6 +699,7 @@ export function createOfficePlugin(
     stopWatchingWeather();
     weather.stop();
     stopNotesRuns();
+    stopDutyRuns();
     stopIncidentsRuns();
     deps.schedules.stop();
     for (const remove of removeHooks) remove();
@@ -625,7 +711,7 @@ export function createOfficePlugin(
     await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
     await ssh.stop();
-    office.stop();
+    await office.stop();
     // A chat still loading would start its clock after this stop.
     await chatReady;
     stopWatching?.();
@@ -648,6 +734,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
+    dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),

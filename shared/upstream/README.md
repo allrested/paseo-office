@@ -1,3 +1,1 @@
-`chat-engine.js` and `chat.js` are my-office's files, unchanged, under its MIT licence
-([vendor/my-office/LICENSE](../../vendor/my-office/LICENSE)). The two `.d.ts` files beside them are
-this plugin's. [vendor/SOURCES.md](../../vendor/SOURCES.md) says how they are taken.
+The team chat engine, prompt coach and English chat strings come from my-office under its [MIT licence](../../vendor/my-office/LICENSE). The adjacent `.d.ts` files describe the APIs the plugin uses. [Import details](../../vendor/SOURCES.md)

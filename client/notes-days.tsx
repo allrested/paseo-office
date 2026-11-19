@@ -8,7 +8,7 @@ export const NOTES_DAYS_LABEL = "Stand-up days";
 const HINT = "The days of the 8:00 run.";
 const NO_DAY_HINT = "No day chosen: nothing runs at 8:00. The bell still starts the notes.";
 /** By weekday number, 0 for Sunday: each button's name; its pill shows the first three letters. */
-const DAY_NAMES = [
+export const DAY_NAMES = [
   "Sunday",
   "Monday",
   "Tuesday",

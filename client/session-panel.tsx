@@ -1,12 +1,5 @@
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
+import { AppearanceEditor } from "./agent-appearance.js";
+import { useCallback, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import {
   Text,
   View,
@@ -20,22 +13,26 @@ import { agentTitle, answerableInOffice } from "../shared/model.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
 import { enterSends } from "./chat-text.js";
-import type { ConversationRow } from "./conversation-model.js";
 import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
+import {
+  SessionButton,
+  SessionDetailTabs,
+  SessionIdentity,
+  SubagentRow,
+  type SessionDetailTab,
+} from "./session-panel-detail.js";
 import {
   ANSWER_IN_WORKSPACE,
   CANNOT_ANSWER_HERE,
   EARLIER_FAILED,
   LOADING,
-  NOTHING_SAID,
   SENDING_DENIES,
   UNLISTED_LINE,
   composerPlaceholder,
-  rowLabel,
-  statusLine,
 } from "./session-text.js";
+import { SessionTranscript } from "./session-transcript.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
 import { useConversation, type Conversation } from "./use-conversation.js";
@@ -61,95 +58,60 @@ export interface SessionPanelProps {
   /** Leaves the office for the agent's workspace; absent where the host cannot. */
   onOpenWorkspace: (() => void) | undefined;
   onClose(): void;
+  /** The workspace dialog already provides a close control. */
+  hideClose?: boolean;
+  subagents?: readonly OfficeAgent[];
+  onOpenSubagent?(id: string): void;
 }
 
 type KeyPress = NativeSyntheticEvent<
   TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean }
 >;
 
-interface HeaderProps {
-  agent: OfficeAgent | null;
-  room: string | null;
-  onOpenWorkspace: (() => void) | undefined;
-  onClose(): void;
-  styles: OfficeStyles;
-}
-
-function Header({ agent, room, onOpenWorkspace, onClose, styles }: HeaderProps) {
+function Header({
+  agent,
+  room,
+  onOpenWorkspace,
+  onClose,
+  hideClose,
+  styles,
+}: Pick<
+  SessionPanelProps,
+  "agent" | "room" | "onOpenWorkspace" | "onClose" | "hideClose" | "styles"
+>) {
+  const [editing, setEditing] = useState(false);
+  const edit = useCallback(() => setEditing(true), []);
+  const closeEditor = useCallback(() => setEditing(false), []);
   return (
-    <View style={styles.sessionHead}>
-      {agent === null ? (
-        <Text style={styles.muted}>{UNLISTED_LINE}</Text>
-      ) : (
-        <>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {agentTitle(agent)}
-          </Text>
-          <Text style={styles.chatMeta}>{statusLine(agent, room)}</Text>
-        </>
-      )}
-      <View style={styles.actions}>
-        {onOpenWorkspace ? (
-          <ActionButton
-            label="Open in workspace"
-            pendingLabel="Opening..."
-            onPress={onOpenWorkspace}
-            styles={styles}
-          />
-        ) : null}
-        <ActionButton label="Close" pendingLabel="Closing..." onPress={onClose} styles={styles} />
+    <View style={styles.sessions.deskHead}>
+      <View style={styles.sessions.identityRow}>
+        {agent === null ? (
+          <View style={styles.columnBody}>
+            <Text style={styles.muted}>{UNLISTED_LINE}</Text>
+          </View>
+        ) : (
+          <SessionIdentity agent={agent} room={room} styles={styles} />
+        )}
+        {agent && (
+          <SessionButton label="Customize agent" icon="Pencil" onPress={edit} styles={styles} />
+        )}
+        {agent && editing && (
+          <AppearanceEditor key={agent.id} agent={agent} styles={styles} close={closeEditor} />
+        )}
+        {!hideClose && <SessionButton label="Close" icon="X" onPress={onClose} styles={styles} />}
       </View>
+      {onOpenWorkspace && (
+        <SessionButton
+          label="Open in workspace"
+          icon="ArrowUpRight"
+          caption
+          onPress={onOpenWorkspace}
+          styles={styles}
+        />
+      )}
     </View>
   );
 }
-
-interface RowProps {
-  row: ConversationRow;
-  name: string;
-  styles: OfficeStyles;
-}
-
-/** The rows are new objects each time the list is read, so a row is compared by what it shows. */
-function sameRow(before: RowProps, after: RowProps): boolean {
-  const [a, b] = [before.row, after.row];
-  return (
-    before.name === after.name &&
-    before.styles === after.styles &&
-    a.kind === b.kind &&
-    a.key === b.key &&
-    a.text === b.text &&
-    (a.kind !== "notice" || (b.kind === "notice" && a.tone === b.tone))
-  );
-}
-
-/** One line of the conversation; a streamed piece redraws only the row it changed. */
-const Row = memo(function Row({ row, name, styles }: RowProps) {
-  const label = rowLabel(row, name);
-  if (row.kind === "tool") {
-    return (
-      <Text accessibilityLabel={label} selectable numberOfLines={1} style={styles.sessionTool}>
-        {row.text}
-      </Text>
-    );
-  }
-  const danger = row.kind === "notice" && row.tone === "danger";
-  let words = styles.chatText;
-  if (row.kind === "notice") words = danger ? styles.bannerText : styles.chatMeta;
-  return (
-    <View
-      accessible
-      accessibilityLabel={label}
-      style={row.kind === "you" ? styles.sessionRowYou : styles.sessionRow}
-    >
-      {row.kind === "you" || row.kind === "agent" ? (
-        <Text style={styles.chatName}>{row.kind === "you" ? "You" : name}</Text>
-      ) : null}
-      <Text selectable style={words}>
-        {row.text}
-      </Text>
-    </View>
-  );
-}, sameRow);
 
 function Alert({ text, styles }: { text: string; styles: OfficeStyles }) {
   return (
@@ -162,13 +124,15 @@ function Alert({ text, styles }: { text: string; styles: OfficeStyles }) {
 }
 
 interface RowsProps {
+  appearance?: OfficeAgent["appearance"];
   conversation: Conversation;
+  steps: boolean;
   name: string;
   styles: OfficeStyles;
 }
 
 /** What the list holds: its state while it has none, else Show earlier and the rows. */
-function Rows({ conversation, name, styles }: RowsProps): ReactNode {
+function Rows({ conversation, steps, name, appearance, styles }: RowsProps): ReactNode {
   const { status, rows } = conversation;
   if (status === "loading") return <Text style={styles.muted}>{LOADING}</Text>;
   if (status === "error") {
@@ -198,10 +162,13 @@ function Rows({ conversation, name, styles }: RowsProps): ReactNode {
           />
         </View>
       ) : null}
-      {rows.length === 0 ? <Text style={styles.muted}>{NOTHING_SAID}</Text> : null}
-      {rows.map((row) => (
-        <Row key={row.key} row={row} name={name} styles={styles} />
-      ))}
+      <SessionTranscript
+        appearance={appearance}
+        rows={rows}
+        steps={steps}
+        name={name}
+        styles={styles}
+      />
     </>
   );
 }
@@ -254,11 +221,20 @@ function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps)
   const [error, setError] = useState<string | null>(null);
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const focus = useCallback(() => setFocused(true), []);
+  const blur = useCallback(() => setFocused(false), []);
+  const shell = useMemo(
+    () => [styles.sessions.replyShell, focused && styles.sessions.replyFocused],
+    [styles, focused],
+  );
   const agentId = agent.id;
   const send = useCallback(async () => {
     const sent = text.trim();
     if (sent === "" || sending.current) return;
     sending.current = true;
+    setPending(true);
     try {
       // A reply to a working agent joins its turn: a plain send makes the daemon interrupt it.
       await actions.send(agentId, sent, { activeTurnBehavior: "steer" });
@@ -268,6 +244,7 @@ function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps)
       setError(failureText("Send", failure));
     }
     sending.current = false;
+    setPending(false);
   }, [text, setText, actions, agentId]);
   const stop = useCallback(() => actions.cancel?.(agentId), [actions, agentId]);
   const onKeyPress = useCallback(
@@ -281,37 +258,39 @@ function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps)
     [touchScreen, send],
   );
   return (
-    <View style={styles.sessionComposer}>
-      <TextInput
-        accessibilityLabel="Message"
-        placeholder={composerPlaceholder(agent)}
-        value={text}
-        onChangeText={setText}
-        onKeyPress={onKeyPress}
-        multiline
-        style={styles.input}
-      />
-      {agent.permissions.length > 0 ? (
-        <Text style={styles.composerWarning}>{SENDING_DENIES}</Text>
-      ) : null}
-      {error === null ? null : (
+    <View style={styles.sessions.deskComposer}>
+      <View style={shell}>
+        <TextInput
+          accessibilityLabel="Message"
+          placeholder={composerPlaceholder(agent)}
+          placeholderTextColor={styles.placeholderColor}
+          value={text}
+          onChangeText={setText}
+          onKeyPress={onKeyPress}
+          onFocus={focus}
+          onBlur={blur}
+          multiline
+          numberOfLines={Math.min(4, text.split("\n", 4).length)}
+          style={styles.sessions.replyInput}
+        />
+        {agent.status === "running" && actions.cancel !== null && (
+          <ActionButton label="Stop" pendingLabel="Stopping..." onPress={stop} styles={styles} />
+        )}
+        <SessionButton
+          label={pending ? "Sending..." : "Send"}
+          icon={pending ? "Ellipsis" : "ArrowUp"}
+          onPress={send}
+          disabled={text.trim() === "" || pending}
+          primary
+          styles={styles}
+        />
+      </View>
+      {agent.permissions.length > 0 && <Text style={styles.composerWarning}>{SENDING_DENIES}</Text>}
+      {error !== null && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {error}
         </Text>
       )}
-      <View style={styles.actions}>
-        <ActionButton
-          label="Send"
-          pendingLabel="Sending..."
-          onPress={send}
-          disabled={text.trim() === ""}
-          primary
-          styles={styles}
-        />
-        {agent.status === "running" && actions.cancel !== null ? (
-          <ActionButton label="Stop" pendingLabel="Stopping..." onPress={stop} styles={styles} />
-        ) : null}
-      </View>
     </View>
   );
 }
@@ -327,8 +306,12 @@ export function SessionPanel({
   layout,
   onOpenWorkspace,
   onClose,
+  hideClose,
+  subagents,
+  onOpenSubagent,
 }: SessionPanelProps) {
   const conversation = useConversation(agentId);
+  const [tab, setTab] = useState<SessionDetailTab>("chat");
   const { scroller, onScroll, followEnd } = useFollowEnd();
   const touchScreen = useMemo(
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
@@ -342,6 +325,13 @@ export function SessionPanel({
         room={room}
         onOpenWorkspace={onOpenWorkspace}
         onClose={onClose}
+        hideClose={hideClose}
+        styles={styles}
+      />
+      <SessionDetailTabs
+        tab={tab}
+        setTab={setTab}
+        childCount={onOpenSubagent ? subagents?.length : undefined}
         styles={styles}
       />
       <ScrollView
@@ -353,7 +343,24 @@ export function SessionPanel({
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       >
-        <Rows conversation={conversation} name={name} styles={styles} />
+        {tab === "subagents" && subagents && onOpenSubagent ? (
+          <>
+            {subagents.length === 0 && (
+              <Text style={styles.muted}>No subagents in this session.</Text>
+            )}
+            {subagents.map((child) => (
+              <SubagentRow key={child.id} agent={child} onOpen={onOpenSubagent} styles={styles} />
+            ))}
+          </>
+        ) : (
+          <Rows
+            appearance={agent?.appearance}
+            conversation={conversation}
+            steps={tab === "steps"}
+            name={name}
+            styles={styles}
+          />
+        )}
       </ScrollView>
       {agent === null ? null : (
         <>

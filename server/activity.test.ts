@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Checklists } from "../shared/contracts.js";
+import type { Checklists, ChecklistCounts } from "../shared/contracts.js";
 import {
   ACTIVITY_INTERVAL_MS,
   callsIn,
@@ -395,7 +395,8 @@ test("a checklist is the newest todo item's unfinished steps", () => {
       ],
     },
   ];
-  expect(readChecklist(items)).toEqual([
+  expect(readChecklist(items)?.progress).toEqual({ completed: 3, total: 5 });
+  expect(readChecklist(items)?.steps).toEqual([
     { text: "Run typecheck", status: "in_progress" },
     { text: "Open the PR", status: "pending" },
   ]);
@@ -403,12 +404,15 @@ test("a checklist is the newest todo item's unfinished steps", () => {
 
 test("a tail without a todo item has no checklist; an all-finished one is empty", () => {
   expect(readChecklist([{ type: "assistant_message" }])).toBeNull();
-  expect(readChecklist([{ type: "todo", items: [{ text: "x", completed: true }] }])).toEqual([]);
+  expect(readChecklist([{ type: "todo", items: [{ text: "x", completed: true }] }])).toEqual({
+    steps: [],
+    progress: { completed: 1, total: 1 },
+  });
 });
 
 test("bad steps are skipped, text is one line of 200 at most, 50 steps at most", () => {
   const long = "a".repeat(5000);
-  const steps = readChecklist([
+  const report = readChecklist([
     {
       type: "todo",
       items: [
@@ -421,12 +425,17 @@ test("bad steps are skipped, text is one line of 200 at most, 50 steps at most",
       ],
     },
   ]);
+  const steps = report?.steps;
+  expect(report?.progress).toEqual({ completed: 0, total: 82 });
   expect(steps?.[0]).toEqual({ text: "First", status: "pending" });
   expect(steps?.[1].text).toBe(`${"a".repeat(199)}…`);
   expect(steps).toHaveLength(50);
   // The cap counts the steps kept: the two cut ones and the first 48 short ones.
   expect(steps?.at(-1)).toEqual({ text: "s47", status: "pending" });
-  expect(readChecklist([{ type: "todo", items: "nope" }])).toEqual([]);
+  expect(readChecklist([{ type: "todo", items: "nope" }])).toEqual({
+    steps: [],
+    progress: { completed: 0, total: 0 },
+  });
 });
 
 interface PollerHarness {
@@ -437,6 +446,7 @@ interface PollerHarness {
   changes: Record<string, string>[];
   steps: Record<string, ActivityStep>[];
   checklists: Checklists[];
+  counts: ChecklistCounts[];
   logs: string[];
   poller: ActivityPoller;
 }
@@ -447,6 +457,7 @@ function startHarness(running: string[], tails: Map<string, ActivityItem[]>): Po
   const changes: Record<string, string>[] = [];
   const steps: Record<string, ActivityStep>[] = [];
   const checklists: Checklists[] = [];
+  const counts: ChecklistCounts[] = [];
   const logs: string[] = [];
   const poller = startActivityPoller({
     running: () => running,
@@ -458,13 +469,14 @@ function startHarness(running: string[], tails: Map<string, ActivityItem[]>): Po
     },
     timers: clock,
     log: (message) => logs.push(message),
-    onChange: (activity, doing, report) => {
+    onChange: (activity, doing, report, progress) => {
+      counts.push({ ...progress });
       changes.push({ ...activity });
       steps.push({ ...doing });
       checklists.push({ ...report });
     },
   });
-  return { clock, running, tails, reads, changes, steps, checklists, logs, poller };
+  return { clock, running, tails, reads, changes, steps, checklists, counts, logs, poller };
 }
 
 test("reads each running agent once per interval and reports only changes", async () => {
@@ -725,4 +737,21 @@ test("a read that fails after stop is not logged and changes nothing", async () 
   expect(logs).toEqual([]);
   expect(changes).toEqual([]);
   expect(clock.pending()).toBe(0);
+});
+
+test("a completion beyond the step text cap still updates the total", async () => {
+  const items = Array.from({ length: 81 }, (_, i) => ({ text: `Step ${i}`, completed: false }));
+  const tails = new Map([["a", [{ type: "todo", items }]]]);
+  const h = startHarness(["a"], tails);
+  await settle();
+  items[80].completed = true;
+  h.clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(h.checklists[0]?.a).toHaveLength(50);
+  expect(h.checklists[0]).toEqual(h.checklists[1]);
+  expect(h.counts).toEqual([
+    { a: { completed: 0, total: 81 } },
+    { a: { completed: 1, total: 81 } },
+  ]);
+  h.poller.stop();
 });

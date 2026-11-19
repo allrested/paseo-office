@@ -287,3 +287,14 @@ test("the row's label", () => {
     "Ali: Idle, context 50%",
   );
 });
+
+test("a permission's waiting time comes from its own timestamp", () => {
+  const waiting = row({
+    status: "running",
+    promptedAt: "2026-11-16T09:00:00Z",
+    permissionSince: "2026-11-17T09:00:00Z",
+    permissions: [permission()],
+  });
+  expect(timeText(waiting, AT + 5000)).toBe("Waiting <1m");
+  expect(timeText(waiting, AT + 180000)).toBe("Waiting 3m");
+});

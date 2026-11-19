@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
-import { notesWriteRpc, worldRpc } from "../../shared/contracts.js";
+import { homeDepartureRpc, notesWriteRpc, worldRpc } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { isWordsLanguage, type SceneLanguage } from "../../shared/scene-language.js";
 import { failureText } from "../action-button.js";
@@ -12,6 +12,8 @@ import { sharedWorldLoader } from "./world-loader.js";
 
 /** What the scene's callbacks and its start read: always the last render's. */
 export interface WorldLatest {
+  scene?: WorldStartOptions["scene"];
+  night?: boolean | undefined;
   street?: { kit: string | null } | null;
   model: OfficeModel;
   theme: PluginTheme;
@@ -21,11 +23,16 @@ export interface WorldLatest {
   onSelectBoard(roomId: string): void;
   onOpenMachine(): void;
   onOpenResources: (() => void) | undefined;
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   onOpenLibrary(): void;
   onOpenNotes(): void;
   onOpenIncidents(): void;
+  /** The pantry's duty board: the duty board's editor. */
+  onOpenDuties?(): void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?(id: string, agentId: string): void;
   onBell(): void | Promise<void>;
+  onWentHome?: WorldStartOptions["onWentHome"];
   onLife?: WorldStartOptions["onLife"];
   onTenure?: WorldStartOptions["onTenure"];
   onSound(on: boolean): void;
@@ -41,6 +48,7 @@ export function worldStartOptions(
   latest: { readonly current: WorldLatest },
   extras: {
     focus(): void;
+    onToggleFullscreen?: () => void;
     brand: WorldBrand;
     plan: WorldPlan;
     photo?: false;
@@ -51,9 +59,11 @@ export function worldStartOptions(
   const { focus } = extras;
   const { colors } = latest.current.theme;
   return {
+    ...(latest.current.scene ? { scene: latest.current.scene } : {}),
     ...(latest.current.street ? { street: latest.current.street } : {}),
     plan: extras.plan,
-    dark: isDarkTheme(colors),
+    ...(extras.onToggleFullscreen ? { onToggleFullscreen: extras.onToggleFullscreen } : {}),
+    dark: latest.current.night ?? isDarkTheme(colors),
     colors,
     brand: extras.brand,
     ...(isWordsLanguage(extras.language) && extras.words !== undefined
@@ -92,16 +102,16 @@ export function worldStartOptions(
             latest.current.onOpenResources?.();
           },
         }),
-    // Given only where the office can open a session (the agent card's "Open session"): otherwise
-    // a person under E is chosen, as a click does. The keyboard goes with the session.
-    ...(latest.current.onOpenSession === undefined
+    // Give the workspace the keyboard when the walker interacts with a person.
+    ...(latest.current.onOpenAgentWorkspace === undefined
       ? {}
       : {
           onOpen: (agentId: string) => {
             focus();
-            latest.current.onOpenSession?.(agentId);
+            latest.current.onOpenAgentWorkspace?.(agentId);
           },
         }),
+    onWentHome: (id, idleSince) => latest.current.onWentHome?.(id, idleSince),
     onLife: (kind, vars) => latest.current.onLife?.(kind, vars),
     onTenure: (op) => latest.current.onTenure?.(op),
     onBell: () => void latest.current.onBell(),
@@ -114,6 +124,12 @@ export function worldStartOptions(
       focus();
       latest.current.onOpenIncidents();
     },
+    onDuties: () => {
+      focus();
+      latest.current.onOpenDuties?.();
+    },
+    // (nothing of Paseo's opens: the keyboard stays in the office)
+    onDutyDone: (id, agentId) => latest.current.onDutyActed?.(id, agentId),
     onProblem: (message) => latest.current.onProblem(message),
   };
 }
@@ -151,6 +167,19 @@ export function useWorldScript(
     };
   }, [fetchScript, enabled]);
   return loadState.status === "ready" ? loadState.script : null;
+}
+
+export function useHomeDeparture() {
+  const archive = useRpc(homeDepartureRpc);
+  const toast = useToast();
+  return useCallback(
+    (agentId: string, idleSince: string) => {
+      void archive({ agentId, idleSince }).catch((error) =>
+        toast.error(failureText("Archive the departed session", error)),
+      );
+    },
+    [archive, toast],
+  );
 }
 
 /**

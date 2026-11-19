@@ -222,7 +222,8 @@ export function ColumnTabs({
       style={vertical ? styles.columnTabsVertical : styles.columnTabs}
     >
       {COLUMN_TABS.map((each) => {
-        if (hideSessions && each.tab === "sessions") return null;
+        // In the desktop fullscreen layout Sessions has its own rail and Team chat its own toolbar button.
+        if (hideSessions && (each.tab === "sessions" || each.tab === "chat")) return null;
         let count: string | null = null;
         let countNote = "new";
         if (each.tab === "attention") count = badges.attention;

@@ -37,3 +37,31 @@ test("the lift's sticker does not say the name of the scene's source", () => {
     expect(ours).toContain(`'${key}'`);
   }
 });
+
+test("each hand-changed line of the duty board's files carries its own PASEO marker", () => {
+  const changed: Record<string, string[]> = {
+    "people/duty.js": [
+      "import { BOARD_AT, SINK, drawBoard, setPile }",
+      "const J = job = { chore, w, owed, stage: 'up', held: null, left: 0, given };",
+      "what: given ? given.name :",
+      "if (chore !== 'board') say(",
+      "({ cups, trash, plants, table, board })[chore](J);",
+      "job = null; if (line) say(w, line, 3500);",
+    ],
+    "world/props/duty-board.js": [
+      "g.fillText(b.none || tr(",
+      "const y = 92 + i * step;",
+      "if (r.chore) icon(",
+      "fitText(g, label, 196); g.fillText(label, 60, y);",
+      "const name = r.name || '—'; fitText(g, name, 150);",
+      "g.fillText(r.label ? '✓' :",
+    ],
+  };
+  for (const [file, snippets] of Object.entries(changed)) {
+    const lines = read(file).split("\n");
+    for (const snippet of snippets) {
+      const line = lines.find((candidate) => candidate.includes(snippet));
+      expect(line, `${file}: ${snippet}`).toMatch(/\/\/ PASEO\b/);
+    }
+  }
+});

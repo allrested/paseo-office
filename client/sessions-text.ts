@@ -1,3 +1,5 @@
+import type { ChecklistProgress, OfficeAgent } from "../shared/contracts.js";
+import { contextPercent } from "./context-text.js";
 import { ACTIVITY_KINDS } from "../shared/names.js";
 import { eventText } from "./activity-feed-text.js";
 import { agentTask, agentTitle } from "../shared/model.js";
@@ -137,4 +139,20 @@ export function avatarInitials(name: string): string {
       .map((word) => Array.from(word)[0])
       .join("") || "•"
   ).toUpperCase();
+}
+
+/** Prefer reported task completion; a provider's context percentage has its own label and color. */
+export function sessionMeter(agent: OfficeAgent, progress?: ChecklistProgress) {
+  if (progress && progress.total > 0) {
+    const { completed, total } = progress;
+    return {
+      kind: "tasks" as const,
+      label: `${completed}/${total} tasks`,
+      percent: Math.min(100, Math.round((100 * completed) / total)),
+    };
+  }
+  const percent = contextPercent(agent);
+  return percent === null
+    ? null
+    : { kind: "context" as const, label: `Context ${percent}%`, percent };
 }

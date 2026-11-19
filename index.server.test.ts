@@ -23,6 +23,7 @@ import {
   type IncidentsStore,
 } from "./server/incidents-store.js";
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
+import type { DutiesFile } from "./server/duty-service.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -349,8 +350,12 @@ function setup(
     env?: NodeJS.ProcessEnv;
     fetchFn?: typeof fetch;
     chatStore?: ChatStore;
+    /** The kept duty list; an empty one by default, so no duty takes a post id. Null: none kept. */
+    duties?: DutiesFile | null;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
     server?: (base: PluginServerContext) => PluginServerContext;
+    /** The clock's start; Wednesday 11 November 2026, 12:00 in Riyadh by default. */
+    start?: number;
   } = {},
 ) {
   const recorded: Recorded = {
@@ -371,7 +376,7 @@ function setup(
   const notesStore = memoryNotesStore();
   const incidentsStore = memoryIncidentsStore();
   const chatStore = options.chatStore ?? memoryChatStore();
-  const clock = createFakeClock(Date.parse("2026-11-11T09:00:00.000Z"));
+  const clock = createFakeClock(options.start ?? Date.parse("2026-11-11T09:00:00.000Z"));
   const context = fakeContext(statuses, sent, writers, directory);
   const baseServer = fakeServer(recorded, read);
   const stop = createOfficePlugin(options.server?.(baseServer) ?? baseServer, {
@@ -381,6 +386,11 @@ function setup(
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
     tenureFile: { load: async () => null, save: async () => {} },
+    dutiesFile: {
+      load: async () =>
+        options.duties === undefined ? { version: 1, duties: [] } : options.duties,
+      save: async () => {},
+    },
     liftFile: { load: async () => null, save: async () => {} },
     env: options.env ?? {},
     clock,
@@ -500,6 +510,8 @@ test("settings that are not ready are logged, and both schedules' cards show why
   await settle();
   const message = "The office's settings cannot be read: notesFolder: Required";
   expect(logs).toContain(`[office] ${message}`);
+  // The duty board's zone is then the host's: its 8:00 run still comes.
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
   const events: { type: string; state?: { notes?: unknown; incidents?: unknown } }[] = [];
   const leaving = new AbortController();
   const done = recorded.handlers.get("office.state")?.({}, {
@@ -755,14 +767,17 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.delete.request",
     "office.board.clear_done.request",
     "office.set_wakes_paused.request",
+    "office.duties.save.request",
+    "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
     "office.chat.request",
     "office.life",
     "office.street.events",
+    "office.home.departure",
     "office.tenure.request",
   ]);
-  expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "incidents"]);
+  expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "duty-board", "incidents"]);
   expect([...recorded.hooks.keys()]).toEqual([
     "agent.open.before",
     "agent.turn.after",
@@ -796,7 +811,7 @@ function openOffice(recorded: Recorded, context: PluginHandlerContext) {
   };
 }
 
-test("a chat send posts your message to an open office and the snapshot carries the chat", async () => {
+test("a group message and its no-session reply reach both the open office and the next snapshot", async () => {
   const { recorded, context, stop } = setup(async () => ON);
   await settle();
   const first = openOffice(recorded, context);
@@ -810,13 +825,24 @@ test("a chat send posts your message to an open office and the snapshot carries 
   const chat = recorded.handlers.get("office.chat.request");
   expect(await chat?.({ op: "send", text: "hello" }, context)).toEqual({ ok: true });
   expect(first.events.filter((event) => event.type === "chat")).toMatchObject([
-    { type: "chat", change: { op: "add", message: { from: "me", text: "hello" } } },
+    { type: "chat", change: { op: "add", message: { from: "me", text: "hello", tag: "group" } } },
+    {
+      type: "chat",
+      change: {
+        op: "add",
+        message: { from: "__director", tag: "delivery", reply: { text: "hello" } },
+      },
+    },
   ]);
 
   const second = openOffice(recorded, context);
   await settle();
   expect(second.events.at(-1)?.state?.chat).toMatchObject({
-    messages: [{ kind: "sys" }, { from: "me", text: "hello" }],
+    messages: [
+      { kind: "sys" },
+      { from: "me", text: "hello" },
+      { from: "__director", tag: "delivery", reply: { text: "hello" } },
+    ],
   });
   await first.leave();
   await second.leave();
@@ -843,14 +869,14 @@ test("a turn that ends answers the chat message that named its agent, as a reply
   const chat = recorded.handlers.get("office.chat.request");
   expect(await chat?.({ op: "send", text: "@Mjd hi" }, context)).toEqual({ ok: true });
   await settle();
+  const mine = chatAdds(office.events).find((message) => message.from === "me");
   expect(sent).toEqual([
     {
       agentId: "a1",
       text: "Team chat message from you: @Mjd hi",
-      options: { activeTurnBehavior: "steer" },
+      options: { activeTurnBehavior: "steer", messageId: `office-chat-${mine!.id}` },
     },
   ]);
-  const mine = chatAdds(office.events).find((message) => message.from === "me");
 
   directory.timelines.set("a1", [
     { turnId: "t1", item: { type: "user_message", text: "Team chat message from you: @Mjd hi" } },
@@ -1181,6 +1207,37 @@ test("a writer archived by someone else frees the bell", async () => {
   await stop();
 });
 
+test("an open office receives host branding, saved overrides and cleared defaults", async () => {
+  const { recorded, context, stop } = setup(async () => NOTES, {
+    env: { PASEO_BRAND_NAME: "Host office", PASEO_BRAND_COLOR: "#224466" },
+  });
+  await settle();
+  const events: { type: string; state?: { brand?: unknown } }[] = [];
+  const leaving = new AbortController();
+  const done = recorded.handlers.get("office.state")?.({}, {
+    ...context,
+    signal: leaving.signal,
+    push: async (event: { type: string }) => {
+      if (event.type === "snapshot") events.push(event);
+    },
+  } as never);
+  try {
+    await settle();
+    const latest = () => events.at(-1)?.state?.brand;
+    expect(latest()).toEqual({ name: "Host office", color: "#224466" });
+    for (const brandName of ["Studio", ""]) {
+      const state = { ...NOTES, values: { ...NOTES.values, brandName } } as SettingsState;
+      await Promise.all([...recorded.listeners].map((listener) => listener(state)));
+      await settle();
+      expect(latest()).toEqual({ name: brandName || "Host office", color: "#224466" });
+    }
+  } finally {
+    leaving.abort();
+    await done;
+    await stop();
+  }
+});
+
 test("an open office gets the notes state in its snapshot, and a schedule that fails after a save", async () => {
   const { recorded, context, stop } = setup(async () => NOTES);
   await settle();
@@ -1469,5 +1526,91 @@ test("a tenure write the ledger does not hold is refused", async () => {
   const { recorded, context, stop } = setup(async () => ON);
   const write = recorded.handlers.get("office.tenure.request");
   expect(await write?.({ op: "official", name: "api" }, context as never)).toEqual({ ok: false });
+  await stop();
+});
+
+test("a host without a duty list posts the pantry chores at 08:00; a save and the 3D office's report change the board", async () => {
+  const { recorded, context, stop } = setup(async () => ON, { duties: null });
+  await settle();
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = () =>
+    office.events.findLast((event) => event.type === "snapshot")?.state as
+      | {
+          duties?: { duties: { name: string }[]; day: string | null };
+          boards: Record<string, { id: string; state?: string; claimedBy?: string }[]>;
+        }
+      | undefined;
+  expect(snapshot()?.duties?.day).toBe("2026-11-11");
+  expect(snapshot()?.duties?.duties.map((duty) => duty.name)).toEqual([
+    "Wash the cups",
+    "Take out the bin",
+    "Water the plants",
+    "Wipe the tables",
+  ]);
+  expect(snapshot()?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
+  const save = recorded.handlers.get("office.duties.save.request");
+  expect(await save?.({ duties: [{ name: "", instructions: "", days: [] }] }, context)).toEqual({
+    ok: false,
+    error: "Unable to save: duty 1 has no name",
+  });
+  expect(
+    await save?.({ duties: [{ id: "cups", name: "Mugs", instructions: "", days: [3] }] }, context),
+  ).toEqual({ ok: true });
+  await settle();
+  expect(snapshot()?.duties?.duties.map((duty) => duty.name)).toEqual(["Mugs"]);
+  const acted = recorded.handlers.get("office.duty.acted.request");
+  expect(await acted?.({ id: "p1", agentId: "agent-1" }, context)).toMatchObject({
+    ok: true,
+    post: { id: "p1", state: "done", claimedBy: "agent-1" },
+  });
+  await settle();
+  const board = office.events.findLast((event) => event.type === "board") as unknown as {
+    board: string;
+    posts: { id: string; state?: string }[];
+  };
+  expect(board.board).toBe("duty");
+  expect(board.posts.map((post) => [post.id, post.state])).toEqual([["p1", "done"]]);
+  await office.leave();
+  await stop();
+});
+
+test("the duty board's 08:00 run takes the instant it was due, so a run a millisecond early posts the day", async () => {
+  const { recorded, context, stop } = setup(async () => ON, {
+    duties: null,
+    // 07:59:59.999 in Riyadh.
+    start: Date.parse("2026-11-11T04:59:59.999Z"),
+  });
+  await settle();
+  await recorded.scheduleRuns.get("duty-board")?.(Date.parse("2026-11-11T05:00:00.000Z"));
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { duties?: { day: string | null }; boards: Record<string, { id: string }[]> }
+    | undefined;
+  expect(snapshot?.duties?.day).toBe("2026-11-11");
+  expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
+  await office.leave();
+  await stop();
+});
+
+test("a notes time zone the host does not know leaves the duty board on the host's zone", async () => {
+  const unknownZone: SettingsState = {
+    ...ON,
+    values: { ...ON.values, notesTimeZone: "Mars/Olympus_Mons" },
+  };
+  const { recorded, context, logs, stop } = setup(async () => unknownZone, { duties: null });
+  await settle();
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
+  expect(logs.filter((line) => line.includes("duty board"))).toEqual([]);
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { duties?: { day: string | null }; boards: Record<string, { id: string }[]> }
+    | undefined;
+  expect(snapshot?.duties?.day).toBe("2026-11-11");
+  expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
+  await office.leave();
   await stop();
 });

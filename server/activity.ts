@@ -2,6 +2,8 @@ import {
   CHECKLIST_STEP_MAX,
   CHECKLIST_TEXT_MAX,
   type ChecklistStep,
+  type ChecklistCounts,
+  type ChecklistProgress,
   type Checklists,
 } from "../shared/contracts.js";
 import type { ActivityKind, ActivityStep, TestResult } from "../shared/names.js";
@@ -248,36 +250,40 @@ export function nextStep(
 }
 
 /**
- * A step as the office sends it: its text's first line, cut to the most it sends. Null for a
- * finished step, and for one with no text to show.
+ * A step as the office sends it: its text's first line, cut to the most it sends. Finished steps contribute to the count only.
  */
-function checklistStep(entry: unknown): ChecklistStep | null {
+function checklistStep(entry: unknown): ChecklistStep | "done" | null {
   const text = field(entry, "text");
   if (typeof text !== "string") return null;
   const status = field(entry, "status");
   // Either one saying finished wins: providers do not keep the pair consistent.
   const finished = field(entry, "completed") === true || status === "completed";
-  if (finished) return null;
   const line = text.split(/[\r\n]/, 1)[0].trim();
   if (line === "") return null;
+  if (finished) return "done";
   const shown =
     line.length > CHECKLIST_TEXT_MAX ? `${line.slice(0, CHECKLIST_TEXT_MAX - 1)}…` : line;
   return { text: shown, status: status === "in_progress" ? "in_progress" : "pending" };
 }
 
 /** The unfinished steps of the newest todo item in a tail; null when the tail has none. */
-export function readChecklist(items: readonly ActivityItem[]): ChecklistStep[] | null {
+export function readChecklist(items: readonly ActivityItem[]): {
+  steps: ChecklistStep[];
+  progress: ChecklistProgress;
+} | null {
   const todo = items.findLast((item) => item.type === "todo");
   if (todo === undefined) return null;
-  if (!Array.isArray(todo.items)) return [];
-  const entries: readonly unknown[] = todo.items;
+  const entries: readonly unknown[] = Array.isArray(todo.items) ? todo.items : [];
+  const progress = { completed: 0, total: 0 };
   const steps: ChecklistStep[] = [];
   for (const entry of entries) {
     const step = checklistStep(entry);
-    if (step !== null) steps.push(step);
-    if (steps.length === CHECKLIST_STEP_MAX) break;
+    if (step === null) continue;
+    progress.total++;
+    if (step === "done") progress.completed++;
+    else if (steps.length < CHECKLIST_STEP_MAX) steps.push(step);
   }
-  return steps;
+  return { steps, progress };
 }
 
 /** What the poller knows of each running agent: its line, and its step when it is at one. */
@@ -295,7 +301,12 @@ export interface ActivityPorts {
    * steps are finished; an agent whose read failed, or whose tail has none, is absent. An agent
    * that stopped since the last round is read for this alone, once.
    */
-  onChange(activity: ActivityLines, doing: ActivitySteps, checklists: Readonly<Checklists>): void;
+  onChange(
+    activity: ActivityLines,
+    doing: ActivitySteps,
+    checklists: Readonly<Checklists>,
+    progress: Readonly<ChecklistCounts>,
+  ): void;
 }
 
 export interface ActivityPoller {
@@ -325,7 +336,7 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
   let cancel: (() => void) | null = null;
   let previous: ActivityLines = {};
   let previousSteps: ActivitySteps = {};
-  let previousChecklists = "{}";
+  let previousChecklists = "[{},{}]";
   let wasRunning: readonly string[] = [];
   // The calls each agent's last read saw, kept while the poller runs: an agent's next turn is
   // read against them too. A prompt ends the look back, so an old turn's call is never told.
@@ -336,6 +347,7 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     next: Record<string, string>,
     steps: Record<string, ActivityStep>,
     checklists: Checklists,
+    progress: ChecklistCounts,
   ): Promise<void> {
     try {
       const items = await ports.tail(agentId);
@@ -345,7 +357,10 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
       const step = nextStep(previousSteps[agentId], items, seen);
       if (step !== null) steps[agentId] = step;
       const checklist = readChecklist(items);
-      if (checklist !== null) checklists[agentId] = checklist;
+      if (checklist !== null) {
+        checklists[agentId] = checklist.steps;
+        progress[agentId] = checklist.progress;
+      }
       const calls = callsIn(items);
       // A call held back for a run's end has not been told: it stays new for the next read.
       const newest = describeStep(items, seen);
@@ -362,10 +377,17 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
 
   // An agent often ticks its last step and stops between two reads: it is read once more after
   // it stopped, for its checklist alone. A failed read leaves the checklist it had.
-  async function readStopped(agentId: string, checklists: Checklists): Promise<void> {
+  async function readStopped(
+    agentId: string,
+    checklists: Checklists,
+    progress: ChecklistCounts,
+  ): Promise<void> {
     try {
       const checklist = readChecklist(await ports.tail(agentId));
-      if (checklist !== null) checklists[agentId] = checklist;
+      if (checklist !== null) {
+        checklists[agentId] = checklist.steps;
+        progress[agentId] = checklist.progress;
+      }
     } catch (error) {
       if (!stopped) ports.log(`[office] activity of ${agentId}: ${errorMessage(error)}`);
     }
@@ -375,17 +397,18 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     const next: Record<string, string> = {};
     const steps: Record<string, ActivityStep> = {};
     const checklists: Checklists = {};
+    const progress: ChecklistCounts = {};
     const running = [...ports.running()];
     for (const agentId of running) {
       if (stopped) return;
-      await readOne(agentId, next, steps, checklists);
+      await readOne(agentId, next, steps, checklists, progress);
     }
     for (const agentId of wasRunning) {
       if (stopped) return;
-      if (!running.includes(agentId)) await readStopped(agentId, checklists);
+      if (!running.includes(agentId)) await readStopped(agentId, checklists, progress);
     }
     wasRunning = running;
-    const checklistsText = JSON.stringify(checklists);
+    const checklistsText = JSON.stringify([checklists, progress]);
     const unchanged =
       sameLines(previous, next) &&
       sameSteps(previousSteps, steps) &&
@@ -394,7 +417,7 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     previous = next;
     previousSteps = steps;
     previousChecklists = checklistsText;
-    ports.onChange(next, steps, checklists);
+    ports.onChange(next, steps, checklists, progress);
   }
 
   function runLogged(): void {

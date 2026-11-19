@@ -1,5 +1,7 @@
+import { transcriptStyles } from "./transcript-styles.js";
 import { hostStyles } from "./host-styles.js";
 import { sessionStyles } from "./session-styles.js";
+import { messengerStyles } from "./messenger-styles.js";
 import { useMemo } from "react";
 import { Platform, type TextStyle, type ViewStyle } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -14,8 +16,12 @@ export const SESSION_RAIL_MIN = 264;
 export interface OfficeStyles {
   host: ReturnType<typeof hostStyles>;
   sessions: ReturnType<typeof sessionStyles>;
+  transcript: ReturnType<typeof transcriptStyles>;
+  messenger: ReturnType<typeof messengerStyles>;
   fullscreenHeader: ViewStyle;
   headerTools: ViewStyle;
+  workspaceAction: ViewStyle;
+  workspaceAccent: string;
   headerBrand: ViewStyle;
   brandText: TextStyle;
   brandIcon: { color: string };
@@ -61,13 +67,8 @@ export interface OfficeStyles {
   columnTabsScroll: ViewStyle;
   /** An open session's tab: its pill, the button to press, and the close button beside it. */
   sessionTab: ViewStyle;
-  /** The session panel: its header, the list of rows, a tool's one line, and the composer. */
-  sessionHead: ViewStyle;
+  /** Reading width and spacing for a session transcript. */
   sessionList: ViewStyle;
-  sessionRow: ViewStyle;
-  sessionRowYou: ViewStyle;
-  sessionTool: TextStyle;
-  sessionComposer: ViewStyle;
   composerWarning: TextStyle;
   sessionTabMain: ViewStyle;
   sessionTabClose: ViewStyle;
@@ -165,6 +166,10 @@ export interface OfficeStyles {
   standupPeople: ViewStyle;
   /** The month's notes: the rest of the card's height, scrolled on its own. */
   notesScroll: ViewStyle;
+  notesMonthBar: ViewStyle;
+  notesPaper: ViewStyle;
+  notesDateStrip: ViewStyle;
+  panelHeading: TextStyle;
   /** The Contents' links to the month's entries, as a list. */
   notesLinks: ViewStyle;
   notesLinkRow: ViewStyle;
@@ -253,6 +258,17 @@ export interface OfficeStyles {
   boardPosts: ViewStyle;
   /** One post in the sheet with its buttons. */
   boardPost: ViewStyle;
+  lobbyForm: ViewStyle;
+  lobbySection: ViewStyle;
+  lobbyHeading: TextStyle;
+  lobbyRecipient: ViewStyle;
+  lobbyTask: ViewStyle;
+  lobbyTaskLine: ViewStyle;
+  /** A duty of the duty board's editor: a to-do's card with room for its fields. */
+  dutyCard: ViewStyle;
+  lobbyDelete: ViewStyle;
+  lobbyDeleteText: TextStyle;
+  lobbyConfirm: ViewStyle;
   post: ViewStyle;
   postMeta: TextStyle;
   postText: TextStyle;
@@ -281,6 +297,9 @@ export interface OfficeStyles {
   pickerSearch: TextStyle;
   /** The New agent form, and its list of workspaces: it scrolls inside the form past this height. */
   newAgentForm: ViewStyle;
+  newAgentHeader: ViewStyle;
+  newAgentFooter: ViewStyle;
+  newAgentSelector: ViewStyle;
   newAgentWorkspaces: ViewStyle;
   /** A text setting's field, as the search field. */
   fieldInput: TextStyle;
@@ -344,10 +363,8 @@ export interface OfficeStyles {
   chatReactionOn: ViewStyle;
   /** React, Reply and Recall: on a wide web screen they keep their place while hidden. */
   chatActions: ViewStyle;
-  chatActionsHidden: ViewStyle;
   /** The typing line keeps its height while nobody types, so the list does not move. */
   chatTyping: TextStyle;
-  chatBox: ViewStyle;
   /** The @ list under the box. */
   chatMentions: ViewStyle;
   /** The count on the header's Chat button: white on the accent, as a badge is. */
@@ -509,7 +526,9 @@ export function useOfficeStyles(
     const todoRow: ViewStyle = {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 8,
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
       minHeight: TOUCH_CONTROL,
       paddingVertical: 12,
     };
@@ -530,7 +549,7 @@ export function useOfficeStyles(
       maxWidth: "80%",
       paddingVertical: 8,
       paddingHorizontal: 12,
-      borderRadius: 12,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface1,
@@ -570,8 +589,16 @@ export function useOfficeStyles(
         backgroundColor: colors.surface0,
       },
       headerTools,
+      workspaceAction: { ...sidebarButton, borderColor: "transparent" },
+      workspaceAccent: colors.accent,
       headerBrand: { ...headerTools, marginRight: 8 },
-      brandText: { color: colors.foreground, fontSize: 16, fontWeight: "700" },
+      brandText: {
+        maxWidth: compact ? 100 : 240,
+        flexShrink: 1,
+        color: colors.foreground,
+        fontSize: 16,
+        fontWeight: "700",
+      },
       brandIcon: { color: colors.statusWarning },
       headerModes: {
         borderWidth: 1,
@@ -687,30 +714,13 @@ export function useOfficeStyles(
       },
       columnTabsVertical: { alignItems: "center", gap: 4 },
       columnTabsScroll: { flexShrink: 1 },
-      sessionHead: {
+      sessionList: {
+        width: "100%",
+        maxWidth: 880,
+        alignSelf: "center",
         paddingHorizontal: pad,
-        paddingVertical: 8,
-        gap: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      },
-      sessionList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
-      sessionRow: { gap: 2 },
-      sessionRowYou: {
-        gap: 2,
-        alignSelf: "flex-end",
-        maxWidth: "90%",
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: colors.surface2,
-      },
-      sessionTool: { ...small, fontFamily: MONOSPACE, color: colors.foregroundMuted },
-      sessionComposer: {
-        paddingHorizontal: pad,
-        paddingVertical: 8,
-        gap: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
+        paddingVertical: 16,
+        gap: 12,
       },
       composerWarning: { ...small, color: colors.statusWarning },
       sessionTab: {
@@ -745,7 +755,6 @@ export function useOfficeStyles(
         opacity: 0,
       },
       columnBody: { flex: 1 },
-      dialogBody: { padding: compact ? 16 : 22, gap: 16 },
       columnAttention: { paddingVertical: 8 },
       columnBar: {
         flexDirection: "row",
@@ -757,6 +766,7 @@ export function useOfficeStyles(
         backgroundColor: colors.surface0,
       },
       sheetScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 },
+      dialogBody: { padding: compact ? 16 : 22, gap: 16 },
       // The floor's top quarter stays in view over the sheet, so the office is still there.
       columnSheet: {
         position: "absolute",
@@ -800,8 +810,7 @@ export function useOfficeStyles(
         flexDirection: "row",
         flexWrap: "wrap",
         columnGap: 16,
-        rowGap: 12,
-        paddingHorizontal: pad,
+        rowGap: 14,
       },
       headerField: { flexGrow: 1, flexBasis: 240, gap: 4 },
       fieldHint: { ...small, color: colors.foregroundMuted },
@@ -931,6 +940,22 @@ export function useOfficeStyles(
       standupHeading: { ...base, color: colors.foreground, fontWeight: "500" },
       standupBlocker: { ...base, color: colors.statusWarning },
       standupPeople: { gap: 6 },
+      notesMonthBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+      },
+      panelHeading: { ...base, color: colors.foreground, fontWeight: "700", fontSize: 19 },
+      notesDateStrip: { alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 2 },
+      notesPaper: {
+        padding: touch ? 12 : 20,
+        backgroundColor: colors.surface1,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 12,
+        gap: 8,
+      },
       notesScroll: { flex: 1, minHeight: 0 },
       notesLinks: { paddingBottom: 8 },
       notesLinkRow: { alignSelf: "flex-start", paddingVertical: touch ? 8 : 2 },
@@ -1112,12 +1137,65 @@ export function useOfficeStyles(
       // A post and its buttons are one block: closer to each other than to the next post.
       boardPosts: { gap: 16 },
       boardPost: { gap: 8 },
+      lobbyForm: {
+        padding: 12,
+        gap: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+      },
+      lobbyRecipient: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        maxWidth: "100%",
+        minHeight: controlHeight,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        gap: 8,
+        overflow: "hidden",
+      },
+      lobbySection: { gap: 6 },
+      lobbyHeading: {
+        ...small,
+        color: colors.foregroundMuted,
+        letterSpacing: 0.7,
+        fontWeight: "700",
+        textTransform: "uppercase",
+      },
+      lobbyTask: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        paddingHorizontal: 12,
+      },
+      lobbyTaskLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+      dutyCard: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        padding: 12,
+        gap: 8,
+      },
+      lobbyDelete: {
+        minWidth: controlHeight,
+        minHeight: controlHeight,
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 6,
+        paddingHorizontal: 4,
+      },
+      lobbyDeleteText: { ...small, fontWeight: "500", color: colors.foregroundMuted },
+      lobbyConfirm: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 10, gap: 8 },
       post: { gap: 4, paddingVertical: 4 },
       postMeta: { ...small, color: colors.foregroundMuted },
       postText: { ...base, color: colors.foreground },
       todoRow,
       todoRowDisabled: { ...todoRow, opacity: 0.5 },
-      todoTextDone: { ...base, color: colors.foregroundMuted },
+      todoTextDone: { ...base, color: colors.foregroundMuted, textDecorationLine: "line-through" },
       chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
       // The padding leaves room for a chip's focus ring inside the scroller, and the scroller
       // reaches out by as much, so the chips at rest still stand on the sheet's rails.
@@ -1160,8 +1238,37 @@ export function useOfficeStyles(
       // As wide as the dot even without one, so "Nobody" starts on the agents' rail.
       pickerLead: { width: DOT, height: 20, justifyContent: "center" },
       pickerSearch: lineInput,
+      newAgentHeader: {
+        paddingHorizontal: pad,
+        paddingVertical: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      newAgentFooter: {
+        paddingHorizontal: pad,
+        paddingVertical: 10,
+        gap: 6,
+        backgroundColor: colors.surface0,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
+      newAgentSelector: {
+        minHeight: 40,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 8,
+        backgroundColor: colors.surface1,
+      },
       newAgentForm: { padding: pad, gap: 16 },
-      newAgentWorkspaces: { maxHeight: 240 },
+      newAgentWorkspaces: { maxHeight: 160 },
       fieldInput: lineInput,
       iconColor: colors.foregroundMuted,
       scene: { flex: 1, minHeight: SCENE_MIN_HEIGHT },
@@ -1187,6 +1294,8 @@ export function useOfficeStyles(
       sceneNoteText: { ...small, color: colors.foregroundMuted },
       host: hostStyles(colors, compact, touch),
       sessions: sessionStyles(colors, touch),
+      transcript: transcriptStyles(colors, touch),
+      messenger: messengerStyles(theme, compact, touch),
       sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       activityTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 12, gap: 10 },
       activityHeading: {
@@ -1236,7 +1345,7 @@ export function useOfficeStyles(
       panelCount: { color: colors.foregroundMuted },
       panelFeed: { paddingBottom: 24 },
       panelTime: { ...small, flexShrink: 0, color: colors.foregroundMuted },
-      chatList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
+      chatList: { paddingHorizontal: pad, paddingVertical: 14, gap: 12 },
       chatRow,
       chatRowMine: { ...chatRow, justifyContent: "flex-end" },
       chatAvatar: {
@@ -1280,14 +1389,12 @@ export function useOfficeStyles(
       // The segment's chosen fill is a layer of its own, which a style cannot add: the outline.
       chatReactionOn: { ...chatReaction, borderColor: colors.foreground },
       chatActions,
-      chatActionsHidden: { ...chatActions, opacity: 0 },
       chatTyping: {
         ...small,
         minHeight: small.lineHeight,
         color: colors.foregroundMuted,
         paddingHorizontal: pad,
       },
-      chatBox: { padding: pad, gap: 8, borderTopWidth: 1, borderTopColor: colors.border },
       chatMentions: {
         borderWidth: 1,
         borderColor: colors.border,

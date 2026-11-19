@@ -130,9 +130,9 @@ test("a chosen agent that left, or closed, is nobody again", () => {
   expect(keptChoice("2", all)).toBe(NOBODY);
   expect(keptChoice("gone", all)).toBe(NOBODY);
   expect(keptChoice(NOBODY, all)).toBe(NOBODY);
-  expect(choiceLabel("1", all)).toBe("Builder");
-  expect(choiceLabel(NOBODY, all)).toBe("Nobody");
-  expect(choiceLabel("gone", all)).toBe("Nobody");
+  expect(choiceLabel("1", all, "Nobody")).toBe("Builder");
+  expect(choiceLabel(NOBODY, all, "Nobody")).toBe("Nobody");
+  expect(choiceLabel("gone", all, "Any idle agent")).toBe("Any idle agent");
 });
 
 test("a close goes back from the page when the sheet stays, and closes when it has left", () => {

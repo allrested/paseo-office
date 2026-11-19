@@ -92,39 +92,48 @@ function TodoRow({ post, name, actions, styles }: TodoRowProps) {
   const keep = useCallback(() => setAsking(false), []);
   const remove = useCallback(() => actions.remove(post.id), [actions, post.id]);
   return (
-    <View style={styles.boardPost}>
-      <Pressable
-        id={id}
-        accessibilityRole="checkbox"
-        accessibilityLabel={meta === null ? post.text : `${post.text}, ${meta}`}
-        aria-checked={done}
-        disabled={pending}
-        onPress={toggle}
-        style={pending ? styles.todoRowDisabled : styles.todoRow}
-      >
-        <Icon name={done ? "SquareCheck" : "Square"} size={20} color={styles.iconColor} />
-        <View style={styles.rowBody}>
-          <Text style={done ? styles.todoTextDone : styles.postText}>{post.text}</Text>
-          {meta === null ? null : <Text style={styles.postMeta}>{meta}</Text>}
-        </View>
-      </Pressable>
+    <View style={styles.lobbyTask}>
+      <View style={styles.lobbyTaskLine}>
+        <Pressable
+          id={id}
+          accessibilityRole="checkbox"
+          accessibilityLabel={meta === null ? post.text : `${post.text}, ${meta}`}
+          aria-checked={done}
+          disabled={pending}
+          onPress={toggle}
+          style={pending ? styles.todoRowDisabled : styles.todoRow}
+        >
+          <Icon name={done ? "SquareCheck" : "Square"} size={20} color={styles.iconColor} />
+          <View style={styles.rowBody}>
+            <Text style={done ? styles.todoTextDone : styles.postText}>{post.text}</Text>
+            {meta === null ? null : <Text style={styles.postMeta}>{meta}</Text>}
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete task: ${post.text}`}
+          aria-expanded={asking}
+          onPress={ask}
+          style={styles.lobbyDelete}
+        >
+          <Icon name="Trash2" size={16} color={styles.iconColor} />
+        </Pressable>
+      </View>
       {failure === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {failure}
         </Text>
       )}
       {asking ? (
-        <DeleteQuestion
-          question="Delete this post?"
-          onDelete={remove}
-          onKeep={keep}
-          styles={styles}
-        />
-      ) : (
-        <View style={styles.actions}>
-          <ActionButton label="Delete" pendingLabel="Deleting..." onPress={ask} styles={styles} />
+        <View style={styles.lobbyConfirm}>
+          <DeleteQuestion
+            question="Delete this post?"
+            onDelete={remove}
+            onKeep={keep}
+            styles={styles}
+          />
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -153,7 +162,9 @@ function TodoHeading({ board, done, actions, styles }: TodoHeadingProps) {
   if (asking && done === 0) setAsking(false);
   return (
     <View style={styles.boardTitleRow}>
-      <Text style={styles.sheetLabel}>To-do</Text>
+      <Text accessibilityRole="header" style={styles.lobbyHeading}>
+        To-do
+      </Text>
       {asking ? (
         <View style={styles.sheetActions}>
           <DeleteQuestion
@@ -164,13 +175,15 @@ function TodoHeading({ board, done, actions, styles }: TodoHeadingProps) {
           />
         </View>
       ) : (
-        <ActionButton
-          label="Clear finished"
-          pendingLabel="Clearing..."
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Clear finished"
           onPress={ask}
           disabled={done === 0}
-          styles={styles}
-        />
+          style={styles.lobbyDelete}
+        >
+          <Text style={styles.lobbyDeleteText}>Clear finished</Text>
+        </Pressable>
       )}
     </View>
   );
@@ -204,13 +217,15 @@ interface TaskGroupProps {
 function TaskGroup({ group, name, styles }: TaskGroupProps) {
   const lines = useMemo(() => stepLines(group.steps), [group.steps]);
   return (
-    <View style={styles.post}>
-      <Text style={styles.postMeta}>{name(group.agentId)}</Text>
-      {lines.map((line) => (
-        <Text key={line.key} style={styles.postText} numberOfLines={1}>
-          {line.text}
-        </Text>
-      ))}
+    <View style={styles.lobbyTask}>
+      <View style={styles.post}>
+        <Text style={styles.rowTitle}>{name(group.agentId)}</Text>
+        {lines.map((line) => (
+          <Text key={line.key} style={styles.postText}>
+            {line.text}
+          </Text>
+        ))}
+      </View>
     </View>
   );
 }
@@ -281,7 +296,7 @@ export function LobbyBody({
   }
   return (
     <View style={styles.sheet}>
-      <View style={styles.sheetField}>
+      <View style={styles.lobbyForm}>
         <View style={styles.boardTitleRow}>
           <View style={styles.rowBody}>
             <TextInput
@@ -313,16 +328,17 @@ export function LobbyBody({
             {failure}
           </Text>
         )}
+        <WakeField
+          id={fieldId}
+          roomId={room.id}
+          to={to}
+          rooms={rooms}
+          wakesPaused={wakesPaused}
+          onOpen={open}
+          styles={styles}
+        />
       </View>
-      <WakeField
-        id={fieldId}
-        to={to}
-        rooms={rooms}
-        wakesPaused={wakesPaused}
-        onOpen={open}
-        styles={styles}
-      />
-      <View style={styles.boardPosts}>
+      <View style={styles.lobbySection}>
         <TodoHeading board={room.id} done={done} actions={actions} styles={styles} />
         {room.todos.length === 0 ? <Text style={styles.muted}>No to-dos</Text> : null}
         {room.todos.map((post) => (
@@ -330,8 +346,10 @@ export function LobbyBody({
         ))}
       </View>
       {notes.length > 0 ? (
-        <View style={styles.boardPosts}>
-          <Text style={styles.sheetLabel}>Notes</Text>
+        <View style={styles.lobbySection}>
+          <Text accessibilityRole="header" style={styles.lobbyHeading}>
+            Notes
+          </Text>
           {notes.map((post) => (
             <PostWithActions
               key={post.id}
@@ -343,8 +361,10 @@ export function LobbyBody({
           ))}
         </View>
       ) : null}
-      <View style={styles.boardPosts}>
-        <Text style={styles.sheetLabel}>Agent tasks</Text>
+      <View style={styles.lobbySection}>
+        <Text accessibilityRole="header" style={styles.lobbyHeading}>
+          Agent tasks
+        </Text>
         {agentTasks.length === 0 ? <Text style={styles.muted}>No agent tasks</Text> : null}
         {agentTasks.map((group) => (
           <TaskGroup key={group.agentId} group={group} name={name} styles={styles} />

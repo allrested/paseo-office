@@ -4,10 +4,7 @@ import { z } from "zod";
 import { ChatMessageSchema, type ChatMessage } from "../shared/contracts.js";
 import { errorMessage } from "./errors.js";
 
-/**
- * The file upstream's engine saves. zod drops the keys it does not know, so a photo's picture and
- * a work card's body do not come back on load.
- */
+/** The upstream engine keeps the newest six group photos with the conversation. */
 export const ChatFileSchema = z.object({
   v: z.literal(1),
   msgs: z.array(ChatMessageSchema),

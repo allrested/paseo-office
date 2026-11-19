@@ -1,3 +1,4 @@
+import { useOfficeBrand } from "../office-brand-context.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
@@ -13,6 +14,7 @@ import { bridgePageScript } from "./world-bridge-page.js";
 import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
+  useHomeDeparture,
   useStandupBell,
   useWorldScript,
   worldStartOptions,
@@ -41,6 +43,8 @@ function WorldViewNativeScene({
   theme,
   styles,
   plan,
+  scene,
+  night,
   street,
   focusRoomId,
   focusRequest,
@@ -50,20 +54,25 @@ function WorldViewNativeScene({
   machine,
   onOpenMachine,
   onOpenResources,
-  onOpenSession,
+  onOpenAgentWorkspace,
   onOpenLibrary,
   onOpenNotes,
+  onPhotoReady,
   meeting,
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
+  const brand = useOfficeBrand();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -73,13 +82,18 @@ function WorldViewNativeScene({
     onSelectBoard,
     onOpenMachine,
     onOpenResources,
-    onOpenSession,
+    onOpenAgentWorkspace,
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
+    onWentHome,
     onTenure,
+    scene,
+    night,
     street,
     onSound: sound.set,
     onProblem,
@@ -94,13 +108,18 @@ function WorldViewNativeScene({
       onSelectBoard,
       onOpenMachine,
       onOpenResources,
-      onOpenSession,
+      onOpenAgentWorkspace,
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
+      onWentHome,
       onTenure,
+      scene,
+      night,
       street,
       onSound: sound.set,
       onProblem,
@@ -118,13 +137,13 @@ function WorldViewNativeScene({
   useEffect(() => {
     const handle = frame.current;
     if (words.status !== "ready" || page === null || handle === null) return undefined;
-    const made = createWorldBridge((text) => handle.post(text));
+    const made = createWorldBridge((text) => handle.post(text), onPhotoReady);
     bridge.current = made;
     try {
       made.api.start(
         worldStartOptions(latest, {
           focus: noFocus,
-          brand: worldBrand(null),
+          brand: worldBrand(brand),
           photo: false,
           language: words.language,
           words: words.words,
@@ -141,7 +160,7 @@ function WorldViewNativeScene({
       bridge.current = null;
       setApi(null);
     };
-  }, [page, plan, words.status, words.language, words.words]);
+  }, [page, plan, brand, words.status, words.language, words.words, onPhotoReady]);
 
   const { note: feedNote } = useWorldFeed(api, {
     model,
@@ -155,6 +174,7 @@ function WorldViewNativeScene({
     weather,
     incidents,
     streetNote: street?.kit === null,
+    night,
     sound: sound.on,
     plan,
   });
@@ -190,12 +210,13 @@ function WorldViewNativeScene({
  * The office in 3D on the phone's script frame, on the host's plan. A changed plan unmounts the
  * `ScriptFrame` and mounts a new one: the scene's page starts once.
  */
-export function WorldViewNative({ plan, streetOn = false, ...rest }: WorldViewProps) {
-  const { street, loading } = useStreetStart(streetOn);
+export function WorldViewNative({ plan, streetOn = false, scene, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(scene ? scene === "city" : streetOn);
   if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
   return (
     <WorldViewNativeScene
-      key={plan + String(street !== null)}
+      key={plan + (scene ?? String(street !== null))}
+      scene={scene}
       street={street}
       plan={plan}
       {...rest}

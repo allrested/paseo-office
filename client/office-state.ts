@@ -27,6 +27,7 @@ export function applyOfficeEvent(state: OfficeSnapshot, event: OfficeEvent): Off
         activity: event.activity,
         doing: event.doing ?? {},
         checklists: event.checklists ?? {},
+        checklistProgress: event.checklistProgress,
       };
     case "board":
       return { ...state, boards: { ...state.boards, [event.board]: event.posts } };
@@ -66,12 +67,21 @@ export function applyChatEvent(chat: ChatSnapshot | null, event: OfficeEvent): C
       const messages = known
         ? base.messages.map((m) => (m.id === change.message.id ? change.message : m))
         : [...base.messages, change.message];
-      return { ...base, messages: messages.slice(-CHAT_MESSAGE_MAX) };
+      const recalledPin = change.message.recalled && change.message.id === base.pinned;
+      return {
+        ...base,
+        messages: messages.slice(-CHAT_MESSAGE_MAX),
+        ...(recalledPin ? { pinned: null } : {}),
+      };
     }
     case "typing":
       return { ...base, typing: change.names };
     case "all":
-      return { ...base, messages: change.messages };
+      return {
+        ...base,
+        messages: change.messages,
+        ...(change.pinned === undefined ? {} : { pinned: change.pinned }),
+      };
     case "act":
       return base;
   }

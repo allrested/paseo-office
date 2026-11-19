@@ -150,18 +150,25 @@ test("keys do nothing while a text field has them", () => {
   page("fp-exit").click();
 });
 
-test("E by a person opens their session and keeps walking", () => {
-  page("btn-fp").click();
-  seatAhead();
-  fpUpdate(0.016);
-  expect(page("fp-near").hidden).toBe(false);
-  expect(page("fp-near").textContent).toContain("Ada");
+test.each(["working", "sleeping", "tap"] as const)(
+  "a %s desk interaction opens the workspace and preserves the walk",
+  (interaction) => {
+    page("btn-fp").click();
+    seatAhead();
+    const rouse = vi.fn(() => true);
+    if (interaction === "sleeping") Object.assign(h.workers.get("ada")!, { anim: "sleep", rouse });
+    fpUpdate(0.016);
+    expect(page("fp-near").hidden).toBe(false);
+    expect(page("fp-near").textContent).toContain("Ada");
 
-  key("KeyE");
-  expect(h.openSession).toHaveBeenCalledWith("ada", { open: true });
-  expect(walk.fp.on).toBe(true);
-  page("fp-exit").click();
-});
+    if (interaction === "tap") page("fp-near").click();
+    else key("KeyE");
+    if (interaction === "sleeping") expect(rouse).toHaveBeenCalled();
+    expect(h.openSession).toHaveBeenCalledWith("ada", { open: true });
+    expect(walk.fp.on).toBe(true);
+    page("fp-exit").click();
+  },
+);
 
 test("the door offers the lift when the street is available", () => {
   // the door, within reach ahead of where the walk starts, with a city outside it

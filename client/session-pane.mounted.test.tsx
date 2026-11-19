@@ -10,12 +10,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent } from "../shared/contracts.js";
 import type { OfficeModel } from "../shared/model.js";
-import {
-  SessionPane,
-  sessionOf,
-  type SessionContext,
-  type SessionPaneProps,
-} from "./session-pane.js";
+import { SessionPane, sessionOf, type SessionPaneProps } from "./session-pane.js";
 import { useOfficeStyles } from "./styles.js";
 
 let draws: number;
@@ -45,7 +40,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
       return createElement(View, null, props.children);
     },
   );
-  return { ScrollView, TextInput };
+  return { ScrollView, TextInput, Icon: () => null };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -66,7 +61,7 @@ const agent = (id: string, status: OfficeAgent["status"] = "idle"): OfficeAgent 
 });
 
 const actions = { send: async () => undefined, respond: async () => undefined, cancel: null };
-const context = { actions, navigation: undefined, closeSession: () => undefined };
+const context = { actions, showWorkspace: undefined, closeSession: () => undefined };
 
 let container: HTMLElement;
 let root: Root;
@@ -118,8 +113,7 @@ test("an agent that came again unchanged does not draw the pane; a change to its
 });
 
 test("a tab opened before its agent is listed becomes the normal panel when the agent appears", async () => {
-  const navigation = { openAgent: vi.fn() } as unknown as SessionContext["navigation"];
-  const withNavigation = { ...context, navigation };
+  const withNavigation = { ...context, showWorkspace: vi.fn() };
   const box = () => container.querySelector('[aria-label="Message"]');
   const open = () => container.querySelector('[aria-label="Open in workspace"]');
   const show = (listed: OfficeAgent | null) =>

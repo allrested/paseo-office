@@ -1,3 +1,4 @@
+import { AVATARS, shirtColor, type Appearance } from "../shared/appearance.js";
 import { CHAT_TEXT_MAX, type ChatMessage } from "../shared/contracts.js";
 import { agentTitle, type OfficeModel } from "../shared/model.js";
 import { REACTIONS } from "../shared/upstream/chat-engine.js";
@@ -29,9 +30,12 @@ const MENTION_QUERY_MAX = 40;
 const MENTION_OPTIONS_MAX = 8;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** Photos, work cards, loops, CI and denied calls never show. */
+/** Older photos may have no picture. The office also skips unsupported engine cards. */
 export function shows(message: ChatMessage): boolean {
-  return SHOWN_KINDS.has(message.kind);
+  return (
+    SHOWN_KINDS.has(message.kind) ||
+    (message.kind === "photo" && Boolean(message.photo || message.recalled))
+  );
 }
 
 export function isYours(message: ChatMessage): boolean {
@@ -123,14 +127,28 @@ function initialsOf(name: string): string {
 }
 
 /** Null for a system line and for yours. An agent's colour is its shirt on the floor. */
-export function avatarOf(message: ChatMessage): { initials: string; color: string } | null {
+export function avatarOf(
+  message: ChatMessage,
+  appearance?: Appearance,
+): { initials: string; color: string } | null {
   if (message.kind === "sys" || message.from === undefined || isYours(message)) return null;
   const name = message.name ?? message.from;
-  if (message.from === DIRECTOR) {
+  return memberAvatar(message.from, name, appearance);
+}
+
+export function memberAvatar(
+  id: string,
+  name: string,
+  appearance?: Appearance,
+): { initials: string; color: string } {
+  if (id === DIRECTOR) {
     return { initials: [...name].slice(0, 1).join("").toUpperCase(), color: DIRECTOR_COLOR };
   }
-  const shirt = SHIRTS[lookOf(message.from).shirt] ?? SHIRTS[0];
-  return { initials: initialsOf(name), color: shirt.shirt };
+  const shirt = SHIRTS[lookOf(id).shirt] ?? SHIRTS[0];
+  return {
+    initials: appearance?.avatar ? AVATARS[appearance.avatar] : initialsOf(name),
+    color: shirtColor(appearance) ?? shirt.shirt,
+  };
 }
 
 export function pollRows(
@@ -181,6 +199,7 @@ export function mentionAt(text: string): Mention | null {
 }
 
 export interface MentionOption {
+  appearance?: Appearance;
   id: string;
   name: string;
   room: string;

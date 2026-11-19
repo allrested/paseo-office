@@ -1,10 +1,25 @@
 import { stateLabel } from "./agent-card.js";
 import { agentTask, agentTitle, dotTone, type DotTone, type OfficeRoom } from "../shared/model.js";
+import { LOBBY } from "../shared/names.js";
 
-/** The choice that wakes no agent. */
+/** The post has no named recipient. */
 export const NOBODY = "";
 /** The search field shows from this many agents: more than eight. */
 export const SEARCH_FROM = 9;
+
+export function recipientLabels(roomId: string) {
+  return roomId === LOBBY
+    ? {
+        field: "Send task to",
+        defaultChoice: "Any idle agent",
+        detail: "An available agent picks up the task automatically.",
+      }
+    : {
+        field: "Wake an agent with it",
+        defaultChoice: "Nobody",
+        detail: "The post wakes no agent",
+      };
+}
 
 export interface PickerRow {
   agentId: string;
@@ -75,9 +90,13 @@ export function keptChoice(to: string, rooms: readonly OfficeRoom[]): string {
   return to !== NOBODY && titleOf(to, rooms) !== null ? to : NOBODY;
 }
 
-/** What the form says is chosen: the agent's title, or "Nobody". */
-export function choiceLabel(to: string, rooms: readonly OfficeRoom[]): string {
-  return (to === NOBODY ? null : titleOf(to, rooms)) ?? "Nobody";
+/** The selected agent's title, or the board's default recipient. */
+export function choiceLabel(
+  to: string,
+  rooms: readonly OfficeRoom[],
+  defaultChoice: string,
+): string {
+  return (to === NOBODY ? null : titleOf(to, rooms)) ?? defaultChoice;
 }
 
 /**

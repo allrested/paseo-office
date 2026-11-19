@@ -12,6 +12,7 @@ import {
   teamOfRoom,
   worldBoardRows,
   worldChanges,
+  worldDuties,
   worldWeather,
   worldMachine,
   worldPeople,
@@ -39,6 +40,7 @@ export interface WorldFeedInput {
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
   streetNote?: boolean;
+  night?: boolean | undefined;
   sound: boolean | null;
   /** The floor plan the scene was started on: its desks seat the people. */
   plan: WorldPlan;
@@ -65,6 +67,7 @@ export function useWorldFeed(
     weather,
     incidents,
     streetNote,
+    night,
     sound,
     plan,
   }: WorldFeedInput,
@@ -84,8 +87,8 @@ export function useWorldFeed(
 
   useEffect(() => {
     if (api === null) return;
-    world.current?.setTheme({ dark: isDarkTheme(theme.colors), colors: theme.colors });
-  }, [theme, api]);
+    world.current?.setTheme({ dark: night ?? isDarkTheme(theme.colors), colors: theme.colors });
+  }, [theme, night, api]);
 
   useEffect(() => {
     if (sound !== null) world.current?.setSound?.(sound);
@@ -101,6 +104,7 @@ export function useWorldFeed(
     rests.current = restsAfter(rests.current, people.sessions, Date.now());
     scene.setSessions(withRestTimes(people.sessions, rests.current));
     scene.setBoardRows(worldBoardRows(model, people.sessions));
+    scene.setDuties?.(model.dutyList === null ? null : worldDuties(model));
     const changes = worldChanges(memory.current, people);
     for (const event of changes.events) scene.event(event);
     memory.current = changes.memory;

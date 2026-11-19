@@ -19,6 +19,7 @@ import type {
 } from "../shared/contracts.js";
 import { getChatSeen, resetChatSeen } from "./chat-seen.js";
 import { CHAT_EMPTY, CHAT_RECALLED, REACTION_CHOICES, STICKERS, remindState } from "./chat-text.js";
+import { quickSettings } from "./chat-quick.js";
 import { ChatPanel } from "./chat-panel.js";
 import { EMPTY_CHOICE } from "./new-agent-model.js";
 import type { ChatDraft, NewAgentDraft, OfficeLink } from "./office-link.js";
@@ -31,10 +32,24 @@ let call: Mock<(input: ChatRequest) => Promise<ChatResult>>;
 /** The props the message list was last drawn with, and how often it was sent to its end. */
 let scroller: ScrollViewProps | null;
 let toEnd: number;
+const board = vi.fn(),
+  duties = vi.fn(),
+  newAgent = vi.fn(),
+  groupPhoto = vi.fn(async () => {});
+let quickDocument = quickSettings.schema.parse({});
 
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
   useRpc: () => call,
+  useSettings: () => ({
+    status: "ready",
+    values: quickDocument,
+    revision: "1",
+    save: async (value: typeof quickDocument) => {
+      quickDocument = value;
+      return true;
+    },
+  }),
 }));
 
 vi.mock("@getpaseo/plugin/client/ui", async () => {
@@ -119,7 +134,18 @@ function Harness({ value }: { value: OfficeState }) {
   const layout = { compact: compactLayout, platform: "web" } as const;
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  const draft: ChatDraft = { text, setText, replyTo, setReplyTo };
+  const [recipient, setRecipient] = useState<string | null>(null);
+  const [images, setImages] = useState<ChatDraft["images"]>([]);
+  const draft: ChatDraft = {
+    text,
+    setText,
+    replyTo,
+    setReplyTo,
+    recipient,
+    setRecipient,
+    images,
+    setImages,
+  };
   const styles = useOfficeStyles(THEME, layout.compact, false);
   const link: OfficeLink = {
     select: (agentId) => void selected.push(agentId),
@@ -133,6 +159,10 @@ function Harness({ value }: { value: OfficeState }) {
     link,
     draft,
     newAgent: NO_FORM,
+    onBoard: board,
+    onDuties: duties,
+    onNewAgent: newAgent,
+    onGroupPhoto: groupPhoto,
   });
 }
 
@@ -192,10 +222,14 @@ function row(id: string): HTMLElement {
 
 const box = () => labelled("Message") as HTMLTextAreaElement;
 
-async function type(text: string): Promise<void> {
-  const field = box();
+async function type(text: string, label = "Message"): Promise<void> {
+  const field = labelled(label);
+  const proto =
+    field instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
     field.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -245,6 +279,11 @@ beforeEach(() => {
   call = vi.fn(async () => ({ ok: true as const }));
   scroller = null;
   toEnd = 0;
+  quickDocument = quickSettings.schema.parse({});
+  board.mockClear();
+  duties.mockClear();
+  newAgent.mockClear();
+  groupPhoto.mockClear();
   selected = [];
   opened = [];
   container = document.createElement("div");
@@ -278,6 +317,216 @@ test("empty: the line that says how to start", async () => {
 
   await chat({ op: "add", message: msg() });
   expect(container.textContent).not.toContain(CHAT_EMPTY);
+});
+
+test("the To picker targets one session by id and can switch back to the whole group", async () => {
+  await mount();
+  await snapshot([], [FIX, DOCS]);
+  expect(container.textContent).toContain("3 members");
+  await press("To: Whole group");
+  await press("Fix login, Lobby");
+  await type("Check permissions");
+  await press("Send");
+  expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Check permissions", to: FIX.id });
+  await press("To: Fix login");
+  await press("Whole group, Ask an available session");
+  await type("Thanks everyone!");
+  await press("Send");
+  expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Thanks everyone!" });
+});
+
+test("the poll composer posts choices, retains them on error, and reopens after a successful post", async () => {
+  await mount();
+  await snapshot([]);
+  await press("Create poll");
+  await type("Next deploy?", "Poll question");
+  await type("Monday\nTuesday", "Poll choices");
+  call.mockResolvedValueOnce({ ok: false, error: "Host offline." });
+  await press("Post poll");
+  expect(labelled("Poll question")).toHaveProperty("value", "Next deploy?");
+  await press("Post poll");
+  expect(call).toHaveBeenLastCalledWith({
+    op: "poll",
+    question: "Next deploy?",
+    options: ["Monday", "Tuesday"],
+  });
+  expect(maybe("Poll question")).toBeNull();
+  await press("Create poll");
+  expect(labelled("Poll question")).toHaveProperty("value", "");
+});
+
+test("the pin banner isolates a message and disappears when its author recalls it", async () => {
+  await mount();
+  const a = msg(),
+    b = msg();
+  await snapshot([a, b], [FIX]);
+  await press("Pin message", row(a.id));
+  expect(call).toHaveBeenLastCalledWith({ op: "pin", id: a.id });
+  await chat({ op: "all", messages: [a, b], pinned: a.id });
+  await press("Pinned message");
+  expect(maybeRow(b.id)).toBeNull();
+  await press("Pinned message");
+  expect(row(b.id)).toBeDefined();
+  await chat({ op: "update", message: { ...a, recalled: true } });
+  expect(maybe("Pinned message")).toBeNull();
+});
+
+test("the empty composer can send a thumbs up to one selected session with a reply", async () => {
+  await mount();
+  const earlier = msg();
+  await snapshot([earlier], [FIX]);
+  await press("To: Whole group");
+  await press("Fix login, Lobby");
+  await press("Reply", row(earlier.id));
+  await press("Send thumbs up");
+  expect(call).toHaveBeenLastCalledWith({
+    op: "send",
+    text: "👍",
+    to: FIX.id,
+    replyTo: earlier.id,
+  });
+  await type("text");
+  expect(maybe("Send thumbs up")).toBeNull();
+  expect(maybe("Send")).not.toBeNull();
+});
+test("the live member directory shows work status and opens the requested session", async () => {
+  await mount();
+  await snapshot([], [FIX, { ...DOCS, status: "running" }]);
+  await press("Team members");
+  expect(maybe("Open Docs, Working, Lobby")).not.toBeNull();
+  await press("Open Fix login, Resting, Lobby");
+  expect(opened).toEqual([FIX.id]);
+  expect(maybe("Open Docs, Working, Lobby")).toBeNull();
+  await press("To: Whole group");
+  await press("Docs, Lobby");
+  await press("Open recipient session");
+  expect(opened).toEqual([FIX.id, DOCS.id]);
+});
+test("More opens the lobby or agent form, and retains a failed photo request to retry", async () => {
+  await mount();
+  await snapshot([]);
+  await press("More chat actions");
+  await press("Lobby board");
+  expect(board).toHaveBeenCalledOnce();
+  await press("More chat actions");
+  await press("Duty board");
+  expect(duties).toHaveBeenCalledOnce();
+  await press("More chat actions");
+  await press("New agent");
+  expect(newAgent).toHaveBeenCalledOnce();
+  groupPhoto.mockRejectedValueOnce(new Error("Floor is still loading."));
+  await press("More chat actions");
+  await press("Take office photo");
+  expect(container.textContent).toContain("Floor is still loading.");
+  await press("Take office photo");
+  expect(groupPhoto).toHaveBeenCalledTimes(2);
+  expect(maybe("Close chat actions")).toBeNull();
+});
+test("quick messages can be kept on the device, used as a draft, edited and removed", async () => {
+  await mount();
+  await snapshot([]);
+  await type("Check the screenshot");
+  await press("More chat actions");
+  await press("Quick messages");
+  await press("Add quick message");
+  await type("Review", "Quick message name");
+  await press("Save");
+  expect(quickDocument.list.at(-1)).toEqual({ label: "Review", prompt: "Check the screenshot" });
+  await press("Back to chat actions");
+  await press("Close chat actions");
+  await type("");
+  await press("More chat actions");
+  await press("Quick messages");
+  await press("Review");
+  expect(box().value).toBe("Check the screenshot");
+  expect(call).not.toHaveBeenCalled();
+  await press("More chat actions");
+  await press("Quick messages");
+  await press("Edit Review");
+  await type("Ask for the latest screenshot", "Saved message");
+  await press("Save");
+  await press("Edit Review");
+  await press("Delete");
+  await press("Confirm delete");
+  expect(maybe("Review")).toBeNull();
+});
+test("browsers without speech recognition keep the composer and hide dictation", async () => {
+  touchScreen();
+  await mount();
+  await snapshot([]);
+  await press("More chat actions");
+  expect(maybe("Dictate message")).toBeNull();
+  await type("Typing on a phone");
+  await press("Send");
+  expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Typing on a phone" });
+});
+test("dictation appends final speech without losing typed words, and releasing the panel stops its microphone", async () => {
+  const recognizers: Speech[] = [];
+  class Speech extends EventTarget {
+    constructor() {
+      super();
+      recognizers.push(this);
+    }
+    start = vi.fn();
+    stop = vi.fn(() => this.dispatchEvent(new Event("end")));
+    abort = vi.fn();
+  }
+  Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: Speech });
+  try {
+    await mount();
+    await snapshot([]);
+    await press("More chat actions");
+    await press("Dictate message");
+    const voice = recognizers[0];
+    expect(voice.start).toHaveBeenCalledOnce();
+    await type("Check");
+    const result = Object.assign(new Event("result"), {
+      resultIndex: 0,
+      results: [{ isFinal: true, 0: { transcript: "the tests" } }],
+    });
+    await act(async () => {
+      voice.dispatchEvent(result);
+      voice.dispatchEvent(result);
+    });
+    expect(box().value).toBe("Check the tests");
+    expect(call).not.toHaveBeenCalled();
+    await press("Stop dictation");
+    expect(voice.stop).toHaveBeenCalledOnce();
+    await act(async () => {
+      voice.dispatchEvent(new Event("error"));
+      voice.dispatchEvent(result);
+    });
+    expect(box().value).toBe("Check the tests");
+    await press("Dictate message");
+    await press("Close chat actions");
+    expect(recognizers[1].abort).toHaveBeenCalledOnce();
+  } finally {
+    Reflect.deleteProperty(window, "webkitSpeechRecognition");
+  }
+});
+test("search filters messages, preserves the draft, and restores the unread divider", async () => {
+  resetChatSeen(at(9, 0));
+  await mount();
+  const old = msg({ at: at(8, 55), text: "Check tickets" });
+  const fresh = msg({ at: at(9, 3), text: "Deployed reports" });
+  await snapshot([old, fresh], [FIX]);
+  expect(follows(row(old.id), textElement("New messages"))).toBe(true);
+  expect(follows(textElement("New messages"), row(fresh.id))).toBe(true);
+  await type("Draft reply");
+  await press("Search chat");
+  const search = labelled("Search messages");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+      search,
+      "rePORT",
+    );
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(maybeRow(old.id)).toBeNull();
+  expect(row(fresh.id)).toBeDefined();
+  await press("Search chat");
+  expect(row(old.id)).toBeDefined();
+  expect(box().value).toBe("Draft reply");
 });
 
 test("messages oldest first: yours on the right without an avatar, an agent's with initials, name and time", async () => {
@@ -339,9 +588,11 @@ test("a reply quotes the message it answers; a system line is centred; a recalle
 test("a sticker is a chip with upstream's words; a photo or work message shows nothing", async () => {
   const sticker = msg({ kind: "sticker", sticker: 2, text: "" });
   const photo = msg({ kind: "photo", text: "" });
+  const frame = msg({ kind: "photo", photo: "data:image/jpeg;base64,/9j/YQ==" });
   const work = msg({ kind: "work", text: "" });
   await mount();
-  await snapshot([sticker, photo, work], [FIX]);
+  await snapshot([sticker, photo, frame, work], [FIX]);
+  expect(maybe("Office photo", row(frame.id))).not.toBeNull();
 
   // A pill with an outline around the words.
   const chip = textElement(STICKERS[2] ?? "", row(sticker.id)).parentElement;
@@ -526,6 +777,9 @@ test("@ lists the team filtered by the words after it; Enter, Tab or a press put
   await snapshot([], [FIX, DOCS]);
   expect(maybe("Fix login, Lobby")).toBeNull();
 
+  await press("Mention someone");
+  expect(box().value).toBe("@");
+  expect(document.activeElement).toBe(box());
   await type("hi @fi");
   expect(maybe("Fix login, Lobby")).not.toBeNull();
   expect(maybe("Docs, Lobby")).toBeNull();

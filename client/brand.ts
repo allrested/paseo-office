@@ -1,5 +1,6 @@
 /** The host's brand, as the daemon writes it into the web page it serves. */
 export interface OfficeBrand {
+  color?: string;
   /** Null keeps the product's name. */
   name: string | null;
   /** The logo's address in full; null when the brand has none. */

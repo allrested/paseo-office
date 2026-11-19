@@ -48,6 +48,7 @@ function clockInterval(rooms: readonly OfficeRoom[]): number | null {
   let interval: number | null = null;
   for (const room of rooms) {
     for (const { agent } of room.rows) {
+      if (agent.permissions.length && agent.permissionSince) interval = MINUTE;
       if (attentionReason(agent) !== null) continue;
       if (agent.status === "running" && agent.promptedAt !== undefined) return SECOND;
       if (agent.status === "idle") interval = MINUTE;
@@ -57,7 +58,8 @@ function clockInterval(rooms: readonly OfficeRoom[]): number | null {
 }
 
 /** The time now, read again every `intervalMs`; kept as it was while that is null. */
-function useNow(intervalMs: number | null): number {
+export function useRowClock(rooms: readonly OfficeRoom[]): number {
+  const intervalMs = clockInterval(rooms);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (intervalMs === null) return undefined;
@@ -213,6 +215,7 @@ interface RoomCardProps {
   onSelectAgent(agentId: string): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
+  onOpenDuties: (() => void) | undefined;
 }
 
 function RoomCard({
@@ -225,6 +228,7 @@ function RoomCard({
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
+  onOpenDuties,
 }: RoomCardProps) {
   return (
     <View style={styles.card}>
@@ -253,7 +257,13 @@ function RoomCard({
           onOpenSession={onOpenSession}
         />
       ))}
-      <RoomBoard room={room} name={name} styles={styles} onOpenBoard={onOpenBoard} />
+      <RoomBoard
+        room={room}
+        name={name}
+        styles={styles}
+        onOpenBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+      />
     </View>
   );
 }
@@ -370,6 +380,11 @@ export interface StructureViewProps {
   /** Opens an agent's session from its row, in the office's column. The surface always supplies it. */
   onOpenSession?(agentId: string): void;
   onOpenBoard(roomId: string): void;
+  /**
+   * The duty board's editor, from the lobby's card: the way to it without the 3D floor. Absent
+   * while the host has sent no duty list.
+   */
+  onOpenDuties?: (() => void) | undefined;
 }
 
 /**
@@ -385,12 +400,13 @@ export function StructureView({
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
+  onOpenDuties,
 }: StructureViewProps) {
   const [tab, setTab] = useState<ListTab>("all");
   const [query, setQuery] = useState("");
   const counts = useMemo(() => tabCounts(rooms.flatMap((room) => room.rows)), [rooms]);
   const shown = useMemo(() => filterRooms(rooms, tab, query), [rooms, tab, query]);
-  const now = useNow(clockInterval(shown));
+  const now = useRowClock(shown);
   useEffect(() => (Platform.OS === "web" ? listenForSlash(SEARCH_ID) : undefined), []);
   // An office without agents keeps its rooms' own "No agents"; a filter that finds none says so.
   const found = counts.all === 0 || shown.some((room) => room.rows.length > 0);
@@ -418,6 +434,7 @@ export function StructureView({
           onSelectAgent={onSelectAgent}
           onOpenSession={onOpenSession}
           onOpenBoard={onOpenBoard}
+          onOpenDuties={onOpenDuties}
         />
       ))}
     </ScrollView>

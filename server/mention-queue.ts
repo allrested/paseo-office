@@ -55,6 +55,8 @@ export interface MentionQueuePorts {
 
 export interface MentionQueue {
   enqueue(agentId: string, delivery: Delivery): void;
+  /** Shares the wake limit with mentions. A queued mention gets first use of the agent. */
+  tryPickup(agentId: string, run: (available: () => boolean) => Promise<boolean>): Promise<void>;
   /** From agent.turn.after: the agent may be idle now. */
   turnEnded(agentId: string): void;
   /** From agent.close.after and agent.archive.after. */
@@ -185,6 +187,18 @@ export function createMentionQueue(ports: MentionQueuePorts, paused: boolean): M
   }
 
   return {
+    async tryPickup(agentId, run) {
+      const available = () => !stopped && !isPaused && !queues.has(agentId);
+      if (!available() || inFlight.has(agentId) || recentWakes(agentId).length >= WAKES_PER_HOUR)
+        return;
+      inFlight.add(agentId);
+      try {
+        if (await run(available)) wakes.set(agentId, [...recentWakes(agentId), ports.clock.now()]);
+      } finally {
+        inFlight.delete(agentId);
+        if (queues.has(agentId)) attempt(agentId);
+      }
+    },
     enqueue(agentId, delivery) {
       if (stopped || delivery.author === agentId) return;
       queues.set(agentId, [...(queues.get(agentId) ?? []), delivery]);

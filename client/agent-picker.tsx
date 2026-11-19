@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { TextInput } from "@getpaseo/plugin/client/ui";
 import { ActionButton } from "./action-button.js";
-import { NOBODY, pickerGroups, showsSearch } from "./agent-picker-text.js";
+import { NOBODY, pickerGroups, recipientLabels, showsSearch } from "./agent-picker-text.js";
 import type { DotTone, OfficeRoom } from "../shared/model.js";
 import type { OfficeStyles } from "./styles.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
@@ -92,6 +92,7 @@ export interface AgentPickerProps {
 /** The page of a board's sheet that chooses who a post wakes. */
 export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: AgentPickerProps) {
   const [query, setQuery] = useState("");
+  const labels = recipientLabels(roomId);
   const searchable = showsSearch(rooms);
   const groups = useMemo(
     () => pickerGroups(rooms, roomId, searchable ? query : ""),
@@ -114,16 +115,12 @@ export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: 
           style={styles.pickerSearch}
         />
       ) : null}
-      <View
-        accessibilityRole="radiogroup"
-        accessibilityLabel="Wake an agent with it"
-        style={styles.sheet}
-      >
+      <View accessibilityRole="radiogroup" accessibilityLabel={labels.field} style={styles.sheet}>
         <View style={styles.pickerRows}>
           <Row
             value={NOBODY}
-            title="Nobody"
-            detail="The post wakes no agent"
+            title={labels.defaultChoice}
+            detail={labels.detail}
             tone={null}
             selected={value === NOBODY}
             takesFocus={!searchable && value === NOBODY}

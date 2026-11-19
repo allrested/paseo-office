@@ -1,7 +1,7 @@
 import type { SetStateAction } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
-import type { ChatMessage } from "../shared/contracts.js";
+import type { ChatImage, ChatMessage } from "../shared/contracts.js";
 import type { NewAgentChoice } from "./new-agent-model.js";
 import type { OfficeStyles } from "./styles.js";
 import type { OfficeState } from "./use-office.js";
@@ -12,6 +12,8 @@ export interface OfficeLink {
   select(agentId: string): void;
   /** Shows the agent's session. */
   openSession(agentId: string): void;
+  /** Shows the agent's workspace over the office; absent where the surface has no such view. */
+  openWorkspace?(agentId: string): void;
 }
 
 /** What the surface hands each panel of its column. */
@@ -33,6 +35,10 @@ export interface ChatDraft {
   setText(next: SetStateAction<string>): void;
   replyTo: ChatMessage | null;
   setReplyTo(next: ChatMessage | null): void;
+  recipient: string | null;
+  setRecipient(agentId: string | null): void;
+  images: (ChatImage & { id: number; name: string })[];
+  setImages(next: SetStateAction<ChatDraft["images"]>): void;
 }
 
 /**

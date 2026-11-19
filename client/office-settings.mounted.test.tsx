@@ -141,6 +141,41 @@ test("the screen holds the switches, the fields and the view", async () => {
   expect(labelled("List view")?.getAttribute("aria-selected")).toBe("true");
 });
 
+test("Appearance previews the active host brand and offers individual overrides", async () => {
+  await mount();
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: { ...EMPTY_OFFICE, brand: { name: "North Office", color: "#113355" } },
+    }),
+  );
+  expect(container.textContent).toContain("North Office");
+  for (const field of ["Office name", "Logo URL", "Brand color"]) {
+    expect((labelled(field) as HTMLInputElement).value).toBe("");
+  }
+});
+
+test("section changes reveal the matching controls and keep the notes field mounted", async () => {
+  await mount();
+  const section = (name: string) =>
+    container.querySelector<HTMLElement>(`[role="button"][aria-label="${name}"]`)!;
+  const visible = (node: HTMLElement | null) => {
+    for (let el = node; el; el = el.parentElement)
+      if (getComputedStyle(el).display === "none") return false;
+    return node !== null;
+  };
+  const folder = labelled("Notes folder");
+  expect(section("Appearance").getAttribute("aria-pressed")).toBe("true");
+  expect(visible(labelled("Outdoor scene"))).toBe(true);
+  expect(visible(folder)).toBe(false);
+  await act(async () => section("Automation").click());
+  expect(visible(folder)).toBe(true);
+  await act(async () => section("Services").click());
+  expect(visible(labelled("Jira projects"))).toBe(true);
+  expect(visible(folder)).toBe(false);
+  expect(labelled("Notes folder")).toBe(folder);
+});
+
 test("a view chosen here is saved on the device", async () => {
   await mount();
   await act(async () => labelled("2D view")?.click());
@@ -206,10 +241,11 @@ test("the notes schedule's failure shows under the Time zone field", async () =>
   expect(field.compareDocumentPosition(failure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("the wide device can turn off the street and keep its other settings", async () => {
+test("older devices keep their street choice and can switch to countryside in daylight", async () => {
   await mount();
-  const row = container.querySelector<HTMLElement>('[aria-label^="The street outside"]');
-  expect(row?.getAttribute("aria-checked")).toBe("true");
-  await act(async () => row?.click());
-  expect(deviceSaves).toEqual([{ ...deviceValues.current, street: false }]);
+  expect(labelled("City")?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => labelled("Countryside")?.click());
+  expect(deviceSaves).toContainEqual({ ...deviceValues.current, scene: "countryside" });
+  await act(async () => labelled("Day")?.click());
+  expect(deviceSaves).toContainEqual(expect.objectContaining({ lighting: "day" }));
 });

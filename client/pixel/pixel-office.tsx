@@ -607,7 +607,7 @@ const DeskView = memo(function DeskView({
   const { screen } = member.standing;
   const frame = useFrame(screen === "code" && !still);
   const press = useCallback(() => onSelect(member.id), [onSelect, member.id]);
-  const look = useMemo(() => lookOf(member.id), [member.id]);
+  const look = useMemo(() => lookOf(member.id, member.appearance), [member.id, member.appearance]);
   const slot = useMemo(
     (): ViewStyle => ({
       ...styles.slotHit,
@@ -794,7 +794,7 @@ const PersonView = memo(function PersonView({
 
   const frame = useFrame(motion.kind === "walking");
   const pose = poseOf(motion, member.standing.place, frame);
-  const look = useMemo(() => lookOf(member.id), [member.id]);
+  const look = useMemo(() => lookOf(member.id, member.appearance), [member.id, member.appearance]);
   const press = useCallback(() => onSelect(member.id), [onSelect, member.id]);
   const { icon } = member.standing;
   const seated = motion.kind === "seated";

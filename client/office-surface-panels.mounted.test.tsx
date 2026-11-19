@@ -9,7 +9,12 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { AccessibilityInfo } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { PluginScreenProps, SettingsState } from "@getpaseo/plugin/client";
+import type {
+  PluginClientContext,
+  PluginScreenProps,
+  PluginSidebarItemProps,
+  SettingsState,
+} from "@getpaseo/plugin/client";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import type { ChatMessage, OfficeAgent, OfficeEvent } from "../shared/contracts.js";
 import { buildOfficeModel } from "../shared/model.js";
@@ -165,6 +170,12 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   const Icon = (props: { name: string }) => createElement(View, { testID: `icon-${props.name}` });
   return {
     ExternalLink,
+    SidebarRow: ({ onPress }: { onPress(): void }) =>
+      createElement("button", {
+        type: "button",
+        onClick: onPress,
+        "aria-label": "Sidebar Office 3D",
+      }),
     Icon,
     Markdown,
     Modal,
@@ -228,12 +239,12 @@ beforeAll(async () => {
   ({ OfficeSurface } = await import("./office-surface.js"));
 });
 
-async function mount(): Promise<void> {
+async function mount(params: Record<string, string> = {}): Promise<void> {
   const props = {
     theme: THEME,
     layout: { compact, platform: "web" },
     host: { id: "host", label: "Host" },
-    params: {},
+    params,
     ...(settingsWay ? { onOpenSettings: () => void (settingsOpened += 1) } : {}),
     ...(withNavigation
       ? {
@@ -315,6 +326,16 @@ test("the page has no settings: no switch and no field", async () => {
   expect(container.querySelector('[role="switch"]')).toBeNull();
   // The list view's agent search is the page's own field, not a setting.
   expect(container.querySelector("input:not(#office-list-search)")).toBeNull();
+});
+
+test("Duty board is offered once the host has sent its duty list, not before", async () => {
+  await mount();
+  await act(async () => deliver?.({ type: "snapshot", state: EMPTY_OFFICE }));
+  expect(labelled("Duty board")).toBeNull();
+  await act(async () =>
+    deliver?.({ type: "snapshot", state: { ...EMPTY_OFFICE, duties: { duties: [], day: null } } }),
+  );
+  expect(labelled("Duty board")).not.toBeNull();
 });
 
 const BROKEN_NOTES = {
@@ -780,7 +801,7 @@ test("a collapsed column opens when a session opens", async () => {
   expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
 });
 
-test("the card's Open session works with no navigation, and the panel has no Open in workspace", async () => {
+test("the office workspace is available even on hosts without navigation", async () => {
   compact = false;
   withNavigation = false;
   await mount();
@@ -790,10 +811,10 @@ test("the card's Open session works with no navigation, and the panel has no Ope
 
   expect(sessionTab()).not.toBeNull();
   expect(container.textContent).toContain("Reading the ledger");
-  expect(labelled("Open in workspace")).toBeNull();
+  expect(labelled("Open in workspace")).not.toBeNull();
 });
 
-test("the panel's Open in workspace asks the app once", async () => {
+test("opening the workspace keeps the Office route and chat in place", async () => {
   compact = false;
   await mount();
   await seeAda();
@@ -801,7 +822,11 @@ test("the panel's Open in workspace asks the app once", async () => {
   await press("Open session");
   await press("Open in workspace");
 
-  expect(opened).toEqual(["ada"]);
+  expect(opened).toEqual([]);
+  expect(sessionTab()).not.toBeNull();
+  expect(
+    container.querySelector('[role="dialog"], dialog, iframe[title*="workspace" i]'),
+  ).not.toBeNull();
 });
 
 test("the List's Open session for a plan opens the tab", async () => {
@@ -1124,8 +1149,21 @@ test("the floor receives the weather and service failures appear in Attention", 
   expect(container.textContent).toContain("Weather service failed");
 });
 
+test("restoring the fullscreen route inside Paseo leaves Sessions to the host sidebar", async () => {
+  compact = false;
+  view = "3d";
+  floor.webgl = true;
+  await mount({ layout: "fullscreen" });
+  await sizeSurface(1440);
+  expect(labelled("Hide details sidebar")).not.toBeNull();
+  expect(container.querySelector('[data-testid="office-sessions-sidebar"]')).toBeNull();
+  expect(labelled("Hide sessions sidebar")).toBeNull();
+  expect(labelled("Show sessions sidebar")).toBeNull();
+});
+
 test("wide fullscreen gives Sessions its own rail and opens the chosen conversation beside the floor", async () => {
   compact = false;
+  floor.webgl = true;
   view = "2d";
   let target: Element | null = null;
   Object.defineProperties(document, {
@@ -1150,13 +1188,115 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     const sidebarSearch = labelled("Search agents");
     expect(sidebarSearch).not.toBeNull();
     await typeReply("Keep this draft");
+    await press("Office 3D");
+    expect(target).toBe(surface);
+    expect(labelled("3D view")?.getAttribute("aria-selected")).toBe("true");
+    expect(labelled("Activity")?.getAttribute("aria-selected")).toBe("true");
+    await pressTab("Ada");
+    expect(reply()).toBe("Keep this draft");
+    // jsdom has no dialog top layer. Record the browser operation on the actual mounted dialog.
+    const proto = Object.getPrototypeOf(document.createElement("dialog"));
+    Object.defineProperties(proto, {
+      show: {
+        configurable: true,
+        value() {
+          this.setAttribute("open", "");
+        },
+      },
+      showModal: {
+        configurable: true,
+        value() {
+          this.setAttribute("open", "");
+        },
+      },
+      close: {
+        configurable: true,
+        value() {
+          this.removeAttribute("open");
+        },
+      },
+    });
+    try {
+      await press("Open in workspace");
+      const workspace = surface.querySelector<HTMLDialogElement>("dialog[open]")!;
+      const workbench = workspace.querySelector('iframe[title="Paseo workspace"]');
+      expect(workbench).not.toBeNull();
+      await press("Office controls");
+      const steps = workspace.querySelector<HTMLElement>('[aria-label="Session steps"]')!;
+      await act(async () => steps.click());
+      await press("Paseo workspace");
+      await press("Office controls");
+      expect(workspace.querySelector("iframe")).toBe(workbench);
+      expect(steps.isConnected && steps.getAttribute("aria-pressed") === "true").toBe(true);
+      expect(workspace.querySelector('[aria-label="Close"]')).toBeNull();
+      await press("Minimize workspace");
+      expect(workspace.open).toBe(false);
+      expect(workbench?.isConnected).toBe(true);
+      await press("Restore Shop · shop-api");
+      expect(workspace.open).toBe(true);
+      expect(workspace.querySelector("iframe")).toBe(workbench);
+      expect(steps.getAttribute("aria-pressed")).toBe("true");
+      await press("Workspace board");
+      expect(surface.querySelectorAll("dialog[open]")).toHaveLength(2);
+      await press("Close shop-api board");
+      expect(surface.querySelector("dialog[open]")).toBe(workspace);
+      expect(workspace.querySelector("textarea")?.value).toBe("Keep this draft");
+      await press("Close Shop · shop-api");
+      await press("Office settings");
+      const settingsDialog = surface.querySelector("dialog[open]");
+      expect(settingsDialog?.querySelector('[aria-label="Notes folder"]')).toBeInstanceOf(
+        HTMLElement,
+      );
+      expect(settingsOpened).toBe(0);
+      await press("Close Office settings");
+      expect(surface.querySelector("dialog")).toBeNull();
+      expect(reply()).toBe("Keep this draft");
+      expect(labelled("Search agents")).toBe(sidebarSearch);
+      const notes = {
+        ...BROKEN_NOTES,
+        scheduleError: null,
+        failedAgentId: "ada",
+        problem: "Rate limited",
+      };
+      await act(async () =>
+        deliver?.({ type: "snapshot", state: { ...OFFICE_WITH_ONE_AGENT, notes } }),
+      );
+      await openAttention();
+      await pressFirst("Stand-up:");
+      expect(surface.querySelector('dialog[open][aria-label="Stand-up"]')).not.toBeNull();
+      await press("Stand-up notes");
+      expect(surface.querySelectorAll("dialog[open]")).toHaveLength(1);
+      expect(surface.querySelector('dialog[open][aria-label="Stand-up notes"]')).not.toBeNull();
+      await press("Close Stand-up notes");
+      expect(surface.querySelector("dialog")).toBeNull();
+      await pressTab("Ada");
+      expect(reply()).toBe("Keep this draft");
+    } finally {
+      Reflect.deleteProperty(proto, "show");
+      Reflect.deleteProperty(proto, "showModal");
+      Reflect.deleteProperty(proto, "close");
+    }
+
     await press("Hide sessions sidebar");
     expect(labelled("Show sessions sidebar")?.getAttribute("aria-expanded")).toBe("false");
     expect(reply()).toBe("Keep this draft");
     await press("Hide details sidebar");
     expect(labelled("Message")).toBeNull();
     expect(labelled("Show details sidebar")).not.toBeNull();
-    expect(labelled("Chat")?.getAttribute("role")).toBe("tab");
+    expect(labelled("Chat")).toBeNull();
+    expect(labelled("Team chat")?.getAttribute("role")).toBe("button");
+    await press("Team chat");
+    expect(labelled("To: Whole group")).not.toBeNull();
+    await press("Close team chat");
+    expect(labelled("To: Whole group")).toBeNull();
+    await act(async () => deliver?.({ type: "chat", change: { op: "all", messages: [] } }));
+    await act(async () =>
+      deliver?.({ type: "chat", change: { op: "add", message: chatMessage(Date.now(), "Ada") } }),
+    );
+    await press("Open team chat: Ada · Hi");
+    expect(labelled("To: Whole group")).not.toBeNull();
+    await press("Close team chat");
+    expect(labelled("Open team chat: Ada · Hi")).toBeNull();
     await press("Show details sidebar");
     expect(reply()).toBe("Keep this draft");
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
@@ -1171,9 +1311,105 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     target = null;
     await act(async () => void document.dispatchEvent(new Event("fullscreenchange")));
     expect(labelled("Full screen")).not.toBeNull();
+    expect(container.querySelector('[data-testid="office-sessions-sidebar"]')).toBeNull();
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
   } finally {
     Reflect.deleteProperty(document, "fullscreenEnabled");
     Reflect.deleteProperty(document, "fullscreenElement");
   }
+});
+
+async function registerOffice() {
+  const { default: contribute } = await import("../index.client.js");
+  const remove = () => undefined;
+  const addScreen = vi.fn<PluginClientContext["addScreen"]>(() => remove);
+  const addSidebarHeaderItem = vi.fn<PluginClientContext["addSidebarHeaderItem"]>(() => remove);
+  const cleanup = contribute({
+    addScreen,
+    addSidebarHeaderItem,
+    addWorkspacePanel: () => remove,
+    addSettingsScreen: () => remove,
+    addCommandCenterItem: () => remove,
+  } as unknown as PluginClientContext);
+  const [{ Component: Office }] = addScreen.mock.calls[0];
+  const [{ Component: Row }] = addSidebarHeaderItem.mock.calls[0];
+  return { Office, Row, cleanup };
+}
+
+test("the registered Office 3D row opens the screen once and expands the visible office in place", async () => {
+  const { Office, Row, cleanup } = await registerOffice();
+  const anotherHost = await registerOffice();
+  const openScreen = vi.fn<PluginSidebarItemProps["openScreen"]>();
+  const host = { id: "h", label: "Host" };
+  const layout = { compact: false, platform: "web" } as const;
+  const item = { theme: THEME, host, layout, openScreen, openPopover: vi.fn() };
+  const params = { layout: "fullscreen" };
+  const props = { host, layout, theme: THEME, params };
+  const location = { screenId: "office", params };
+  const render = async (mounted: boolean, active: boolean, SidebarItem = Row) => {
+    await act(async () =>
+      root.render(
+        <>
+          <SidebarItem {...item} currentScreen={active ? location : null} />
+          <div id="office-screen">{mounted && <Office {...props} />}</div>
+        </>,
+      ),
+    );
+  };
+  Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
+  try {
+    await render(false, false);
+    await press("Sidebar Office 3D");
+    expect(openScreen.mock.calls).toEqual([[location]]);
+    await render(true, true);
+    const surface = container.querySelector<HTMLElement>("#office-screen > div");
+    if (!surface) throw new Error("The registered screen did not render");
+    const requestFullscreen = vi.fn(async () => undefined);
+    surface.requestFullscreen = requestFullscreen;
+    const hiddenBounds = surface.getBoundingClientRect();
+    const measure = vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
+      ...hiddenBounds,
+      width: 1100,
+      height: 800,
+      right: 1100,
+      bottom: 800,
+    });
+    await press("Sidebar Office 3D");
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(openScreen).toHaveBeenCalledTimes(1);
+
+    // A different host contribution has no registered office, even while this one is visible.
+    await render(true, false, anotherHost.Row);
+    await press("Sidebar Office 3D");
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(openScreen).toHaveBeenCalledTimes(2);
+
+    // Paseo may retain an inactive panel and remove its layout box.
+    await render(true, false);
+    surface.parentElement!.hidden = true;
+    measure.mockReturnValue(hiddenBounds);
+    await press("Sidebar Office 3D");
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(openScreen).toHaveBeenCalledTimes(3);
+  } finally {
+    Reflect.deleteProperty(document, "fullscreenEnabled");
+    cleanup();
+    anotherHost.cleanup();
+  }
+});
+
+test("the native Office 3D row opens its regular screen", async () => {
+  const { Row, cleanup } = await registerOffice();
+  const props: PluginSidebarItemProps = {
+    host: { id: "h", label: "Host" },
+    layout: { compact: true, platform: "ios" },
+    theme: THEME,
+    currentScreen: null,
+    openScreen: vi.fn(),
+    openPopover: vi.fn(),
+  };
+  await act(async () => root.render(<Row {...props} />));
+  await press("Sidebar Office 3D");
+  expect(props.openScreen).toHaveBeenCalledWith({ screenId: "office" });
+  cleanup();
 });

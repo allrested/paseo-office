@@ -1,3 +1,4 @@
+import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
   useEffect,
@@ -17,6 +18,7 @@ import {
 } from "@getpaseo/plugin/client";
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import {
+  LOBBY,
   notesReadRpc,
   type ChatMessage,
   type WeatherScene,
@@ -36,9 +38,13 @@ import { sheetLeavesFirstOn } from "./agent-picker-text.js";
 import { AttentionStrip, type StripCard } from "./attention-strip.js";
 import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
+import { DutySheet } from "./duty-sheet.js";
+import { useDutyActions } from "./use-duty-actions.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
-import { ChatPanel } from "./chat-panel.js";
+import { TeamChatPreview } from "./team-chat-preview.js";
+import { useGroupPhoto } from "./use-group-photo.js";
+import { ChatPanel, FloatingTeamChat } from "./chat-panel.js";
 import { unreadCount, unreadLabel } from "./chat-text.js";
 import {
   COLUMN_MIN,
@@ -53,7 +59,6 @@ import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
 import { useSshServers } from "./ssh-hosts.js";
-import { OfficeDialogs } from "./office-modal.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -64,11 +69,21 @@ import {
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
-import { SessionPane, sessionOf, sessionTabsOf, type SessionContext } from "./session-pane.js";
+import {
+  SessionPane,
+  sessionChildren,
+  sessionOf,
+  sessionTabsOf,
+  type SessionContext,
+} from "./session-pane.js";
 import { useReplyDrafts } from "./use-reply-drafts.js";
+import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
+import { OfficeDialogs } from "./office-modal.js";
+import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
+import type { SidebarLauncher } from "./sidebar-launcher.js";
 import { SessionsPanel } from "./sessions-panel.js";
 import { PixelOffice } from "./pixel/pixel-office.js";
 import { StructureView } from "./structure-view.js";
@@ -76,10 +91,12 @@ import { SESSION_RAIL_MIN, useOfficeStyles, type OfficeStyles } from "./styles.j
 import { useAgentActions, type AgentActions } from "./use-agent-actions.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useDeviceSwitch } from "./use-device-switch.js";
+import { fullscreenTheme } from "./fullscreen-theme.js";
 import { FullscreenHeader, type SidebarControls } from "./fullscreen-header.js";
 import { useColumn, type ColumnState } from "./use-column.js";
 import { LibraryCard } from "./library-card.js";
 import { NotesCard } from "./notes-card.js";
+import { leaveFullscreenAfter, lockEscape, pageUsesEscape, unlockEscape } from "./world/escape.js";
 import { todayZone } from "./notes-text.js";
 import { QaCard } from "./qa-card.js";
 import { ReviewCard } from "./review-card.js";
@@ -99,7 +116,7 @@ import { ViewSwitch } from "./view-switch.js";
 import { hasWebGL2 } from "./web-env.web.js";
 import { hasScriptFrame } from "./world/script-frame-kit.js";
 import { useFloorPlan } from "./world/use-floor-plan.js";
-import { useStreetSwitch } from "./use-street.js";
+import { useOfficeScene } from "./use-street.js";
 import { WorldView } from "./world/world-view.js";
 import { WorldViewNative } from "./world/world-view-native.js";
 
@@ -530,6 +547,7 @@ function SurfaceNotices({
 interface PanelButtonProps {
   /** What it opens, and what a screen reader calls it. */
   label: string;
+  caption?: string | undefined;
   /** A Lucide name. */
   icon: string;
   screenId: string;
@@ -548,6 +566,7 @@ interface PanelButtonProps {
  */
 function PanelButton({
   label,
+  caption,
   icon,
   screenId,
   size,
@@ -572,7 +591,7 @@ function PanelButton({
       onPressOut={pressOut}
       onHoverIn={hoverIn}
       onHoverOut={hoverOut}
-      style={styles.segment}
+      style={caption ? styles.sidebarButton : styles.segment}
     >
       {hovered || pressed ? <View style={styles.segmentHoverFill} /> : null}
       {/* The count sits on the icon's corner, inside the pill that clips. */}
@@ -584,6 +603,11 @@ function PanelButton({
           </View>
         ) : null}
       </View>
+      {caption && (
+        <Text numberOfLines={1} style={styles.sidebarButtonText}>
+          {caption}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -615,6 +639,8 @@ function SettingsButton({ onOpen, compact, touchScreen, color, styles }: Setting
 }
 
 interface SurfaceBodyProps {
+  onPhotoReady: ReturnType<typeof useGroupPhoto>["onPhotoReady"];
+  fullscreen?: { active: boolean; toggle(): void } | undefined;
   office: OfficeState;
   model: OfficeModel;
   rooms: readonly OfficeRoom[];
@@ -631,7 +657,15 @@ interface SurfaceBodyProps {
   /** Null from the 3D office, when the chosen person is tapped again. */
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace(agentId: string): void;
   onOpenBoard(roomId: string): void;
+  /**
+   * The duty board's editor: the 3D pantry's board and the List's lobby card open it. Absent while
+   * the host has sent no duty list.
+   */
+  onOpenDuties: (() => void) | undefined;
+  /** The 3D office acted out a pretend duty with this agent's figure. */
+  onDutyActed(id: string, agentId: string): void;
   machine: Machine | null;
   onOpenMachine(): void;
   /** The 3D wall screen's: absent on an app that cannot show Resources beside the floor. */
@@ -651,10 +685,12 @@ interface SurfaceBodyProps {
   platform: Platform;
   /** The device's Sound switch, which the 3D office follows and its button sets. */
   sound: SoundSwitch;
-  street: boolean | null;
+  street: ReturnType<typeof useOfficeScene>;
 }
 
 function SurfaceBody({
+  onPhotoReady,
+  fullscreen,
   office,
   model,
   rooms,
@@ -669,7 +705,10 @@ function SurfaceBody({
   name,
   onSelectAgent,
   onOpenSession,
+  onOpenAgentWorkspace,
   onOpenBoard,
+  onOpenDuties,
+  onDutyActed,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -710,6 +749,8 @@ function SurfaceBody({
     const World = worldViewFor(platform);
     return (
       <World
+        onPhotoReady={onPhotoReady}
+        fullscreen={fullscreen}
         model={model}
         theme={theme}
         styles={styles}
@@ -719,10 +760,12 @@ function SurfaceBody({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onSelectBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+        onDutyActed={onDutyActed}
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
-        onOpenSession={onOpenSession}
+        onOpenAgentWorkspace={onOpenAgentWorkspace}
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
@@ -731,7 +774,13 @@ function SurfaceBody({
         onOpenIncidents={onOpenIncidents}
         onProblem={onSceneProblem}
         sound={sound}
-        streetOn={street}
+        streetOn={street.scene.on === null ? null : street.scene.on === "city"}
+        scene={street.scene.on ?? undefined}
+        night={
+          street.lighting.on === "auto" || street.lighting.on === null
+            ? undefined
+            : street.lighting.on === "night"
+        }
       />
     );
   }
@@ -763,6 +812,7 @@ function SurfaceBody({
       onSelectAgent={onSelectAgent}
       onOpenSession={onOpenSession}
       onOpenBoard={onOpenBoard}
+      onOpenDuties={onOpenDuties}
     />
   );
 }
@@ -814,6 +864,8 @@ interface ViewControlsProps {
   viewChoice: ViewChoiceState;
   /** The device refused to store a press on the 3D floor's Sound button. */
   soundUnsaved: boolean;
+  toolbarLabels: boolean;
+  onTeam(): void;
   machine: Machine | null;
   onMachine?: () => void;
   onChange(next: OfficeViewChoice): void;
@@ -855,6 +907,8 @@ function ViewControls({
   floorDrawn,
   viewChoice,
   soundUnsaved,
+  toolbarLabels,
+  onTeam,
   machine,
   onMachine,
   onChange,
@@ -876,10 +930,27 @@ function ViewControls({
     ),
     [viewChoice.options, viewChoice.choice, onChange, styles],
   );
+  const showOffice = useCallback(() => {
+    onChange(viewChoice.options.includes("3d") ? "3d" : "2d");
+    sidebars?.column.show("activity");
+  }, [onChange, viewChoice.options, sidebars]);
   const actions = (
     <>
       {sidebars && onMachine && (
         <HostResourceButton machine={machine} onOpen={onMachine} styles={styles} />
+      )}
+      {sidebars && (
+        <PanelButton
+          label="Team chat"
+          caption={toolbarLabels ? "Team chat" : undefined}
+          icon="MessageCircle"
+          screenId="team"
+          size={18}
+          count={badges.chat}
+          color={color}
+          onOpen={onTeam}
+          styles={styles}
+        />
       )}
       {full.available ? (
         <PanelButton
@@ -916,6 +987,7 @@ function ViewControls({
           sidebars={sidebars}
           badges={badges}
           modes={modes}
+          onOffice={showOffice}
           color={color}
           styles={styles}
         >
@@ -1004,6 +1076,8 @@ function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
     return (
       <SessionPane
         agentId={view.agentId}
+        subagents={sessionChildren(model, view.agentId)}
+        onOpenSubagent={panel.link.openSession}
         agent={agent}
         room={room}
         reply={replies.texts.get(view.agentId) ?? ""}
@@ -1021,7 +1095,12 @@ function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
 function useChatDraft(): ChatDraft {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  return useMemo(() => ({ text, setText, replyTo, setReplyTo }), [text, replyTo]);
+  const [recipient, setRecipient] = useState<string | null>(null);
+  const [images, setImages] = useState<ChatDraft["images"]>([]);
+  return useMemo(
+    () => ({ text, setText, replyTo, setReplyTo, recipient, setRecipient, images, setImages }),
+    [text, replyTo, recipient, images],
+  );
 }
 
 /** What is chosen and typed in the Sessions tab's New agent form: the surface's, as the chat's is. */
@@ -1111,16 +1190,40 @@ function useColumnContent({
  * dismissing the sheet leaves an open session open. A row press must not leave the agent's card
  * under the sheet, so the sheet closes first; a session opens in the sheet.
  */
-function useColumnSheet(column: ColumnState, compact: boolean, select: (agentId: string) => void) {
+function useOfficeColumn(compact: boolean, integrated: boolean, openChat: () => void): ColumnState {
+  const column = useColumn(compact);
+  const { show, view } = column;
+  return useMemo(
+    () => ({
+      ...column,
+      view:
+        integrated && view.kind === "tab" && view.tab === "chat"
+          ? { kind: "tab", tab: "activity" }
+          : view,
+      show(tab) {
+        if (integrated && tab === "chat") openChat();
+        else show(tab);
+      },
+    }),
+    [column, view, show, integrated, openChat],
+  );
+}
+
+function useColumnSheet(
+  column: ColumnState,
+  compact: boolean,
+  floatingChat: boolean,
+  select: (agentId: string) => void,
+) {
   const [open, setOpen] = useState(false);
   const closeSheet = useCallback(() => setOpen(false), []);
   const { show, openSession: openInColumn } = column;
   const openTab = useCallback(
     (tab: ColumnTab) => {
       show(tab);
-      setOpen(true);
+      setOpen(!(floatingChat && tab === "chat"));
     },
-    [show],
+    [show, floatingChat],
   );
   const openSession = useCallback(
     (agentId: string) => {
@@ -1318,24 +1421,83 @@ function useSurfaceLayout(deviceCompact: boolean, styles: OfficeStyles, fullscre
  * at `contribute`: each call returns a new component type, so calling it while rendering would
  * remount the office.
  */
-export function createOfficeSurface(openSettings: () => void) {
+export function createOfficeSurface(openSettings: () => void, launcher: SidebarLauncher) {
   return function Surface(props: OfficeSurfaceProps) {
-    return <OfficeSurface {...props} onOpenSettings={openSettings} />;
+    return <OfficeSurface {...props} onOpenSettings={openSettings} launcher={launcher} />;
   };
 }
 
-function useFullscreen(platform: Platform) {
+function useFullscreen(props: OfficeSurfaceProps, launcher: SidebarLauncher | undefined) {
+  const { platform } = props.layout;
+  const startExpanded =
+    platform === "web" && !("workspaceId" in props) && props.params?.layout === "fullscreen";
   const root = useRef<View>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [expandedInPage, setExpandedInPage] = useState(startExpanded);
   const [fullscreenError, setFullscreenError] = useState(false);
   const canFullscreen =
     platform === "web" && typeof document !== "undefined" && document.fullscreenEnabled;
   useEffect(() => {
     if (!canFullscreen) return;
-    const changed = () => setFullscreen(Object.is(document.fullscreenElement, root.current));
+    const changed = () => {
+      const active = Object.is(document.fullscreenElement, root.current);
+      if (active) setExpandedInPage(false);
+      setFullscreen(active);
+      // The scene's Escape (getting up from an activity, leaving walk-in) is the browser's own
+      // while fullscreen: hold it for the page, and give it back with fullscreen.
+      if (active) lockEscape(navigator);
+      else unlockEscape(navigator);
+    };
+    // With Escape held, a press nothing used leaves fullscreen as it did before.
+    const pressed = (event: KeyboardEvent) => {
+      if (!Object.is(document.fullscreenElement, root.current)) return;
+      leaveFullscreenAfter(event, pageUsesEscape(document), document);
+    };
     document.addEventListener("fullscreenchange", changed);
-    return () => document.removeEventListener("fullscreenchange", changed);
+    document.addEventListener("keydown", pressed, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", changed);
+      document.removeEventListener("keydown", pressed, true);
+      unlockEscape(navigator);
+    };
   }, [canFullscreen]);
+  // A sidebar press on a retained screen must not activate a hidden floor.
+  const launch = useCallback(() => {
+    const element = root.current as unknown as HTMLElement | null;
+    if (!element?.isConnected) return false;
+    const rect = element.getBoundingClientRect();
+    if (
+      rect.width <= 0 ||
+      rect.height <= 0 ||
+      rect.bottom <= 0 ||
+      rect.right <= 0 ||
+      rect.left >= window.innerWidth ||
+      rect.top >= window.innerHeight ||
+      element.checkVisibility?.({ visibilityProperty: true }) === false
+    )
+      return false;
+    setFullscreenError(false);
+    if (document.fullscreenElement !== element) {
+      if (
+        canFullscreen &&
+        typeof element.requestFullscreen === "function" &&
+        navigator.userActivation?.isActive !== false
+      ) {
+        void element.requestFullscreen().catch(() => setExpandedInPage(true));
+      } else {
+        setExpandedInPage(true);
+      }
+    }
+    return true;
+  }, [canFullscreen]);
+  useEffect(() => {
+    if (platform === "web") return launcher?.register(launch);
+  }, [platform, launcher, launch]);
+  // The cold launch can mount after browser user activation has expired. Its
+  // one-page layout still opens, with the toolbar available to enter fullscreen.
+  useEffect(() => {
+    if (startExpanded && launcher?.takeScreenLaunch()) launch();
+  }, [startExpanded, launcher, launch]);
   const toggleFullscreen = useCallback(async () => {
     const element = root.current as unknown as HTMLElement | null;
     if (!element) return;
@@ -1350,6 +1512,7 @@ function useFullscreen(platform: Platform) {
   return {
     root,
     active: fullscreen,
+    integrated: fullscreen || expandedInPage,
     error: fullscreenError,
     available: canFullscreen,
     toggle: toggleFullscreen,
@@ -1358,14 +1521,17 @@ function useFullscreen(platform: Platform) {
 
 function useFullscreenPanels(
   active: boolean,
+  fullscreen: boolean,
   compact: boolean,
   surfaceWidth: number,
   column: ColumnState,
   sheet: ColumnSheetState,
   select: (id: string | null) => void,
   selectFromStrip: (id: string) => void,
+  openWorkspace: (agentId: string) => void,
 ) {
   const docked = active && !compact && surfaceWidth > 0;
+  const sessionsAvailable = docked && fullscreen;
   const { on: sessionsHidden, set: hideSessions } = useDeviceSwitch("sessionsHidden", false);
   const sessionsOpen = sessionsHidden !== true;
   const sidebarWidth = Math.max(SESSION_RAIL_MIN, Math.min(312, Math.round(surfaceWidth * 0.24)));
@@ -1373,14 +1539,19 @@ function useFullscreenPanels(
   const sidebars: SidebarControls | undefined = docked
     ? {
         sessionsOpen,
+        sessionsAvailable,
         column,
         hideSessions,
       }
     : undefined;
   const { openSession } = sheet;
+  // A Sessions row's own button goes straight to the agent's workspace, past its details.
   const link = useMemo(
-    () => (active ? { select: openSession, openSession } : sheet.link),
-    [active, openSession, sheet.link],
+    (): OfficeLink => ({
+      ...(active ? { select: openSession, openSession } : sheet.link),
+      openWorkspace,
+    }),
+    [active, openSession, sheet.link, openWorkspace],
   );
   const selectAgent = useCallback(
     (id: string | null) => {
@@ -1391,13 +1562,14 @@ function useFullscreenPanels(
   );
   return {
     docked,
+    sessionsAvailable,
     sidebars,
     sessionsOpen,
     railSize,
     link,
     selectAgent,
     selectFromStrip: active ? openSession : selectFromStrip,
-    width: docked && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
+    width: sessionsAvailable && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
     column: useMemo(
       () =>
         docked && column.view.kind === "tab" && column.view.tab === "sessions"
@@ -1407,6 +1579,91 @@ function useFullscreenPanels(
     ),
     sheet: useMemo(() => (active ? { ...sheet, sheetLink: link } : sheet), [sheet, link, active]),
   };
+}
+
+function selectAgentDetail(
+  id: string | null,
+  model: OfficeModel,
+  activities: OfficeState["state"]["activity"],
+) {
+  if (!id) return { agent: null, activity: null };
+  return { agent: model.agents.get(id) ?? null, activity: activities[id] ?? null };
+}
+
+function OfficeMessenger({
+  open,
+  link,
+  onOpen,
+  onClose,
+  ...panel
+}: Omit<Parameters<typeof FloatingTeamChat>[0], "onClose"> & {
+  open: boolean;
+  onOpen(): void;
+  onClose(): void;
+}) {
+  const sessionLink = useMemo(
+    (): OfficeLink => ({
+      select(id) {
+        onClose();
+        link.select(id);
+      },
+      openSession(id) {
+        onClose();
+        link.openSession(id);
+      },
+    }),
+    [link, onClose],
+  );
+  return open ? (
+    <FloatingTeamChat {...panel} link={sessionLink} onClose={onClose} />
+  ) : (
+    <TeamChatPreview chat={panel.office.chat} onOpen={onOpen} />
+  );
+}
+
+function useMessengerTasks(
+  board: BoardSheetState,
+  sidebars: SidebarControls | undefined,
+  sheet: ColumnSheetState,
+  column: ColumnState,
+  compact: boolean,
+  newAgent: NewAgentDraft,
+  closeChat: () => void,
+) {
+  const { open } = board;
+  const onBoard = useCallback(() => open(LOBBY), [open]);
+  const { openTab } = sheet;
+  const { show } = column;
+  const { setOpen } = newAgent;
+  const onNewAgent = useCallback(() => {
+    closeChat();
+    if (sidebars) sidebars.hideSessions(false);
+    else if (compact) openTab("sessions");
+    else show("sessions");
+    setOpen(true);
+  }, [sidebars, compact, openTab, show, setOpen, closeChat]);
+  return { onBoard, onNewAgent };
+}
+function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void) {
+  const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(null);
+  const closeWorkspace = useCallback(() => setWorkspace(null), []);
+  const showWorkspace = useCallback(
+    (workspaceId: string) => setWorkspace({ workspaceId, agentId: null }),
+    [],
+  );
+  const showAgentWorkspace = useCallback(
+    (agentId: string) =>
+      setWorkspace({ workspaceId: model.agents.get(agentId)?.workspaceId ?? null, agentId }),
+    [model.agents],
+  );
+  const openWorkspaceBoard = useCallback(
+    (id: string) => {
+      closeWorkspace();
+      openBoard(id);
+    },
+    [closeWorkspace, openBoard],
+  );
+  return { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard };
 }
 
 function useHostResources(machine: Machine | null, live: boolean) {
@@ -1429,9 +1686,10 @@ export function OfficeSurface(
   props: OfficeSurfaceProps & {
     /** Absent only in tests and on a host that gives no way to its settings. */
     onOpenSettings?: () => void;
+    launcher?: SidebarLauncher;
   },
 ) {
-  const { theme, layout, navigation, onOpenSettings } = props;
+  const { layout, navigation, onOpenSettings } = props;
   const focusRoomId = "workspaceId" in props ? props.workspaceId : null;
   // Asked once for the surface's life, like the app: a mouse plugged into a tablet does not
   // shrink its controls.
@@ -1439,8 +1697,10 @@ export function OfficeSurface(
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
     [layout.platform],
   );
+  const full = useFullscreen(props, props.launcher);
+  const theme = fullscreenTheme(props.theme, full.integrated);
   const styles = useOfficeStyles(theme, layout.compact, touchScreen);
-  const full = useFullscreen(layout.platform);
+
   const office = useOffice();
   const actions = useAgentActions();
   const boardActions = useBoardActions();
@@ -1453,8 +1713,15 @@ export function OfficeSurface(
   const readNotes = useRpc(notesReadRpc);
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
+  const settings = useOfficeSettingsDialog(
+    full.integrated || viewChoice.choice === "3d",
+    onOpenSettings,
+  );
+  const [teamOpen, setTeamOpen] = useState(false);
+  const openTeam = useCallback(() => setTeamOpen((value) => !value), []);
+  const closeTeam = useCallback(() => setTeamOpen(false), []);
   // One Sound switch for the floor: the 3D office follows it, and the corner shows a refused save.
-  const street = useStreetSwitch(layout);
+  const street = useOfficeScene(layout);
   const sound = useSoundSwitch();
   const model = useMemo(() => buildOfficeModel(office.state), [office.state]);
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
@@ -1462,7 +1729,7 @@ export function OfficeSurface(
     styles,
     full.active,
   );
-  const column = useColumn(compact);
+  const column = useOfficeColumn(compact, full.integrated, openTeam);
   const machine = useMemo(() => namedMachine(reading, model.agents), [reading, model.agents]);
   const rooms = useMemo(
     () => orderRoomsForFocus(model.rooms, focusRoomId),
@@ -1476,6 +1743,16 @@ export function OfficeSurface(
     live,
   );
   const board = useBoardSheet(model, live);
+  const dutyCard = useCardOpening(live);
+  // Until the host sends its duty list (an older host has none) nothing offers the duty board.
+  const openDuties = model.dutyList === null ? undefined : dutyCard.show;
+  const dutyActions = useDutyActions();
+  const { acted } = dutyActions;
+  // A report the host refuses changes nothing: its duty board is what the scene is told next.
+  const dutyActed = useCallback(
+    (id: string, agentId: string) => void acted(id, agentId).catch(() => undefined),
+    [acted],
+  );
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
   const incidentsCard = useCardOpening(live);
@@ -1487,10 +1764,8 @@ export function OfficeSurface(
     closeStandup();
     openNotes();
   }, [closeStandup, openNotes]);
-  const showWorkspace = useMemo(() => {
-    if (navigation === undefined) return undefined;
-    return (workspaceId: string) => navigation.openWorkspace({ workspaceId });
-  }, [navigation]);
+  const { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard } =
+    useWorkspaceOverlay(model, board.open);
   const qa = useQa(model, live);
   const readLog = useScriptLog();
   const reviews = useReviews({
@@ -1511,9 +1786,10 @@ export function OfficeSurface(
     setFocusRequest((previous) => nextFocusRequest(previous, agentId));
   }, []);
   // Every way in to a session ends in the column: its tab, or the phone's sheet.
-  const sheet = useColumnSheet(column, compact, setSelectedId);
+  const sheet = useColumnSheet(column, compact, full.integrated, setSelectedId);
   const { openSession } = sheet;
   const panels = useFullscreenPanels(
+    full.integrated,
     full.active,
     compact,
     surfaceWidth,
@@ -1521,6 +1797,7 @@ export function OfficeSurface(
     sheet,
     setSelectedId,
     selectFromStrip,
+    showAgentWorkspace,
   );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
@@ -1532,8 +1809,8 @@ export function OfficeSurface(
     [closeStandup, closeNotes, openSession],
   );
   const openResources = useMemo(
-    () => resourcesOpener(navigation, openMachine),
-    [navigation, openMachine],
+    () => (full.integrated ? openMachine : resourcesOpener(navigation, openMachine)),
+    [full.integrated, navigation, openMachine],
   );
   // The panels of the column reach this surface through the link: a row press opens the card, as
   // a List row does, and "Open session" shows the session.
@@ -1567,10 +1844,10 @@ export function OfficeSurface(
     () => incidentsEntry(incidents, openIncidents),
     [incidents, openIncidents],
   );
-  const settingsStripEntry = useSettingsEntry(office.state, onOpenSettings);
+  const settingsStripEntry = useSettingsEntry(office.state, settings.show);
   const weatherStripEntry = useMemo(
-    () => weatherEntry(office.state.weather, onOpenSettings),
-    [office.state.weather, onOpenSettings],
+    () => weatherEntry(office.state.weather, settings.show),
+    [office.state.weather, settings.show],
   );
   // The strip's cards, each only while it has something to say. An incident comes first.
   const cards = useMemo(
@@ -1610,11 +1887,31 @@ export function OfficeSurface(
     onLeave: sheet.closeSheet,
     styles,
   });
-  const selected = kept === null ? null : (model.agents.get(kept) ?? null);
-  const selectedActivity = kept === null ? null : (office.state.activity[kept] ?? null);
+  const selected = selectAgentDetail(kept, model, office.state.activity);
   // The panels size their controls for the surface they are in, not only for the device.
   const panelLayout = useMemo(() => ({ ...layout, compact }), [layout, compact]);
-  const panel = { office, styles, theme, layout: panelLayout, attention, draft, newAgent };
+  const { onPhotoReady, onGroupPhoto } = useGroupPhoto();
+  const chatTasks = useMessengerTasks(
+    board,
+    panels.sidebars,
+    sheet,
+    column,
+    compact,
+    newAgent,
+    closeTeam,
+  );
+  const panel = {
+    office,
+    styles,
+    theme,
+    layout: panelLayout,
+    attention,
+    draft,
+    newAgent,
+    ...chatTasks,
+    onDuties: openDuties,
+    onGroupPhoto,
+  };
   const sessions = useMemo(
     () => sessionTabsOf(column.sessions, model.agents),
     [column.sessions, model.agents],
@@ -1622,8 +1919,14 @@ export function OfficeSurface(
   const { closeSession } = column;
   const replies = useReplyDrafts(column.sessions);
   const session = useMemo(
-    (): SessionContext => ({ model, replies, actions, navigation, closeSession }),
-    [model, replies, actions, navigation, closeSession],
+    (): SessionContext => ({
+      model,
+      replies,
+      actions,
+      showWorkspace: showAgentWorkspace,
+      closeSession,
+    }),
+    [model, replies, actions, showAgentWorkspace, closeSession],
   );
   const color = theme.colors.foreground;
   const controls = (
@@ -1634,19 +1937,21 @@ export function OfficeSurface(
       floorDrawn={floorDrawn}
       viewChoice={viewChoice}
       soundUnsaved={sound.unsaved}
+      toolbarLabels={surfaceWidth >= 1100}
+      onTeam={openTeam}
       machine={machine}
       onMachine={hostEntry?.onOpen}
       onChange={changeView}
       compact={layout.compact}
       touchScreen={touchScreen}
       color={color}
-      onOpenSettings={onOpenSettings}
+      onOpenSettings={settings.show}
       styles={styles}
     />
   );
   // One tree in both layouts, so a flip between them does not draw the floor again: compact adds
   // the sheet in the floor's box and the bar under the row, wide adds the column beside the floor.
-  return (
+  const surface = (
     <View ref={full.root} style={styles.screen} onLayout={measure}>
       <SurfaceNotices
         fullscreenError={full.error}
@@ -1657,7 +1962,7 @@ export function OfficeSurface(
       />
       {panels.docked && controls}
       <View style={styles.officeRow}>
-        {panels.docked ? (
+        {panels.sessionsAvailable ? (
           <SessionsSidebar
             {...panel}
             link={panels.link}
@@ -1668,6 +1973,8 @@ export function OfficeSurface(
         <View style={floorStyle}>
           {!panels.docked && controls}
           <SurfaceBody
+            onPhotoReady={onPhotoReady}
+            fullscreen={full.available ? full : undefined}
             office={office}
             model={model}
             rooms={rooms}
@@ -1682,7 +1989,10 @@ export function OfficeSurface(
             name={name}
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
+            onOpenAgentWorkspace={showAgentWorkspace}
             onOpenBoard={board.open}
+            onOpenDuties={openDuties}
+            onDutyActed={dutyActed}
             machine={machine}
             onOpenMachine={openMachine}
             onOpenResources={openResources}
@@ -1697,7 +2007,7 @@ export function OfficeSurface(
             onSceneProblem={setSceneProblem}
             platform={layout.platform}
             sound={sound}
-            street={street.on}
+            street={street}
           />
           <PhoneSheet
             compact={compact}
@@ -1734,23 +2044,21 @@ export function OfficeSurface(
         styles={styles}
       />
       <AgentCard
-        agent={selected}
-        activity={selectedActivity}
+        agent={selected.agent}
+        activity={selected.activity}
         actions={actions}
         onOpenSession={openSession}
         styles={styles}
         onClose={closeCard}
       />
-      <OfficeDialogs fullscreen={full.active} theme={theme} styles={styles}>
-        <MachineCard
-          machine={live ? machine : null}
-          ssh={ssh}
-          open={machineOpen}
-          cleanUp={cleanUp}
-          styles={styles}
-          onClose={closeMachine}
-        />
-      </OfficeDialogs>
+      <MachineCard
+        ssh={ssh}
+        machine={machine}
+        open={machineOpen}
+        cleanUp={cleanUp}
+        styles={styles}
+        onClose={closeMachine}
+      />
       <JanitorCard
         rows={contexts}
         open={janitorOpen && live}
@@ -1829,6 +2137,51 @@ export function OfficeSurface(
         styles={styles}
         onClose={board.close}
       />
+      <DutySheet
+        open={dutyCard.open}
+        list={model.dutyList}
+        rows={model.duties}
+        name={name}
+        actions={dutyActions}
+        styles={styles}
+        onClose={dutyCard.close}
+      />
+      {full.integrated && (
+        <OfficeMessenger
+          open={teamOpen}
+          {...panel}
+          link={panels.link}
+          onOpen={openTeam}
+          onClose={closeTeam}
+        />
+      )}
+      <OfficeWorkspace
+        selection={workspace}
+        hostId={props.host.id}
+        session={session}
+        styles={styles}
+        layout={panelLayout}
+        onSelect={showAgentWorkspace}
+        onBoard={full.integrated ? board.open : openWorkspaceBoard}
+        onClose={closeWorkspace}
+      />
+      <FullscreenSettings
+        open={settings.open}
+        onClose={settings.close}
+        office={office}
+        actions={boardActions}
+        styles={styles}
+        view={viewChoice}
+        street={street}
+        sound={sound}
+      />
     </View>
+  );
+  return (
+    <OfficeBrandContext.Provider value={office.state.brand}>
+      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+        {surface}
+      </OfficeDialogs>
+    </OfficeBrandContext.Provider>
   );
 }

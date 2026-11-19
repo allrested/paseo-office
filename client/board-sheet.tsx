@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Icon, Modal, TextInput } from "@getpaseo/plugin/client/ui";
-import { POST_TEXT_MAX, type Post, type PostKind } from "../shared/contracts.js";
+import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
+import { LOBBY, POST_TEXT_MAX, type Post, type PostKind } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
 import { AgentPicker } from "./agent-picker.js";
-import { NOBODY, choiceLabel, closeStep, keptChoice } from "./agent-picker-text.js";
+import {
+  NOBODY,
+  choiceLabel,
+  closeStep,
+  keptChoice,
+  recipientLabels,
+} from "./agent-picker-text.js";
 import { orderBoardPosts } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import { LobbyBody } from "./lobby-board.js";
@@ -51,7 +58,11 @@ interface PostActionsProps {
 }
 
 export function PostWithActions({ post, name, actions, styles }: PostActionsProps) {
-  const done = useCallback(() => actions.markDone(post.id), [actions, post.id]);
+  const finished = post.state === "done";
+  const toggleDone = useCallback(
+    () => (finished ? actions.reopen(post.id) : actions.markDone(post.id)),
+    [actions, finished, post.id],
+  );
   const remove = useCallback(() => actions.remove(post.id), [actions, post.id]);
   // A deleted post is gone for good, so Delete asks once more. The question moves the buttons
   // down a line: a second tap in the same place lands on the words, not on a button.
@@ -78,9 +89,9 @@ export function PostWithActions({ post, name, actions, styles }: PostActionsProp
         <View style={styles.actions}>
           {post.kind === "task" ? (
             <ActionButton
-              label="Mark done"
+              label={finished ? "Reopen" : "Mark done"}
               pendingLabel="Saving..."
-              onPress={done}
+              onPress={toggleDone}
               styles={styles}
             />
           ) : null}
@@ -102,12 +113,13 @@ interface ChoiceFieldProps {
   label: string;
   /** The choice now. */
   value: string;
+  inline: boolean;
   onOpen(): void;
   styles: OfficeStyles;
 }
 
 /** A form's row that opens a page: what it chooses, the choice, and a chevron. */
-function ChoiceField({ id, label, value, onOpen, styles }: ChoiceFieldProps) {
+function ChoiceField({ id, label, value, inline, onOpen, styles }: ChoiceFieldProps) {
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
   const hoverOut = useCallback(() => setHovered(false), []);
@@ -125,10 +137,11 @@ function ChoiceField({ id, label, value, onOpen, styles }: ChoiceFieldProps) {
       onPressOut={pressOut}
       onHoverIn={hoverIn}
       onHoverOut={hoverOut}
-      style={styles.pickerField}
+      style={inline ? styles.lobbyRecipient : styles.pickerField}
     >
       {lit ? <View style={styles.pressedFill} /> : null}
-      <View style={styles.pickerFieldBody}>
+      {inline ? <Icon name="UserRound" size={14} color={styles.iconColor} /> : null}
+      <View style={inline ? styles.lobbyTaskLine : styles.pickerFieldBody}>
         <Text style={styles.rowMeta} numberOfLines={1}>
           {label}
         </Text>
@@ -136,7 +149,7 @@ function ChoiceField({ id, label, value, onOpen, styles }: ChoiceFieldProps) {
           {value}
         </Text>
       </View>
-      <Icon name="ChevronRight" size={16} color={styles.iconColor} />
+      <Icon name={inline ? "ChevronDown" : "ChevronRight"} size={16} color={styles.iconColor} />
     </Pressable>
   );
 }
@@ -186,6 +199,7 @@ export function useWakeChoice({ rooms, picking, onPicking }: WakeChoiceInput): W
 
 interface WakeFieldProps {
   id: string;
+  roomId: string;
   to: string;
   rooms: readonly OfficeRoom[];
   wakesPaused: boolean;
@@ -194,19 +208,24 @@ interface WakeFieldProps {
 }
 
 /** The form's row that opens the page, and while wakes are off, that the agent waits. */
-export function WakeField({ id, to, rooms, wakesPaused, onOpen, styles }: WakeFieldProps) {
+export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }: WakeFieldProps) {
+  const labels = recipientLabels(roomId);
+  const paused = wakesPaused && (roomId === LOBBY || to !== NOBODY);
   return (
     <View style={styles.sheetField}>
       <ChoiceField
         id={id}
-        label="Wake an agent with it"
-        value={choiceLabel(to, rooms)}
+        label={labels.field}
+        value={choiceLabel(to, rooms, labels.defaultChoice)}
+        inline={roomId === LOBBY}
         onOpen={onOpen}
         styles={styles}
       />
-      {to !== NOBODY && wakesPaused ? (
+      {paused ? (
         <Text style={styles.muted}>
-          Wake agents is off. The agent gets this post when you turn it on.
+          {to === NOBODY
+            ? "Automatic pickup resumes when you turn on Wake agents."
+            : "Wake agents is off. The agent gets this post when you turn it on."}
         </Text>
       ) : null}
     </View>
@@ -300,6 +319,7 @@ function SheetBody({
       </View>
       <WakeField
         id={fieldId}
+        roomId={room.id}
         to={to}
         rooms={rooms}
         wakesPaused={wakesPaused}
@@ -383,8 +403,20 @@ export function BoardSheet({
     [sheetLeavesFirst, onClose, picking],
   );
   const board = room ? `${room.name} board` : "Board";
+  const pickerTitle = room?.lobby ? "Send task to" : "Wake an agent";
+  const icon = useMemo(
+    () => (
+      <Icon name={picking ? "UsersRound" : "ClipboardList"} size={18} color={styles.iconColor} />
+    ),
+    [picking, styles.iconColor],
+  );
   return (
-    <Modal title={picking ? "Wake an agent" : board} open={room !== null} onOpenChange={change}>
+    <Modal
+      title={picking ? pickerTitle : board}
+      icon={icon}
+      open={room !== null}
+      onOpenChange={change}
+    >
       <Modal.Content>
         {room?.lobby ? (
           <LobbyBody

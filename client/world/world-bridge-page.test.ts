@@ -102,3 +102,16 @@ test("the page counts as focused while it is on screen", () => {
   visibility = "hidden";
   expect(document.hasFocus()).toBe(false);
 });
+
+test("the native page advertises only a capable renderer and returns that renderer's capture", () => {
+  window.eval(bridgePageScript(SCENE));
+  send("start", { callbacks: ["onCaptureReady", "onCaptured"] });
+  expect(posted).toEqual([]);
+  Reflect.set(Reflect.get(window, "PaseoOfficeWorld"), "captureGroupPhoto", () => "jpeg");
+  send("start", { callbacks: ["onCaptureReady", "onCaptured"] });
+  send("captureGroupPhoto", 4);
+  expect(posted).toEqual([
+    { callback: "onCaptureReady", args: [] },
+    { callback: "onCaptured", args: [4, "jpeg"] },
+  ]);
+});
