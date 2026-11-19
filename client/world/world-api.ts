@@ -6,6 +6,8 @@ import type { PluginTheme } from "@getpaseo/plugin";
  */
 
 /** A person in the office, in the shape the vendored scene reads. */
+export type WorldWeather = import("../../shared/contracts.js").WeatherScene;
+
 export interface WorldSession {
   id: string;
   name: string;
@@ -202,6 +204,7 @@ export interface WorldApi {
    * rings starts the alarm: 25 s of red, a fail bubble over everyone at work and the siren. Several
    * that ring at once ring once.
    */
+  setWeather?(weather: WorldWeather): void;
   setIncidents?(incidents: readonly WorldIncident[]): void;
   /**
    * The device's Sound switch. On plays the scene's sounds once a press has started audio; off, and

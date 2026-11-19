@@ -2,6 +2,7 @@ import type {
   ChatChange,
   ChatSnapshot,
   IncidentsState,
+  WeatherState,
   Checklists,
   NotesState,
   OfficeAgent,
@@ -66,6 +67,7 @@ export interface Hub {
   /** The stand-up notes writer's state; the same state again sends nothing. */
   setNotes(notes: NotesState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
+  setWeather(weather: WeatherState): void;
   setIncidents(incidents: IncidentsState): void;
   /**
    * The conversation each snapshot carries from now on; null removes it. Every subscriber gets a
@@ -131,6 +133,8 @@ export function createHub(ports: HubPorts): Hub {
   let notes: NotesState | null = null;
   let sentNotes = "";
   let incidents: IncidentsState | null = null;
+  let weather: WeatherState | null = null;
+  let sentWeather = "";
   let sentIncidents = "";
   let chatSource: (() => ChatSnapshot) | null = null;
   const watchers = new Set<(view: DirectoryView | null) => void>();
@@ -155,6 +159,7 @@ export function createHub(ports: HubPorts): Hub {
       boards: copy,
       wake: { paused: wake.paused, queued: { ...wake.queued } },
       ...(notes === null ? {} : { notes: { ...notes } }),
+      ...(weather === null ? {} : { weather }),
       ...(incidents === null ? {} : { incidents: { ...incidents } }),
       ...(chatSource === null ? {} : { chat: chatSource() }),
     };
@@ -470,6 +475,13 @@ export function createHub(ports: HubPorts): Hub {
       if (text === sentNotes) return;
       sentNotes = text;
       notes = { ...next };
+      broadcast({ type: "snapshot", state: snapshot() });
+    },
+    setWeather(next) {
+      const text = JSON.stringify(next);
+      if (text === sentWeather) return;
+      sentWeather = text;
+      weather = { ...next };
       broadcast({ type: "snapshot", state: snapshot() });
     },
     setIncidents(next) {

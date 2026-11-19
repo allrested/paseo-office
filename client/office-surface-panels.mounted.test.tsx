@@ -1065,3 +1065,29 @@ test("a send still pending in one session does not stop another session's Send",
   await press("Send");
   expect(delivered).toEqual(["bo:hi"]);
 });
+
+test("the floor receives the weather and service failures appear in Attention", async () => {
+  compact = false;
+  floor.webgl = true;
+  view = "3d";
+  await mount();
+  const scene = { kind: "reading" as const, code: 63, temp: 14, cloud: 0.9 };
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: { ...EMPTY_OFFICE, weather: { scene, problem: null, readAt: 10 } },
+    }),
+  );
+  expect(floor.props).toHaveProperty("weather", scene);
+  await act(async () =>
+    deliver?.({
+      type: "snapshot",
+      state: {
+        ...EMPTY_OFFICE,
+        weather: { scene: { kind: "season" }, problem: "Weather service failed", readAt: null },
+      },
+    }),
+  );
+  await pressTab("Attention");
+  expect(container.textContent).toContain("Weather service failed");
+});

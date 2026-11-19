@@ -190,3 +190,14 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
 });
+
+test("weather follows the host after seating the people", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input()} />));
+  expect(calls.indexOf('setWeather:[{"kind":"none"}]')).toBeGreaterThan(
+    calls.indexOf("setSessions:[[]]"),
+  );
+  const weather = { kind: "reading" as const, code: 63, temp: 14, cloud: 0.9 };
+  await act(async () => root.render(<Probe api={api} feed={input({ weather })} />));
+  expect(calls).toContain("setWeather:" + JSON.stringify([weather]));
+});

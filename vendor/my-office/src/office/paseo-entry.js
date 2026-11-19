@@ -7,7 +7,9 @@ import { MODULES } from './paseo-modules.js';
 import { host } from './paseo-host.js';
 import { STYLE } from './paseo-style.js';
 import { CSS2DObject } from '../../three/addons/renderers/CSS2DRenderer.js';
-import { el, reduceMotion, short } from './core/env.js';
+import { setWeather as drawWeather } from './life/weather.js';
+import { weatherToDraw } from './paseo-weather-plan.js';
+import { SEASON, el, reduceMotion, short } from './core/env.js';
 import { renderer, scene } from './scene/renderer.js';
 import { canvasTex } from './scene/blocks.js';
 import { focusTarget } from './core/loop.js';
@@ -50,6 +52,7 @@ let boardRows = [];
 let problem = () => {};
 let onMachine = null;
 let stopped = false;
+let weatherKey = '';
 let stopWatchingAudio = () => {};
 let noteTimer = 0;
 /** How long the scene's own note stays. */
@@ -477,6 +480,19 @@ const api = {
     if (open.length === 0) state.incidentUntil = 0;
   },
   /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
+  /**
+   * The weather outside, from the host: `{ kind: 'none' }` draws none, `{ kind: 'season' }` the weather of the
+   * scene's own season (paseo-weather-plan.js), `{ kind: 'reading', code, temp, cloud }` a WMO weather code, a
+   * temperature and a cloud share (0 to 1). The host's server reads the weather service; the scene asks nobody.
+   * The same weather again, in the same season, draws nothing new.
+   */
+  setWeather(scene) {
+    if (!started || stopped) return;
+    const key = JSON.stringify([scene, SEASON]);
+    if (key === weatherKey) return;
+    weatherKey = key;
+    drawWeather(weatherToDraw(scene, SEASON));
+  },
   setLimits(list) { limits = Array.isArray(list) ? list : []; },
 };
 

@@ -10,7 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, expect, test } from "vitest";
+import { afterAll, afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { createOfficePlugin } from "./index.server.js";
 import { EMPTY_BOARDS, type BoardStore } from "./server/board-store.js";
@@ -60,6 +60,9 @@ const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
   sentryProjects: "",
+  weatherMode: "off" as const,
+  weatherManual: "season" as const,
+  weatherUrl: "",
   sentryUrl: "https://sentry.io",
 };
 const ON: SettingsState = {
@@ -343,6 +346,7 @@ function setup(
   read: () => Promise<SettingsState>,
   options: {
     env?: NodeJS.ProcessEnv;
+    fetchFn?: typeof fetch;
     chatStore?: ChatStore;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
     server?: (base: PluginServerContext) => PluginServerContext;
@@ -374,6 +378,7 @@ function setup(
     notesStore,
     incidentsStore,
     chatStore,
+    fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
@@ -1386,5 +1391,34 @@ test("a tracker's problem goes once no tracker is on", async () => {
 
   leaving.abort();
   await done;
+  await stop();
+});
+
+test("weather is read only for an open office, reaches its snapshot and stops when it closes", async () => {
+  const url = "http://127.0.0.1:9/weather.json?key=SECRET";
+  const fetchFn = vi.fn(async () =>
+    Response.json({ current: { weather_code: 63, temperature_2m: 14.2, cloud_cover: 90 } }),
+  );
+  const values = { ...ON.values, weatherMode: "service" as const, weatherUrl: url };
+  const { recorded, clock, context, stop } = setup(async () => ({ ...ON, values }), { fetchFn });
+  await settle();
+  expect(fetchFn).not.toHaveBeenCalled();
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(fetchFn).toHaveBeenCalledExactlyOnceWith(
+    url,
+    expect.objectContaining({ redirect: "manual" }),
+  );
+  expect(office.events.at(-1)?.state).toMatchObject({
+    weather: {
+      scene: { kind: "reading", code: 63, temp: 14.2, cloud: 0.9 },
+      problem: null,
+      readAt: clock.now(),
+    },
+  });
+  await office.leave();
+  clock.advance(3 * 3600_000);
+  await settle();
+  expect(fetchFn).toHaveBeenCalledTimes(1);
   await stop();
 });

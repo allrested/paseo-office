@@ -65,6 +65,9 @@
     "office/people/billiards.js",
     "office/people/karaoke.js",
     "office/life/trophies.js",
+    "office/life/seasons.js",
+    "office/life/rain.js",
+    "office/life/weather.js",
     "office/life/quota.js",
     "office/life/tests.js",
     "office/world/room-update.js",
@@ -112,19 +115,6 @@
     ],
     "office/life/post.js": [
       "updatePost"
-    ],
-    "office/life/rain.js": [
-      "updateSeason"
-    ],
-    "office/life/seasons.js": [
-      "SEASON_SPOT",
-      "floorBlocks",
-      "seasonName",
-      "seasonProp"
-    ],
-    "office/life/weather.js": [
-      "applyWeather",
-      "updateWeather"
     ],
     "office/people/accountant.js": [
       "updateAccountant"
@@ -249,8 +239,11 @@
     "office/interact/props.js": "eaea94db0fb65a93267ee17364b8fb6640cec7b68b3de3e5a404bedd5db6a815",
     "office/interact/rings.js": "a1ba8574ed6377f1589de0ac30c91c74dc2b1cf8c1b261840e31f4ed64a65d96",
     "office/life/quota.js": "5a6553ea901b5b72d3b02f124c2cd2d241dfdcad0b7e0529d98e1f7f26abc4f5",
+    "office/life/rain.js": "d9b6f1d1168278e921e5dbd5152e8c1ffb955808a4040053e8efb429492f2882",
+    "office/life/seasons.js": "fa265aa53f88776f97e2e1c34b101a4722b85c9037b0b561aaf3131c26e771db",
     "office/life/tests.js": "03c5096eaf9a1302d7036816155e78b77f00db28ce1c4ade5c4c4e1953893273",
     "office/life/trophies.js": "422c4cd10e0191a5e225e0d7ed3a2c4b7de9e0c10a3a13f28ffba5a4dbfbcb80",
+    "office/life/weather.js": "07d14af67279f4a1e8ad258892c4087b12c193a0675d721343320398def84bf2",
     "office/life/your-turn.js": "29790f01f10b3fe8be2d86327b0c8d43cf122d1a43651882adbd6c840ae153cc",
     "office/net/live.js": "9c4232ad9a2697245201f2ed88d33b767c475325194819d9f6bc59089c375862",
     "office/people/bedding.js": "1f9abb36b2f9327c33decae42a53f965f3cad15dc1a43e284effdc19887288a3",

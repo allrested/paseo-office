@@ -41,12 +41,14 @@ test("the optional calls and the theme and the board rows go too", () => {
   api.setTheme({ dark: true, colors: {} as never });
   api.setBoardRows([]);
   api.setIncidents?.([]);
+  api.setWeather?.({ kind: "season" });
   api.meet?.();
   api.gather?.();
   expect(posted.map((message) => message.call)).toEqual([
     "setTheme",
     "setBoardRows",
     "setIncidents",
+    "setWeather",
     "meet",
     "gather",
   ]);

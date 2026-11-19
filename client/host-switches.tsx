@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { SettingField } from "./setting-field.js";
+import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
 import { officeHostSettings, type FloorPlanChoice } from "../shared/settings.js";
 import { failureText } from "./action-button.js";
@@ -13,7 +14,7 @@ import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
 type HostSettings = SettingsState<typeof officeHostSettings.schema>;
-type HostValues = Extract<HostSettings, { status: "ready" }>["values"];
+export type HostValues = Extract<HostSettings, { status: "ready" }>["values"];
 /** A host setting, as its control is labelled. */
 type HostSetting =
   | "Agent tools"
@@ -24,7 +25,8 @@ type HostSetting =
   | "Jira projects"
   | "Sentry organisation"
   | "Sentry projects"
-  | "Sentry address";
+  | "Sentry address"
+  | WeatherSetting;
 
 /** What the incidents fields need to know from the host: never a token's value. */
 type TrackerState = Pick<IncidentsState, "jiraReady" | "sentryReady" | "scheduleError">;
@@ -67,6 +69,7 @@ export interface HostSwitchesProps {
   /** Absent until the office's server has read the incidents: no field then says a variable is unset. */
   incidents: TrackerState | undefined;
   /** The device's own switch: last in the row, so on a phone it wraps to the line above the view. */
+  weather?: import("../shared/contracts.js").WeatherState | undefined;
   children?: ReactNode;
 }
 
@@ -83,6 +86,7 @@ export function HostSwitches({
   deviceProblem,
   scheduleError,
   incidents,
+  weather,
   children,
 }: HostSwitchesProps) {
   const settings = useSettings(officeHostSettings);
@@ -230,6 +234,13 @@ export function HostSwitches({
         saveProblem={saveProblem}
         styles={styles}
       />
+      <WeatherFields
+        values={stored}
+        weather={weather}
+        change={change}
+        saveProblem={saveProblem}
+        styles={styles}
+      />
       {problems.length > 0 ? (
         <View style={styles.headerProblems}>
           {problems.map((problem) => (
@@ -342,73 +353,5 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         </View>
       )}
     </>
-  );
-}
-
-interface SettingFieldProps {
-  label: string;
-  hint: string;
-  /** Null while the settings are read or cannot be read: the field is then not usable. */
-  value: string | null;
-  /** Resolves once the host has answered, and never rejects. */
-  onSave(next: string): Promise<unknown>;
-  problem: string | null;
-  styles: OfficeStyles;
-}
-
-/**
- * A host setting typed as text. It saves when it is submitted or loses focus, not on each
- * keystroke, since each save brings the daemon's schedule in step again. The text, trimmed, shows
- * until the host has answered; a refused save goes back to the stored value.
- */
-function SettingField({ label, hint, value, onSave, problem, styles }: SettingFieldProps) {
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  // What is typed, until the host has answered its save; null shows the stored value.
-  const [draft, setDraft] = useState<string | null>(null);
-  // A submit blurs the field too: one save, not a second against a revision already gone.
-  const saving = useRef(false);
-  const commit = useCallback(() => {
-    if (draft === null || saving.current) return;
-    const next = draft.trim();
-    if (value === null || next === value) {
-      setDraft(null);
-      return;
-    }
-    saving.current = true;
-    setDraft(next);
-    void onSave(next).finally(() => {
-      saving.current = false;
-      if (mounted.current) setDraft(null);
-    });
-  }, [draft, value, onSave]);
-  return (
-    <View style={styles.headerField}>
-      <Text style={styles.sheetLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        accessibilityHint={hint}
-        value={draft ?? value ?? ""}
-        editable={value !== null}
-        onChangeText={setDraft}
-        onBlur={commit}
-        onSubmitEditing={commit}
-        autoCapitalize="none"
-        autoCorrect={false}
-        spellCheck={false}
-        style={styles.fieldInput}
-      />
-      <Text style={styles.fieldHint}>{hint}</Text>
-      {problem === null ? null : (
-        <Text accessibilityRole="alert" style={styles.actionError}>
-          {problem}
-        </Text>
-      )}
-    </View>
   );
 }

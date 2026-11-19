@@ -1153,3 +1153,21 @@ test("a parent whose next cannot be stored gets no new sub-agent number, and bot
   subscriber.controller.abort();
   await subscriber.done;
 });
+
+test("weather broadcasts changes and later subscribers receive the current reading", async () => {
+  const { hub } = startHarness({ agents: [], workspaces: [] });
+  const one = subscribe(hub);
+  await settle();
+  expect(one.events[0]).not.toHaveProperty("state.weather");
+  const state = { scene: { kind: "season" as const }, problem: null, readAt: null };
+  hub.setWeather(state);
+  hub.setWeather({ ...state });
+  expect(one.events).toHaveLength(2);
+  hub.setWeather({ ...state, problem: "failed" });
+  const two = subscribe(hub);
+  await settle();
+  expect(two.events[0]).toMatchObject({ state: { weather: { ...state, problem: "failed" } } });
+  one.controller.abort();
+  two.controller.abort();
+  await Promise.all([one.done, two.done]);
+});

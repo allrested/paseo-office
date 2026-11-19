@@ -35,6 +35,9 @@ const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
   sentryProjects: "",
+  weatherMode: "off" as const,
+  weatherManual: "season" as const,
+  weatherUrl: "",
   sentryUrl: "https://sentry.io",
 };
 
@@ -476,4 +479,28 @@ test("the incidents schedule's failure shows under the incidents fields", async 
   if (!alert) throw new Error("No alert");
   const after = field("Sentry address").compareDocumentPosition(alert);
   expect(after & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
+test("weather defaults off, manual and service expose their own controls", async () => {
+  await mount();
+  const button = (label: string) =>
+    container.querySelector<HTMLElement>(`[role="button"][aria-label="${label}"]`);
+  expect(button("Off")?.getAttribute("aria-pressed")).toBe("true");
+  expect(button("Storm")).toBeNull();
+  await act(async () => button("Manual")?.click());
+  expect(saved.at(-1)?.values.weatherMode).toBe("manual");
+  stored = { ...stored, weatherMode: "manual" };
+  await mount();
+  expect(button("Follow the season")?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => button("Storm")?.click());
+  expect(saved.at(-1)?.values.weatherManual).toBe("storm");
+  stored = { ...stored, weatherMode: "service" };
+  await mount();
+  expect(field("Weather address").value).toBe("");
+  expect(container.textContent).toContain("No address");
+  await type("Weather address", "http://weather.test/?key=SECRET");
+  await leave("Weather address");
+  await mount();
+  expect(container.textContent).toContain("plain http only on this machine");
+  expect(container.textContent).not.toContain("SECRET");
 });

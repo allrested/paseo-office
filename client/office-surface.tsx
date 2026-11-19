@@ -19,6 +19,7 @@ import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import {
   notesReadRpc,
   type ChatMessage,
+  type WeatherScene,
   type IncidentsState,
   type Machine,
 } from "../shared/contracts.js";
@@ -47,6 +48,7 @@ import {
   type ColumnView,
 } from "./column-model.js";
 import { IncidentsCard } from "./incidents-card.js";
+import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
@@ -611,6 +613,7 @@ interface SurfaceBodyProps {
   onOpenJanitor(): void;
   /** The stand-up is open. */
   meeting: boolean;
+  weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** The 3D office's incidents banner. */
   onOpenIncidents(): void;
@@ -644,6 +647,7 @@ function SurfaceBody({
   janitor,
   onOpenJanitor,
   meeting,
+  weather,
   incidents,
   onOpenIncidents,
   onSceneProblem,
@@ -690,6 +694,7 @@ function SurfaceBody({
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
+        weather={weather}
         incidents={incidents}
         onOpenIncidents={onOpenIncidents}
         onProblem={onSceneProblem}
@@ -1317,12 +1322,17 @@ export function OfficeSurface(
     [incidents, openIncidents],
   );
   const settingsStripEntry = useSettingsEntry(office.state, onOpenSettings);
+  const weatherStripEntry = useMemo(
+    () => weatherEntry(office.state.weather, onOpenSettings),
+    [office.state.weather, onOpenSettings],
+  );
   // The strip's cards, each only while it has something to say. An incident comes first.
   const cards = useMemo(
     () =>
       [
         incidentsStripEntry,
         settingsStripEntry,
+        weatherStripEntry,
         hostEntry,
         janitorEntry,
         standup.entry,
@@ -1333,6 +1343,7 @@ export function OfficeSurface(
     [
       incidentsStripEntry,
       settingsStripEntry,
+      weatherStripEntry,
       hostEntry,
       janitorEntry,
       standup.entry,
@@ -1413,6 +1424,7 @@ export function OfficeSurface(
             janitor={janitorEntry?.note ?? null}
             onOpenJanitor={openJanitor}
             meeting={standup.open}
+            weather={office.state.weather?.scene}
             incidents={incidents}
             onOpenIncidents={openIncidents}
             onSceneProblem={setSceneProblem}
