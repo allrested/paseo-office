@@ -70,11 +70,12 @@ close a waiting agent.
 Tapping a row, a desk or a person opens the agent's card. It opens the session, sends a prompt,
 and answers a tool, mode or other permission. A plan or a question is not answered on the card:
 it says "Answer in the session", and the card's own "Open session" is the way there. A row of the
-List or an Activity card puts an "Open session" button beside it instead. Stop ends the running turn, and is offered only on a host whose SDK has an agent's
+List or an Activity card puts an "Open session" button beside it instead. Stop ends the running
+turn, and is offered only on a host whose SDK has an agent's
 `cancel()` (`shared/host-extras.ts`); stock Paseo 0.16 does not.
 
 "Open session" shows the session in the office's column (see below) in every app, and the card
-closes as it does. Every way in (the card, an Activity card, the List's "Answer in the session",
+closes as it does. Every way in (the card, an Activity card, the List's "Open session",
 the 3D office's walk-in) calls the surface's one `openSession`. Leaving for the agent's workspace
 is the session panel's own "Open in workspace", drawn only where the app gives the plugin
 `navigation`.
@@ -126,7 +127,8 @@ a turn runs on a host that can stop one. A reply joins the running turn (it does
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
 says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
 tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a
-question is answered in the workspace, where the app gives one: the panel then says "Answer this in the workspace." and offers
+question is answered in the workspace, where the app gives one: the panel then says "Answer this in
+the workspace." and offers
 "Open in workspace"; in an app that gives none it says "This cannot be answered here."
 Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
 there. A tab leaves only when it is closed: an agent the office does not list (closed, archived, or
@@ -144,12 +146,15 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
   of the providers that are ready and enabled; and the first prompt. Create starts the agent in
   that workspace (not in a new one for its folder), closes the form and opens the agent's session
-  as a tab. The workspaces and providers are read when the form opens, not when the office does.
-  The provider and model start as the last agent's, kept in the `lastAgent` field of the `office-device` setting, or the
+  as a tab. The workspaces and providers are read when the form opens, not when the office does; a
+  provider still loading after five seconds is left out of the choices.
+  The provider and model start as the last agent's, kept in the `lastAgent` field of the
+  `office-device` setting, or the
   first provider's default model when that choice is gone. A failure shows its reason with
   everything typed kept. Whether the form is open, the workspace, provider and model chosen and
   the prompt typed are the surface's, as the Chat box is: another tab, Back and a dismissed phone
-  sheet keep them while the office is mounted, and a create clears the prompt. A new project folder, a new worktree, attachments and modes
+  sheet keep them while the office is mounted, and a create clears the prompt. A new project folder,
+  a new worktree, attachments and modes
   stay in the app's own screen.
 - **Activity** is a feed derived on the client from the office's state, kept in memory for this
   app run. It fills only while an office surface is open.
@@ -357,7 +362,8 @@ One writer runs at a time, and the office keeps it in `<PASEO_HOME>/office/notes
 restart does not start a second. An entry counts as written only when its `## DD Month YYYY` header
 starts a line of the month's file after the writer's turn; the office then records the time and
 archives the writer. A writer that fails, is stopped or closed, or ends without the entry is left as
-it is and stays named, with an "Open the writer" button that opens its session in the office's column, on the Stand-up card and the notes card; while it is at
+it is and stays named, with an "Open the writer" button that opens its session in the office's
+column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
 notes card: a month's file as Markdown at its newest entry, read only. The server reads only
 `daily-standup-YYYYMM.md` directly in the notes folder.
