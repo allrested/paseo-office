@@ -62,3 +62,11 @@ export function hostSkillFolders(env: NodeJS.ProcessEnv, home: string): SkillFol
 export function workspaceSkillFolders(folder: string): SkillFolder[] {
   return SKILL_HOMES.map((label) => ({ label, path: join(folder, label, "skills") }));
 }
+
+export function liftFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "lift.json");
+}
+
+export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "tenure.json");
+}

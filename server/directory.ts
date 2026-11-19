@@ -113,6 +113,8 @@ export interface DirectoryPullRequestInput {
 
 /** The fields the office reads from a workspace descriptor. */
 export interface DirectoryWorkspaceInput {
+  workspaceDirectory?: string | null;
+  projectRootPath?: string | null;
   id: string;
   name: string;
   projectDisplayName: string;
@@ -318,6 +320,16 @@ export function applyAgentUpdate(
   return next;
 }
 
+export function foldersOf(
+  workspaces: ReadonlyMap<string, DirectoryWorkspaceInput> | readonly DirectoryWorkspaceInput[],
+): Record<string, string> {
+  const folders = new Map<string, string>();
+  for (const w of workspaces.values()) {
+    const path = w.workspaceDirectory ?? w.projectRootPath;
+    if (path && !w.archivingAt) folders.set(w.id, path);
+  }
+  return Object.fromEntries(folders);
+}
 export function projectWorkspace(workspace: DirectoryWorkspaceInput): OfficeWorkspace | null {
   if (workspace.archivingAt) return null;
   const branch = workspace.gitRuntime?.currentBranch;

@@ -10,6 +10,14 @@ const plural = new Intl.PluralRules(LOCALE);
 // Paseo's wording, where upstream's line needs something Paseo does not send (a file's name, a
 // prompt, a repository's state) or counts a day when the office counts since it was opened.
 const OURS = {
+  // the courier is any courier (people/staff.js; upstream names a shop)
+  'people.staff.shipper': 'Courier',
+  'people.staff.shipperHi': ['Delivery!', 'A parcel, I will leave it at the desk!'],
+  'people.staff.call': ['{name}, a parcel for you!', '{name}, your parcel is here!'],
+  'people.staff.callDoor': ['{name}, parcel!', 'Delivery! {name}?'],
+  // the lift's sticker (life/lift-service.js): the build is the office plugin's, not upstream's
+  'life.liftService.stickerWhat': 'Office {version}',
+
   'people.handOver': 'A new task for you',
   'events.generic.grep': 'the code',
   'events.generic.web': 'the web',

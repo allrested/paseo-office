@@ -61,16 +61,31 @@
     "office/people/director.js",
     "office/people/errands.js",
     "office/people/gatherings.js",
+    "office/people/comnha.js",
+    "office/people/staff.js",
+    "office/people/duty.js",
+    "office/people/teatime.js",
+    "office/people/accountant.js",
+    "office/people/rounds.js",
+    "office/people/hr.js",
     "office/people/foosball.js",
     "office/people/gaming.js",
     "office/people/billiards.js",
     "office/people/karaoke.js",
+    "office/people/farewell.js",
+    "office/people/interns.js",
     "office/life/trophies.js",
     "office/life/seasons.js",
     "office/life/rain.js",
     "office/life/weather.js",
+    "office/life/nap.js",
     "office/life/quota.js",
+    "office/life/altar.js",
+    "office/life/lift-service.js",
+    "office/life/drill.js",
+    "office/life/day-swaps.js",
     "office/life/tests.js",
+    "office/life/post.js",
     "office/world/room-update.js",
     "office/interact/props.js",
     "office/interact/place-chips.js",
@@ -95,61 +110,23 @@
     "office/demo/demo.js": [
       "DEMO"
     ],
-    "office/life/altar.js": [
-      "updateAltar"
-    ],
-    "office/life/day-swaps.js": [
-      "updateDaySwaps"
-    ],
-    "office/life/drill.js": [
-      "updateDrill"
-    ],
     "office/life/incidents.js": [
       "updateIncident"
     ],
-    "office/life/lift-service.js": [
-      "updateLiftService"
-    ],
-    "office/life/nap.js": [
-      "napOn",
-      "updateNap"
-    ],
-    "office/life/post.js": [
-      "updatePost"
-    ],
-    "office/people/accountant.js": [
-      "updateAccountant"
-    ],
-    "office/people/comnha.js": [
-      "updateMicro"
-    ],
-    "office/people/duty.js": [
-      "dutyText",
-      "updateDuty"
-    ],
-    "office/people/farewell.js": [
-      "updateFarewell"
-    ],
     "office/people/guard.js": [
+      "guardPost",
+      "marshal",
       "updateGuard"
     ],
-    "office/people/hr.js": [
-      "updateHr"
-    ],
-    "office/people/interns.js": [
-      "updateInterns"
-    ],
     "office/people/outings.js": [
-      "updateOutings"
-    ],
-    "office/people/rounds.js": [
-      "updateRounds"
-    ],
-    "office/people/staff.js": [
-      "updateStaff"
-    ],
-    "office/people/teatime.js": [
-      "updateTeatime"
+      "called",
+      "mainExit",
+      "outside",
+      "resting",
+      "resume",
+      "street",
+      "updateOutings",
+      "walk"
     ],
     "office/replay/replay.js": [
       "REPLAY_MOTION",
@@ -170,6 +147,7 @@
     ],
     "office/ui/group-chat.js": [
       "chatLife",
+      "chatPhoto",
       "chatSay"
     ],
     "office/ui/lite.js": [
@@ -214,6 +192,7 @@
   "files": {
     "i18n/locales/en/activity.js": "15f6b049c4f1f9b76498c5fd0cf14db9e00e5b208e6896be97964d1a7df3fa90",
     "i18n/locales/en/common.js": "8011d3d9bdcb5fa846bbdf1fd831bac6920522e87c1f63cf4561a72317e1a824",
+    "i18n/locales/en/drawer.js": "6e49d28c1179fe55be238f0e1241650ee6229f48b01ef5917564acc28c60860e",
     "i18n/locales/en/events.js": "6bbfb6c9ae6d8259100b088751622171a1868d3a2f0b791733f8eb70b89dac1f",
     "i18n/locales/en/fp.js": "6fae360563129cc87e10a38dc7832147f927d404311c7ead749ce5059bfb787d",
     "i18n/locales/en/incident.js": "046b4447c1e5aa3b00363a457993665ecfb302c49bccfa87f2ed801490e8b15e",
@@ -236,6 +215,12 @@
     "office/interact/place-chips.js": "602bbf24a39821ca534a45ff02d6244ec6f03ade1ed36db970b6b6317fb00f4b",
     "office/interact/props.js": "eaea94db0fb65a93267ee17364b8fb6640cec7b68b3de3e5a404bedd5db6a815",
     "office/interact/rings.js": "a1ba8574ed6377f1589de0ac30c91c74dc2b1cf8c1b261840e31f4ed64a65d96",
+    "office/life/altar.js": "4c7e410a0343b9ad46099579ef6144ac48e13cc68fe53592a57e669a9df8ceea",
+    "office/life/day-swaps.js": "cab150dd726d4ff4eab6dae0a895242b2c9dfa634f5803a961769fc5de16b11f",
+    "office/life/drill.js": "d8bd21ba7d1e6b21717c9e19f78d6bcdb22a8a6f19ec821e9f6eee305a471cc8",
+    "office/life/lift-service.js": "c5011adfdeedd315402182562d760ecb570e7a61b107b498b526db5ae82ee3c5",
+    "office/life/nap.js": "4b43f427720382585e9ea1bcc91a6b96438eac81ed5b7214d8f4d89a20d48f70",
+    "office/life/post.js": "5d7b40419f4995a372b7db259168eb41a03316bb1591932676ac25fb52a6d260",
     "office/life/quota.js": "5a6553ea901b5b72d3b02f124c2cd2d241dfdcad0b7e0529d98e1f7f26abc4f5",
     "office/life/rain.js": "d9b6f1d1168278e921e5dbd5152e8c1ffb955808a4040053e8efb429492f2882",
     "office/life/seasons.js": "fa265aa53f88776f97e2e1c34b101a4722b85c9037b0b561aaf3131c26e771db",
@@ -244,20 +229,29 @@
     "office/life/weather.js": "07d14af67279f4a1e8ad258892c4087b12c193a0675d721343320398def84bf2",
     "office/life/your-turn.js": "29790f01f10b3fe8be2d86327b0c8d43cf122d1a43651882adbd6c840ae153cc",
     "office/net/live.js": "9c4232ad9a2697245201f2ed88d33b767c475325194819d9f6bc59089c375862",
+    "office/people/accountant.js": "0d333518b11f24ef42e51ea265e85a88a3d4231499a44c7f7b8b81e724cc54e3",
     "office/people/bedding.js": "1f9abb36b2f9327c33decae42a53f965f3cad15dc1a43e284effdc19887288a3",
     "office/people/billiards.js": "e36f8a6d21d867b4440298cd7035638af2e7cd372d74651c1eb2b02c3f11b4ce",
     "office/people/breaks.js": "39c8ca718c4976b8674cc8b53bb2fd74d8cf754a811e5055b4bb6ae0435a6b5e",
     "office/people/chibi-rig.js": "091a2963043ee84647a3435682b2abc238afc76817a208af2bb9b3d9d9de80e2",
+    "office/people/comnha.js": "3db3bbc2d94070da99aec8e0884b7044144d8efaced9d4958f138b34ffffdddd",
     "office/people/director.js": "4760331b5d2fb0622e49d5ea45b546c8f76a4a4b999fdad3b9593bde7ac57b8e",
+    "office/people/duty.js": "4c22b72d9779c6f30eb3c6f4df35a5fb8227cbd92f3ee493a1fa0391f313ded0",
     "office/people/errands.js": "963fc359ce0aeeae2acac35a976b48fdbb31ef287c3328ac5ef09a650c5a2c47",
+    "office/people/farewell.js": "a98594182f7e4125e39c68cb8810df1c3036a18eb5db607e7d178af7cc171db2",
     "office/people/foosball.js": "70c15e67ec3fefa12d95565f26820aeb68a8d670762e5754e465cfef32695d12",
     "office/people/gaming.js": "276840830cd2daecd60f0f501ff3ab4733b373062403ae45dc30bf0437c5cd2b",
     "office/people/gatherings.js": "8f5e0e413ba3f3dfcf6eb2854444066eb1d7153b36fc17897af1f5bfd4d852a5",
+    "office/people/hr.js": "a31983ed072eaddd31e4e629b4a8dfa5f53340cd837159dee30a81ef49cb1fcc",
+    "office/people/interns.js": "9159c5688b83a02bf2d3639b89ce39e25912fe407757c4a8a37d869e1c7514d9",
     "office/people/karaoke-songs.js": "a2062d9a2b3d2cb6c615514d651a06c149773627fb116bdf0004504e7343284d",
     "office/people/karaoke.js": "8529733197fd60796bbe3bf3cdb4ac81f6df20308ff555120cc94bdb67d0b823",
     "office/people/look.js": "1f7bc510fad4eef1eeeae186a5c1e889545aaef640466d4597c9541de3dda655",
     "office/people/navigation.js": "ccc374ba6660b9b14ee1a78e9d053c8671e1b55da13be2e2e8270709da4fe76a",
+    "office/people/rounds.js": "4748b6eab688d262c03d51ebbad97a62955307901779d3846cd2716a0b5d9ca4",
+    "office/people/staff.js": "c9df99490c7900a407c9cc24db76d923e7ecc0f756f0bf6330589b9d1e51a1f9",
     "office/people/team-lines.js": "6213942c582c65888a4a5fa124fc771e0966edb6e180664aa95e904463060405",
+    "office/people/teatime.js": "03fad4f3d1a913eaed9a872db966067e77eb51d8713c3102be9fc55a701b9f9a",
     "office/people/workers.js": "44ff11013da0000ad013e799cb9eba8b8c2f3f02869ddc42bb2aaad65ddbc032",
     "office/scene/blocks.js": "02bf430c1438035c04eb3edcbffc4cecb80e8adb0ba4ac9e0110192f523a3798",
     "office/scene/lights.js": "d032ce0f2eb4e34fbcb10672ee72ed3b87f70200fe0a7d18162110b9193bda95",
@@ -309,6 +303,7 @@
     "office/world/terrace.js": "e07e6642f747523bf4d2f4363ffd72a78e6e75e3046d24f1f76f93e9e9485e65",
     "office/world/windows.js": "9d5c1d10a6b64dbca78258e232de1dc867787d1fd1361d5d36954774a58faeda",
     "shared/cache-clock.js": "6bea97429b540d61f392a69792b543c6c5466a795208a11862f6048aecc6744a",
+    "shared/comnha.js": "4942b6be6b8af741c89a011a122d53514fd1473d9a6e67f80575823285710c11",
     "shared/duty.js": "2ff5820852f1b3cade39ed2e2541dca3c14dfb0d6c0c26231522061c15f8f05c",
     "shared/model-name.js": "7ec137c9fd072acd272acfc6a94d89a8145851e179aa6f4c92d8ab55073f28b3",
     "shared/workdays.js": "82d793eac17886804cf2637f4a70dd992cbbc08e947f4145f31589998864268b"

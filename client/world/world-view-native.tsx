@@ -10,6 +10,7 @@ import { WorldLoading } from "./world-loading.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
+  useSceneLifeChat,
   useWorldScript,
   worldStartOptions,
   type WorldLatest,
@@ -39,6 +40,8 @@ function WorldViewNativeScene({
   selectedAgentId,
   onSelectAgent,
   onSelectBoard,
+  life,
+  onTenure,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -54,6 +57,7 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const onLife = useSceneLifeChat();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -68,6 +72,8 @@ function WorldViewNativeScene({
     onOpenNotes,
     onOpenIncidents,
     onBell,
+    onLife,
+    onTenure,
     onSound: sound.set,
     onProblem,
   });
@@ -86,6 +92,8 @@ function WorldViewNativeScene({
       onOpenNotes,
       onOpenIncidents,
       onBell,
+      onLife,
+      onTenure,
       onSound: sound.set,
       onProblem,
     };
@@ -131,6 +139,7 @@ function WorldViewNativeScene({
     focusRoomId,
     focusRequest,
     selectedAgentId,
+    life,
     machine,
     meeting,
     weather,

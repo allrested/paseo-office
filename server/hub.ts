@@ -25,6 +25,8 @@ export const DIRECTORY_FLUSH_MS = 300;
 export const DIRECTORY_RESTART_MS = 5000;
 
 export interface DirectoryView {
+  /** Server-only workspace paths for repository history. */
+  folders?: Readonly<Record<string, string>>;
   agents: readonly OfficeAgent[];
   workspaces: readonly OfficeWorkspace[];
 }
@@ -286,6 +288,7 @@ export function createHub(ports: HubPorts): Hub {
     view = {
       agents: named(resets.size === 0 ? next.agents : settled.agents),
       workspaces: next.workspaces,
+      folders: next.folders,
     };
     tell(view);
     // Until the start finished, the first snapshot carries the view.

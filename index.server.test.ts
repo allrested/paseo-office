@@ -379,6 +379,8 @@ function setup(
     incidentsStore,
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
+    tenureStore: { load: () => null, save: () => {}, flush: () => {} },
+    liftStore: { load: () => null, save: () => {}, flush: () => {} },
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
@@ -746,6 +748,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.notes.write.request",
     "office.incidents.dismiss.request",
     "office.chat.request",
+    "office.life",
+    "office.tenure.request",
   ]);
   expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "incidents"]);
   expect([...recorded.hooks.keys()]).toEqual([

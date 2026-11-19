@@ -11,6 +11,11 @@ import { openWorldFrame } from "./world-frame.web.js";
 
 const h = vi.hoisted(() => ({
   weather: vi.fn(),
+  setTenure: vi.fn(),
+  setLiftService: vi.fn(),
+  onCommit: vi.fn(),
+  onPush: vi.fn(),
+  postAction: vi.fn(),
   sessions: new Map<string, Record<string, unknown>>(),
   workers: new Map<string, Record<string, unknown>>(),
   applauded: [] as string[],
@@ -34,6 +39,20 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("../../vendor/my-office/src/office/life/weather.js", () => ({ setWeather: h.weather }));
+vi.mock("../../vendor/my-office/src/office/life/post.js", () => ({
+  onCommit: h.onCommit,
+  onPush: h.onPush,
+  postAction: h.postAction,
+}));
+vi.mock("../../vendor/my-office/src/office/people/farewell.js", () => ({ setTenure: h.setTenure }));
+vi.mock("../../vendor/my-office/src/office/life/lift-service.js", () => ({
+  setLiftService: h.setLiftService,
+}));
+vi.mock("../../vendor/my-office/src/office/ui/activity.js", () => ({
+  everyFrame() {},
+  queueUi() {},
+  toast() {},
+}));
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
   MODULES: [
     [
@@ -154,6 +173,8 @@ interface World {
   setSessions(list: object[]): void;
   event(e: { sess: string; type: string }): void;
   setIncidents(list: object[]): void;
+  setTenure(data: object): void;
+  setLiftService(data: object): void;
   setMachine(machine: object | null): void;
   meet(): void;
   gather(): void;
@@ -701,4 +722,19 @@ test("identical host readings draw once and clearing the sky draws none", () => 
   world.setWeather({ ...rain });
   world.setWeather({ kind: "none" });
   expect(h.weather.mock.calls).toEqual([[{ code: 63, temp: 14, cloud: 0.9 }], [null]]);
+});
+
+test("the host feeds the daily-life scenes", () => {
+  world.setTenure({ days: 30, projects: [] });
+  world.setLiftService({ left: 1 });
+  expect(h.setTenure).toHaveBeenCalledWith({ days: 30, projects: [] });
+  expect(h.setLiftService).toHaveBeenCalledWith({ left: 1 });
+});
+
+test("commit and push events feed the office post", () => {
+  world.setSessions([session("post")]);
+  world.event({ sess: "post", type: "commit" });
+  world.event({ sess: "post", type: "push" });
+  expect(h.onCommit).toHaveBeenCalled();
+  expect(h.onPush).toHaveBeenCalled();
 });

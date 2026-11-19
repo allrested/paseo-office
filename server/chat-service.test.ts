@@ -129,19 +129,21 @@ async function send(h: Harness, text: string): Promise<void> {
 
 /* ---------- the pure parts ---------- */
 
-test("only the director has a name", () => {
-  expect(staffNameOf("__director", chatT)).toBe("Director");
-  for (const key of [
-    "__reception",
-    "__hr",
-    "__cleaner",
-    "__guard",
-    "__courier",
-    "__accountant",
-    "__claude",
-  ]) {
-    expect(staffNameOf(key, chatT)).toBeNull();
-  }
+test("the seven office staff have chat names", () => {
+  expect(
+    ["director", "reception", "hr", "cleaner", "guard", "courier", "accountant"].map((key) =>
+      staffNameOf("__" + key, chatT),
+    ),
+  ).toEqual([
+    "Director",
+    "Receptionist",
+    "HR",
+    "Cleaner",
+    "Security guard",
+    "Courier",
+    "Accountant",
+  ]);
+  expect(staffNameOf("__claude", chatT)).toBeNull();
 });
 
 test("a usage limit is told from other errors", () => {
@@ -586,7 +588,7 @@ test("each office event is the engine's line: a new agent is added and says hell
   expect(messages(h)).toContainEqual(
     expect.objectContaining({
       kind: "sys",
-      text: chatT("chat.sys.added", { by: "Boss", name: "Bea" }),
+      text: chatT("chat.sys.added", { by: "HR", name: "Bea" }),
     }),
   );
   const hello = said(h, "Bea");
@@ -651,11 +653,14 @@ test("each office event is the engine's line: a turn that ends says it is done w
 
 /* ---------- the office's life ---------- */
 
-test("the director is the only staff, so the morning hello does not come and the lunch poll comes from an agent", async () => {
+test("reception greets the office and an agent starts the lunch poll", async () => {
   const early = await harness({ at: new Date(2026, 10, 18, 8, 0).getTime() });
   early.service.view(view(agent("a1", "Alice")));
   early.clock.advance(CHAT_CLOCK_MS);
-  expect(messages(early)).toEqual([expect.objectContaining({ text: chatT("chat.sys.created") })]);
+  early.clock.advance(6000);
+  expect(messages(early)).toContainEqual(
+    expect.objectContaining({ from: "__reception", name: "Receptionist" }),
+  );
 
   const noon = await harness({ at: new Date(2026, 10, 18, 10, 50).getTime() });
   noon.service.view(view(agent("a1", "Alice")));
@@ -912,4 +917,16 @@ test("lines are told to subscribers as changes, and not while the engine is bein
   // A pinned poll tells the whole conversation again.
   await send(h, "lunch?");
   expect(h.changes.at(-1)).toEqual({ op: "all", messages: messages(h) });
+});
+
+test("the same scene moment from two devices becomes one staff line", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Alice")));
+  const event = { op: "life", kind: "parcel", vars: { id: "a1" } } as const;
+  expect(await h.service.request(event)).toEqual({ ok: true });
+  await h.service.request(event);
+  h.clock.advance(15000);
+  const parcels = messages(h).filter((m) => m.from === "__reception" && m.text?.includes("Alice"));
+  expect(parcels).toHaveLength(1);
+  expect(parcels[0]?.name).toBe("Receptionist");
 });

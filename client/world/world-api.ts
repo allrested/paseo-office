@@ -14,7 +14,7 @@ export interface WorldSession {
   title: string;
   /** The project's folder; the scene seats a project's people together. */
   dir: string;
-  git: { repo: string };
+  git: { repo: string; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
   /** Which mark the scene puts on the person's screen. */
@@ -40,7 +40,7 @@ export interface WorldSession {
    * The context window, in tokens: the paper on the desk grows with it, and a flag stands in it
    * from 85%. Absent when the provider has not said.
    */
-  usage?: { ctx: number; ctxMax: number };
+  usage?: { ctx: number; ctxMax: number; cost?: number };
 }
 
 /**
@@ -123,7 +123,36 @@ export interface WorldBrand {
   logoUrl: string | null;
 }
 
+export interface WorldTenureProject {
+  name: string;
+  last: number;
+  days: number;
+  turns: number;
+  due: boolean;
+  farewell: number;
+  back: number;
+  intern: boolean;
+  ready: boolean;
+  official: number;
+}
+export interface WorldTenure {
+  days: number;
+  choices: number[];
+  projects: WorldTenureProject[];
+}
+export interface WorldLiftService {
+  left: number;
+  total: number;
+  newBuild: boolean;
+  sticker: { version: string; at: number; build: string } | null;
+}
+
 export interface WorldStartOptions {
+  /** Something the office's people would say in the team chat: a kind of moment and a few words. */
+  onLife?(kind: string, vars: Record<string, string>): void;
+  /** The tenure list's two writes: a farewell was held, an intern was made permanent. */
+  onTenure?(op: { op: "farewell" | "official"; name: string }): void;
+
   /**
    * The floor plan: "pro" is the company floor, "cozy" one open room, and "hq" headquarters. A page starts once, so a new
    * plan is a new page.
@@ -187,6 +216,8 @@ export interface WorldApi {
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.
    */
+  setTenure?(data: WorldTenure): void;
+  setLiftService?(info: WorldLiftService): void;
   setMachine(machine: WorldMachine | null): void;
   /**
    * Rings the bell on the meeting table for a stand-up: everyone free walks there and says what

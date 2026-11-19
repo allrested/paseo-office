@@ -1,6 +1,7 @@
 import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
 import {
   agentsFromSnapshot,
+  foldersOf,
   applyAgentUpdate,
   applyWorkspaceUpdate,
   sortAgents,
@@ -47,9 +48,14 @@ export async function openPaseoDirectory(
   }
   let agents = new Map<string, OfficeAgent>();
   let workspaces = new Map<string, OfficeWorkspace>();
+  let folders: Record<string, string> = {};
+  let haveAgents = false,
+    haveWorkspaces = false;
   function emit(): void {
+    if (!haveAgents || !haveWorkspaces) return;
     try {
       onChange({
+        folders,
         agents: newestAgents(agents.values()),
         workspaces: sortWorkspaces(workspaces.values()),
       });
@@ -70,6 +76,7 @@ export async function openPaseoDirectory(
     });
   const stopAgents = agentList.subscription.subscribe({
     snapshot: (snapshot) => {
+      haveAgents = true;
       agents = agentsFromSnapshot(snapshot.entries.map((entry) => entry.agent));
       emit();
     },
@@ -82,11 +89,17 @@ export async function openPaseoDirectory(
   });
   const stopWorkspaces = workspaceList.subscription.subscribe({
     snapshot: (snapshot) => {
+      haveWorkspaces = true;
+      folders = foldersOf(snapshot.entries);
       workspaces = workspacesFromSnapshot(snapshot.entries);
       emit();
     },
     update: (message) => {
       if (message.type !== "workspace_update") return;
+      const update = message.payload;
+      folders = { ...folders };
+      delete folders[update.kind === "remove" ? update.id : update.workspace.id];
+      if (update.kind === "upsert") folders = { ...folders, ...foldersOf([update.workspace]) };
       workspaces = applyWorkspaceUpdate(workspaces, message.payload);
       emit();
     },

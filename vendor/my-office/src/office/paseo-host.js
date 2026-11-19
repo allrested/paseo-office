@@ -31,6 +31,10 @@ export const host = {
   /** False where Photo mode cannot keep a picture (a WebView has no download): no button, no P key. */
   photo: true,
   /** A short line the office says once. */
+  /** The scene tells the host a tenure write: { op: 'farewell' | 'official', name }. */
+  tenure() {},
+  /** The scene says a line in the team chat: (kind, vars), as upstream's chatLife is called. */
+  life() {},
   toast() {},
   /** Usage windows, as upstream's plan card has them: [{ key, pct, resetsAt }]. */
   limits: () => [],

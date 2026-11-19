@@ -28,11 +28,14 @@ import { OFFICE_MARK, PRO_FX } from './world/pro/pieces.js';
 import { SIGN, drawSign } from './paseo-sign.js';
 import { followHostFocus } from './paseo-focus.js';
 import { ringWithEveryone, updateLeisure } from './paseo-leisure.js';
-import { everyFrame } from './life/nap.js';
+import { everyFrame } from './ui/activity.js';
+import { setTenure } from './people/farewell.js';
+import { setLiftService } from './life/lift-service.js';
 import { dropSub, sessions, spawnSub, subAct, subs, workers } from './people/workers.js';
 import { director } from './people/director.js';
 import { STATIONS } from './people/navigation.js';
 import { applaud, ringBell } from './people/gatherings.js';
+import { onCommit, onPush, postAction } from './life/post.js';
 import { launchRocket } from './world/room-update.js';
 import { printPage } from './world/props/printer.js';
 import { lostObj, syncDevBoxes } from './world/props/dev-servers.js';
@@ -234,6 +237,8 @@ function onEvent(e) {
   record(e);
   const s = sessions.get(e.sess), w = workers.get(e.sess);
   if (e.type === 'stop' || e.type === 'commit') printPage();   // every finished turn and every commit prints a page
+  if (e.type === 'commit') onCommit();
+  if (e.type === 'push') onPush();
   if (e.type === 'test' || e.type === 'testok' || e.type === 'testfail') onTest(e);
   if (e.type === 'deploy' && w) w.cheeredAt = null;   // (upstream's applaud cheers someone once per 600 s: a deploy is cheered also right after a push)
   if (e.type === 'push' || e.type === 'deploy') applaud(e.sess);
@@ -263,6 +268,7 @@ function onEvent(e) {
     a = { station: 'director', anim: 'think', type: 'stop', text: !done ? tr('incident.reportNoTask') : tr('incident.report', { task: short(done, 40) }), e, dwell: 2.4,
       after: () => { if (!director.ack(w)) w.say('stop', tr('incident.reportLeft')); w.push(rest); } };
   }
+  if (e.type === 'commit') a = postAction(w, a) || a;
   w.push(e.type === 'compact' ? shredAction(w, a) : a);
 }
 
@@ -304,6 +310,8 @@ const api = {
     host.bell = typeof options.onBell === 'function' ? () => options.onBell() : null;
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
+    host.tenure = (op) => options.onTenure?.(op);
+    host.life = (kind, vars) => options.onLife?.(kind, vars);
     host.photo = options.photo !== false;
     host.limits = () => limits;
     host.boardRows = () => boardRows;
@@ -493,6 +501,10 @@ const api = {
     weatherKey = key;
     drawWeather(weatherToDraw(scene, SEASON));
   },
+  /** The tenure list: { days, choices, projects: [{ name, last, days, turns, due, farewell, back, intern, ready, official }] }. */
+  setTenure(data) { if (!started || stopped || !data) return; setTenure(data); },
+  /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
+  setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
   setLimits(list) { limits = Array.isArray(list) ? list : []; },
 };
 

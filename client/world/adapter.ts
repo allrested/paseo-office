@@ -59,7 +59,11 @@ function rank(session: WorldSession): number {
   return session.status === "work" ? 1 : 2;
 }
 
-function toSession(row: OfficeRow, team: string): WorldSession {
+function toSession(
+  row: OfficeRow,
+  team: string,
+  born: Readonly<Record<string, string>>,
+): WorldSession {
   const { agent } = row;
   const title = agentTitle(agent);
   const status = statusOf(agent, row.waitingOn);
@@ -70,7 +74,7 @@ function toSession(row: OfficeRow, team: string): WorldSession {
     name: title,
     title,
     dir: team,
-    git: { repo: team },
+    git: { repo: team, ...(Object.hasOwn(born, team) ? { born: born[team] } : {}) },
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
@@ -78,9 +82,15 @@ function toSession(row: OfficeRow, team: string): WorldSession {
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: [],
-    ...(agent.context === undefined
+    ...(agent.context === undefined && agent.costUsd === undefined
       ? {}
-      : { usage: { ctx: agent.context.usedTokens, ctxMax: agent.context.maxTokens } }),
+      : {
+          usage: {
+            ctx: agent.context?.usedTokens ?? 0,
+            ctxMax: agent.context?.maxTokens ?? 0,
+            ...(agent.costUsd === undefined ? {} : { cost: agent.costUsd }),
+          },
+        }),
   };
 }
 
@@ -88,9 +98,13 @@ function toSession(row: OfficeRow, team: string): WorldSession {
  * The office's agents as people on a floor with this many desks: a room is a team, seated
  * together. Who does not fit stays in the list view.
  */
-export function worldPeople(model: OfficeModel, desks: number): WorldPeople {
+export function worldPeople(
+  model: OfficeModel,
+  desks: number,
+  born: Readonly<Record<string, string>> = {},
+): WorldPeople {
   const rows = model.rooms.flatMap((room) => room.rows.map((row) => ({ row, team: room.name })));
-  const all = rows.map(({ row, team }) => toSession(row, team));
+  const all = rows.map(({ row, team }) => toSession(row, team, born));
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks
