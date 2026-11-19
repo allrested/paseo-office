@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   Pressable,
+  Image,
   Text,
   View,
   type NativeSyntheticEvent,
@@ -24,6 +25,9 @@ import { CHAT_TEXT_MAX, chatRpc, type ChatMessage, type ChatRequest } from "../s
 import { agentTitle, buildOfficeModel } from "../shared/model.js";
 import { failureText } from "./action-button.js";
 import { ChatHeader } from "./chat-chrome.js";
+import { PromptCoach } from "./prompt-coach.js";
+import { tabOf } from "./list-text.js";
+import type { ChatShortcuts } from "./chat-more.js";
 import { ComposeTools } from "./chat-compose-tools.js";
 import { messengerTheme } from "./messenger-styles.js";
 import { loadProblem } from "./activity-panel.js";
@@ -292,10 +296,24 @@ function RemindBody({ message, run, keep, styles }: BodyProps) {
   );
 }
 
+function OfficePhoto({ photo, styles }: { photo: string; styles: OfficeStyles }) {
+  const source = useMemo(() => ({ uri: photo }), [photo]);
+  return (
+    <Image
+      accessibilityLabel="Office photo"
+      accessible
+      source={source}
+      resizeMode="contain"
+      style={styles.messenger.photo}
+    />
+  );
+}
 function Body(props: BodyProps) {
   const { message, styles } = props;
   if (message.recalled === true) return <Text style={styles.chatMeta}>{CHAT_RECALLED}</Text>;
   switch (message.kind) {
+    case "photo":
+      return message.photo ? <OfficePhoto photo={message.photo} styles={styles} /> : null;
     case "sticker":
       return (
         <View style={styles.chatChip}>
@@ -667,6 +685,43 @@ function readyToSend({ images, recipient, text }: ChatDraft, reading: boolean): 
   return !reading && (images.length ? recipient !== null : text.trim() !== "");
 }
 
+function SendButton({
+  like,
+  canSend,
+  send,
+  sendLike,
+  styles,
+  color,
+  muted,
+  size,
+}: {
+  like: boolean;
+  canSend: boolean;
+  send(): void;
+  sendLike(): void;
+  styles: OfficeStyles;
+  color: string;
+  muted: string;
+  size: number;
+}) {
+  const enabled = like || canSend;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={like ? "Send thumbs up" : "Send"}
+      onPress={like ? sendLike : send}
+      disabled={!enabled}
+      style={enabled ? styles.messenger.send : styles.messenger.sendOff}
+    >
+      <Icon name={like ? "ThumbsUp" : "Send"} size={size} color={enabled ? color : muted} />
+    </Pressable>
+  );
+}
+
+function canLike(draft: ChatDraft, reading: boolean): boolean {
+  return !reading && draft.images.length === 0 && draft.text.trim() === "";
+}
+
 function Pinned({
   message,
   active,
@@ -699,7 +754,8 @@ function Pinned({
   );
 }
 
-type ChatPanelProps = ColumnPanelProps & { draft: ChatDraft; onClose?(): void };
+const memberStatuses = { attention: "Needs you", working: "Working", resting: "Resting" } as const;
+type ChatPanelProps = ColumnPanelProps & ChatShortcuts & { draft: ChatDraft; onClose?(): void };
 
 export function FloatingTeamChat(props: ChatPanelProps & { onClose(): void }) {
   const theme = useMemo(() => messengerTheme(props.theme), [props.theme]);
@@ -711,7 +767,18 @@ export function FloatingTeamChat(props: ChatPanelProps & { onClose(): void }) {
   );
 }
 
-export function ChatPanel({ office, styles, theme, layout, link, draft, onClose }: ChatPanelProps) {
+export function ChatPanel({
+  office,
+  styles,
+  theme,
+  layout,
+  link,
+  draft,
+  onClose,
+  onBoard,
+  onNewAgent,
+  onGroupPhoto,
+}: ChatPanelProps) {
   const { state, subscription, chat } = office;
   const call = useRpc(chatRpc);
   const model = useMemo(() => buildOfficeModel(state), [state]);
@@ -734,7 +801,12 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
   const members = useMemo(
     () =>
       model.rooms.flatMap((room) =>
-        room.rows.map(({ agent }) => ({ id: agent.id, name: agentTitle(agent), room: room.name })),
+        room.rows.map((row) => ({
+          id: row.agent.id,
+          name: agentTitle(row.agent),
+          room: room.name,
+          status: memberStatuses[tabOf(row)],
+        })),
       ),
     [model],
   );
@@ -793,25 +865,30 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
   );
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
-  const send = useCallback(async () => {
-    const sent = text.trim();
-    if (!canSend || sending.current) return;
-    sending.current = true;
-    const ok = await run({
-      op: "send",
-      text: sent,
-      ...(replyTo ? { replyTo: replyTo.id } : {}),
-      ...(recipient ? { to: recipient } : {}),
-      ...(images.length
-        ? { images: images.map(({ data, mimeType }) => ({ data, mimeType })) }
-        : {}),
-    });
-    sending.current = false;
-    if (!ok) return;
-    setText((current) => textAfterSend(current, sent));
-    if (images.length) setImages((current) => current.filter((image) => !images.includes(image)));
-    setReplyTo(null);
-  }, [text, replyTo, recipient, images, setImages, canSend, run, setText, setReplyTo]);
+  const post = useCallback(
+    async (like: boolean) => {
+      const sent = like ? "👍" : text.trim();
+      if ((!like && !canSend) || sending.current) return;
+      sending.current = true;
+      const ok = await run({
+        op: "send",
+        text: sent,
+        ...(replyTo ? { replyTo: replyTo.id } : {}),
+        ...(recipient ? { to: recipient } : {}),
+        ...(images.length
+          ? { images: images.map(({ data, mimeType }) => ({ data, mimeType })) }
+          : {}),
+      });
+      sending.current = false;
+      if (!ok) return;
+      setText((current) => textAfterSend(current, sent));
+      if (images.length) setImages((current) => current.filter((image) => !images.includes(image)));
+      setReplyTo(null);
+    },
+    [text, replyTo, recipient, images, setImages, canSend, run, setText, setReplyTo],
+  );
+  const send = useCallback(() => post(false), [post]);
+  const sendLike = useCallback(() => post(true), [post]);
   const sendSticker = useCallback(
     async (sticker: number) => {
       const ok = await run({
@@ -833,6 +910,13 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
   }, [text, model]);
   const first = options[0];
   const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const useQuick = useCallback(
+    (message: string) => {
+      setText(message);
+      input.current?.focus();
+    },
+    [setText],
+  );
   const insertMention = useCallback(() => {
     setText((value) => (value.trimEnd() ? value.trimEnd() + " @" : "@"));
     input.current?.focus();
@@ -876,6 +960,7 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
     <View style={styles.screen}>
       <ChatHeader
         members={members}
+        onOpenSession={link.openSession}
         searching={searching}
         onSearch={toggleSearch}
         onClose={onClose}
@@ -934,6 +1019,11 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
           web={layout.platform === "web"}
           run={run}
           styles={styles}
+          onBoard={onBoard}
+          onNewAgent={onNewAgent}
+          onGroupPhoto={onGroupPhoto}
+          openSession={link.openSession}
+          onUse={useQuick}
           insertMention={insertMention}
           setReading={setReading}
           stickersOpen={stickersOpen}
@@ -943,6 +1033,7 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
           <MentionList options={options} onPick={pick} styles={styles} />
         ) : null}
         {counter === null ? null : <Text style={styles.chatMeta}>{counter}</Text>}
+        <PromptCoach draft={draft} styles={styles} />
         <View style={styles.messenger.composerRow}>
           <TextInput
             ref={input}
@@ -956,19 +1047,16 @@ export function ChatPanel({ office, styles, theme, layout, link, draft, onClose 
             maxLength={CHAT_TEXT_MAX}
             style={styles.messenger.field}
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            onPress={send}
-            disabled={!canSend}
-            style={canSend ? styles.messenger.send : styles.messenger.sendOff}
-          >
-            <Icon
-              name="Send"
-              size={iconSize}
-              color={canSend ? theme.colors.accentForeground : theme.colors.foregroundMuted}
-            />
-          </Pressable>
+          <SendButton
+            like={canLike(draft, reading)}
+            canSend={canSend}
+            send={send}
+            sendLike={sendLike}
+            styles={styles}
+            color={theme.colors.accentForeground}
+            muted={theme.colors.foregroundMuted}
+            size={iconSize}
+          />
         </View>
         {error === null ? null : (
           <Text accessibilityRole="alert" style={styles.actionError}>

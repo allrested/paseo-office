@@ -278,6 +278,13 @@ export type WeatherState = z.output<typeof WeatherStateSchema>;
 export const CHAT_TEXT_MAX = 600;
 export const CHAT_IMAGE_LIMIT = 4;
 export const CHAT_IMAGE_CHARS = 1_000_000;
+// The group picture is the renderer's 480 × 360 JPEG. Six fit in a single office snapshot.
+export const GROUP_PHOTO_MAX = 96_000;
+export const GROUP_PHOTO_COUNT = 6;
+export const GroupPhotoSchema = z
+  .string()
+  .max(GROUP_PHOTO_MAX)
+  .regex(/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/);
 const ChatImageSchema = z.object({
   mimeType: z.literal("image/jpeg"),
   data: z
@@ -310,8 +317,7 @@ export const ChatRemindSchema = z.object({
 });
 
 /**
- * A message of the team chat, as upstream's engine keeps it. Keys not named here (a photo's
- * picture, a work card's body) are dropped on parse.
+ * A message of the team chat, as upstream's engine keeps it. Older photos may have no picture.
  */
 export const ChatMessageSchema = z.object({
   id: z.string(),
@@ -326,6 +332,7 @@ export const ChatMessageSchema = z.object({
   name: z.string().optional(),
   text: z.string(),
   sticker: z.number().int().nullable().optional(),
+  photo: GroupPhotoSchema.nullable().optional().catch(null),
   poll: ChatPollSchema.nullable().optional(),
   remind: ChatRemindSchema.nullable().optional(),
   reply: ChatReplySchema.nullable().optional(),
@@ -362,6 +369,11 @@ export type ChatChange = z.output<typeof ChatChangeSchema>;
 
 /** What the owner does in the chat; each op goes to the engine's function of that name. */
 export const ChatRequestSchema = z.discriminatedUnion("op", [
+  z.object({
+    op: z.literal("photo"),
+    requestId: z.string().min(1).max(80),
+    data: GroupPhotoSchema,
+  }),
   z.object({
     op: z.literal("life"),
     kind: z.string().min(1).max(40),

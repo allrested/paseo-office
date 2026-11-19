@@ -16,6 +16,7 @@ import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
 import { focusApp, openWorldFrame } from "./world-frame.web.js";
 import { WorldLoading } from "./world-loading.js";
+import type { GroupPhotoCapture } from "../use-group-photo.js";
 import { messageOf } from "./world-loader.js";
 import {
   useStandupBell,
@@ -25,6 +26,7 @@ import {
 } from "./world-view-shared.js";
 
 export interface WorldViewProps {
+  onPhotoReady?: ((capture: GroupPhotoCapture | null) => void) | undefined;
   scene?: WorldStartOptions["scene"];
   night?: boolean | undefined;
   streetOn?: boolean | null;
@@ -100,6 +102,7 @@ type WorldSceneProps = Omit<WorldViewProps, "plan"> & {
 function WorldScene({
   model,
   fullscreen,
+  onPhotoReady,
   theme,
   styles,
   plan,
@@ -258,6 +261,12 @@ function WorldScene({
     words.words,
     onToggleFullscreen,
   ]);
+
+  useEffect(() => {
+    if (!api?.captureGroupPhoto || !onPhotoReady) return undefined;
+    onPhotoReady(() => api.captureGroupPhoto?.() ?? null);
+    return () => onPhotoReady(null);
+  }, [api, onPhotoReady]);
 
   const fullscreenActive = fullscreen?.active ?? false;
   useEffect(() => {

@@ -4,6 +4,7 @@
 // The plugin's side of this contract is plugins/office/client/world/world-api.ts.
 import { state } from './core/state.js';
 import { MODULES } from './paseo-modules.js';
+import { captureGroupPhoto } from './paseo-group-photo.js';
 import { host } from './paseo-host.js';
 import { STYLE } from './paseo-style.js';
 import { CSS2DObject } from '../../three/addons/renderers/CSS2DRenderer.js';
@@ -460,6 +461,7 @@ const api = {
   /** The whiteboard's rows: [{ id, name, color, text, state: 'doing' | 'wait' | 'done' }]. */
   setBoardRows(rows) { boardRows = Array.isArray(rows) ? rows : []; state.boardDirty = true; },
   /** The host's readings, for the server racks and the wall screen; null when unknown. */
+  captureGroupPhoto() { return started && !stopped ? captureGroupPhoto() : null; },
   setMachine(snapshot) {
     if (!started) return;
     setMacSnap(snapshot || null);

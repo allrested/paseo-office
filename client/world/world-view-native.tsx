@@ -55,6 +55,7 @@ function WorldViewNativeScene({
   onOpenSession,
   onOpenLibrary,
   onOpenNotes,
+  onPhotoReady,
   meeting,
   weather,
   incidents,
@@ -124,7 +125,7 @@ function WorldViewNativeScene({
   useEffect(() => {
     const handle = frame.current;
     if (words.status !== "ready" || page === null || handle === null) return undefined;
-    const made = createWorldBridge((text) => handle.post(text));
+    const made = createWorldBridge((text) => handle.post(text), onPhotoReady);
     bridge.current = made;
     try {
       made.api.start(
@@ -147,7 +148,7 @@ function WorldViewNativeScene({
       bridge.current = null;
       setApi(null);
     };
-  }, [page, plan, words.status, words.language, words.words]);
+  }, [page, plan, words.status, words.language, words.words, onPhotoReady]);
 
   const { note: feedNote } = useWorldFeed(api, {
     model,

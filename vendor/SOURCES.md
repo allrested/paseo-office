@@ -129,18 +129,13 @@ it under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry.j
   (its part that moves people stands in `paseo-entry.js`); and the banner, which is the entry's
   and shows while an incident is open, not only for the 25 s.
 
-The team chat's engine (`src/shared/chat-engine.js`) and the English `chat` area
-(`src/i18n/locales/en/chat.js`, with its names made up) are taken into the plugin's
-`shared/upstream/`, not into `my-office/src/`. The office's server runs the engine
-(`server/chat-service.ts`) and the chat's panel reads its stickers and reactions
-(`client/chat-text.ts`); the plugin compiler bundles only modules under `client/`, `server/`
-and `shared/`, so neither could import them from `my-office/`. The scene does not take them.
-Nothing in the start-up list reaches the engine, so the import tool takes the two files by name
-and records them under `chat` in `MANIFEST.json`. The plugin compiles
-with `allowJs` off, so two `.d.ts` files beside them type what the office calls:
-`shared/upstream/chat-engine.d.ts` and `shared/upstream/chat.d.ts`. The import tool never writes a
-`.d.ts`. The engine's `tr` is `shared/chat-words.ts`, the stand-in's lookup over the `chat` area
-and `people.director`, which keeps upstream's emoji.
+The importer takes the team chat engine (`src/shared/chat-engine.js`), the local prompt coach
+(`src/shared/prompt-coach.js`) and English chat strings (`src/i18n/locales/en/chat.js`) into
+`shared/upstream/`. It records their upstream hashes under `chat` in `MANIFEST.json`. The plugin
+compiler can bundle modules from this directory on web, native and server. Adjacent `.d.ts`
+files describe what the plugin uses. `server/chat-service.ts` runs the chat engine with
+`shared/chat-words.ts` for translations. The composer calls the coach directly on the current
+draft to suggest clearer directions before sending. The scene bundle loads separately.
 
 The Headquarters wing (`src/office/world/pro/wing.js`) is imported from upstream. Its room plaques follow desk assignment. The camera uses the walk bounds for all three plans.
 

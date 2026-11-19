@@ -1209,6 +1209,14 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     expect(labelled("To: Whole group")).not.toBeNull();
     await press("Close team chat");
     expect(labelled("To: Whole group")).toBeNull();
+    await act(async () => deliver?.({ type: "chat", change: { op: "all", messages: [] } }));
+    await act(async () =>
+      deliver?.({ type: "chat", change: { op: "add", message: chatMessage(Date.now(), "Ada") } }),
+    );
+    await press("Open team chat: Ada · Hi");
+    expect(labelled("To: Whole group")).not.toBeNull();
+    await press("Close team chat");
+    expect(labelled("Open team chat: Ada · Hi")).toBeNull();
     await press("Show details sidebar");
     expect(reply()).toBe("Keep this draft");
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");

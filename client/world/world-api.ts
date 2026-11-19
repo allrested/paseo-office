@@ -192,6 +192,8 @@ export interface WorldStartOptions {
 }
 
 export interface WorldApi {
+  /** A small JPEG of the current floor, where this renderer supports capture. */
+  captureGroupPhoto?(): string | null;
   version: number;
   start(options: WorldStartOptions): void;
   /** Gives the graphics context back; the page is thrown away after it. */

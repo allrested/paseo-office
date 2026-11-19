@@ -6,6 +6,7 @@ import type { ChatDraft } from "./office-link.js";
 import type { OfficeStyles } from "./styles.js";
 import { ActionButton, failureText } from "./action-button.js";
 import type { MentionOption } from "./chat-text.js";
+import { ChatMore, type ChatShortcuts } from "./chat-more.js";
 import { ChatIcon, ToField } from "./chat-chrome.js";
 
 function PollForm({
@@ -229,7 +230,14 @@ export function ComposeTools({
   insertMention,
   stickersOpen,
   toggleStickers,
-}: {
+  onUse,
+  openSession,
+  onBoard,
+  onNewAgent,
+  onGroupPhoto,
+}: ChatShortcuts & {
+  onUse(message: string): void;
+  openSession(id: string): void;
   draft: ChatDraft;
   members: readonly MentionOption[];
   web: boolean;
@@ -241,12 +249,20 @@ export function ComposeTools({
   toggleStickers(): void;
 }) {
   const { recipient, setRecipient } = draft;
-  const [pollOpen, setPollOpen] = useState(false);
-  const togglePoll = useCallback(() => setPollOpen((value) => !value), []);
-  const closePoll = useCallback(() => setPollOpen(false), []);
+  const [panel, setPanel] = useState<"more" | "poll" | null>(null);
+  const pollOpen = panel === "poll";
+  const togglePoll = useCallback(() => setPanel((p) => (p === "poll" ? null : "poll")), []);
+  const toggleMore = useCallback(() => setPanel((p) => (p === "more" ? null : "more")), []);
+  const close = useCallback(() => setPanel(null), []);
   return (
     <>
-      <ToField members={members} value={recipient} onPick={setRecipient} styles={styles} />
+      <ToField
+        openSession={openSession}
+        members={members}
+        value={recipient}
+        onPick={setRecipient}
+        styles={styles}
+      />
       <View style={styles.messenger.toolbar}>
         <ChatIcon
           name="Smile"
@@ -266,8 +282,27 @@ export function ComposeTools({
         {web && recipient && (
           <ImagePicker key={recipient} draft={draft} styles={styles} onReading={setReading} />
         )}
+        <ChatIcon
+          name="Ellipsis"
+          label="More chat actions"
+          active={panel === "more"}
+          onPress={toggleMore}
+          styles={styles}
+        />
       </View>
-      {pollOpen && <PollForm run={run} onClose={closePoll} styles={styles} />}
+      {panel === "more" && (
+        <ChatMore
+          draft={draft}
+          web={web}
+          onUse={onUse}
+          onClose={close}
+          styles={styles}
+          onBoard={onBoard}
+          onNewAgent={onNewAgent}
+          onGroupPhoto={onGroupPhoto}
+        />
+      )}
+      {pollOpen && <PollForm run={run} onClose={close} styles={styles} />}
       {draft.images.length > 0 && <ImageDrafts draft={draft} styles={styles} />}
       {draft.images.length > 0 && !recipient && (
         <Text style={styles.chatMeta}>Choose a session for the attached images.</Text>

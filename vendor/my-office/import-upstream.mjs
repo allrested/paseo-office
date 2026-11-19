@@ -140,12 +140,13 @@ for (const backdrop of ["countryside", "beach"]) visit(`office/world/backdrops/$
 for (const rel of ["i18n/locales/en/common.js", "i18n/locales/en/time.js"]) visit(rel);
 
 /**
- * The team chat's engine and its English `chat` area, taken unchanged into the plugin's shared/upstream/: the
+ * The team chat's engine, local prompt coach and English `chat` area, taken into the plugin's shared/upstream/: the
  * plugin's own bundles take modules only from client/, server/ and shared/ (packages/server/src/server/plugins/
  * compiler-build.ts). The scene does not run the engine.
  */
 const CHAT = new Map([
   ["shared/chat-engine.js", "chat-engine.js"],
+  ["shared/prompt-coach.js", "prompt-coach.js"],
   ["i18n/locales/en/chat.js", "chat.js"],
 ]);
 const chatOut = (name) => path.join(HERE, "../../shared/upstream", name);

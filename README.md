@@ -27,7 +27,7 @@ my-office's.
   Sessions sits on the left, the floor in the center, and activity or the open conversation
   on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.
   Hide both for an edge-to-edge floor, or open a conversation to reply and answer permission requests.
-  Open **Team chat** to float the group conversation over the floor, or **Open in workspace** in a session to use the real web workbench without leaving Office. Session cards show status, elapsed time, and completed checklist items when the provider supplies them.
+  Open **Team chat** for group messages, polls and photos of the floor. Choose **To** to give a session work. Choose **Open in workspace** in a session for the real web workbench without leaving Office. Session cards show status, elapsed time, and completed checklist items when the provider supplies them.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it. With **Agent tools** and **Wake agents** enabled, available agents also claim unassigned lobby tasks in order.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an

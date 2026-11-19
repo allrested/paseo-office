@@ -167,7 +167,11 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   prompt. The shared chat shows the image count and the session’s reply. The image files go
   to the chosen session. Use the toolbar to mention someone, send a sticker or create a poll.
   Polls take two to six choices and pin themselves. You can also pin a message from its row.
-  Select the pinned banner to read it, or use **Search chat** to find an earlier message. Messages support quoted replies, reactions, pins, search and polls. On web, selecting a recipient also lets you attach images. The chosen session receives the images and the group sees an attachment label.
+  Select the pinned banner to read it, or use **Search chat** to find an earlier message.
+  The member count opens the team directory with each session’s status. **More chat actions**
+  opens the lobby board, starts an agent, or takes a group photo when the floor is available.
+  **Quick messages** saves reusable drafts on this device. Browsers with speech recognition
+  also offer dictation. With an empty composer, the thumbs-up button sends a quick reply. Messages support quoted replies, reactions, pins, search and polls. On web, selecting a recipient also lets you attach images. The chosen session receives the images and the group sees an attachment label. Open the group header to browse members and open a session. **More** contains saved quick messages, the lobby board and the new-agent form. On a live 3D floor, **Take office photo** captures a 480 × 360 view and posts it to the group. The chat keeps the six most recent photos. Compatible browsers offer dictation. Local draft suggestions use upstream’s English and Vietnamese rules and can be undone.
 
 The panels read the surface's one `office.state` subscription.
 

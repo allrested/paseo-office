@@ -29,9 +29,12 @@ const MENTION_QUERY_MAX = 40;
 const MENTION_OPTIONS_MAX = 8;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** Photos, work cards, loops, CI and denied calls never show. */
+/** Older photos may have no picture. The office also skips unsupported engine cards. */
 export function shows(message: ChatMessage): boolean {
-  return SHOWN_KINDS.has(message.kind);
+  return (
+    SHOWN_KINDS.has(message.kind) ||
+    (message.kind === "photo" && Boolean(message.photo || message.recalled))
+  );
 }
 
 export function isYours(message: ChatMessage): boolean {

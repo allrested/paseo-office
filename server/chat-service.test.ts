@@ -999,3 +999,78 @@ test("the same scene moment from two devices becomes one staff line", async () =
   expect(parcels).toHaveLength(1);
   expect(parcels[0]?.name).toBe("Receptionist");
 });
+
+/** JPEG frame and scan markers with the office thumbnail dimensions. */
+function jpegFrame(width = 480): string {
+  const image = Buffer.from([
+    0xff,
+    0xd8,
+    0xff,
+    0xc0,
+    0,
+    11,
+    8,
+    1,
+    104,
+    width >> 8,
+    width & 255,
+    1,
+    1,
+    0x11,
+    0,
+    0xff,
+    0xda,
+    0,
+    8,
+    1,
+    1,
+    0,
+    0,
+    63,
+    0,
+    0x7f,
+    0xff,
+    0xd9,
+  ]);
+  return `data:image/jpeg;base64,${image.toString("base64")}`;
+}
+
+test("group photos reach every chat once, survive a retry after restart, and never prompt an agent", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a", "Ada")));
+  const shot = { op: "photo", requestId: "click-1", data: jpegFrame() } as const;
+  const replies = await Promise.all([h.service.request(shot), h.service.request(shot)]);
+  expect(replies).toEqual([{ ok: true }, { ok: true }]);
+  const photos = () => h.service.snapshot().messages.filter((m) => m.kind === "photo");
+  expect(photos()).toMatchObject([{ photo: shot.data, from: "me" }]);
+  expect(h.changes.filter((c) => c.op === "add" && c.message.kind === "photo")).toHaveLength(1);
+  expect(h.sent).toHaveLength(0);
+  for (let i = 2; i <= 8; i++) await h.service.request({ ...shot, requestId: `click-${i}` });
+  expect(photos().filter((m) => m.photo)).toHaveLength(6);
+  expect(
+    h.changes.filter((c) => c.op === "update" && c.message.kind === "photo" && !c.message.photo),
+  ).toHaveLength(2);
+  await h.service.stop();
+  const saved = h.saved.at(-1)!;
+  expect(saved.msgs.filter((m) => m.photo)).toHaveLength(6);
+  const restarted = await harness({ store: { load: async () => saved, save: async () => {} } });
+  await restarted.service.request(shot);
+  expect(restarted.service.snapshot().messages.filter((m) => m.kind === "photo")).toHaveLength(8);
+  await restarted.service.stop();
+});
+
+test("a malformed or oversized group photo or a JPEG with different dimensions cannot enter the chat", async () => {
+  const h = await harness();
+  for (const data of [
+    jpegFrame(481),
+    jpegFrame().slice(0, -4),
+    "data:image/jpeg;base64," + "A".repeat(96_000),
+    "https://host/image.jpg",
+  ]) {
+    expect(await h.service.request({ op: "photo", requestId: "fixture", data })).toMatchObject({
+      ok: false,
+    });
+  }
+  expect(h.service.snapshot().messages.some((m) => m.kind === "photo")).toBe(false);
+  await h.service.stop();
+});

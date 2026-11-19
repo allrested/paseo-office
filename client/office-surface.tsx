@@ -17,6 +17,7 @@ import {
 } from "@getpaseo/plugin/client";
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import {
+  LOBBY,
   notesReadRpc,
   type ChatMessage,
   type WeatherScene,
@@ -38,6 +39,8 @@ import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
+import { TeamChatPreview } from "./team-chat-preview.js";
+import { useGroupPhoto } from "./use-group-photo.js";
 import { ChatPanel, FloatingTeamChat } from "./chat-panel.js";
 import { unreadCount, unreadLabel } from "./chat-text.js";
 import {
@@ -631,6 +634,7 @@ function SettingsButton({ onOpen, compact, touchScreen, color, styles }: Setting
 }
 
 interface SurfaceBodyProps {
+  onPhotoReady: ReturnType<typeof useGroupPhoto>["onPhotoReady"];
   fullscreen?: { active: boolean; toggle(): void } | undefined;
   office: OfficeState;
   model: OfficeModel;
@@ -672,6 +676,7 @@ interface SurfaceBodyProps {
 }
 
 function SurfaceBody({
+  onPhotoReady,
   fullscreen,
   office,
   model,
@@ -728,6 +733,7 @@ function SurfaceBody({
     const World = worldViewFor(platform);
     return (
       <World
+        onPhotoReady={onPhotoReady}
         fullscreen={fullscreen}
         model={model}
         theme={theme}
@@ -1555,6 +1561,60 @@ function selectAgentDetail(
   return { agent: model.agents.get(id) ?? null, activity: activities[id] ?? null };
 }
 
+function OfficeMessenger({
+  open,
+  link,
+  onOpen,
+  onClose,
+  ...panel
+}: Omit<Parameters<typeof FloatingTeamChat>[0], "onClose"> & {
+  open: boolean;
+  onOpen(): void;
+  onClose(): void;
+}) {
+  const sessionLink = useMemo(
+    (): OfficeLink => ({
+      select(id) {
+        onClose();
+        link.select(id);
+      },
+      openSession(id) {
+        onClose();
+        link.openSession(id);
+      },
+    }),
+    [link, onClose],
+  );
+  return open ? (
+    <FloatingTeamChat {...panel} link={sessionLink} onClose={onClose} />
+  ) : (
+    <TeamChatPreview chat={panel.office.chat} onOpen={onOpen} />
+  );
+}
+
+function useMessengerTasks(
+  board: BoardSheetState,
+  sidebars: SidebarControls | undefined,
+  sheet: ColumnSheetState,
+  column: ColumnState,
+  compact: boolean,
+  newAgent: NewAgentDraft,
+  closeChat: () => void,
+) {
+  const { open } = board;
+  const onBoard = useCallback(() => open(LOBBY), [open]);
+  const { openTab } = sheet;
+  const { show } = column;
+  const { setOpen } = newAgent;
+  const onNewAgent = useCallback(() => {
+    closeChat();
+    if (sidebars) sidebars.hideSessions(false);
+    else if (compact) openTab("sessions");
+    else show("sessions");
+    setOpen(true);
+  }, [sidebars, compact, openTab, show, setOpen, closeChat]);
+  return { onBoard, onNewAgent };
+}
 function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void) {
   const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(null);
   const closeWorkspace = useCallback(() => setWorkspace(null), []);
@@ -1800,7 +1860,27 @@ export function OfficeSurface(
   const selected = selectAgentDetail(kept, model, office.state.activity);
   // The panels size their controls for the surface they are in, not only for the device.
   const panelLayout = useMemo(() => ({ ...layout, compact }), [layout, compact]);
-  const panel = { office, styles, theme, layout: panelLayout, attention, draft, newAgent };
+  const { onPhotoReady, onGroupPhoto } = useGroupPhoto();
+  const chatTasks = useMessengerTasks(
+    board,
+    panels.sidebars,
+    sheet,
+    column,
+    compact,
+    newAgent,
+    closeTeam,
+  );
+  const panel = {
+    office,
+    styles,
+    theme,
+    layout: panelLayout,
+    attention,
+    draft,
+    newAgent,
+    ...chatTasks,
+    onGroupPhoto,
+  };
   const sessions = useMemo(
     () => sessionTabsOf(column.sessions, model.agents),
     [column.sessions, model.agents],
@@ -1863,6 +1943,7 @@ export function OfficeSurface(
         <View style={floorStyle}>
           {!panels.docked && controls}
           <SurfaceBody
+            onPhotoReady={onPhotoReady}
             fullscreen={full.available ? full : undefined}
             office={office}
             model={model}
@@ -2022,8 +2103,14 @@ export function OfficeSurface(
         styles={styles}
         onClose={board.close}
       />
-      {full.integrated && teamOpen && (
-        <FloatingTeamChat {...panel} link={panels.link} draft={draft} onClose={closeTeam} />
+      {full.integrated && (
+        <OfficeMessenger
+          open={teamOpen}
+          {...panel}
+          link={panels.link}
+          onOpen={openTeam}
+          onClose={closeTeam}
+        />
       )}
       <SceneDialog open={sceneOpen} setOpen={setSceneOpen} choice={street} styles={styles} />
       <OfficeWorkspace

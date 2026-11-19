@@ -384,6 +384,10 @@
       "to": "shared/upstream/chat-engine.js",
       "sha256": "d494b5761f6f6c40cce24fb6827340c5529f846740601ee4a66eb0c62f303983"
     },
+    "shared/prompt-coach.js": {
+      "to": "shared/upstream/prompt-coach.js",
+      "sha256": "8188319864097b688ae26df18bd2d63700037937680a6cab54a711e0b565f3a0"
+    },
     "i18n/locales/en/chat.js": {
       "to": "shared/upstream/chat.js",
       "sha256": "225e33b5d6ee3a47dbfc65fcc99723c488ff496c8fe6a6db332e011757742b2f"

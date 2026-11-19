@@ -68,7 +68,7 @@ test("a file of another shape is moved aside too", async () => {
   expect(logs.join("\n")).toContain("unexpected shape");
 });
 
-test("a photo in the file does not come back: its picture is dropped, the message stays", async () => {
+test("an unsupported legacy picture is cleared and its chat message is preserved", async () => {
   const photo = {
     id: "m9",
     at: 1_763_359_200_009,
@@ -86,9 +86,9 @@ test("a photo in the file does not come back: its picture is dropped, the messag
   );
   const loaded = await store().load();
   expect(loaded.msgs.map((message) => message.id)).toEqual(["m1", "m9"]);
-  expect(loaded.msgs[1]).not.toHaveProperty("photo");
+  expect(loaded.msgs[1]?.photo).toBeNull();
   const { photo: _picture, ...rest } = photo;
-  expect(loaded.msgs[1]).toEqual(rest);
+  expect(loaded.msgs[1]).toEqual({ ...rest, photo: null });
 });
 
 test("a load after a save reads what the save wrote", async () => {

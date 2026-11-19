@@ -43,45 +43,108 @@ function MemberDisc({ id, name, styles }: { id: string; name: string; styles: Of
   );
 }
 
+export interface ChatMember extends MentionOption {
+  status: string;
+}
+function MemberRow({
+  member,
+  open,
+  styles,
+}: {
+  member: ChatMember;
+  open(id: string): void;
+  styles: OfficeStyles;
+}) {
+  const show = useCallback(() => open(member.id), [open, member.id]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${member.name}, ${member.status}, ${member.room}`}
+      onPress={show}
+      style={styles.messenger.choice}
+    >
+      <MemberDisc id={member.id} name={member.name} styles={styles} />
+      <View style={styles.rowBody}>
+        <Text numberOfLines={1} style={styles.chatName}>
+          {member.name}
+        </Text>
+        <Text numberOfLines={1} style={styles.chatMeta}>
+          {member.status} · {member.room}
+        </Text>
+      </View>
+      <Icon name="ArrowUpRight" size={15} color={styles.iconColor} />
+    </Pressable>
+  );
+}
 export function ChatHeader({
   members,
+  onOpenSession,
   searching,
   onSearch,
   onClose,
   styles,
 }: {
-  members: readonly MentionOption[];
+  members: readonly ChatMember[];
+  onOpenSession(id: string): void;
   searching: boolean;
   onSearch(): void;
   onClose?(): void;
   styles: OfficeStyles;
 }) {
   const count = members.length + 1;
+  const [expanded, setExpanded] = useState(false);
+  const toggle = useCallback(() => setExpanded((value) => !value), []);
+  const open = useCallback(
+    (id: string) => {
+      setExpanded(false);
+      onOpenSession(id);
+    },
+    [onOpenSession],
+  );
   return (
-    <View style={styles.messenger.header}>
-      <View style={styles.messenger.group} aria-hidden>
-        <MemberDisc id="me" name="You" styles={styles} />
-        {members.slice(0, 3).map((member) => (
-          <MemberDisc key={member.id} id={member.id} name={member.name} styles={styles} />
-        ))}
+    <>
+      <View style={styles.messenger.header}>
+        <View style={styles.messenger.group} aria-hidden>
+          <MemberDisc id="me" name="You" styles={styles} />
+          {members.slice(0, 3).map((member) => (
+            <MemberDisc key={member.id} id={member.id} name={member.name} styles={styles} />
+          ))}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Team members"
+          aria-expanded={expanded}
+          onPress={toggle}
+          style={styles.rowBody}
+        >
+          <Text accessibilityRole="header" style={styles.messenger.title}>
+            Office team
+          </Text>
+          <Text style={styles.messenger.subtitle}>
+            {count === 1 ? "1 member" : `${count} members`}
+          </Text>
+        </Pressable>
+        <ChatIcon
+          name="Search"
+          label="Search chat"
+          active={searching}
+          onPress={onSearch}
+          styles={styles}
+        />
+        {onClose && <ChatIcon name="X" label="Close team chat" onPress={onClose} styles={styles} />}
       </View>
-      <View style={styles.rowBody}>
-        <Text accessibilityRole="header" style={styles.messenger.title}>
-          Office team
-        </Text>
-        <Text style={styles.messenger.subtitle}>
-          {count === 1 ? "1 member" : `${count} members`}
-        </Text>
-      </View>
-      <ChatIcon
-        name="Search"
-        label="Search chat"
-        active={searching}
-        onPress={onSearch}
-        styles={styles}
-      />
-      {onClose && <ChatIcon name="X" label="Close team chat" onPress={onClose} styles={styles} />}
-    </View>
+      {expanded && (
+        <ScrollView style={styles.messenger.memberList} keyboardShouldPersistTaps="handled">
+          <View style={styles.messenger.choice}>
+            <MemberDisc id="me" name="You" styles={styles} />
+            <Text style={styles.chatName}>You</Text>
+          </View>
+          {members.map((member) => (
+            <MemberRow key={member.id} member={member} open={open} styles={styles} />
+          ))}
+        </ScrollView>
+      )}
+    </>
   );
 }
 
@@ -126,12 +189,14 @@ function RecipientRow({
 }
 
 export function ToField({
+  openSession,
   members,
   value,
   onPick,
   styles,
 }: {
   members: readonly MentionOption[];
+  openSession(id: string): void;
   value: string | null;
   onPick(id: string | null): void;
   styles: OfficeStyles;
@@ -150,6 +215,9 @@ export function ToField({
     },
     [onPick],
   );
+  const showSession = useCallback(() => {
+    if (value !== null) openSession(value);
+  }, [value, openSession]);
   const name =
     value === null
       ? "Whole group"
@@ -174,7 +242,19 @@ export function ToField({
         <Icon name="ChevronDown" size={14} color={styles.iconColor} />
       </Pressable>
       {value !== null && !open && (
-        <Text style={styles.chatMeta}>The session receives your message and replies here.</Text>
+        <View style={styles.messenger.quickRow}>
+          <View style={styles.rowBody}>
+            <Text style={styles.chatMeta}>The session receives your message and replies here.</Text>
+          </View>
+          {members.some((m) => m.id === value) && (
+            <ChatIcon
+              name="ExternalLink"
+              label="Open recipient session"
+              onPress={showSession}
+              styles={styles}
+            />
+          )}
+        </View>
       )}
       {open && (
         <View style={styles.messenger.picker}>

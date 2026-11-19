@@ -34,6 +34,29 @@ export function messengerStyles({ colors }: PluginTheme, compact: boolean, touch
   };
   return {
     tools,
+    photo: { width: 210, maxWidth: "100%", aspectRatio: 4 / 3, borderRadius: 8 },
+    morePanel: {
+      padding: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.surface1,
+    },
+    sectionTitle: { flex: 1, color: colors.foreground, fontWeight: "700", fontSize: 14 },
+    quickRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 6,
+      minHeight: control,
+    },
+    memberList: {
+      flexGrow: 0,
+      maxHeight: 210,
+      backgroundColor: colors.surface1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+    },
     pollScroll: { maxHeight: 230 },
     preview: {
       flexDirection: "row",

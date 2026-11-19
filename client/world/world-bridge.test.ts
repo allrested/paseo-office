@@ -167,3 +167,21 @@ test("the tenure list and the lift go to the page as calls, and the scenes' line
   expect(onLife).toHaveBeenCalledWith("tea", {});
   expect(onTenure).toHaveBeenCalledWith({ op: "official", name: "web" });
 });
+
+test("a native renderer advertises group photos after startup and releases a pending capture on close", async () => {
+  const ready = vi.fn();
+  const post = vi.fn();
+  const b = createWorldBridge(post, ready);
+  b.api.start(options());
+  expect(ready).not.toHaveBeenCalled();
+  b.receive(JSON.stringify({ callback: "onCaptureReady", args: [] }));
+  const capture = ready.mock.calls[0]?.[0];
+  const image = capture();
+  const { args } = JSON.parse(post.mock.lastCall?.[0] ?? "");
+  b.receive(JSON.stringify({ callback: "onCaptured", args: [args[0], "jpeg"] }));
+  await expect(image).resolves.toBe("jpeg");
+  const waiting = capture();
+  b.api.stop();
+  await expect(waiting).resolves.toBeNull();
+  expect(ready).toHaveBeenLastCalledWith(null);
+});

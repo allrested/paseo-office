@@ -28,6 +28,7 @@ export function bridgePageScript(scene: string): string {
     });
     return options;
   }
+  var reportPhoto;
   frame.onMessage = function (text) {
     var message;
     try { message = JSON.parse(text); } catch (e) { return; }
@@ -35,7 +36,17 @@ export function bridgePageScript(scene: string): string {
     if (!message || !world || typeof world[message.call] !== "function") return;
     var args = message.args || [];
     if (message.call === "start" && args[0]) args[0] = standIns(args[0]);
-    try { world[message.call].apply(world, args); } catch (error) { problem(error); }
+    if (message.call === "captureGroupPhoto" && reportPhoto) {
+      try { reportPhoto(args[0], world.captureGroupPhoto()); } catch (error) { reportPhoto(args[0], null); }
+      return;
+    }
+    try {
+      world[message.call].apply(world, args);
+      if (message.call === "start" && args[0].onCaptureReady && typeof world.captureGroupPhoto === "function") {
+        reportPhoto = args[0].onCaptured;
+        args[0].onCaptureReady();
+      }
+    } catch (error) { problem(error); }
   };
   try {
 ${scene}

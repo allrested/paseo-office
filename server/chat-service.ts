@@ -2,6 +2,7 @@ import { lifeLine } from "../shared/life-lines.js";
 import type { PluginTurnOutcome } from "@getpaseo/plugin/server";
 import {
   CHAT_MESSAGE_MAX,
+  GROUP_PHOTO_COUNT,
   CHAT_TEXT_MAX,
   ChatMessageSchema,
   type ChatChange,
@@ -22,6 +23,7 @@ import {
   type Translate,
 } from "../shared/upstream/chat-engine.js";
 import type { ChatData, ChatStore } from "./chat-store.js";
+import { isOfficePhoto } from "./group-photo.js";
 import { errorMessage } from "./errors.js";
 import type { DirectoryView } from "./hub.js";
 import type { Clock } from "./timers.js";
@@ -145,7 +147,7 @@ function memberOf(agent: OfficeAgent, workspaces: readonly OfficeWorkspace[]): C
   };
 }
 
-// Drops a photo's picture and the cards' bodies.
+// Keep only the public fields that the chat can display.
 function wireOf(message: EngineMessage): ChatMessage | null {
   const parsed = ChatMessageSchema.safeParse(message);
   return parsed.success ? parsed.data : null;
@@ -464,6 +466,21 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
 
     async request(input) {
       switch (input.op) {
+        case "photo": {
+          if (!isOfficePhoto(input.data))
+            return { ok: false, error: "The office photo is not a valid 480 × 360 JPEG." };
+          if (!engine.fresh(`office-photo:${input.requestId}`)) return OK;
+          const pictures = engine.state.msgs.filter((message) => message.photo);
+          for (const old of pictures.slice(
+            0,
+            Math.max(0, pictures.length + 1 - GROUP_PHOTO_COUNT),
+          )) {
+            old.photo = null;
+            emit("update", old);
+          }
+          engine.photo(input.data);
+          return OK;
+        }
         case "life":
           return life(input);
         case "send":
