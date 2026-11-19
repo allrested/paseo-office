@@ -1487,7 +1487,7 @@ test("a host without a duty list posts the pantry chores at 08:00; a save and th
   const office = openOffice(recorded, context);
   await settle();
   const snapshot = () =>
-    office.events.filter((event) => event.type === "snapshot").at(-1)?.state as
+    office.events.findLast((event) => event.type === "snapshot")?.state as
       | {
           duties?: { duties: { name: string }[]; day: string | null };
           boards: Record<string, { id: string; state?: string; claimedBy?: string }[]>;
@@ -1517,7 +1517,7 @@ test("a host without a duty list posts the pantry chores at 08:00; a save and th
     post: { id: "p1", state: "done", claimedBy: "agent-1" },
   });
   await settle();
-  const board = office.events.filter((event) => event.type === "board").at(-1) as unknown as {
+  const board = office.events.findLast((event) => event.type === "board") as unknown as {
     board: string;
     posts: { id: string; state?: string }[];
   };

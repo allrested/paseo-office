@@ -830,9 +830,10 @@ test("the host's duties replace the scene's rota, and a pretend duty acted out i
   const done = vi.fn();
   await startPage({ onDutyDone: done });
   // @ts-expect-error vendored JavaScript has no declarations
-  const { host } = await import("../../vendor/my-office/src/office/paseo-host.js");
-  expect(host.duties).toBeNull();
-  const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld as World & {
+  const { host: pageHost } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  expect(pageHost.duties).toBeNull();
+  const sceneApi = (globalThis as unknown as { PaseoOfficeWorld: World })
+    .PaseoOfficeWorld as World & {
     setDuties(list: unknown): void;
   };
   const list = [
@@ -846,8 +847,8 @@ test("the host's duties replace the scene's rota, and a pretend duty acted out i
       owed: false,
     },
   ];
-  world.setDuties(list);
-  expect(host.duties).toEqual(list);
-  host.dutyDone("p1", "a1");
+  sceneApi.setDuties(list);
+  expect(pageHost.duties).toEqual(list);
+  pageHost.dutyDone("p1", "a1");
   expect(done).toHaveBeenCalledWith("p1", "a1");
 });
