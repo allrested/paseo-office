@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
+import { GroupSessionUnavailable } from "./chat-service.js";
 import { liveAgentPorts, liveChatPorts, liveNotesPorts } from "./live-ports.js";
 import type { Paseo, PaseoHolder } from "./paseo-holder.js";
 
@@ -24,6 +25,12 @@ const KNOWN = new Map([
   ["old", agent("old", { archivedAt: "2026-11-10T08:00:00.000Z" })],
   ["shut", agent("shut", { status: "closed" })],
 ]);
+
+const GROUP = {
+  group: true,
+  messageId: "office-group-x",
+  sentAt: Date.parse("2026-11-18T05:00:00Z"),
+};
 
 interface Sent {
   agentId: string;
@@ -176,6 +183,35 @@ test("a chat prompt steers a running turn", async () => {
   ]);
 });
 
+test("a group prompt goes only to a session that is still available on the daemon", async () => {
+  const sent: Sent[] = [];
+  const ports = liveChatPorts(fakeHolder(sent));
+  for (const id of ["run", "old", "shut", "nobody"]) {
+    await expect(ports.send(id, "Reply to the group", undefined, GROUP)).rejects.toBeInstanceOf(
+      GroupSessionUnavailable,
+    );
+  }
+  await ports.send("b-full-id", "Reply to the group", undefined, GROUP);
+  expect(sent).toEqual([
+    {
+      agentId: "b-full-id",
+      text: "Reply to the group",
+      options: { activeTurnBehavior: "steer", messageId: GROUP.messageId },
+    },
+  ]);
+});
+
+test("a send error after the eligibility check keeps its original delivery error", async () => {
+  const error = new Error("Disconnected after send");
+  const send = vi.fn().mockRejectedValue(error);
+  const ref = { refresh: async () => ({ agent: agent("session") }), send };
+  const holder = { require: () => ({ agents: { ref: () => ref } }) } as unknown as PaseoHolder;
+  await expect(
+    liveChatPorts(holder).send("session", "Group question", undefined, GROUP),
+  ).rejects.toBe(error);
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
 test("the answer is the last assistant message of the turn the hook names", async () => {
   let options: unknown = null;
   const entries = [
@@ -197,11 +233,69 @@ test("the answer is the last assistant message of the turn the hook names", asyn
   };
   const holder = { remember: () => undefined, require: () => paseo } as unknown as PaseoHolder;
   const ports = liveChatPorts(holder);
-  expect(await ports.lastAnswer("a", "t1")).toBe("Done.");
+  expect(await ports.readTurn("a", "t1")).toEqual({ matches: true, text: "Done." });
   expect(options).toEqual({ direction: "tail", limit: 1, wholeTurns: true });
-  expect(await ports.lastAnswer("a", null)).toBeNull();
-  expect(await ports.lastAnswer("a", "t9")).toBeNull();
+  expect((await ports.readTurn("a", null)).text).toBeNull();
+  expect((await ports.readTurn("a", "t9")).text).toBeNull();
 });
+
+test.each(["messageId", "clientMessageId"])(
+  "the group answer follows its %s in the hook's turn",
+  async (key) => {
+    const cursor = { seq: 10, epoch: "epoch" };
+    const newer = {
+      turnId: "new",
+      timestamp: "2026-11-18T05:05:00Z",
+      item: { type: "assistant_message", text: "Unrelated" },
+    };
+    const older = {
+      turnId: "group",
+      item: { type: "assistant_message", text: "Private text before the group steer" },
+    };
+    const user = {
+      turnId: "group",
+      item: { type: "user_message", text: "hi", [key]: GROUP.messageId },
+    };
+    const answer = { turnId: "group", item: { type: "assistant_message", text: "Hello group!" } };
+    const otherUser = {
+      turnId: "group",
+      item: { type: "user_message", text: "An additional request", [key]: "another-id" },
+    };
+    const refetch = vi
+      .fn()
+      .mockResolvedValueOnce({ entries: [newer] })
+      .mockResolvedValueOnce({ entries: [newer], hasOlder: true, startCursor: cursor })
+      .mockResolvedValueOnce({ entries: [older, user, answer] })
+      .mockResolvedValueOnce({ entries: [older, user] })
+      .mockResolvedValueOnce({ entries: [user, otherUser, answer] })
+      .mockResolvedValueOnce({ entries: [otherUser, user, answer] })
+      .mockResolvedValueOnce({ entries: [user, otherUser, answer] });
+    const holder = {
+      require: () => ({ agents: { ref: () => ({ timeline: { refetch } }) } }),
+    } as unknown as PaseoHolder;
+    const ports = liveChatPorts(holder);
+    expect(await ports.readTurn("a", "new", GROUP)).toEqual({ matches: false, text: null });
+    expect(await ports.readTurn("a", "group", GROUP)).toEqual({
+      matches: true,
+      text: "Hello group!",
+    });
+    expect(refetch.mock.calls[2]).toEqual([
+      { direction: "before", cursor, limit: 1, wholeTurns: true },
+    ]);
+    expect(await ports.readTurn("a", "group", GROUP)).toEqual({ matches: true, text: null });
+    for (let i = 0; i < 2; i++) {
+      expect(await ports.readTurn("a", "group", GROUP)).toEqual({
+        matches: true,
+        privateTurn: true,
+        text: null,
+      });
+    }
+    expect(await ports.readTurn("a", "group", GROUP, ["another-id"])).toEqual({
+      matches: true,
+      text: "Hello group!",
+    });
+  },
+);
 
 interface Created {
   cwd: string;

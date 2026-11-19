@@ -1,7 +1,11 @@
 import { stat } from "node:fs/promises";
 import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import { ACTIVITY_TAIL_LIMIT, startActivityPoller } from "./activity.js";
-import { lastAssistantText, type ChatServicePorts } from "./chat-service.js";
+import {
+  GroupSessionUnavailable,
+  lastAssistantText,
+  type ChatServicePorts,
+} from "./chat-service.js";
 import { PARENT_AGENT_ID_LABEL } from "./directory.js";
 import type { Hub, HubPorts } from "./hub.js";
 import type { JanitorPorts } from "./janitor.js";
@@ -47,7 +51,7 @@ export function liveHubPorts(
 }
 
 /** A finished-turn notification is normal for an available agent. Other attention needs the user. */
-function availableForLobby(agent: AgentSnapshotPayload): boolean {
+function availableForOfficeWork(agent: AgentSnapshotPayload): boolean {
   const attention = agent.requiresAttention || agent.attentionReason;
   return (
     agent.status === "idle" &&
@@ -82,7 +86,7 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
           page: { limit: 200, cursor },
         });
         for (const { agent } of result.entries) {
-          if (availableForLobby(agent)) ids.add(agent.id);
+          if (availableForOfficeWork(agent)) ids.add(agent.id);
         }
         cursor = result.pageInfo.nextCursor ?? undefined;
       } while (cursor);
@@ -90,7 +94,7 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
     },
     async lobbyEligible(agentId) {
       const result = await refresh(agentId);
-      return result !== null && availableForLobby(result.agent);
+      return result !== null && availableForOfficeWork(result.agent);
     },
     async status(agentId) {
       const result = await refresh(agentId);
@@ -117,24 +121,64 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
 }
 
 /** The team chat's ports on the daemon's own API; the holder is set by every hook and handler. */
-export function liveChatPorts(holder: PaseoHolder): Pick<ChatServicePorts, "send" | "lastAnswer"> {
+export function liveChatPorts(holder: PaseoHolder): Pick<ChatServicePorts, "send" | "readTurn"> {
   return {
-    // Steers a running turn, as a wake from the user does, so a busy agent is not cut off.
-    send: async (agentId, prompt, images) =>
-      holder
-        .require()
-        .agents.ref(agentId)
-        .send(prompt, { activeTurnBehavior: "steer", ...(images ? { images } : {}) }),
+    async send(agentId, prompt, images, delivery) {
+      const ref = holder.require().agents.ref(agentId);
+      if (delivery?.group) {
+        const result = await ref.refresh();
+        if (!result || !availableForOfficeWork(result.agent))
+          throw new GroupSessionUnavailable("The session is no longer available for a group reply");
+      }
+      await ref.send(prompt, {
+        activeTurnBehavior: "steer",
+        ...(delivery ? { messageId: delivery.messageId } : {}),
+        ...(images ? { images } : {}),
+      });
+    },
     // The hook's own recipe (PluginHookEvents["agent.turn.after"]): the latest whole turn, kept
     // only when it is the turn that ended. A null turn id has no entries.
-    async lastAnswer(agentId, turnId) {
-      if (turnId === null) return null;
-      const page = await holder
-        .require()
-        .agents.ref(agentId)
-        .timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
+    async readTurn(agentId, turnId, group, officeIds = []) {
+      const missing = { matches: !group, text: null };
+      if (turnId === null) return missing;
+      const timeline = holder.require().agents.ref(agentId).timeline;
+      const options = { limit: 1, wholeTurns: true };
+      let page = await timeline.refetch({ direction: "tail", ...options });
+      // Another turn may already have started by the time this hook reads. Only walk back to
+      // the reservation; a group message cannot be present in any older turn.
+      if (group)
+        while (
+          !page.error &&
+          !page.entries.some((entry) => entry.turnId === turnId) &&
+          page.hasOlder &&
+          page.startCursor &&
+          Date.parse(page.entries[0]?.timestamp ?? "") >= group.sentAt
+        ) {
+          page = await timeline.refetch({
+            direction: "before",
+            cursor: page.startCursor,
+            ...options,
+          });
+        }
+      if (page.error) throw new Error(page.error);
       const turn = page.entries.filter((entry) => entry.turnId === turnId);
-      return lastAssistantText(turn.map((entry) => entry.item));
+      const items = turn.map((entry) => entry.item);
+      if (!group) return { matches: true, text: lastAssistantText(items) };
+      const index = items.findIndex(
+        (item) =>
+          item.type === "user_message" &&
+          (item.clientMessageId === group.messageId || item.messageId === group.messageId),
+      );
+      if (index < 0) return missing;
+      const known = new Set([group.messageId, ...officeIds]);
+      const privateTurn = items.some(
+        (item) =>
+          item.type === "user_message" &&
+          !known.has(item.clientMessageId ?? "") &&
+          !known.has(item.messageId ?? ""),
+      );
+      if (privateTurn) return { matches: true, privateTurn: true, text: null };
+      return { matches: true, text: lastAssistantText(items.slice(index + 1)) };
     },
   };
 }

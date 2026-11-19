@@ -161,7 +161,7 @@ function RecipientRow({
 }) {
   const choose = useCallback(() => onPick(member?.id ?? null), [onPick, member]);
   const label = member?.name ?? "Whole group";
-  const hint = member?.room ?? "Send to the group chat";
+  const hint = member?.room ?? "Ask an available session";
   return (
     <Pressable
       accessibilityRole="radio"

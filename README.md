@@ -115,8 +115,10 @@ photo lighting group title are English in every language.
   Anyone who can open the settings page can see it there.
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
-- The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
-  notes' prompt to the host's own agents, and so to whichever provider runs them.
+- The stand-up notes writer and agent wakes send prompts to the host's agents and their providers.
+  In team chat, **Whole group** can send your message and up to six recent group or scene chat
+  lines to one available session for a conversational reply. **To**, an `@mention`, or a reply
+  to a session sends your message to the session you address.
 - It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
   in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
 

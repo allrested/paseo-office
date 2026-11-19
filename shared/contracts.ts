@@ -336,6 +336,8 @@ export const ChatMessageSchema = z.object({
   poll: ChatPollSchema.nullable().optional(),
   remind: ChatRemindSchema.nullable().optional(),
   reply: ChatReplySchema.nullable().optional(),
+  /** Routing of a plain group exchange or delivery notice. Older messages have no tag. */
+  tag: z.string().optional().catch(undefined),
   /** Emoji → who reacted with it. */
   reacts: z.record(z.string(), z.array(z.string())),
   recalled: z.boolean().optional(),
