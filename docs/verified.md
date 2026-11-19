@@ -1,4 +1,23 @@
-# What was seen on a stock daemon
+# Office 3D verification on stock Paseo
+
+## Fullscreen screenshot checks
+
+The gallery shows the plugin at `3095d6a` running on stock Paseo 0.16.2. A separate daemon hosted a sample workspace named **Northstar** with three sessions and a local test provider. Chromium rendered the company floor with software WebGL, the Countryside backdrop and daylight.
+
+| View                                                             | What was checked                                                                                                                      |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [Fullscreen office](fullscreen-office.png)                       | Sessions and Activity share the screen with the floor. The Sessions counts distinguish the running agent from the two resting agents. |
+| [Floor only](fullscreen-floor.png)                               | Hiding both sidebars gives the scene the full width. Both controls are still available in the header.                                 |
+| [Team chat](fullscreen-team-chat.webp)                           | A message addressed to **Release review** reached that session and its reply appeared in the group.                                   |
+| [Embedded workbench](fullscreen-workspace.webp)                  | The arrow beside **Release review** opened its Paseo workspace and transcript over the floor.                                         |
+| [Office controls](workspace-controls.webp)                       | Switching to **Office controls** showed the selected session’s conversation and accepted a draft reply.                               |
+| [Office controls at phone width](workspace-controls-mobile.webp) | The same dialog and its composer fit a 390 × 844 px browser viewport. Closing the dialog returned to the same fullscreen scene.       |
+
+The desktop images are 1600 × 960 px. The narrow image checks the responsive web layout in Chromium. Physical devices and the Paseo desktop app require separate checks.
+
+## Earlier verification runs
+
+The following observations record the build, host and viewport used in each earlier check.
 
 The plugin was installed by Git, from a local clone of this repository, on an unmodified Paseo
 0.16.2 (the published `@getpaseo/server` and `@getpaseo/cli`) on 2026-11-19. The daemon ran on a
@@ -6,8 +25,7 @@ throwaway home with plugins turned on and the web UI enabled, with no agents, no
 and no tracker tokens. The page was opened with a browser, at 1280 and at 390 px wide.
 
 The first look was at this repository before its last fixes, which moved the floor's note and
-changed comments, docs and the stand-up notes' prompt. A second look, at the tree this document is
-in, was of the 3D view's note only. It is not repeated on each change.
+changed comments, docs and the stand-up notes' prompt. A second look covered that build’s updated 3D view note only. It is not repeated on each change.
 
 A third look, on 2026-11-19, was of the session tabs and the New agent form (see "Session tabs and
 the New agent form"). It used the same stock 0.16.2, with a folder under `/tmp` opened as a
@@ -615,11 +633,6 @@ stayed mounted across the toggles. Restoring Details returned to the selected co
 and its unsent draft. At 390 px, Sessions and conversations opened as sheets over the floor. On stock Paseo 0.16.2, the New agent draft survived hiding and
 showing Sessions, and the saved sidebar choice survived a page reload.
 
-The screenshots use the plugin’s real components and scene with sample session data.
-[With Sessions and Activity](fullscreen-office.png) · [With both sidebars hidden](fullscreen-floor.png)
-
 ### Fullscreen workspace and team chat
 
 Stock Paseo 0.16.2 in Chromium rendered the Countryside scene in daylight with a scratch workspace, two sessions and a local test provider. A message addressed through **Team chat → To** reached the selected session, which replied in the group. The embedded workspace opened its Explorer, showed a changed file and created a terminal. Closing the workbench at desktop width returned to the same fullscreen scene iframe. The workbench also opened at 390 px.
-
-[Session and floor](fullscreen-workspace.webp) · [Floating team chat](fullscreen-team-chat.webp)

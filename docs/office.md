@@ -1,11 +1,15 @@
-# The office
+# Office 3D guide
 
-The office shows every agent on a Paseo host in one place. The Office item in the sidebar opens it
-as a screen, and "Open office" in the Command Center opens it as a workspace tab, which lists that
-workspace's room first. Each workspace is a room, and the lobby holds agents without a workspace.
+Open **Office 3D** from the Paseo sidebar to see the host’s workspaces and agents. **Open office** in the Command Center opens a tab with the current workspace’s room first. Agents without a workspace appear in the lobby.
 
-This doc says what each part does, where its code is, and what the code cannot tell you. What is
-taken from my-office, and how to take a newer version, is in [vendor/SOURCES.md](../vendor/SOURCES.md).
+## Work in fullscreen
+
+1. Choose **3D** and **Full screen**. **Sessions** on the left shows who is working, resting or waiting for you. **Details** on the right shows activity or the selected conversation. Toggle either sidebar in the header to give the floor more room. [Office with both sidebars](fullscreen-office.png) · [Floor with both sidebars hidden](fullscreen-floor.png)
+2. Select a session row to read its conversation. Click the **↗** beside the row to open the agent’s full Paseo workspace over the floor. In **Walk in**, press **E** at an agent’s desk for the same workspace. The minimize button keeps it available from the camera toolbar. Closing it returns you to the floor. [Embedded workbench](fullscreen-workspace.webp)
+3. Inside the workspace dialog, choose **Office controls** for the conversation, steps and subagents. A reply can join the running turn. **Workspace** switches back to the embedded workbench. On clients without an embeddable workbench, Office shows the session controls directly. [Desktop controls](workspace-controls.webp) · [Controls at phone width](workspace-controls-mobile.webp)
+4. Choose **Team chat** in the header for the shared conversation. Address a session through **To** when you want it to take an action. An assignment that should remain visible until completion belongs on the lobby board. [Floating team chat](fullscreen-team-chat.webp)
+
+For configuration, see [Office settings](#settings), [branding](#custom-branding), [boards and wakes](#boards-and-wakes) and the [duty board](#the-duty-board). The port’s upstream revision and asset credits are recorded in [the vendor sources](../vendor/SOURCES.md).
 
 ## Where the code is
 
@@ -454,11 +458,15 @@ Each saved value overrides its environment variable. On web, the name and logo c
 
 ## Settings
 
-The office's settings are a screen in its page under Settings > Plugins > Office 3D
-(`client/office-settings.tsx`): the view, "Agent tools", "Wake agents", "Floor plan", "Notes
-folder", "Time zone", "Stand-up days", "Sound", "3D office language", the tracker fields and "Weather". Three things open it with
-`client.openSettings("office")`: the gear beside the view switch, the Command Center's "Office
-settings", and the Attention tab's Settings card.
+The gear in fullscreen opens **Office settings** over the floor. You can also open the plugin’s settings from Paseo settings or the Command Center.
+
+| Section    | Controls                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
+| Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
+| Services   | Jira projects, Sentry organization and projects, and the optional weather service.           |
+
+View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
 ## The host
 
