@@ -12,6 +12,7 @@ import {
   teamOfRoom,
   worldBoardRows,
   worldChanges,
+  worldDuties,
   worldWeather,
   worldMachine,
   worldPeople,
@@ -103,6 +104,7 @@ export function useWorldFeed(
     rests.current = restsAfter(rests.current, people.sessions, Date.now());
     scene.setSessions(withRestTimes(people.sessions, rests.current));
     scene.setBoardRows(worldBoardRows(model, people.sessions));
+    scene.setDuties?.(worldDuties(model));
     const changes = worldChanges(memory.current, people);
     for (const event of changes.events) scene.event(event);
     memory.current = changes.memory;

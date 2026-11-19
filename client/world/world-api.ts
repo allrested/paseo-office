@@ -1,6 +1,6 @@
 import type { OfficeScene } from "../../shared/settings.js";
 import type { WordsLanguage } from "../../shared/scene-language.js";
-import type { LifeEvent } from "../../shared/contracts.js";
+import type { DutyChore, LifeEvent } from "../../shared/contracts.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 
 /**
@@ -92,6 +92,25 @@ export interface WorldBoardRow {
   state: "doing" | "wait" | "done";
 }
 
+/**
+ * A duty of the day's duty board, as the pantry's board shows it. Never its instructions: only
+ * its name, who has it and its state.
+ */
+export interface WorldDuty {
+  /** The duty's post: a pretend duty acted out is reported by it (`onDutyDone`). */
+  id: string;
+  name: string;
+  /** The chore it is acted out as; null: its figure walks to the board and back. */
+  chore: DutyChore | null;
+  /** No agent is asked: the scene picks a free figure to act it out, and reports it done. */
+  pretend: boolean;
+  /** Who has it: the agent and its name cut short; null while open, or when ticked by hand. */
+  holder: { id: string; name: string } | null;
+  state: "open" | "claimed" | "done";
+  /** Not done on its day: still on the board. */
+  owed: boolean;
+}
+
 /** Something an agent left listening, as the scene draws it: a small server box. */
 export interface WorldDevServer {
   /** Whose it is. Not alive: forgotten, so the box stands in the server room with a red light. */
@@ -178,6 +197,10 @@ export interface WorldStartOptions {
   onOpen?(agentId: string): void;
   /** The incidents' banner was chosen. */
   onIncidents?(): void;
+  /** The pantry's duty board was chosen. Absent: a click says the day's duties in a note. */
+  onDuties?(): void;
+  /** A figure acted out a pretend duty (`WorldDuty.id`): the host records it done by that agent. */
+  onDutyDone?(id: string, agentId: string): void;
   /** A short line the office says once. */
   onToast?(text: string): void;
   /**
@@ -204,6 +227,11 @@ export interface WorldApi {
   select(agentId: string | null): void;
   focusProject(project: string): void;
   setBoardRows(rows: readonly WorldBoardRow[]): void;
+  /**
+   * The day's duties for the pantry's board. Once given, the scene no longer keeps a rota of its
+   * own. Absent on a page built from before the duty board.
+   */
+  setDuties?(duties: readonly WorldDuty[]): void;
   /**
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.

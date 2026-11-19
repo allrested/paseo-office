@@ -657,6 +657,8 @@ interface SurfaceBodyProps {
   onOpenBoard(roomId: string): void;
   /** The duty board's editor: the 3D pantry's board and the List's lobby card open it. */
   onOpenDuties(): void;
+  /** The 3D office acted out a pretend duty with this agent's figure. */
+  onDutyActed(id: string, agentId: string): void;
   machine: Machine | null;
   onOpenMachine(): void;
   /** The 3D wall screen's: absent on an app that cannot show Resources beside the floor. */
@@ -698,6 +700,7 @@ function SurfaceBody({
   onOpenSession,
   onOpenBoard,
   onOpenDuties,
+  onDutyActed,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -749,6 +752,8 @@ function SurfaceBody({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onSelectBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+        onDutyActed={onDutyActed}
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
@@ -1732,6 +1737,12 @@ export function OfficeSurface(
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   const dutyActions = useDutyActions();
+  const { acted } = dutyActions;
+  // A report the host refuses changes nothing: its duty board is what the scene is told next.
+  const dutyActed = useCallback(
+    (id: string, agentId: string) => void acted(id, agentId).catch(() => undefined),
+    [acted],
+  );
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
   const incidentsCard = useCardOpening(live);
@@ -1975,6 +1986,7 @@ export function OfficeSurface(
             onOpenSession={openSession}
             onOpenBoard={board.open}
             onOpenDuties={dutyCard.show}
+            onDutyActed={dutyActed}
             machine={machine}
             onOpenMachine={openMachine}
             onOpenResources={openResources}

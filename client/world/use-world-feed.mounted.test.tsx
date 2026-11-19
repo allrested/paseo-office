@@ -106,9 +106,17 @@ test("seats the people, writes the board, sets the machine and the selection onc
   await act(async () => root.render(<Probe api={api} feed={input()} />));
   const names = calls.map((call) => call.split(":")[0]);
   expect(names).toEqual(
-    expect.arrayContaining(["setTheme", "setSessions", "setBoardRows", "setMachine", "select"]),
+    expect.arrayContaining([
+      "setTheme",
+      "setSessions",
+      "setBoardRows",
+      "setDuties",
+      "setMachine",
+      "select",
+    ]),
   );
   expect(calls).toContain("setSessions:[[]]");
+  expect(calls).toContain("setDuties:[[]]");
   expect(calls).toContain("setMachine:[null]");
   expect(calls).toContain("select:[null]");
 });
