@@ -1161,6 +1161,12 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     // jsdom has no dialog top layer. Record the browser operation on the actual mounted dialog.
     const proto = Object.getPrototypeOf(document.createElement("dialog"));
     Object.defineProperties(proto, {
+      show: {
+        configurable: true,
+        value() {
+          this.setAttribute("open", "");
+        },
+      },
       showModal: {
         configurable: true,
         value() {
@@ -1230,6 +1236,7 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
       await pressTab("Ada");
       expect(reply()).toBe("Keep this draft");
     } finally {
+      Reflect.deleteProperty(proto, "show");
       Reflect.deleteProperty(proto, "showModal");
       Reflect.deleteProperty(proto, "close");
     }
