@@ -141,4 +141,22 @@ body.is-photo #paseo-note { bottom: 118px; }
 @keyframes incident-blink { 50% { opacity: .3; } }
 
 @media (prefers-reduced-motion: reduce) { .tag, .bubble, .zone { transition: none; } #stage-wrap.is-incident::after { animation: none; } .paseo-note { animation: none; } }
+
+/* The first visit's tour (ui/tips.js): one card over the thing it is about, or above a button of the page. Upstream's
+   styles/tips.css in the page's language: the app's surface, border and text, radius 12, no glow. */
+.tour-wrap { width: 0; height: 0; position: relative; z-index: 100000 !important; }
+.tour { position: absolute; left: 0; bottom: 16px; transform: translateX(-50%); width: 264px; max-width: calc(100vw - 32px); box-sizing: border-box; pointer-events: auto; padding: 11px 12px 10px; background: var(--o-surface-raised); color: var(--o-fg); border: 1px solid var(--o-muted); border-radius: 12px; font-size: 12px; line-height: 1.45; animation: tour-in .25s ease-out; }
+.tour::after { content: ""; position: absolute; left: var(--arrow, 50%); bottom: -7px; width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg); background: var(--o-surface-raised); border-right: 1px solid var(--o-muted); border-bottom: 1px solid var(--o-muted); }
+.tour--page { position: absolute; z-index: 7; }
+.tour-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tour-title { font-size: 13px; font-weight: 600; }
+.tour-n { font-size: 11px; color: var(--o-muted); white-space: nowrap; }
+.tour-text { margin: 5px 0 9px; }
+.tour-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.tour-skip, .tour-next { all: unset; box-sizing: border-box; min-height: 32px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--o-border); color: var(--o-fg); }
+.tour-next { background: var(--o-fg); color: var(--o-surface-raised); border-color: var(--o-fg); }
+.tour-skip:hover { border-color: var(--o-muted); }
+.tour-skip:focus-visible, .tour-next:focus-visible { outline: 2px solid var(--o-fg); outline-offset: 2px; }
+@keyframes tour-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .tour { animation: none; } }
 `;

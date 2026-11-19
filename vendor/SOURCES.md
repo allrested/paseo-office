@@ -31,7 +31,12 @@ character, and a game can be played from there. The games call the group chat an
 chat's window is not taken: its stand-in exports what the games import and does nothing. The sounds are upstream's,
 off until the Sound switch is on, so a game and a karaoke song are heard then.
 
-Six copied files are changed by hand, and each change starts with `// PASEO:`:
+The first-visit tour is taken too (`ui/tips.js`, with its English words, `locales/en/tips.js`). It
+shows only where Walk in does (a fine pointer; `state.isLocal` is set from it in
+`ui/camera-bar.js`), once per device (`office-tips`), and its person card's words are Paseo's
+(`OURS` in `i18n/index.js`). Its cards' styles are in `paseo-style.js`.
+
+Seven copied files are changed by hand, and each change starts with `// PASEO:`:
 
 - `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
   gap); the engine and every other sound are upstream's.
@@ -49,6 +54,9 @@ Six copied files are changed by hand, and each change starts with `// PASEO:`:
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
   has no Photo mode (the button is hidden and `enterPhoto` returns), and leaving photo mode calls
   `setTimeMode('auto')`, so Day and Night, held for the photo, go back to the app's theme.
+- `src/office/ui/tips.js`: the bell card is dropped (a click on the bell in Paseo also has the
+  stand-up notes written), and a card's look calls `setView(null)`, so Overview is not shown
+  pressed and a resize does not refit under the card.
 
 ### Made-up names
 
@@ -118,8 +126,8 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command |
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
-| `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera |
-| `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons |
+| `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera; `state.isLocal` for the tour |
+| `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons; `togglePop` does nothing |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
@@ -137,7 +145,7 @@ the scene's toasts in a note of its own over the floor where the host gives no `
 the probe that finds out whether the page lets audio start: it runs on a real activating press only,
 never on Escape or a bare modifier key or while the frame has no active user activation; 'blocked'
 is tried again on the next press, 'ready' and 'unsupported' are final), `paseo-style.js` (the page's
-stylesheet, in Paseo's design language), `paseo-modules.js` (generated: the kept modules in start-up order),
+stylesheet, in Paseo's design language, the tour's cards included), `paseo-modules.js` (generated: the kept modules in start-up order),
 `paseo-sign.js` (the picture on the lobby's sign and the reception's plaque, with the host's
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
 `paseo-leisure-plan.js` (who gets up from a rest, when and for what; no scene in it, so

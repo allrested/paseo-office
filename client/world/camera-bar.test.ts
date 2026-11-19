@@ -735,10 +735,13 @@ test("photo mode's bar keeps upstream's focus ring, its round exit, and drops th
 test("Walk in is shown for a fine pointer and hidden for a coarse one, and follows a change", () => {
   const fine = open({ fine: false });
   expect(page("btn-fp").hidden).toBe(true);
+  expect(state.isLocal).toBe(false);
   fine.change(true);
   expect(page("btn-fp").hidden).toBe(false);
+  expect(state.isLocal).toBe(true);
   fine.change(false);
   expect(page("btn-fp").hidden).toBe(true);
+  expect(state.isLocal).toBe(false);
 });
 
 test("a view press leaves walk-in first", () => {

@@ -43,6 +43,9 @@ const OURS = {
   'paseo.tv.resources': 'Open Resources',
   // (the wall clock: it changes nothing, see paseo-entry.js)
   'paseo.clock.hint': "The lights follow the app's theme",
+  // (the tour's card for a person: the card Paseo opens has no prompt, file or command in it)
+  'tips.person.title': 'Each person is an agent',
+  'tips.person.text': 'Click someone to open their card: what they are doing now, and a way into their session.',
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
   'paseo.notes': 'Stand-up notes',
   'places.deploy.today': { one: '{n} deploy since the office opened', other: '{n} deploys since the office opened' },

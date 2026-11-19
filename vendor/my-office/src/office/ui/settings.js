@@ -20,3 +20,5 @@ export function syncTimeBtns() {
   for (const b of document.querySelectorAll('[data-ph-time]')) b.setAttribute('aria-pressed', String(b.dataset.phTime === mode));
 }
 export function syncToggles() {}
+/** Upstream's settings popover: there is none here (its tour button, `#btn-tips`, is not in the page either). */
+export function togglePop() {}

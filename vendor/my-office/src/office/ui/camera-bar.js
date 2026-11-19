@@ -340,9 +340,11 @@ export function setup() {
   setInterval(() => { const v = `${Math.round((fp.on ? 70 / fpCam.fov : camera.zoom / (fitZoom || 1)) * 100)}%`, z = $('zoom-val'); if (z.textContent !== v) z.textContent = v; }, 200);   // (written only when it changes: a write costs a style pass)
   // (made after the renderer's own observer, so the frustum already has the frame's new shape)
   new ResizeObserver(() => { if (home && !state.selectedId) fitFloor(); }).observe(document.getElementById('stage'));
-  // Walk in needs keys: shown for a fine pointer only (a phone could only look around)
+  // Walk in needs keys: shown for a fine pointer only (a phone could only look around). The first-visit tour (ui/tips.js)
+  // says "click" and "WASD": it starts only where Walk in shows. Upstream calls that `state.isLocal`, "the user's own
+  // machine"; here it is a pointer and keys.
   const fine = matchMedia('(pointer: fine)');
-  const showWalk = () => { $('btn-fp').hidden = !fine.matches; };
+  const showWalk = () => { $('btn-fp').hidden = !fine.matches; state.isLocal = fine.matches; };
   showWalk(); fine.addEventListener('change', showWalk);
   // upstream leaves walk-in from ui/topbar.js, which is not taken: the place card goes first, as there
   document.addEventListener('keydown', (e) => {
