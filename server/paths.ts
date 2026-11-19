@@ -70,3 +70,8 @@ export function liftFile(env: NodeJS.ProcessEnv, home: string) {
 export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "tenure.json");
 }
+
+/** The owner's duty list; the day's duties are posts on the duty board in boards.json. */
+export function dutiesFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "duties.json");
+}
