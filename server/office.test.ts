@@ -448,3 +448,65 @@ test("a session without its board tool can confirm just its current assignment",
   expect(store.current().posts[0]?.state).toBe("done");
   await office.stop();
 });
+
+const CUPS = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const };
+const BUILD = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
+const TODAY = "2026-11-11";
+
+test("an instructed duty goes to an idle agent as a lobby task does; a pretend one never does", async () => {
+  const { office, clock, store, prompts, sources } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD] });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([
+    [
+      "b: The office assigned you duty p2 from the duty board.",
+      "  Build",
+      "  ",
+      "  Run the build",
+      'Work on this task. When it is complete, use office_update with id "p2" and action "done". If you need input, leave it claimed and explain what you need.',
+      "If the tool is unavailable and you have finished, put this exact line at the end of your reply: Completed office task p2 (assignment 3).",
+    ].join("\n"),
+  ]);
+  expect(sources).toEqual([null]);
+  expect(store.current().posts[0]).toMatchObject({ id: "p1", state: "open" });
+  expect(store.current().posts[0]).not.toHaveProperty("claimedBy");
+  await office.checkCompletion("b", async () => "Done.\nCompleted office task p2 (assignment 3).");
+  expect(store.current().posts[1]).toMatchObject({ id: "p2", state: "done", claimedBy: "b" });
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("an agent cannot claim a pretend duty; the 3D office's report of one acted out is recorded", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD] });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const claimed = await update?.execute(
+    { id: "p1", action: "claim" },
+    toolContext({ id: "a", title: "Planner" }),
+  );
+  expect(claimed).toEqual({
+    text: "Unable to claim p1: it is a pretend duty, which the 3D office acts out",
+    isError: true,
+  });
+  expect(await office.actDuty("p1", "a")).toMatchObject({
+    ok: true,
+    post: { state: "done", claimedBy: "a" },
+  });
+  expect(await office.actDuty("p2", "a")).toEqual({
+    ok: false,
+    error: "Unable to record p2: an agent is handed this duty",
+  });
+  expect(await office.post({ board: "duty", kind: "task", text: "Extra" })).toEqual({
+    ok: false,
+    error: "Unable to post: the duty board takes its duties from the duty list",
+  });
+  await office.stop();
+});

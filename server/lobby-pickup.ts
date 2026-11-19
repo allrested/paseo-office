@@ -1,4 +1,4 @@
-import { LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
+import { DUTY, LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
 import { assignmentFooter } from "../shared/lobby-assignment.js";
 import type { BoardService } from "./board-service.js";
 import { errorMessage } from "./errors.js";
@@ -21,11 +21,20 @@ interface PickupPorts {
   queue: MentionQueue;
   clock: Clock;
   enabled(): boolean;
+  /** A duty post that is handed out: one with instructions. A pretend duty is acted out in 3D. */
+  instructed(post: Post): boolean;
   log(message: string): void;
 }
 
 function unassigned(task: Post): boolean {
   return task.kind === "task" && task.state === "open" && !task.to && !task.claimedBy;
+}
+
+/** The first line of an assignment: whose task it is, or the duty board's. */
+function assignmentHeading(task: Post): string {
+  if (task.board === DUTY) return `The office assigned you duty ${task.id} from the duty board.`;
+  const author = task.author === USER_AUTHOR ? "the user" : `agent ${oneLine(task.author)}`;
+  return `The office assigned you lobby task ${task.id} from ${author}.`;
 }
 
 export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
@@ -36,22 +45,24 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
 
   const active = () => !stopped && ports.enabled();
 
+  /** The lobby's tasks and the duties handed out: what the office hands to idle agents. */
+  function pickupPosts(): Post[] {
+    return [...service.postsOf(LOBBY), ...service.postsOf(DUTY).filter(ports.instructed)];
+  }
+
   function hasWork(): boolean {
     return (
-      active() &&
-      service.postsOf(LOBBY).some((task) => unassigned(task) || Boolean(task.pickupMessageId))
+      active() && pickupPosts().some((task) => unassigned(task) || Boolean(task.pickupMessageId))
     );
   }
 
   function currentClaim(claim: Post): boolean {
-    return service
-      .postsOf(LOBBY)
-      .some(
-        (post) =>
-          post.id === claim.id &&
-          post.seq === claim.seq &&
-          post.pickupMessageId === claim.pickupMessageId,
-      );
+    return pickupPosts().some(
+      (post) =>
+        post.id === claim.id &&
+        post.seq === claim.seq &&
+        post.pickupMessageId === claim.pickupMessageId,
+    );
   }
 
   async function dispatch(task: Post, agentId: string, available: () => boolean): Promise<boolean> {
@@ -65,9 +76,8 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     }
     if (!currentClaim(claim)) return false;
     const source = task.author === USER_AUTHOR ? null : task.author;
-    const author = source === null ? "the user" : `agent ${oneLine(source)}`;
     const prompt = [
-      `The office assigned you lobby task ${task.id} from ${author}.`,
+      assignmentHeading(task),
       `  ${indented(task.text)}`,
       assignmentFooter(claim),
     ].join("\n");
@@ -78,7 +88,7 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   }
 
   function nextFor(agentId: string): Post | undefined {
-    const board = service.postsOf(LOBBY);
+    const board = pickupPosts();
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
     if (existing) return existing.pickupMessageId ? existing : undefined;
     return board
