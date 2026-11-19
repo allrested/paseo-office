@@ -70,3 +70,12 @@ test("where the handle has no cancel(), the actions have none", async () => {
   expect(refs).toEqual(["probe"]);
   expect(sent).toEqual([]);
 });
+
+test("send passes the options it is given, and with none sends the text alone", async () => {
+  const sent: unknown[][] = [];
+  handle = { send: async (...args: unknown[]) => void sent.push(args) };
+  await act(async () => root.render(<Probe />));
+  await actions?.send("a1", "plain");
+  await actions?.send("a1", "added", { activeTurnBehavior: "steer" });
+  expect(sent).toEqual([["plain"], ["added", { activeTurnBehavior: "steer" }]]);
+});

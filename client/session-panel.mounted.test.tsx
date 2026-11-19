@@ -262,7 +262,7 @@ test("Send sends the trimmed text and clears the box; empty text sends nothing",
   expect(send).not.toHaveBeenCalled();
   await type("  Add tests  ");
   await press("Send");
-  expect(send).toHaveBeenCalledWith("a1", "Add tests");
+  expect(send).toHaveBeenCalledWith("a1", "Add tests", { activeTurnBehavior: "steer" });
   expect(box().value).toBe("");
   expect(box().getAttribute("placeholder")).toBe("Message Builder");
 });
@@ -308,7 +308,7 @@ test("with a keyboard Enter sends and Shift+Enter does not", async () => {
   await key("Enter", true);
   expect(send).not.toHaveBeenCalled();
   await key("Enter");
-  expect(send).toHaveBeenCalledWith("a1", "hello");
+  expect(send).toHaveBeenCalledWith("a1", "hello", { activeTurnBehavior: "steer" });
   expect(box().value).toBe("");
 });
 
@@ -330,5 +330,5 @@ test("on a touch screen Enter is a new line and the Send button sends", async ()
   await key("Enter");
   expect(send).not.toHaveBeenCalled();
   await press("Send");
-  expect(send).toHaveBeenCalledWith("a1", "hello");
+  expect(send).toHaveBeenCalledWith("a1", "hello", { activeTurnBehavior: "steer" });
 });

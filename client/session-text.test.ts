@@ -29,6 +29,11 @@ test("the status line is the agent's state, after its room when it has one", () 
 test("the composer asks to add to a running turn, and otherwise to message the agent", () => {
   expect(composerPlaceholder(running)).toBe("Add to the running turn");
   expect(composerPlaceholder(AGENT)).toBe("Message Builder");
+  // The daemon denies the waiting requests when a message joins the turn.
+  const asking = { ...running, permissions: [{ id: "p1", kind: "tool", title: "Run ls" }] };
+  expect(composerPlaceholder(asking as OfficeAgent)).toBe(
+    "Add to the running turn. Sending denies the request above.",
+  );
   expect(composerPlaceholder({ ...AGENT, title: null })).toBe("Message Agent a1");
 });
 

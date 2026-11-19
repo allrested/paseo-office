@@ -11,8 +11,14 @@ export function statusLine(agent: OfficeAgent, room: string | null): string {
   return room === null ? state : `${room} · ${state}`;
 }
 
+/**
+ * The reply box's prompt. A message that joins a turn waiting on a request denies that request
+ * (the stock daemon clears the waiting permissions on a send), so the box says so.
+ */
 export function composerPlaceholder(agent: OfficeAgent): string {
-  return agent.status === "running" ? "Add to the running turn" : `Message ${agentTitle(agent)}`;
+  const base =
+    agent.status === "running" ? "Add to the running turn" : `Message ${agentTitle(agent)}`;
+  return agent.permissions.length > 0 ? `${base}. Sending denies the request above.` : base;
 }
 
 /** What a screen reader says for a row: who spoke, for the two voices; a tool or notice is its line. */

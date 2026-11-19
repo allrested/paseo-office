@@ -221,7 +221,8 @@ function Composer({ agent, actions, touchScreen, styles }: ComposerProps) {
     if (sent === "" || sending.current) return;
     sending.current = true;
     try {
-      await actions.send(agentId, sent);
+      // A reply to a working agent joins its turn: a plain send makes the daemon interrupt it.
+      await actions.send(agentId, sent, { activeTurnBehavior: "steer" });
       setError(null);
       setText((current) => textAfterSend(current, sent));
     } catch (failure) {
