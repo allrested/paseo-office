@@ -20,7 +20,10 @@ let deliver: ((event: OfficeEvent) => void) | null;
 
 /** What the device's setting holds; a test sets it before it mounts. */
 const deviceValues = vi.hoisted(() => ({
-  current: { threeD: true, view: "list", rungIncidents: {} } as Record<string, unknown>,
+  current: { threeD: true, view: "list", rungIncidents: {}, sound: false } as Record<
+    string,
+    unknown
+  >,
 }));
 
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
@@ -97,6 +100,7 @@ function labelled(label: string): HTMLElement | null {
 }
 
 beforeEach(() => {
+  deviceValues.current = { threeD: true, view: "list", rungIncidents: {}, sound: false };
   hostSaves = [];
   deviceSaves = [];
   deliver = null;
@@ -126,7 +130,7 @@ test("a view chosen here is saved on the device", async () => {
   await mount();
   await act(async () => labelled("2D view")?.click());
 
-  expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {} }]);
+  expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {}, sound: false }]);
   expect(hostSaves).toEqual([]);
 });
 
@@ -135,9 +139,24 @@ test("a view chosen here keeps the last agent the device holds", async () => {
   deviceValues.current = { threeD: true, view: "list", rungIncidents: {}, lastAgent };
   await mount();
   await act(async () => labelled("2D view")?.click());
-  deviceValues.current = { threeD: true, view: "list", rungIncidents: {} };
 
   expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {}, lastAgent }]);
+});
+
+test("the Sound switch saves the device's document with sound on, and nothing of the host's", async () => {
+  await mount();
+  await act(async () => labelled("Sound")?.click());
+
+  expect(deviceSaves).toEqual([{ threeD: true, view: "list", rungIncidents: {}, sound: true }]);
+  expect(hostSaves).toEqual([]);
+});
+
+test("a view chosen here keeps the Sound switch the device holds", async () => {
+  deviceValues.current = { threeD: true, view: "list", rungIncidents: {}, sound: true };
+  await mount();
+  await act(async () => labelled("2D view")?.click());
+
+  expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {}, sound: true }]);
 });
 
 test("a view chosen on a device that never started an agent is stored and not shown as unsaved", async () => {

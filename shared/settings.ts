@@ -140,10 +140,13 @@ export const officeDeviceSettings = defineSettings({
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),
     lastAgent: z.object({ provider: z.string(), model: z.string() }).optional(),
+    sound: z.boolean().default(false),
   }),
   // Version 1 had no `rungIncidents`: its values stay, and the device has rung for none. An
   // additive optional field such as `lastAgent` takes no version bump: a client from before it
-  // still reads the document.
+  // still reads the document. `sound` is the 3D floor's Sound switch, off until someone turns it
+  // on; the scene's button and the settings page change it. Every save of this document writes it
+  // whole.
   migrate: (values) => values,
 });
 

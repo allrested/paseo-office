@@ -137,6 +137,7 @@ test("device settings: version 1 values stay and rungIncidents is {}", async () 
   expect(await officeDeviceSettings.schema.parseAsync(migrated)).toEqual({
     ...stored,
     rungIncidents: {},
+    sound: false,
   });
 });
 
@@ -144,7 +145,10 @@ test("device settings: a version 2 document is valid as it is and has no last ag
   const stored = { threeD: true, view: "list", rungIncidents: { "SHOP-1": 5 } };
   const migrated = await officeDeviceSettings.migrate?.(stored, 2);
   expect(officeDeviceSettings.version).toBe(2);
-  expect(await officeDeviceSettings.schema.parseAsync(migrated)).toEqual(stored);
+  expect(await officeDeviceSettings.schema.parseAsync(migrated)).toEqual({
+    ...stored,
+    sound: false,
+  });
 });
 
 test("device settings keep the last agent's provider and model", async () => {
@@ -153,8 +157,14 @@ test("device settings keep the last agent's provider and model", async () => {
     rungIncidents: {},
     lastAgent: { provider: "claude", model: "opus" },
   };
-  expect(await officeDeviceSettings.schema.parseAsync(stored)).toEqual(stored);
+  expect(await officeDeviceSettings.schema.parseAsync(stored)).toEqual({ ...stored, sound: false });
   expect(officeDeviceSettings.schema.safeParse({ lastAgent: { provider: "claude" } }).success).toBe(
     false,
   );
+});
+
+test("a device document without sound has it off, and one with it keeps it", async () => {
+  expect(officeDeviceSettings.version).toBe(2);
+  expect(officeDeviceSettings.schema.parse({ threeD: true })).toMatchObject({ sound: false });
+  expect(officeDeviceSettings.schema.parse({ sound: true })).toMatchObject({ sound: true });
 });

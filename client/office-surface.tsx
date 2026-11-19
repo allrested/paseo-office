@@ -380,7 +380,8 @@ function viewSync(
   return switchSync(sync, event);
 }
 
-const NONE_RUNG: Record<string, number> = {};
+/** What a view's save keeps while the device's document is unreadable: its defaults. */
+const DEVICE_DEFAULTS = officeDeviceSettings.schema.parse({});
 
 /** The per-device view. The 3D office is loaded only where it is the chosen view. */
 export function useViewChoice(platform: Platform): ViewChoiceState {
@@ -400,8 +401,9 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
   const revision =
     settings.status === "ready" || settings.status === "invalid" ? settings.revision : null;
   const storedValue = settings.status === "ready" ? chosenView(settings.values) : null;
-  // A view's save carries the values as read, so no key is passed without a value.
-  const values = settings.status === "ready" ? settings.values : null;
+  // A view's save carries the rest of the device's document as read (the incidents rung, the last
+  // agent, the Sound switch, whatever a later field holds), so no key is passed without a value.
+  const kept = settings.status === "ready" ? settings.values : DEVICE_DEFAULTS;
   const { save, reload } = settings;
   useEffect(() => {
     const stored = revision === null ? null : { value: storedValue, revision };
@@ -413,10 +415,7 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
     if (step.kind !== "save") return;
     dispatch({ type: "start", value: step.value, against: step.against, retry: step.retry });
     async function store(value: OfficeViewChoice, against: string): Promise<void> {
-      const ok = await save(
-        { rungIncidents: NONE_RUNG, ...values, threeD: value !== "list", view: value },
-        against,
-      );
+      const ok = await save({ ...kept, threeD: value !== "list", view: value }, against);
       if (!mounted.current) return;
       dispatch({ type: "returned", stored: ok });
       if (ok) return;
@@ -425,7 +424,7 @@ export function useViewChoice(platform: Platform): ViewChoiceState {
       if (mounted.current) dispatch({ type: "checked" });
     }
     void store(step.value, step.against);
-  }, [sync, revision, storedValue, values, save, reload]);
+  }, [sync, revision, storedValue, kept, save, reload]);
   const choose = useCallback(
     (next: OfficeViewChoice) => dispatch({ type: "tap", value: next }),
     [],

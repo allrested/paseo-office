@@ -88,7 +88,7 @@ const sdk = vi.hoisted(() => ({
 
 const DEVICE: SettingsState<typeof officeDeviceSettings.schema> = {
   status: "ready",
-  values: { threeD: true, rungIncidents: {} },
+  values: { threeD: true, rungIncidents: {}, sound: false },
   revision: "r1",
   saving: false,
   saveError: null,

@@ -78,7 +78,11 @@ function state(open: Incident[]): IncidentsState {
 }
 
 function ready(rungIncidents: Record<string, number>, revision = "r1"): Stored {
-  return { status: "ready", values: { threeD: true, view: "3d", rungIncidents }, revision };
+  return {
+    status: "ready",
+    values: { threeD: true, view: "3d", rungIncidents, sound: false },
+    revision,
+  };
 }
 
 interface HarnessProps {
@@ -136,6 +140,7 @@ test("nothing goes to the scene before the device's map is read; then the incide
         threeD: true,
         view: "3d",
         rungIncidents: { [older.id]: NOW - HOUR, [newer.id]: NOW },
+        sound: false,
       },
       revision: "r1",
     },
@@ -184,21 +189,29 @@ test("an entry over 2 days old is dropped and saved though nothing rang", async 
 
   expect(sent).toEqual([[]]);
   expect(saved).toEqual([
-    { values: { threeD: true, view: "3d", rungIncidents: {} }, revision: "r1" },
+    { values: { threeD: true, view: "3d", rungIncidents: {}, sound: false }, revision: "r1" },
   ]);
 });
 
 test("a save refused because the view was saved first is saved again over the new view", async () => {
   movedBy = {
     status: "ready",
-    values: { threeD: true, view: "2d", rungIncidents: {} },
+    values: { threeD: true, view: "2d", rungIncidents: {}, sound: false },
     revision: "r9",
   };
   await show({ started: true, incidents: state([older]) });
   await show({ started: true, incidents: state([older]) });
 
   expect(saved).toEqual([
-    { values: { threeD: true, view: "2d", rungIncidents: { [older.id]: NOW } }, revision: "r9" },
+    {
+      values: {
+        threeD: true,
+        view: "2d",
+        rungIncidents: { [older.id]: NOW },
+        sound: false,
+      },
+      revision: "r9",
+    },
   ]);
 });
 
@@ -206,7 +219,7 @@ test("the map is saved with the last agent the device holds", async () => {
   const lastAgent = { provider: "claude", model: "opus" };
   stored = {
     status: "ready",
-    values: { threeD: true, view: "3d", rungIncidents: {}, lastAgent },
+    values: { threeD: true, view: "3d", rungIncidents: {}, lastAgent, sound: false },
     revision: "r1",
   };
   await show({ started: true, incidents: state([older]) });
