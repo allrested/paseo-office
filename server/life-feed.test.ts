@@ -213,3 +213,17 @@ test("the first complete directory seeds even a workspace without agents", () =>
   createLifeFeed(d).view({ ...initial, agents: [] });
   expect(d.tenure.seed).toHaveBeenCalledWith([{ name: "api", first: d.now(), daysSeen: 1 }]);
 });
+
+test("the ledger is not seeded before the directory has said its workspaces", () => {
+  const d = deps();
+  const feed = createLifeFeed(d);
+  // The directory tells its agents first and its workspaces after.
+  feed.view(view({ workspaces: [] }));
+  expect(d.tenure.seed).not.toHaveBeenCalled();
+  expect(d.tenure.touch).not.toHaveBeenCalled();
+  feed.view(view());
+  expect(d.tenure.seed).toHaveBeenCalledTimes(1);
+  expect(d.tenure.seed).toHaveBeenCalledWith([
+    { name: "api", first: Date.parse("2026-10-01T00:00:00Z"), daysSeen: 2 },
+  ]);
+});

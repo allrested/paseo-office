@@ -113,7 +113,9 @@ export function createLifeFeed(deps: {
           seed.days.add(new Date(first).toDateString());
         }
       }
-      if (!deps.tenure.seeded())
+      // The directory tells its agents first and its workspaces after: a ledger seeded before
+      // the workspaces would hold nobody, and every team already there would come in as an intern.
+      if (view.workspaces.length > 0 && !deps.tenure.seeded())
         deps.tenure.seed(
           [...seeds].map(([name, s]) => ({ name, first: s.first, daysSeen: s.days.size })),
         );
