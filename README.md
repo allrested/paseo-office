@@ -1,4 +1,4 @@
-# paseo-office
+# Office 3D
 
 A community port of [my-office](https://github.com/khanh020905/my-office) for
 [Paseo](https://github.com/getpaseo/paseo): your agents at their desks, in 3D.
@@ -49,7 +49,7 @@ paseo plugin install git:allrested/paseo-office
 The host supplies the plugin SDK and `zod`, so installing runs no build and needs no
 `node_modules`.
 
-The settings are in Settings > Plugins > Office. The gear over the floor opens them too.
+The settings are in Settings > Plugins > Office 3D. The gear over the floor opens them too.
 
 ## What works where
 

@@ -19,17 +19,17 @@ function OfficeItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
 export default function contribute(client: PluginClientContext) {
   const Surface = createOfficeSurface(() => client.openSettings(SCREEN_ID));
   const removers = [
-    client.addScreen({ id: SCREEN_ID, title: "Office", Component: Surface }),
+    client.addScreen({ id: SCREEN_ID, title: "Office 3D", Component: Surface }),
     client.addSettingsScreen({
       id: SCREEN_ID,
-      title: "Office",
+      title: "Office 3D",
       icon: ICON,
       Component: OfficeSettings,
     }),
-    client.addSidebarHeaderItem({ id: SCREEN_ID, title: "Office", Component: OfficeItem }),
+    client.addSidebarHeaderItem({ id: SCREEN_ID, title: "Office 3D", Component: OfficeItem }),
     client.addWorkspacePanel({
       id: PANEL_ID,
-      title: "Office",
+      title: "Office 3D",
       icon: ICON,
       Component: Surface,
     }),
@@ -44,7 +44,7 @@ export default function contribute(client: PluginClientContext) {
     }),
     client.addCommandCenterItem({
       id: "open-office-settings",
-      title: "Office settings",
+      title: "Office 3D settings",
       icon: ICON,
       keywords: ["office", "wake", "notes", "incidents", "view"],
       context: "global",

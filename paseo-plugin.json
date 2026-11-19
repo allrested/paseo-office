@@ -1,6 +1,6 @@
 {
   "id": "office",
-  "name": "Office",
+  "name": "Office 3D",
   "description": "A community port of my-office: your agents at their desks, in 3D.",
   "icon": "icon.png",
   "requirements": { "paseo": ">=0.16.0" }

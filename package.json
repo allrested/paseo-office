@@ -1,13 +1,36 @@
 {
   "name": "paseo-office",
   "version": "0.1.0",
-  "private": true,
   "description": "A community port of my-office for Paseo: your agents at their desks, in 3D.",
+  "keywords": [
+    "3d",
+    "agents",
+    "my-office",
+    "paseo",
+    "paseo-plugin"
+  ],
+  "homepage": "https://github.com/allrested/paseo-office#readme",
+  "bugs": {
+    "url": "https://github.com/allrested/paseo-office/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/allrested/paseo-office.git"
   },
+  "files": [
+    "paseo-plugin.json",
+    "icon.png",
+    "index.client.tsx",
+    "index.server.ts",
+    "client",
+    "server",
+    "shared",
+    "docs/office.md",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!**/*.test.mjs"
+  ],
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -20,12 +43,9 @@
     "check:world": "node scripts/build-world.mjs --check",
     "build:icon": "node scripts/make-icon.mjs"
   },
-  "dependencies": {
-    "@getpaseo/plugin": "0.16.2",
-    "zod": "^4.4.3"
-  },
   "devDependencies": {
     "@getpaseo/client": "0.16.2",
+    "@getpaseo/plugin": "0.16.2",
     "@getpaseo/protocol": "0.16.2",
     "@types/node": "^20.9.0",
     "@types/react": "~19.2.0",
@@ -39,7 +59,8 @@
     "react-native": "0.86.3",
     "react-native-web": "~0.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "zod": "^4.4.3"
   },
   "engines": {
     "node": ">=20.11"
