@@ -347,6 +347,10 @@ const api = {
     // room's chip keep the panel)
     const tv = PROPS.get('tv');
     if (tv && host.resources) { tv.act = () => host.resources(); tv.hint = tr('paseo.tv.resources'); }
+    // (the wall clock cycled upstream's time of day: auto, day, night. Here the lights follow the app's theme and only photo
+    // mode's buttons hold day or night, so a click on the clock changes nothing and its tooltip says why)
+    const clock = PROPS.get('clock');
+    if (clock) { clock.act = () => {}; clock.hint = tr('paseo.clock.hint'); }
     everyFrame(updateLeisure);
     showMachine(false);
     showBrand(options.brand);

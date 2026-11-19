@@ -41,6 +41,8 @@ const OURS = {
   'paseo.subwait': { one: 'Waiting on {n} sub-agent', other: 'Waiting on {n} sub-agents' },
   // (the wall screen's tooltip while it opens Paseo's Resources: paseo-entry.js)
   'paseo.tv.resources': 'Open Resources',
+  // (the wall clock: it changes nothing, see paseo-entry.js)
+  'paseo.clock.hint': "The lights follow the app's theme",
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
   'paseo.notes': 'Stand-up notes',
   'places.deploy.today': { one: '{n} deploy since the office opened', other: '{n} deploys since the office opened' },

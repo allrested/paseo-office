@@ -47,7 +47,8 @@ Six copied files are changed by hand, and each change starts with `// PASEO:`:
   learns.
 - `src/office/ui/photo.js`: the mark painted into a photo is the host's brand name (Paseo's when
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
-  has no Photo mode (the button is hidden and `enterPhoto` returns).
+  has no Photo mode (the button is hidden and `enterPhoto` returns), and leaving photo mode calls
+  `setTimeMode('auto')`, so Day and Night, held for the photo, go back to the app's theme.
 
 ### Made-up names
 
@@ -107,8 +108,7 @@ Upstream's own interface (panels, the session drawer, the chat, settings, the to
 connection, the replay, the demo, other languages, the street outside
 with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
 the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, these
-are left out on purpose: the list button, the automatic camera, clip recording, and photo mode's
-day and night buttons.
+are left out on purpose: the list button, the automatic camera and clip recording.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
 with `// PASEO: stand-in`. Most export what is asked of them and do nothing. These do work:
@@ -119,10 +119,14 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay |
+| `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
-| `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night            |
+| `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
 | `life/nap.js`               | No midday nap; calls Paseo's lively floor every frame                  |
+
+The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
+follow the app's theme (`paseo.clock.hint` in `OURS`).
 
 Paseo's own files sit beside upstream's and are named for it: `paseo-entry.js` (the bundle's
 entry: builds the page, starts the modules in upstream's order, sets `PaseoOfficeWorld`, and shows

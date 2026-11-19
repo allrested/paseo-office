@@ -24,6 +24,8 @@ const h = vi.hoisted(() => ({
   closePlace: vi.fn(),
   sound: [] as boolean[],
   soundAsked: [] as boolean[],
+  /** How many times the wall clock's own act ran (upstream's cycleTime). */
+  clockCycled: 0,
 }));
 
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
@@ -415,6 +417,16 @@ async function startPage(options: object): Promise<Map<string, Prop>> {
       PROPS: new Map([
         ["racks", { id: "racks", hint: t("props.racks.hint"), act: () => openMac() }],
         ["tv", { id: "tv", hint: t("props.tv.hint"), act: () => openMac() }],
+        [
+          "clock",
+          {
+            id: "clock",
+            hint: t("props.clock.hint"),
+            act: () => {
+              h.clockCycled += 1;
+            },
+          },
+        ],
       ]),
     };
   });
@@ -636,4 +648,13 @@ test("the scene's note is styled with the page's colours, clear of the toolbar, 
   expect(css).toMatch(
     /@media \(prefers-reduced-motion: reduce\) \{[^\n]*\.paseo-note \{ animation: none; \}/,
   );
+});
+
+test("the wall clock changes nothing: the lights follow the app's theme", async () => {
+  h.clockCycled = 0;
+  const props = await startPage({});
+
+  expect(props.get("clock")?.hint).toBe("The lights follow the app's theme");
+  props.get("clock")?.act();
+  expect(h.clockCycled).toBe(0);
 });

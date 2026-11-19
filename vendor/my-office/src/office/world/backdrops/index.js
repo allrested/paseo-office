@@ -20,6 +20,15 @@ export function applySurface() {
 }
 /** Night with Paseo's dark theme, day with the light one: never by the clock. */
 export function applyNight(on) {
+  state.nightManual = false;
+  setNight(on);
+  applySurface();
+}
+/**
+ * Day or night held against the theme, for a photo or a clip (ui/settings.js setTimeMode). Auto, the end of photo mode
+ * and the theme's own next change (applyNight) let go. The backdrop stays the app's surface colour either way.
+ */
+export function holdNight(on) {
   state.nightManual = true;
   setNight(on);
   applySurface();

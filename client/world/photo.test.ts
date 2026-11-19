@@ -2,7 +2,10 @@
 // Photo mode's switch (ui/photo.js): a host that says photo is false has no button and no P key.
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ host: { photo: true, brandName: "", toast: () => undefined } }));
+const h = vi.hoisted(() => ({
+  host: { photo: true, brandName: "", toast: () => undefined },
+  setTimeMode: vi.fn(),
+}));
 
 vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({ host: h.host }));
 vi.mock("../../vendor/my-office/src/office/core/state.js", () => ({ state: {} }));
@@ -29,7 +32,7 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
   fp: { on: false },
 }));
 vi.mock("../../vendor/my-office/src/office/ui/settings.js", () => ({
-  setTimeMode() {},
+  setTimeMode: h.setTimeMode,
   syncTimeBtns() {},
 }));
 vi.mock("../../vendor/my-office/src/office/world/room-update.js", () => ({ night: false }));
@@ -38,7 +41,7 @@ vi.mock("../../vendor/my-office/src/office/world/pro/pieces.js", () => ({ OFFICE
 vi.mock("../../vendor/my-office/src/i18n/index.js", () => ({ t: (key: string) => key }));
 
 // @ts-expect-error vendored JavaScript has no declarations
-import { enterPhoto, setup } from "../../vendor/my-office/src/office/ui/photo.js";
+import { enterPhoto, exitPhoto, setup } from "../../vendor/my-office/src/office/ui/photo.js";
 
 /** The window outlives each test's page: the P key's listener setup() puts on it is taken off after the test. */
 const onWindow = vi.spyOn(window, "addEventListener");
@@ -57,6 +60,7 @@ beforeEach(() => {
     <div id="photo-bar" hidden>
       <button id="ph-exit"></button><button id="ph-shoot"></button>
       <button id="ph-names"></button><button id="ph-mark"></button>
+      <button data-ph-time="auto"></button><button data-ph-time="day"></button><button data-ph-time="night"></button>
     </div>`;
 });
 
@@ -81,4 +85,25 @@ test("with photo on, the button shows and P opens the bar", () => {
   expect(document.getElementById("btn-photo")?.hidden).toBe(false);
   expect(document.getElementById("photo-bar")?.hidden).toBe(false);
   expect(document.body.classList.contains("is-photo")).toBe(true);
+});
+
+test("a button of the time group holds its mode, and Auto lets go", () => {
+  h.host.photo = true;
+  setup();
+  enterPhoto();
+  h.setTimeMode.mockClear();
+  document.querySelector<HTMLElement>("[data-ph-time=day]")?.click();
+  expect(h.setTimeMode).toHaveBeenLastCalledWith("day");
+  document.querySelector<HTMLElement>("[data-ph-time=auto]")?.click();
+  expect(h.setTimeMode).toHaveBeenLastCalledWith("auto");
+});
+
+test("leaving photo mode puts the lights back to the app's theme", () => {
+  h.host.photo = true;
+  setup();
+  enterPhoto();
+  h.setTimeMode.mockClear();
+  exitPhoto();
+  expect(h.setTimeMode).toHaveBeenLastCalledWith("auto");
+  expect(document.getElementById("photo-bar")?.hidden).toBe(true);
 });

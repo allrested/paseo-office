@@ -77,6 +77,8 @@ const BAR = `
         <button type="button" class="pb-tgl" id="ph-names" aria-pressed="true">Names</button>
         <button type="button" class="pb-tgl" id="ph-mark" aria-pressed="true">Logo</button>
         <span class="pb-sep"></span>
+        <div class="pb-seg" title="Light for the photo: Auto follows the app's theme, Day and Night hold for this photo only"><button type="button" data-ph-time="auto" aria-pressed="true">Auto</button><button type="button" data-ph-time="day" aria-pressed="false">Day</button><button type="button" data-ph-time="night" aria-pressed="false">Night</button></div>
+        <span class="pb-sep"></span>
         <div class="pb-seg" title="Picture size"><button type="button" data-ph-size="screen" aria-pressed="false">Screen</button><button type="button" data-ph-size="fhd" aria-pressed="true">Full HD</button><button type="button" data-ph-size="4k" aria-pressed="false">4K</button></div>
         <button type="button" class="pb-shoot" id="ph-shoot"><span data-icon="camera"></span><span>Take photo</span></button>
         <button type="button" class="pb-exit" id="ph-exit" aria-label="Leave photo mode" title="Leave photo mode"><span data-icon="x"></span></button>

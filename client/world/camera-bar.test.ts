@@ -536,6 +536,18 @@ test("photo mode's bar is in the page, hidden, with its own controls", () => {
   ).toEqual(["Screen", "Full HD", "4K"]);
 });
 
+test("photo mode's bar has Auto, Day and Night, Auto pressed first", () => {
+  open();
+
+  const buttons = [...document.querySelectorAll<HTMLElement>(".photo-bar [data-ph-time]")];
+  expect(buttons.map((b) => [b.dataset.phTime, b.textContent])).toEqual([
+    ["auto", "Auto"],
+    ["day", "Day"],
+    ["night", "Night"],
+  ]);
+  expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+});
+
 test("every element ui/photo.js wires is built before the modules run", () => {
   // ui/photo.js's setup reads these ids and holds no guard: a missing one throws before the office draws.
   build();

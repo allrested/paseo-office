@@ -39,6 +39,7 @@ export function exitPhoto() {
   Object.assign(controls, kept); controls.update();   // the camera slides back inside the usual limits
   document.body.classList.remove('is-photo', 'photo-nonames');
   $('photo-bar').hidden = true;
+  setTimeMode('auto'); // PASEO: Day and Night were held for the photo only: the lights go back to the app's theme
 }
 function sync() {
   $('ph-names').setAttribute('aria-pressed', String(names));
