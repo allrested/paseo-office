@@ -13,6 +13,7 @@ interface Page {
   entries: { seqStart: number; seqEnd: number; item: AgentTimelineItem }[];
   startCursor: { epoch: string; seq: number } | null;
   hasOlder: boolean;
+  staleCursor?: boolean;
   error: string | null;
 }
 interface Pending {
@@ -293,8 +294,31 @@ test("a failed earlier page keeps the rows and leaves loadEarlier usable", async
   expect(conversation.status).toBe("ready");
   expect(conversation.loadingEarlier).toBe(false);
   expect(conversation.hasEarlier).toBe(true);
+  expect(conversation.earlierFailed).toBe(true);
   await act(async () => conversation.loadEarlier());
+  expect(conversation.earlierFailed).toBe(false);
   expect(pending).toHaveLength(3);
+  await answer(2, page([entry(4, you("Earlier"))]));
+  expect(conversation.earlierFailed).toBe(false);
+  expect(texts()).toEqual(["Earlier", "Later"]);
+});
+
+test("an earlier page from a stale cursor is not prepended: the tail is read again", async () => {
+  await mount();
+  await answer(0, page([entry(10, you("Later"))], { hasOlder: true }));
+  await act(async () => conversation.loadEarlier());
+  await answer(1, page([entry(3, you("Wrong"))], { staleCursor: true, hasOlder: true }));
+  expect(texts()).toEqual(["Later"]);
+  expect(pending).toHaveLength(3);
+  expect(pending[2]!.options).toEqual({
+    direction: "tail",
+    limit: 60,
+    wholeTurns: true,
+  });
+  await answer(2, page([entry(1, you("Fresh"))]));
+  expect(texts()).toEqual(["Fresh"]);
+  expect(conversation.loadingEarlier).toBe(false);
+  expect(conversation.earlierFailed).toBe(false);
 });
 
 test("unmount unsubscribes, and a page arriving afterwards sets nothing", async () => {

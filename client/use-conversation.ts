@@ -16,6 +16,8 @@ export interface Conversation {
   /** True while there are earlier entries not loaded yet. */
   hasEarlier: boolean;
   loadingEarlier: boolean;
+  /** True when the last earlier page could not be read; the next attempt clears it. */
+  earlierFailed: boolean;
   loadEarlier(): void;
   retry(): void;
 }
@@ -41,6 +43,7 @@ interface Page {
   }[];
   startCursor: Cursor | null;
   hasOlder: boolean;
+  staleCursor: boolean;
   error: string | null;
 }
 
@@ -53,6 +56,7 @@ interface State {
   cursor: Cursor | null;
   hasEarlier: boolean;
   loadingEarlier: boolean;
+  earlierFailed: boolean;
 }
 
 const fresh = (agentId: string): State => ({
@@ -63,6 +67,7 @@ const fresh = (agentId: string): State => ({
   cursor: null,
   hasEarlier: false,
   loadingEarlier: false,
+  earlierFailed: false,
 });
 
 function fromPage(page: Page): Held[] {
@@ -134,6 +139,7 @@ export function useConversation(agentId: string): Conversation {
         cursor: page.startCursor,
         hasEarlier: page.hasOlder && page.startCursor !== null,
         loadingEarlier: false,
+        earlierFailed: false,
       }));
     };
     const reread = () => void readLatest().catch(fail);
@@ -155,13 +161,15 @@ export function useConversation(agentId: string): Conversation {
       const { cursor, hasEarlier, loadingEarlier } = stateRef.current;
       if (!alive || !hasEarlier || loadingEarlier || cursor === null) return;
       const asked = generation;
-      commit((s) => ({ ...s, loadingEarlier: true }));
+      commit((s) => ({ ...s, loadingEarlier: true, earlierFailed: false }));
       void (async () => {
         try {
           const page = checked(
             (await timeline.refetch({ direction: "before", cursor, ...PAGE })) as Page,
           );
           if (!alive || asked !== generation) return;
+          // The cursor no longer matches the history: what the page holds is not what comes before.
+          if (page.staleCursor) return reread();
           commit((s) => ({
             ...s,
             held: fromPage(page).concat(s.held),
@@ -170,7 +178,8 @@ export function useConversation(agentId: string): Conversation {
             loadingEarlier: false,
           }));
         } catch {
-          if (alive && asked === generation) commit((s) => ({ ...s, loadingEarlier: false }));
+          if (alive && asked === generation)
+            commit((s) => ({ ...s, loadingEarlier: false, earlierFailed: true }));
         }
       })();
     };
@@ -181,6 +190,7 @@ export function useConversation(agentId: string): Conversation {
       earlierRef.current = null;
       subscription();
     };
+    // `paseo` is the one object the host keeps per installation, so this runs once per agent.
   }, [paseo, agentId, attempt, commit]);
 
   const view = state.agentId === agentId ? state : fresh(agentId);
@@ -193,6 +203,7 @@ export function useConversation(agentId: string): Conversation {
     error: view.error,
     hasEarlier: view.hasEarlier,
     loadingEarlier: view.loadingEarlier,
+    earlierFailed: view.earlierFailed,
     loadEarlier,
     retry,
   };
