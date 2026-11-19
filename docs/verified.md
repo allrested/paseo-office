@@ -583,3 +583,13 @@ or a phone.
 The ledger tests exercise the 30-day farewell and the 20-turn, two-day promotion. Phone
 performance, provider-reported costs, the quarterly drill and the time-specific staff ceremonies
 still need observation on the owner's host.
+
+## Fullscreen workspace
+
+At 1440 px on a disposable stock Paseo 0.16.2 daemon, the browser's fullscreen element
+contained the 3D iframe, Sessions and Activity. Opening New agent kept the form and
+floor inside it. The settings page accepted Headquarters, Bahasa Indonesia and Manual
+weather. In a browser fixture with an agent, approving a permission and sending a reply
+kept the same 3D iframe mounted at 1440 and 390 px.
+
+[Fullscreen office with the street enabled](fullscreen-office.png)
