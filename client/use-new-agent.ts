@@ -124,8 +124,8 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
     if (problem !== null || workspace === undefined)
       throw new Error(problem ?? "Choose a workspace.");
     const { provider, model } = choice;
-    const handle = await paseo.agents.create({
-      cwd: workspace.directory,
+    // Through the workspace's handle: a create with only a folder makes a new workspace each time.
+    const handle = await paseo.workspaces.ref(workspace.id).agents.create({
       config: { provider: `${provider}/${model}` },
       prompt: choice.prompt.trim(),
     });

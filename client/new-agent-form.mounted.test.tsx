@@ -56,6 +56,7 @@ const host = vi.hoisted(() => ({
 // One object for every render, as the host's SDK object is: a new one would read again each time.
 const sdk = vi.hoisted(() => ({
   workspaces: {
+    ref: null as unknown as (workspaceId: string) => unknown,
     list: (options: Record<string, unknown>) => {
       host.workspaceCalls.push(options);
       return Promise.resolve(host.pages.shift());
@@ -68,14 +69,23 @@ const sdk = vi.hoisted(() => ({
     },
   },
   agents: {
+    // Without a workspace id the host makes a new workspace for the folder: never called.
     create: (options: Record<string, unknown>) => {
-      host.created.push(options);
+      host.created.push({ withoutWorkspace: true, ...options });
+      return Promise.reject(new Error("agents.create takes no workspace"));
+    },
+  },
+}));
+sdk.workspaces.ref = (workspaceId: string) => ({
+  agents: {
+    create: (options: Record<string, unknown>) => {
+      host.created.push({ workspaceId, ...options });
       return (host.create as (options: Record<string, unknown>) => Promise<{ id: string }>)(
         options,
       );
     },
   },
-}));
+});
 
 vi.mock("@getpaseo/plugin/client", () => ({
   usePaseo: () => sdk,
@@ -325,7 +335,7 @@ test("Create is disabled, with the reason shown, until the form is complete", as
   expect(labelled("Create").hasAttribute("disabled")).toBe(false);
 });
 
-test("Create starts the agent in the workspace's folder, closes the form, keeps the choice, opens the session", async () => {
+test("Create starts the agent in the chosen workspace, closes the form, keeps the choice, opens the session", async () => {
   await openForm();
   await press("Codex");
   await fillForm();
@@ -333,7 +343,7 @@ test("Create starts the agent in the workspace's folder, closes the form, keeps 
   await settle();
 
   expect(host.created).toEqual([
-    { cwd: "/src/shop", config: { provider: "codex/gpt" }, prompt: "Fix the cart" },
+    { workspaceId: "w1", config: { provider: "codex/gpt" }, prompt: "Fix the cart" },
   ]);
   expect(opened).toEqual(["agent-new"]);
   expect(host.saves).toEqual([

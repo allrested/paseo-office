@@ -136,9 +136,9 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
   a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
   of the providers that are ready and enabled; and the first prompt. Create starts the agent in
-  that workspace's folder, closes the form and opens the agent's session as a tab. The workspaces
-  and providers are read when the form opens, not when the office does. The provider and model
-  start as the last agent's, kept in the `lastAgent` field of the `office-device` setting, or the
+  that workspace (not in a new one for its folder), closes the form and opens the agent's session
+  as a tab. The workspaces and providers are read when the form opens, not when the office does.
+  The provider and model start as the last agent's, kept in the `lastAgent` field of the `office-device` setting, or the
   first provider's default model when that choice is gone. A failure shows its reason with
   everything typed kept. Whether the form is open, the workspace, provider and model chosen and
   the prompt typed are the surface's, as the Chat box is: another tab, Back and a dismissed phone
