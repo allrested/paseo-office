@@ -16,6 +16,8 @@ export interface ActionButtonProps {
   styles: OfficeStyles;
   primary?: boolean;
   disabled?: boolean;
+  /** Its name for a screen reader, where the label alone does not say what it acts on. */
+  name?: string;
 }
 
 // Same as server/errors.ts errorMessage; client code may not import server/.
@@ -57,6 +59,7 @@ export function ActionButton({
   styles,
   primary = false,
   disabled = false,
+  name,
 }: ActionButtonProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +103,7 @@ export function ActionButton({
     <View style={styles.actionButton}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={shown}
+        accessibilityLabel={pending || name === undefined ? shown : name}
         disabled={dim}
         onPress={press}
         style={style}
