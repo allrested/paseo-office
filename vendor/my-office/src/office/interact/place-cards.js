@@ -1,6 +1,6 @@
 // Place cards: what happens at each place.
 import { state } from '../core/state.js';
-import { $, el, fmtAgo, hhmm, nowMs, short, small, stage } from '../core/env.js';
+import { $, el, fmtAgo, hhmm, nowMs, reduceMotion, short, small, stage } from '../core/env.js';
 import { lbl, verb } from '../ui/event-text.js';
 import { TYPE_ICON, icon } from '../ui/icons.js';
 import { camera, fpCam } from '../scene/renderer.js';
@@ -159,18 +159,41 @@ function placeContent(id) {
   }
   return null;
 }
+// The card follows its room while the camera moves. Only opening or interacting with it
+// restarts its dismissal; live content updates must not keep an unattended card open.
+let dismissAnimation = null;
+let pointerInside = false;
+let keyboardInside = false;
+function cancelDismissal() {
+  if (!dismissAnimation) return;
+  dismissAnimation.onfinish = null;
+  dismissAnimation.cancel();
+  dismissAnimation = null;
+}
+function scheduleDismissal() {
+  cancelDismissal();
+  if (!plcState.id || pointerInside || keyboardInside) return;
+  dismissAnimation = plc.animate([{ opacity: 1 }, { opacity: 0 }], {
+    delay: 5000, duration: 3000, easing: reduceMotion ? 'steps(1, end)' : 'linear', fill: 'forwards',
+  });
+  dismissAnimation.onfinish = closePlace;
+}
+
 export function openPlace(id, from = null) {
   if (PLACES[id]?.open) { PLACES[id].open(); return; }
-  if (plcState.id === id) { renderPlace(); return; }
+  if (plcState.id === id) { renderPlace(); scheduleDismissal(); return; }
   plcState.id = id; plcState.prop = from;
   for (const [k, x] of Object.entries(PLACES)) x.el?.classList.toggle('zone--open', k === id);
   plc.dataset.place = id; plc.hidden = false;
   // glide the camera toward the place so its card has room (not in first person, not while following a session)
   const pl = PLACES[id], at = pl?.pos || from?.center;
   if (at && !fp.on && !state.selectedId) { focusTarget.set(at.x * 0.75, Math.min(at.y, 1.5), at.z * 0.75); state.lastUserCam = performance.now(); setView(null); }
+  keyboardInside = false;
   renderPlace(true);
+  pointerInside = matchMedia('(any-hover: hover)').matches && plc.matches(':hover');
+  scheduleDismissal();
 }
-export function closePlace() { if (!plcState.id) return; PLACES[plcState.id]?.el?.classList.remove('zone--open'); plcState.id = null; plc.hidden = true; }
+export function closePlace() { cancelDismissal(); if (!plcState.id) return; PLACES[plcState.id]?.el?.classList.remove('zone--open'); plcState.id = null; plc.hidden = true; }
 export function renderPlace(first = false) {
   const id = plcState.id; if (!id) return;
   const c = placeContent(id); if (!c) { closePlace(); return; }
@@ -199,5 +222,21 @@ export function placePlc() {
 export function setup() {
   /* ---------- place cards ---------- */
   plc = $('plc');
+  plc.addEventListener('pointerenter', () => { pointerInside = true; cancelDismissal(); });
+  function pointerLeft() { pointerInside = false; scheduleDismissal(); }
+  plc.addEventListener('pointerleave', pointerLeft);
+  plc.addEventListener('pointercancel', pointerLeft);
+  // Opening places focus on Close. Keep the card open once the user navigates or edits.
+  plc.addEventListener('keydown', () => { keyboardInside = true; cancelDismissal(); });
+  plc.addEventListener('focusin', (event) => {
+    if (event.target.matches('input, textarea, [contenteditable="true"], :focus-visible:not(#plc-close)')) {
+      keyboardInside = true; cancelDismissal();
+    }
+  });
+  plc.addEventListener('focusout', (event) => {
+    if (keyboardInside && !plc.contains(event.relatedTarget)) {
+      keyboardInside = false; scheduleDismissal();
+    }
+  });
   $('plc-close').addEventListener('click', closePlace);
 }
