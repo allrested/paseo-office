@@ -14,6 +14,10 @@ import type { WorldPlan } from "./adapter.js";
 import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { WorldView } from "./world-view.js";
 
+import type { SceneWords } from "./use-scene-words.js";
+const words = vi.hoisted(() => ({ current: {} as SceneWords }));
+vi.mock("./use-scene-words.js", () => ({ useSceneWords: () => words.current }));
+
 const frame = vi.hoisted(() => ({
   focusApp: vi.fn(),
   started: null as WorldStartOptions | null,
@@ -93,6 +97,7 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  words.current = { status: "ready", language: "en", words: undefined, note: null };
   frame.focusApp.mockClear();
   frame.started = null;
   frame.starts = [];
@@ -196,6 +201,9 @@ const EMPTY_FLOOR = "No agents on this host yet. One that starts takes a desk he
 test("an empty floor gets its note; a floor with someone on it does not", async () => {
   await startedOffice(ignore);
   expect(container.textContent).toContain(EMPTY_FLOOR);
+  words.current.note = "The language could not be loaded.";
+  await startedOffice(ignore);
+  expect(container.textContent).not.toContain(words.current.note);
   const agent: OfficeAgent = {
     id: "a1",
     title: "Agent a1",
@@ -217,6 +225,7 @@ test("an empty floor gets its note; a floor with someone on it does not", async 
   });
   await startedOffice(ignore, model);
   expect(container.textContent).not.toContain(EMPTY_FLOOR);
+  expect(container.textContent).toContain(words.current.note);
 });
 
 let probed: OfficeStyles | null = null;
@@ -256,4 +265,18 @@ test.each([
 test("the start gives the scene a Sound callback", async () => {
   const options = await startedOffice(ignore);
   expect(typeof options.onSound).toBe("function");
+});
+
+test("the web frame waits for words and restarts in each chosen language", async () => {
+  words.current.status = "loading";
+  await act(async () => root.render(office("pro")));
+  expect(frame.starts).toHaveLength(0);
+  expect(container.textContent).toContain("Loading the 3D view...");
+  words.current = { status: "ready", language: "vi", words: '{"dict":{}}', note: null };
+  await act(async () => root.render(office("pro")));
+  expect(frame.started).toMatchObject({ language: "vi", words: '{"dict":{}}' });
+  words.current = { ...words.current, language: "th", words: "{}" };
+  await act(async () => root.render(office("pro")));
+  expect(frame.disposed).toBe(1);
+  expect(frame.starts).toMatchObject([{ language: "vi" }, { language: "th", words: "{}" }]);
 });

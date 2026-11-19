@@ -4,6 +4,7 @@ import {
   JIRA_KEY,
   officeDeviceSettings,
   officeHostSettings,
+  officeLanguageSettings,
   parseKeys,
   SENTRY_SLUG,
 } from "./settings.js";
@@ -219,4 +220,14 @@ test("a device document without sound has it off, and one with it keeps it", asy
   expect(officeDeviceSettings.version).toBe(2);
   expect(officeDeviceSettings.schema.parse({ threeD: true })).toMatchObject({ sound: false });
   expect(officeDeviceSettings.schema.parse({ sound: true })).toMatchObject({ sound: true });
+});
+
+test("the language choice is a separate device document with Automatic as its default", () => {
+  const setting = officeLanguageSettings;
+  expect(setting.id).toBe("office-language");
+  expect(setting.scope).toBe("device");
+  expect(setting.schema.parse({})).toEqual({ choice: "auto" });
+  for (const choice of ["auto", "en", "vi", "th", "id"])
+    expect(setting.schema.parse({ choice })).toEqual({ choice });
+  for (const choice of ["fr", 1]) expect(setting.schema.safeParse({ choice }).success).toBe(false);
 });

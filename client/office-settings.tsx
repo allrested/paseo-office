@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { View } from "react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
+import { LanguageSetting } from "./language-switch.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./office-surface.js";
 import { useOfficeStyles } from "./styles.js";
@@ -49,6 +50,7 @@ export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
           <LabeledSwitch label="Sound" value={sound.on} onChange={sound.set} styles={styles} />
         </>
       </HostSwitches>
+      <LanguageSetting styles={styles} />
     </View>
   );
 }

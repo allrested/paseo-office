@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
+import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { createWorldBridge, type WorldBridge } from "./world-bridge.js";
@@ -53,6 +54,7 @@ function WorldViewNativeScene({
 }: WorldViewNativeSceneProps) {
   const Frame = kitScriptFrame();
   const onBell = useStandupBell();
+  const words = useSceneWords();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -100,7 +102,7 @@ function WorldViewNativeScene({
   // order: start goes first, then whatever the feed sends once `api` is set.
   useEffect(() => {
     const handle = frame.current;
-    if (page === null || handle === null) return undefined;
+    if (words.status !== "ready" || page === null || handle === null) return undefined;
     const made = createWorldBridge((text) => handle.post(text));
     bridge.current = made;
     try {
@@ -109,6 +111,8 @@ function WorldViewNativeScene({
           focus: noFocus,
           brand: worldBrand(null),
           photo: false,
+          language: words.language,
+          words: words.words,
           plan,
         }),
       );
@@ -122,9 +126,9 @@ function WorldViewNativeScene({
       bridge.current = null;
       setApi(null);
     };
-  }, [page, plan]);
+  }, [page, plan, words.status, words.language, words.words]);
 
-  const { note } = useWorldFeed(api, {
+  const { note: feedNote } = useWorldFeed(api, {
     model,
     theme,
     focusRoomId,
@@ -140,10 +144,12 @@ function WorldViewNativeScene({
   const onMessage = useCallback((text: string) => bridge.current?.receive(text), []);
   const onError = useCallback((message: string) => latest.current.onProblem(message), []);
 
+  const note = feedNote ?? words.note;
   return (
     <View style={styles.scene}>
-      {Frame !== null && page !== null ? (
+      {Frame !== null && page !== null && words.status === "ready" ? (
         <Frame
+          key={words.language}
           ref={frame}
           script={page}
           title="Office in 3D"
