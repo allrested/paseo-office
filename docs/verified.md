@@ -609,4 +609,11 @@ floor inside it. The settings page accepted Headquarters, Bahasa Indonesia and M
 weather. In a browser fixture with an agent, approving a permission and sending a reply
 kept the same 3D iframe mounted at 1440 and 390 px.
 
-[Fullscreen office with the street enabled](fullscreen-office.png)
+At 1440 × 900 in Chromium, the floor measured 768 px with both sidebars open, 1080 px
+with Sessions hidden, and 1440 px with both hidden. The 3D iframe, canvas and camera
+stayed mounted across the toggles. Restoring Details returned to the selected conversation
+and its unsent draft. At 390 px, Sessions and conversations opened as sheets over the floor. On stock Paseo 0.16.2, the New agent draft survived hiding and
+showing Sessions, and the saved sidebar choice survived a page reload.
+
+The screenshots use the plugin’s real components and scene with sample session data.
+[With Sessions and Activity](fullscreen-office.png) · [With both sidebars hidden](fullscreen-floor.png)
