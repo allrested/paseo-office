@@ -133,17 +133,17 @@ test("parseKeys trims and drops empty entries", () => {
 test("device settings: version 1 values stay and rungIncidents is {}", async () => {
   const stored = { threeD: false, view: "2d" };
   const migrated = await officeDeviceSettings.migrate?.(stored, 1);
-  expect(officeDeviceSettings.version).toBe(3);
+  expect(officeDeviceSettings.version).toBe(2);
   expect(await officeDeviceSettings.schema.parseAsync(migrated)).toEqual({
     ...stored,
     rungIncidents: {},
   });
 });
 
-test("device settings: a version 2 document is valid and has no last agent", async () => {
+test("device settings: a version 2 document is valid as it is and has no last agent", async () => {
   const stored = { threeD: true, view: "list", rungIncidents: { "SHOP-1": 5 } };
   const migrated = await officeDeviceSettings.migrate?.(stored, 2);
-  expect(officeDeviceSettings.version).toBe(3);
+  expect(officeDeviceSettings.version).toBe(2);
   expect(await officeDeviceSettings.schema.parseAsync(migrated)).toEqual(stored);
 });
 

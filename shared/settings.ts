@@ -134,15 +134,16 @@ export type OfficeViewChoice = (typeof OFFICE_VIEWS)[number];
 export const officeDeviceSettings = defineSettings({
   id: "office-device",
   scope: "device",
-  version: 3,
+  version: 2,
   schema: z.object({
     threeD: z.boolean().default(true),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),
     lastAgent: z.object({ provider: z.string(), model: z.string() }).optional(),
   }),
-  // Version 1 had no `rungIncidents`: its values stay, and the device has rung for none. Version 3
-  // added the optional `lastAgent`: older values stay valid.
+  // Version 1 had no `rungIncidents`: its values stay, and the device has rung for none. An
+  // additive optional field such as `lastAgent` takes no version bump: a client from before it
+  // still reads the document.
   migrate: (values) => values,
 });
 
