@@ -50,15 +50,17 @@ interface TodayRowProps {
   styles: OfficeStyles;
 }
 
-/** A duty due today, who has it, and the owner's hand: Mark done, or Reopen once done. */
+/**
+ * A duty due today, who has it, and the owner's hand: Mark done until it is done, and Reopen once
+ * someone has it or it is done, so a duty held by an agent that has gone is not stuck.
+ */
 function TodayRow({ row, name, actions, styles }: TodayRowProps) {
   const title = dutyRowTitle(row);
   const done = row.post.state === "done";
+  const held = done || row.post.state === "claimed";
   const { id } = row.post;
-  const press = useCallback(
-    () => (done ? actions.reopen(id) : actions.markDone(id)),
-    [actions, done, id],
-  );
+  const reopen = useCallback(() => actions.reopen(id), [actions, id]);
+  const markDone = useCallback(() => actions.markDone(id), [actions, id]);
   return (
     <View style={styles.dutyCard}>
       <View style={styles.post}>
@@ -66,13 +68,24 @@ function TodayRow({ row, name, actions, styles }: TodayRowProps) {
         <Text style={styles.postMeta}>{dutyStateText(row, name)}</Text>
       </View>
       <View style={styles.actions}>
-        <ActionButton
-          label={done ? "Reopen" : "Mark done"}
-          name={done ? `Reopen ${title}` : `Mark ${title} done`}
-          pendingLabel="Saving..."
-          onPress={press}
-          styles={styles}
-        />
+        {held ? (
+          <ActionButton
+            label="Reopen"
+            name={`Reopen ${title}`}
+            pendingLabel="Saving..."
+            onPress={reopen}
+            styles={styles}
+          />
+        ) : null}
+        {done ? null : (
+          <ActionButton
+            label="Mark done"
+            name={`Mark ${title} done`}
+            pendingLabel="Saving..."
+            onPress={markDone}
+            styles={styles}
+          />
+        )}
       </View>
     </View>
   );

@@ -142,6 +142,14 @@ test("today's duties say who has each; done ones reopen and open ones are marked
   expect(asked).toEqual(["reopen p1", "done p2"]);
 });
 
+test("a claimed duty can be reopened as well as marked done; an open one only marked done", async () => {
+  await mount(LIST, [post(1, "cups", {}), post(2, "build", { state: "claimed", claimedBy: "a2" })]);
+  expect(container.querySelector('[aria-label="Reopen Wash the cups"]')).toBeNull();
+  await press("Reopen Build");
+  await press("Mark Build done");
+  expect(asked).toEqual(["reopen p2", "done p2"]);
+});
+
 test("a day with nothing due says so", async () => {
   await mount(LIST, []);
   expect(text()).toContain("No duty is due today.");

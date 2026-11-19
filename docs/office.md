@@ -426,12 +426,13 @@ report wins. With no 3D office open during those hours, it stays open and is owe
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
-It shows today's duties with who has each, with Mark done or Reopen, and the list with each duty's
-name, instructions and day buttons, saved whole. Unticking today's day on a duty takes its open post
-of today off the board when you save; a claimed one stays until it is done, as for a removed duty.
-The scene is told each duty's name, its chore, its holder's title cut to 24 characters and its
-state, never its instructions (`worldDuties` in `client/world/adapter.ts`). The board and its
-tooltip show them, and the scene keeps no rota of its own. Until the host has sent its list (an
+It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
+Reopen (so a duty an agent that has gone still holds can be handed out again), and the list with
+each duty's name, instructions and day buttons, saved whole. Unticking today's day on a duty takes
+its open post of today off the board when you save; a claimed one stays until it is done, as for a
+removed duty. The scene is told each duty's name, its chore, its holder's title cut to 24 characters
+and its state, never its instructions (`worldDuties` in `client/world/adapter.ts`). The board and
+its tooltip show them, and the scene keeps no rota of its own. Until the host has sent its list (an
 older host has none) nothing offers the duty board, and the scene keeps upstream's rota and its
 note. The four starting duties keep the cups, bin, plants and tables chores. For a duty you add, the
 person walks to the board and back. The person of an agent that holds a duty acts its chore out
