@@ -1,4 +1,7 @@
 import type { PluginTheme } from "@getpaseo/plugin";
+import type { WorldLiftService, WorldTenure } from "../../shared/contracts.js";
+
+export type { WorldLiftService, WorldTenure };
 
 /**
  * The plugin's side of the page that draws the 3D office. The page's side is
@@ -12,7 +15,8 @@ export interface WorldSession {
   title: string;
   /** The project's folder; the scene seats a project's people together. */
   dir: string;
-  git: { repo: string };
+  /** `born`: the day of the repository's first commit, "YYYY-MM-DD"; HR brings a cake in its month. */
+  git: { repo: string; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
   /** Which mark the scene puts on the person's screen. */
@@ -38,7 +42,7 @@ export interface WorldSession {
    * The context window, in tokens: the paper on the desk grows with it, and a flag stands in it
    * from 85%. Absent when the provider has not said.
    */
-  usage?: { ctx: number; ctxMax: number };
+  usage?: { ctx: number; ctxMax: number; cost?: number };
 }
 
 /**
@@ -171,6 +175,8 @@ export interface WorldStartOptions {
    * few words, as upstream's chatLife is called. The office's server words it.
    */
   onLife?(kind: string, vars: Record<string, string>): void;
+  /** A farewell was held, or an intern made permanent: the server's tenure list keeps it. */
+  onTenure?(op: { op: "farewell" | "official"; name: string }): void;
   /** False hides Photo mode: a WebView cannot keep a download. Absent: Photo mode is offered. */
   photo?: boolean;
 }
@@ -214,6 +220,10 @@ export interface WorldApi {
    * from before sounds.
    */
   setSound?(on: boolean): void;
+  /** The tenure list the farewells and the interns read. Absent on a page built before them. */
+  setTenure?(tenure: WorldTenure): void;
+  /** The lift's servicing after the office's server started. Absent on a page built before it. */
+  setLiftService?(info: WorldLiftService): void;
 }
 
 /** The version of the contract above; the page says which it speaks. */

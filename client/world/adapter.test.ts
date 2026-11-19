@@ -619,3 +619,22 @@ describe("the lobby's sign", () => {
     expect(worldBrand(null)).toEqual({ name: "Paseo", logoUrl: null });
   });
 });
+
+describe("what the staff scenes read of a person", () => {
+  it("carries what the agent cost and the repository's first day", () => {
+    const model = buildOfficeModel(office([agent("1", { costUsd: 1.5 })]));
+    const { sessions } = worldPeople(model, PLAN_DESKS.pro, { "shop-api": "2020-02-03" });
+    expect(sessions[0]?.usage).toEqual({ ctx: 0, ctxMax: 0, cost: 1.5 });
+    expect(sessions[0]?.git).toEqual({ repo: "shop-api", born: "2020-02-03" });
+  });
+
+  it("tells the scene nothing it does not know", () => {
+    const model = buildOfficeModel(
+      office([agent("1", { context: { usedTokens: 10, maxTokens: 100 } }), agent("2")]),
+    );
+    const { sessions } = worldPeople(model, PLAN_DESKS.pro, { landing: "2020-02-03" });
+    expect(sessions[0]?.usage).toEqual({ ctx: 10, ctxMax: 100 });
+    expect(sessions[1]).not.toHaveProperty("usage");
+    expect(sessions[0]?.git).toEqual({ repo: "shop-api" });
+  });
+});

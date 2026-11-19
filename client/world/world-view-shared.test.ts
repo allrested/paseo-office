@@ -32,6 +32,7 @@ function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } 
       onBell: vi.fn(),
       onSound: vi.fn(),
       onLife: vi.fn(),
+      onTenure: vi.fn(),
       onProblem: vi.fn(),
       ...overrides,
     },
@@ -129,5 +130,16 @@ test("a moment for the team chat goes to the latest handler, and keeps no focus 
   now.current = { ...now.current, onLife: said };
   options.onLife?.("parcel", { id: "a1" });
   expect(said).toHaveBeenCalledWith("parcel", { id: "a1" });
+  expect(focus).not.toHaveBeenCalled();
+});
+
+test("a tenure write goes to the latest handler, and keeps no focus from the app", () => {
+  const now = latest();
+  const focus = vi.fn();
+  const options = worldStartOptions(now, { focus, brand: BRAND, plan: "pro" });
+  const told = vi.fn();
+  now.current = { ...now.current, onTenure: told };
+  options.onTenure?.({ op: "farewell", name: "api" });
+  expect(told).toHaveBeenCalledWith({ op: "farewell", name: "api" });
   expect(focus).not.toHaveBeenCalled();
 });

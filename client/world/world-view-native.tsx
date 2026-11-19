@@ -71,6 +71,7 @@ function WorldViewNativeScene({
     onBell,
     onSound: sound.set,
     onLife: life.say,
+    onTenure: life.tell,
     onProblem,
   });
   useEffect(() => {
@@ -90,6 +91,7 @@ function WorldViewNativeScene({
       onBell,
       onSound: sound.set,
       onLife: life.say,
+      onTenure: life.tell,
       onProblem,
     };
   });
@@ -138,6 +140,7 @@ function WorldViewNativeScene({
     meeting,
     incidents,
     sound: sound.on,
+    life: life.life,
     plan,
   });
 

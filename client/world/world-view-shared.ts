@@ -26,6 +26,7 @@ export interface WorldLatest {
   onBell(): void | Promise<void>;
   onSound(on: boolean): void;
   onLife(kind: string, vars: Record<string, string>): void;
+  onTenure(op: { op: "farewell" | "official"; name: string }): void;
   onProblem(message: string): void;
 }
 
@@ -91,6 +92,7 @@ export function worldStartOptions(
     onBell: () => void latest.current.onBell(),
     onSound: (on) => latest.current.onSound(on),
     onLife: (kind, vars) => latest.current.onLife(kind, vars),
+    onTenure: (op) => latest.current.onTenure(op),
     onNotes: () => {
       focus();
       latest.current.onOpenNotes();

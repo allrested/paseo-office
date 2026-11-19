@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@getpaseo/plugin/client", () => ({
   useRpc: () => async () => ({}),
   useSettings: () => ({ status: "loading" }),
+  useSubscription: () => ({ status: "connecting" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({ useToast: () => ({ error: () => undefined }) }));
 vi.mock("./script-frame-kit.js", async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { PluginTheme } from "@getpaseo/plugin";
-import type { IncidentsState, Machine } from "../../shared/contracts.js";
+import type { IncidentsState, LifeEvent, Machine } from "../../shared/contracts.js";
 import type { OfficeModel } from "../../shared/model.js";
 import { onChatAct } from "../chat-acts.js";
 import type { FocusRequest } from "../focus-request.js";
@@ -38,6 +38,8 @@ export interface WorldFeedInput {
   sound: boolean | null;
   /** The floor plan the scene was started on: its desks seat the people. */
   plan: WorldPlan;
+  /** What the staff scenes read beyond the people; null until the server has said. */
+  life: LifeEvent | null;
 }
 
 /**
@@ -60,6 +62,7 @@ export function useWorldFeed(
     incidents,
     sound,
     plan,
+    life,
   }: WorldFeedInput,
 ): { note: string | null } {
   // (a ref for useIncidentAlarm's RefObject; the [api] effect below must stay the first effect)
@@ -84,7 +87,12 @@ export function useWorldFeed(
     if (sound !== null) world.current?.setSound?.(sound);
   }, [sound, api]);
 
-  const people = useMemo(() => worldPeople(model, PLAN_DESKS[plan]), [model, plan]);
+  // Each team's repository's first day: HR's birthday cake (people/hr.js).
+  const born = life?.born;
+  const people = useMemo(
+    () => worldPeople(model, PLAN_DESKS[plan], born ?? {}),
+    [model, plan, born],
+  );
   useEffect(() => {
     const scene = world.current;
     if (scene === null) return;
@@ -95,6 +103,17 @@ export function useWorldFeed(
     for (const event of changes.events) scene.event(event);
     memory.current = changes.memory;
   }, [people, model, api]);
+
+  // The farewells and the interns read the tenure list; the lift its servicing. A list the scene
+  // already has is not sent again; a new scene gets it again.
+  const tenure = life?.tenure;
+  useEffect(() => {
+    if (tenure !== undefined) world.current?.setTenure?.(tenure);
+  }, [tenure, api]);
+  const lift = life?.lift;
+  useEffect(() => {
+    if (lift !== undefined) world.current?.setLiftService?.(lift);
+  }, [lift, api]);
 
   // After the people: the alarm's bubbles go over whoever is seated at work.
   useIncidentAlarm({ world, started: api !== null, incidents });

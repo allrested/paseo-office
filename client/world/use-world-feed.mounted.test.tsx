@@ -38,6 +38,7 @@ function input(overrides: Partial<WorldFeedInput> = {}): WorldFeedInput {
     incidents: undefined,
     sound: null,
     plan: "pro",
+    life: null,
     ...overrides,
   };
 }
@@ -189,4 +190,42 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   );
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
+});
+
+const LIFE = {
+  type: "life" as const,
+  born: {},
+  tenure: { days: 30, choices: [30], projects: [] },
+  lift: { left: 60_000, total: 180_000, newBuild: false, sticker: null },
+};
+
+test("the tenure list and the lift's servicing are sent once each, and again to a new scene", async () => {
+  const first = fakeScene();
+  await act(async () => root.render(<Probe api={first.api} feed={input({ life: LIFE })} />));
+  await act(async () => root.render(<Probe api={first.api} feed={input({ life: LIFE })} />));
+  const told = (calls: string[]) =>
+    calls.filter((call) => call.startsWith("setTenure") || call.startsWith("setLiftService"));
+  expect(told(first.calls)).toEqual([
+    `setTenure:${JSON.stringify([LIFE.tenure])}`,
+    `setLiftService:${JSON.stringify([LIFE.lift])}`,
+  ]);
+
+  const second = fakeScene();
+  await act(async () => root.render(<Probe api={second.api} feed={input({ life: LIFE })} />));
+  expect(told(second.calls)).toHaveLength(2);
+});
+
+test("nothing of the staff scenes is sent before the server has said", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input()} />));
+  expect(calls.filter((call) => /^set(Tenure|LiftService)/.test(call))).toEqual([]);
+});
+
+test("a person carries their team's repository's first day once the server has read it", async () => {
+  const { api, calls } = fakeScene();
+  const model = crowd(1);
+  const life = { ...LIFE, born: { "shop-api": "2020-02-03" } };
+  await act(async () => root.render(<Probe api={api} feed={input({ model, life })} />));
+  const sessions = calls.find((call) => call.startsWith("setSessions:")) ?? "";
+  expect(sessions).toContain('"git":{"repo":"shop-api","born":"2020-02-03"}');
 });

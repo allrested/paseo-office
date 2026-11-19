@@ -57,7 +57,19 @@ function rank(session: WorldSession): number {
   return session.status === "work" ? 1 : 2;
 }
 
-function toSession(row: OfficeRow, team: string): WorldSession {
+/** The context window and what the agent cost, each when known; nothing when neither is. */
+function usageOf(agent: OfficeRow["agent"]): Pick<WorldSession, "usage"> {
+  const cost = agent.costUsd === undefined ? {} : { cost: agent.costUsd };
+  if (agent.context === undefined)
+    return agent.costUsd === undefined ? {} : { usage: { ctx: 0, ctxMax: 0, ...cost } };
+  return { usage: { ctx: agent.context.usedTokens, ctxMax: agent.context.maxTokens, ...cost } };
+}
+
+function toSession(
+  row: OfficeRow,
+  team: string,
+  born: Readonly<Record<string, string>>,
+): WorldSession {
   const { agent } = row;
   const title = agentTitle(agent);
   const status = statusOf(agent, row.waitingOn);
@@ -68,7 +80,7 @@ function toSession(row: OfficeRow, team: string): WorldSession {
     name: title,
     title,
     dir: team,
-    git: { repo: team },
+    git: Object.hasOwn(born, team) ? { repo: team, born: born[team] } : { repo: team },
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
@@ -76,9 +88,7 @@ function toSession(row: OfficeRow, team: string): WorldSession {
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: [],
-    ...(agent.context === undefined
-      ? {}
-      : { usage: { ctx: agent.context.usedTokens, ctxMax: agent.context.maxTokens } }),
+    ...usageOf(agent),
   };
 }
 
@@ -86,9 +96,13 @@ function toSession(row: OfficeRow, team: string): WorldSession {
  * The office's agents as people on a floor with this many desks: a room is a team, seated
  * together. Who does not fit stays in the list view.
  */
-export function worldPeople(model: OfficeModel, desks: number): WorldPeople {
+export function worldPeople(
+  model: OfficeModel,
+  desks: number,
+  born: Readonly<Record<string, string>> = {},
+): WorldPeople {
   const rows = model.rooms.flatMap((room) => room.rows.map((row) => ({ row, team: room.name })));
-  const all = rows.map(({ row, team }) => toSession(row, team));
+  const all = rows.map(({ row, team }) => toSession(row, team, born));
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks

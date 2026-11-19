@@ -125,3 +125,26 @@ test("setSound goes to the page as a call, and the scene's onSound comes back as
   receive(JSON.stringify({ callback: "onSound", args: [true] }));
   expect(onSound).toHaveBeenCalledWith(true);
 });
+
+test("the tenure list and the lift go to the page as calls, and the scenes' lines come back as callbacks", () => {
+  const { api, posted, receive } = bridge();
+  const onLife = vi.fn();
+  const onTenure = vi.fn();
+  api.start(options({ onLife, onTenure }));
+  const tenure = { days: 30, choices: [30], projects: [] };
+  const lift = { left: 1, total: 2, newBuild: false, sticker: null };
+  api.setTenure?.(tenure);
+  api.setLiftService?.(lift);
+  expect(posted.slice(1)).toEqual([
+    { call: "setTenure", args: [tenure] },
+    { call: "setLiftService", args: [lift] },
+  ]);
+  expect(posted[0]).toEqual({
+    call: "start",
+    args: [expect.objectContaining({ callbacks: expect.arrayContaining(["onLife", "onTenure"]) })],
+  });
+  receive(JSON.stringify({ callback: "onLife", args: ["tea", {}] }));
+  receive(JSON.stringify({ callback: "onTenure", args: [{ op: "official", name: "web" }] }));
+  expect(onLife).toHaveBeenCalledWith("tea", {});
+  expect(onTenure).toHaveBeenCalledWith({ op: "official", name: "web" });
+});

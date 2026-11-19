@@ -130,6 +130,7 @@ function WorldScene({
     onBell,
     onSound: sound.set,
     onLife: life.say,
+    onTenure: life.tell,
     onProblem,
   });
   useEffect(() => {
@@ -149,6 +150,7 @@ function WorldScene({
       onBell,
       onSound: sound.set,
       onLife: life.say,
+      onTenure: life.tell,
       onProblem,
     };
   }, [
@@ -167,6 +169,7 @@ function WorldScene({
     onBell,
     sound.set,
     life.say,
+    life.tell,
     onProblem,
   ]);
 
@@ -227,6 +230,7 @@ function WorldScene({
     meeting,
     incidents,
     sound: sound.on,
+    life: life.life,
     plan,
   });
   return (
