@@ -80,12 +80,20 @@ test("Indonesian has one plural form, so a pair has only `other`", () => {
 });
 
 for (const language of ["vi", "th"]) {
-  test(`${language} has only keys English has`, async () => {
+  test(`${language} covers the English areas and keys except known upstream gaps`, async () => {
+    assert.deepEqual(areasOf(language), areasOf("en"));
     const english = new Set(leaves(await loadLocale("en")).map(([key]) => key));
-    const extra = leaves(await loadLocale(language))
-      .map(([key]) => key)
-      .filter((key) => !english.has(key));
-    assert.deepEqual(extra, []);
+    const translated = new Set(leaves(await loadLocale(language)).map(([key]) => key));
+    assert.deepEqual(
+      [...translated].filter((key) => !english.has(key)),
+      [],
+    );
+    // Upstream Thai omits the closed-session message. It uses the scene’s English fallback.
+    const allowedMissing = language === "th" ? ["drawer.sessionGone"] : [];
+    assert.deepEqual(
+      [...english].filter((key) => !translated.has(key) && !allowedMissing.includes(key)),
+      [],
+    );
   });
 }
 

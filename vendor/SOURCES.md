@@ -28,7 +28,8 @@ bundle needs no resolver, and that real brand names are swapped for made-up ones
 
 The import takes English, Vietnamese and Thai area files named by the scene’s English index
 and generates a matching index for each. Vietnamese and Thai come from the same pinned commit,
-including the Thai people submodules. Brand replacements preserve each area’s shared keys.
+including the Thai people submodules. The upstream Thai drawer omits
+`drawer.sessionGone`, so that message uses the English fallback. Brand replacements preserve each area’s shared keys.
 
 The port wrote `i18n/locales/id/` in upstream’s format for all the same areas. Its `ours.js`
 contains the port-specific lines. The locale tests check keys, order, plural forms, slots,

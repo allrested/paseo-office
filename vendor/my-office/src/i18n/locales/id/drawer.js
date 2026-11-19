@@ -91,7 +91,7 @@ export default {
   working: 'sedang bekerja',
   done: 'selesai',
   loadingSub: 'Memuat percakapan subagen…',
-  noSubs: 'Sesi ini belum memanggil subagen sejak kantor dibuka. Saat Claude menyerahkan tugas ke subagen, subagen itu akan menuju ruang rapat dan muncul di sini.',
+  noSubs: 'Sesi ini belum memanggil subagen sejak My Office dijalankan. Saat Claude menyerahkan tugas ke subagen, subagen itu akan menuju ruang rapat dan muncul di sini.',
   doneAt: 'selesai pukul {time}',
   starting: 'Memulai…',
   subDoneMeta: '{steps} · mulai pukul {time}',

@@ -101,7 +101,7 @@ photo lighting group title are English in every language.
   is open, the host checks local Git tags and the installed Claude CLI version. New tags can
   trigger the photo booth. The pickleball scene uses check results already available to Paseo.
 - English travels with the scene. For each other language the host sends one dictionary on request
-  to the device that chose it (about 75–119 KB). The device keeps those words for the life of the page.
+  to the device that chose it (about 82–130 KB). The device keeps those words for the life of the page.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
