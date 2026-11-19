@@ -60,6 +60,8 @@ export const OfficeAgentSchema = z.object({
    * earliest. Absent for any other status: a running agent's time moves with every step.
    */
   idleSince: z.string().optional(),
+  /** When the host flagged the currently pending permission. */
+  permissionSince: z.string().optional(),
   /** What the agent's turns have cost so far; absent when its provider says no cost. */
   costUsd: z.number().nonnegative().optional(),
   /** When the agent was last prompted; on a running or starting agent only. */
@@ -153,6 +155,8 @@ export const PostSchema = z.object({
   /** Tasks only. */
   state: TaskStateSchema.optional(),
   claimedBy: z.string().optional(),
+  /** Persisted until Paseo acknowledges an automatic lobby assignment. */
+  pickupMessageId: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -187,6 +191,15 @@ export type ChecklistStep = z.output<typeof ChecklistStepSchema>;
 /** Each agent's unfinished steps, by agent id; an agent with none is absent. */
 export const ChecklistsSchema = z.record(z.string(), z.array(ChecklistStepSchema));
 export type Checklists = z.output<typeof ChecklistsSchema>;
+
+/** Full step counts, independently of the cap on unfinished step text. */
+const ChecklistProgressSchema = z.object({
+  completed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+export type ChecklistProgress = z.output<typeof ChecklistProgressSchema>;
+const ChecklistCountsSchema = z.record(z.string(), ChecklistProgressSchema);
+export type ChecklistCounts = z.output<typeof ChecklistCountsSchema>;
 
 /** The stand-up notes writer, and the 8:00 schedule that starts it. */
 export const NotesStateSchema = z.object({
@@ -263,6 +276,17 @@ export type WeatherState = z.output<typeof WeatherStateSchema>;
 
 /** The most characters of one chat message the office takes. */
 export const CHAT_TEXT_MAX = 600;
+export const CHAT_IMAGE_LIMIT = 4;
+export const CHAT_IMAGE_CHARS = 1_000_000;
+const ChatImageSchema = z.object({
+  mimeType: z.literal("image/jpeg"),
+  data: z
+    .string()
+    .min(4)
+    .max(CHAT_IMAGE_CHARS)
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+});
+export type ChatImage = z.output<typeof ChatImageSchema>;
 /** The most chat messages kept, as upstream's engine keeps them. */
 export const CHAT_MESSAGE_MAX = 300;
 
@@ -315,6 +339,7 @@ export type ChatMessage = z.output<typeof ChatMessageSchema>;
 export const ChatSnapshotSchema = z.object({
   messages: z.array(ChatMessageSchema),
   typing: z.array(z.string()),
+  pinned: z.string().nullable().optional(),
 });
 export type ChatSnapshot = z.output<typeof ChatSnapshotSchema>;
 
@@ -326,7 +351,11 @@ export const ChatChangeSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("add"), message: ChatMessageSchema }),
   z.object({ op: z.literal("update"), message: ChatMessageSchema }),
   z.object({ op: z.literal("typing"), names: z.array(z.string()) }),
-  z.object({ op: z.literal("all"), messages: z.array(ChatMessageSchema) }),
+  z.object({
+    op: z.literal("all"),
+    messages: z.array(ChatMessageSchema),
+    pinned: z.string().nullable().optional(),
+  }),
   z.object({ op: z.literal("act"), what: z.literal("meeting"), id: z.string() }),
 ]);
 export type ChatChange = z.output<typeof ChatChangeSchema>;
@@ -343,7 +372,15 @@ export const ChatRequestSchema = z.discriminatedUnion("op", [
     text: z.string().max(CHAT_TEXT_MAX).optional(),
     sticker: z.number().int().min(0).optional(),
     replyTo: z.string().min(1).optional(),
+    to: z.string().min(1).optional(),
+    images: z.array(ChatImageSchema).min(1).max(CHAT_IMAGE_LIMIT).optional(),
   }),
+  z.object({
+    op: z.literal("poll"),
+    question: z.string().trim().min(1).max(120),
+    options: z.array(z.string().trim().min(1).max(60)).min(2).max(6),
+  }),
+  z.object({ op: z.literal("pin"), id: z.string().min(1) }),
   z.object({ op: z.literal("react"), id: z.string().min(1), emoji: z.string().min(1) }),
   z.object({ op: z.literal("vote"), id: z.string().min(1), index: z.number().int().min(0) }),
   z.object({ op: z.literal("rsvp"), id: z.string().min(1), yes: z.boolean() }),
@@ -367,6 +404,7 @@ export const OfficeSnapshotSchema = z.object({
   doing: z.record(z.string(), ActivityStepSchema).optional(),
   /** Each agent's own checklist, kept after the agent stops. */
   checklists: ChecklistsSchema.optional(),
+  checklistProgress: ChecklistCountsSchema.optional(),
   boards: z.record(z.string(), z.array(PostSchema)),
   wake: WakeStateSchema,
   /** Absent until the office's server has read the writer's state. */
@@ -388,6 +426,7 @@ export const OfficeEventSchema = z.discriminatedUnion("type", [
     activity: z.record(z.string(), z.string()),
     doing: z.record(z.string(), ActivityStepSchema).optional(),
     checklists: ChecklistsSchema.optional(),
+    checklistProgress: ChecklistCountsSchema.optional(),
   }),
   z.object({ type: z.literal("board"), board: z.string(), posts: z.array(PostSchema) }),
   z.object({ type: z.literal("board-removed"), board: z.string() }),

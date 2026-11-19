@@ -21,6 +21,8 @@ vi.mock("./use-scene-words.js", () => ({ useSceneWords: () => words.current }));
 const frame = vi.hoisted(() => ({
   photoRelease: vi.fn(),
   setClaudeVersion: vi.fn(),
+  setFullscreen: vi.fn(),
+  setTheme: vi.fn(),
   focusApp: vi.fn(),
   started: null as WorldStartOptions | null,
   /** Every start, in order, and how many frames were taken out. */
@@ -62,7 +64,13 @@ vi.mock("./world-frame.web.js", () => ({
     // Every method does nothing but start; "then" stays absent so the promise resolves to it.
     const api = new Proxy({} as WorldApi, {
       get: (_, key) => {
-        if (key === "photoRelease" || key === "setClaudeVersion") return frame[key];
+        if (
+          key === "photoRelease" ||
+          key === "setClaudeVersion" ||
+          key === "setFullscreen" ||
+          key === "setTheme"
+        )
+          return frame[key];
         if (key === "then") return undefined;
         if (key === "start") {
           return (options: WorldStartOptions) => {
@@ -112,6 +120,7 @@ let root: Root;
 beforeEach(() => {
   words.current = { status: "ready", language: "en", words: undefined, note: null };
   frame.focusApp.mockClear();
+  frame.setFullscreen.mockClear();
   frame.started = null;
   frame.starts = [];
   frame.disposed = 0;
@@ -134,10 +143,14 @@ function office(
   onSelectAgent: (id: string | null) => void = ignore,
   model: OfficeModel = MODEL,
   streetOn = false,
+  fullscreen?: { active: boolean; toggle(): void },
+  scenery?: Pick<Parameters<typeof WorldView>[0], "scene" | "night">,
 ) {
   return (
     <WorldView
+      {...scenery}
       streetOn={streetOn}
+      fullscreen={fullscreen}
       plan={plan}
       model={model}
       theme={THEME}
@@ -180,6 +193,20 @@ test("with no plan yet nothing starts, and the view says it is loading", async (
 test("the scene starts on the plan it is given", async () => {
   await act(async () => root.render(office("cozy")));
   expect(frame.starts.map((options) => options.plan)).toEqual(["cozy"]);
+});
+
+test("the toolbar toggles the host surface and follows enter and exit without restarting the floor", async () => {
+  const toggle = vi.fn();
+  const render = (active: boolean) =>
+    act(async () => root.render(office("pro", ignore, MODEL, false, { active, toggle })));
+  await render(false);
+  frame.started?.onToggleFullscreen?.();
+  expect(toggle).toHaveBeenCalledTimes(1);
+  await render(true);
+  await render(false);
+  expect(frame.setFullscreen.mock.calls).toEqual([[false], [true], [false]]);
+  expect(frame.starts).toHaveLength(1);
+  expect(frame.disposed).toBe(0);
 });
 
 test("a changed plan takes the frame out and starts the scene again on the new plan", async () => {
@@ -306,4 +333,20 @@ test("the web frame waits for words and restarts in each chosen language", async
   await act(async () => root.render(office("pro")));
   expect(frame.disposed).toBe(1);
   expect(frame.starts).toMatchObject([{ language: "vi" }, { language: "th", words: "{}" }]);
+});
+
+test("landscapes start on the matching web frame and switching day and night keeps its camera", async () => {
+  const render = (scene: "countryside" | "beach", night: boolean) =>
+    act(async () => root.render(office("pro", ignore, MODEL, true, undefined, { scene, night })));
+  await render("countryside", true);
+  expect(frame.started).toMatchObject({ scene: "countryside", dark: true });
+  expect(frame.started).not.toHaveProperty("street");
+  await render("countryside", false);
+  expect(frame.setTheme.mock.lastCall?.[0].dark).toBe(false);
+  expect(frame.setTheme.mock.lastCall?.[0].colors).toBe(THEME.colors);
+  expect(frame.disposed).toBe(0);
+  await render("beach", false);
+  expect(frame.starts).toMatchObject([{ scene: "countryside" }, { scene: "beach", dark: false }]);
+  expect(frame.started).not.toHaveProperty("street");
+  expect(frame.disposed).toBe(1);
 });

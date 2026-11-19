@@ -259,3 +259,19 @@ test("a language failure appears in the floor note after the phone starts", asyn
   await mount({ model: { ...MODEL, agents: new Map([[agent.id, agent]]) } });
   expect(container.textContent).toContain(words.current.note);
 });
+
+test("the phone starts directly on Beach, changes its lighting in place and remounts for Countryside", async () => {
+  await mount({ scene: "beach", night: false, streetOn: true });
+  expect(calls()[0]).toMatchObject({ call: "start", args: [{ scene: "beach", dark: false }] });
+  expect(calls()[0].args[0]).not.toHaveProperty("street");
+  h.posted = [];
+  await mount({ scene: "beach", night: true, streetOn: true });
+  expect(calls()).toContainEqual({ call: "setTheme", args: [{ dark: true, colors: {} }] });
+  expect([h.mounted, h.unmounted]).toEqual([1, 0]);
+  h.posted = [];
+  await mount({ scene: "countryside", night: true, streetOn: true });
+  const start = calls().find((c) => c.call === "start");
+  expect(start?.args[0]).toMatchObject({ scene: "countryside", dark: true });
+  expect(start?.args[0]).not.toHaveProperty("street");
+  expect([h.mounted, h.unmounted]).toEqual([2, 1]);
+});

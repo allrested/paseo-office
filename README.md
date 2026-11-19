@@ -14,7 +14,7 @@ my-office's.
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
 - The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
-- The optional street outside has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
+- Choose **Change outdoor scene** on the 3D toolbar for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
   on the settings page. Automatic follows the app’s language when supported. Paseo 0.16.2 offers
@@ -27,8 +27,9 @@ my-office's.
   Sessions sits on the left, the floor in the center, and activity or the open conversation
   on the right. Select **Sessions** or **Details** in the toolbar to hide or show that side.
   Hide both for an edge-to-edge floor, or open a conversation to reply and answer permission requests.
+  Open **Team chat** to float the group conversation over the floor, or **Open in workspace** in a session to use the real web workbench without leaving Office. Session cards show status, elapsed time, and completed checklist items when the provider supplies them.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
-  that names an idle agent wakes it.
+  that names an idle agent wakes it. With **Agent tools** and **Wake agents** enabled, available agents also claim unassigned lobby tasks in order.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
   agent on the host gets the office's stand-up report and writes a `## DD Month YYYY` entry into
   `daily-standup-YYYYMM.md` in a folder of notes you choose, following the stand-up notes
@@ -77,7 +78,7 @@ The settings are in Settings > Plugins > Office 3D. The gear over the floor open
 | The phone app with a script frame | The 3D floor without Photo mode, clips and the tour                                                                                                                                    |
 | The store phone app               | The 2D floor and the list: its plugin frame runs no script                                                                                                                             |
 | Sound                             | A browser and the desktop app, where the frame lets audio start; the phone's script frame: see [docs/verified.md](docs/verified.md)                                                    |
-| The street outside                | Available in 3D. Enabled by default on wide web layouts and disabled by default on phones.                                                                                             |
+| Outdoor scene and lighting        | City, Countryside, Beach or Plain, with App theme, Day or Night lighting. A first visit starts in City on wide web layouts and Plain on phones.                                        |
 | Stock Paseo 0.16                  | A session opens in the office in every app. Its SDK has no `cancel()` or `closeRuntime()` for an agent: no Stop on a session, and the Host card does not close an idle agent's runtime |
 
 [docs/verified.md](docs/verified.md) says what was seen on a stock Paseo 0.16.2, and what was not.

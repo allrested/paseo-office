@@ -31,14 +31,14 @@ if (!FROM || !THREE) {
 }
 
 /**
- * Not taken: upstream's panels, chat window, replay, demo, and alternate backdrops.
+ * Not taken: upstream's panels, chat window, replay, demo, and backdrop selector.
  * The lounge's four games are taken (people/billiards.js, gaming.js, foosball.js, karaoke.js). life/incidents.js is
  * taken trimmed by hand, so it stays denied here and only its exports are checked.
  */
 const DENY = [
   /^office\/ui\/(?!event-text\.js$|icons\.js$|photo\.js$|tips\.js$|timelapse\.js$|clip-music\.js$)/,
   /^office\/(demo|replay)\//,
-  /^office\/world\/backdrops\/(?:index|countryside|beach|shared)\.js$/,
+  /^office\/world\/backdrops\/index\.js$/,
   /^office\/life\/incidents\.js$/,
   /^office\/main\.js$/,
   /^i18n\/index\.js$/,
@@ -135,6 +135,8 @@ const order = main
   .filter((name) => imported.has(name));
 const kept = order.filter((name) => !denied(imported.get(name)));
 for (const name of kept) visit(imported.get(name));
+// The port's backdrop selector imports these in place of upstream's selector.
+for (const backdrop of ["countryside", "beach"]) visit(`office/world/backdrops/${backdrop}.js`);
 for (const rel of ["i18n/locales/en/common.js", "i18n/locales/en/time.js"]) visit(rel);
 
 /**

@@ -184,10 +184,20 @@ test("the chat call names its RPC and takes each op", () => {
     { op: "vote", id: "m1", index: 0 },
     { op: "rsvp", id: "m1", yes: true },
     { op: "recall", id: "m1" },
+    { op: "pin", id: "m1" },
+    { op: "poll", question: "Lunch?", options: ["Rice", "Noodles"] },
+    { op: "send", to: "a1", images: [{ mimeType: "image/jpeg", data: "YQ==" }] },
   ])
     expect(ChatRequestSchema.safeParse(input).success).toBe(true);
   expect(ChatRequestSchema.safeParse({ op: "send", text: "x".repeat(601) }).success).toBe(false);
-  expect(ChatRequestSchema.safeParse({ op: "pin", id: "m1" }).success).toBe(false);
+  for (const input of [
+    { op: "pin", id: "" },
+    { op: "poll", question: "Lunch?", options: ["Rice"] },
+    { op: "poll", question: "Lunch?", options: ["Rice", " "] },
+    { op: "send", to: "a1", images: Array(5).fill({ mimeType: "image/jpeg", data: "YQ==" }) },
+    { op: "send", to: "a1", images: [{ mimeType: "image/jpeg", data: "not an image" }] },
+  ])
+    expect(ChatRequestSchema.safeParse(input).success).toBe(false);
 });
 
 test("a snapshot and an event carry the chat, and a snapshot parses without it", () => {

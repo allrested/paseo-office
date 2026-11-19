@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { liveAgentPorts, liveChatPorts, liveNotesPorts } from "./live-ports.js";
 import type { Paseo, PaseoHolder } from "./paseo-holder.js";
 
@@ -68,6 +68,67 @@ test("an agent's wake state is read from the daemon; one it does not know is gon
   expect(await ports.status("nobody")).toBe("gone");
 });
 
+test("lobby pickup reads every page of idle agents, oldest idle first, and rechecks the live state", async () => {
+  const waiting = {
+    ...agent("waiting"),
+    labels: {},
+    requiresAttention: true,
+    attentionReason: "finished",
+  };
+  const unavailable = [
+    { status: "running" },
+    { status: "initializing" },
+    { status: "error" },
+    { archivedAt: "2026-11-18T08:00:00Z" },
+    { activeTurn: { turnId: "t" } },
+    { backgroundWork: { count: 1 } },
+    { pendingPermissions: [{ id: "request" }] },
+    { attentionReason: "permission" },
+    { attentionReason: "error" },
+    { requiresAttention: true, attentionReason: null },
+    { background: true },
+    { internal: true },
+    { providerUnavailable: true },
+    { labels: { "paseo.parent-agent-id": "parent" } },
+    { title: "Stand-up notes" },
+  ].map((fields, i) => Object.assign({}, waiting, fields, { id: String(i) }));
+  const next = { ...waiting, id: "second", requiresAttention: false, attentionReason: null };
+  const list = vi
+    .fn()
+    .mockResolvedValueOnce({
+      entries: [waiting, ...unavailable].map((entry) => ({ agent: entry })),
+      pageInfo: { nextCursor: "next" },
+    })
+    .mockResolvedValueOnce({ entries: [{ agent: next }], pageInfo: { nextCursor: null } });
+  const refresh = vi
+    .fn()
+    .mockResolvedValueOnce({ agent: waiting })
+    .mockResolvedValueOnce({ agent: { ...waiting, activeTurn: { turnId: "new" } } })
+    .mockResolvedValueOnce(null);
+  const holder = {
+    held: () => true,
+    require: () => ({ agents: { list, ref: () => ({ refresh }) } }),
+  } as unknown as PaseoHolder;
+  const ports = liveAgentPorts(holder);
+  expect(await ports.lobbyCandidates()).toEqual(["waiting", "second"]);
+  const options = {
+    filter: { statuses: ["idle"] },
+    sort: [{ key: "updated_at", direction: "asc" }],
+  };
+  expect(list.mock.calls).toEqual([
+    [{ ...options, page: { limit: 200, cursor: undefined } }],
+    [{ ...options, page: { limit: 200, cursor: "next" } }],
+  ]);
+  expect(await ports.lobbyEligible("waiting")).toBe(true);
+  expect(await ports.lobbyEligible("waiting")).toBe(false);
+  expect(await ports.lobbyEligible("gone")).toBe(false);
+});
+
+test("a cold office waits until a hook or handler has supplied its Paseo API", async () => {
+  const holder = { held: () => false } as PaseoHolder;
+  expect(await liveAgentPorts(holder).lobbyCandidates()).toEqual([]);
+});
+
 test("a start of an id resolves to the full id; an agent that can get no post resolves to none", async () => {
   const { ports } = setup();
   expect(await ports.resolve("b-fu")).toBe("b-full-id");
@@ -94,6 +155,12 @@ test("a wake names its source agent; a wake as from the user names none and neve
       options: { activeTurnBehavior: "steer" },
     },
   ]);
+});
+
+test("a retried lobby assignment forwards the same client message id", async () => {
+  const { ports, sent } = setup();
+  await ports.send("b-full-id", "Lobby task p4", null, "assignment-id");
+  expect(sent[0]?.options).toEqual({ activeTurnBehavior: "steer", messageId: "assignment-id" });
 });
 
 test("a chat prompt steers a running turn", async () => {

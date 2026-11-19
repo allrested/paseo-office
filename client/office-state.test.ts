@@ -80,8 +80,13 @@ test("an activity event replaces the checklists, and one without them clears the
     type: "activity",
     activity: {},
     checklists: { a1: [step] },
+    checklistProgress: { a1: { completed: 3, total: 4 } },
   });
   expect(withSteps.checklists).toEqual({ a1: [step] });
+  expect(withSteps.checklistProgress).toEqual({ a1: { completed: 3, total: 4 } });
+  expect(
+    applyOfficeEvent(withSteps, { type: "activity", activity: {} }).checklistProgress,
+  ).toBeUndefined();
   expect(applyOfficeEvent(withSteps, { type: "activity", activity: {} }).checklists).toEqual({});
 });
 

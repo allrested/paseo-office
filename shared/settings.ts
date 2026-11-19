@@ -144,7 +144,13 @@ export const officeHostSettings = defineSettings({
       : values,
 });
 
-/** The office's views: the 3D floor, the 2D pixel floor and the list. */
+/** Outdoor environments for the 3D floor. */
+export const OFFICE_SCENES = ["plain", "city", "countryside", "beach"] as const;
+export type OfficeScene = (typeof OFFICE_SCENES)[number];
+export const OFFICE_LIGHTING = ["auto", "day", "night"] as const;
+export type OfficeLighting = (typeof OFFICE_LIGHTING)[number];
+
+/** The 3D floor, the 2D pixel floor and the list. */
 export const OFFICE_VIEWS = ["3d", "2d", "list"] as const;
 export type OfficeViewChoice = (typeof OFFICE_VIEWS)[number];
 
@@ -152,7 +158,7 @@ export type OfficeViewChoice = (typeof OFFICE_VIEWS)[number];
  * Per device. `view` is the view somebody chose. A device that never chose has only `threeD`,
  * from when the office had a 3D switch: off is the list, on leaves the choice to the device. A
  * save writes both. A client from before version 2 reads neither: it refuses the newer version.
- * `street` controls the 3D street. When absent, wide web layouts show it.
+ * Earlier devices chose City or Plain with `street`. An explicit `scene` takes precedence.
  * `rungIncidents` is when this device rang its alarm for each incident, epoch ms by incident id.
  * `lastAgent` is the provider and model of the last agent started from the office, the next
  * form's start. Every save of this setting writes the document whole and carries it through.
@@ -164,6 +170,8 @@ export const officeDeviceSettings = defineSettings({
   schema: z.object({
     threeD: z.boolean().default(true),
     street: z.boolean().optional(),
+    scene: z.enum(OFFICE_SCENES).optional(),
+    lighting: z.enum(OFFICE_LIGHTING).optional(),
     sessionsHidden: z.boolean().optional(),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),

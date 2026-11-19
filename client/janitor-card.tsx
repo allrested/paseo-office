@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View, type ViewStyle } from "react-native";
-import { Modal } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { contextTone, inShownOrder, janitorRowLabel, type JanitorRow } from "./context-text.js";
 import type { OfficeStyles } from "./styles.js";

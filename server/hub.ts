@@ -4,6 +4,7 @@ import type {
   IncidentsState,
   WeatherState,
   Checklists,
+  ChecklistCounts,
   NotesState,
   OfficeAgent,
   OfficeEvent,
@@ -51,6 +52,7 @@ export interface HubPorts {
       activity: ActivityLines,
       doing: ActivitySteps,
       checklists: Readonly<Checklists>,
+      progress?: Readonly<ChecklistCounts>,
     ) => void,
   ): () => void;
   timers: Timers;
@@ -131,6 +133,7 @@ export function createHub(ports: HubPorts): Hub {
   let doing: ActivitySteps = {};
   // Kept after an agent stops, as the poller reads only running agents; dropped when it leaves.
   let checklists: Checklists = {};
+  let checklistProgress: ChecklistCounts = {};
   let boards: Record<string, readonly Post[]> = {};
   let wake: WakeState = { paused: false, queued: {} };
   let notes: NotesState | null = null;
@@ -159,6 +162,9 @@ export function createHub(ports: HubPorts): Hub {
       activity: { ...activity },
       doing: { ...doing },
       checklists: { ...checklists },
+      ...(Object.keys(checklistProgress).length
+        ? { checklistProgress: { ...checklistProgress } }
+        : {}),
       boards: copy,
       wake: { paused: wake.paused, queued: { ...wake.queued } },
       ...(notes === null ? {} : { notes: { ...notes } }),
@@ -271,6 +277,9 @@ export function createHub(ports: HubPorts): Hub {
       activity: { ...activity },
       doing: { ...doing },
       checklists: { ...checklists },
+      ...(Object.keys(checklistProgress).length
+        ? { checklistProgress: { ...checklistProgress } }
+        : {}),
     };
   }
 
@@ -278,7 +287,12 @@ export function createHub(ports: HubPorts): Hub {
     reported = next;
     const listed = new Set(next.agents.map((agent) => agent.id));
     const kept = Object.entries(checklists).filter(([agentId]) => listed.has(agentId));
-    if (kept.length < Object.keys(checklists).length) {
+    const keptProgress = Object.entries(checklistProgress).filter(([id]) => listed.has(id));
+    if (
+      kept.length < Object.keys(checklists).length ||
+      keptProgress.length < Object.keys(checklistProgress).length
+    ) {
+      checklistProgress = Object.fromEntries(keptProgress);
       checklists = Object.fromEntries(kept);
       // An agent that left the list takes its checklist with it now, not at the next poll round.
       if (stopDirectory !== null) broadcast(activityEvent());
@@ -311,6 +325,7 @@ export function createHub(ports: HubPorts): Hub {
     next: ActivityLines,
     steps: ActivitySteps,
     report: Readonly<Checklists>,
+    progress: Readonly<ChecklistCounts> = {},
   ): void {
     activity = next;
     doing = steps;
@@ -318,6 +333,11 @@ export function createHub(ports: HubPorts): Hub {
     const fresh = Object.entries(report).filter(([agentId]) => listed.has(agentId));
     const merged = Object.entries({ ...checklists, ...Object.fromEntries(fresh) });
     checklists = Object.fromEntries(merged.filter(([, list]) => list.length > 0));
+    for (const [id, count] of Object.entries(progress)) {
+      if (!listed.has(id)) continue;
+      if (count.total > 0) checklistProgress[id] = count;
+      else delete checklistProgress[id];
+    }
     broadcast(activityEvent());
   }
 
@@ -414,6 +434,7 @@ export function createHub(ports: HubPorts): Hub {
     activity = {};
     doing = {};
     checklists = {};
+    checklistProgress = {};
     const stop = stopDirectory;
     stopDirectory = null;
     view = EMPTY_VIEW;

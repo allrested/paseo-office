@@ -39,6 +39,7 @@ export interface WorldFeedInput {
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
   streetNote?: boolean;
+  night?: boolean | undefined;
   sound: boolean | null;
   /** The floor plan the scene was started on: its desks seat the people. */
   plan: WorldPlan;
@@ -65,6 +66,7 @@ export function useWorldFeed(
     weather,
     incidents,
     streetNote,
+    night,
     sound,
     plan,
   }: WorldFeedInput,
@@ -84,8 +86,8 @@ export function useWorldFeed(
 
   useEffect(() => {
     if (api === null) return;
-    world.current?.setTheme({ dark: isDarkTheme(theme.colors), colors: theme.colors });
-  }, [theme, api]);
+    world.current?.setTheme({ dark: night ?? isDarkTheme(theme.colors), colors: theme.colors });
+  }, [theme, night, api]);
 
   useEffect(() => {
     if (sound !== null) world.current?.setSound?.(sound);

@@ -1,3 +1,4 @@
+import type { OfficeScene } from "../../shared/settings.js";
 import type { WordsLanguage } from "../../shared/scene-language.js";
 import type { LifeEvent } from "../../shared/contracts.js";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -136,6 +137,7 @@ export interface WorldStartOptions {
   /** The tenure list's two writes: a farewell was held, an intern was made permanent. */
   onTenure?(op: { op: "farewell" | "official"; name: string }): void;
 
+  scene?: OfficeScene;
   street?: { kit: string | null };
   language?: WordsLanguage;
   words?: string;
@@ -183,6 +185,8 @@ export interface WorldStartOptions {
    * answers with `setSound`; the scene has already applied it, since audio starts only inside a press.
    */
   onSound?(on: boolean): void;
+  /** Fullscreen belongs to the surface containing the floor and both sidebars. */
+  onToggleFullscreen?(): void;
   /** False hides Photo mode: a WebView cannot keep a download. Absent: Photo mode is offered. */
   photo?: boolean;
 }
@@ -232,6 +236,7 @@ export interface WorldApi {
    * from before sounds.
    */
   setSound?(on: boolean): void;
+  setFullscreen?(active: boolean): void;
 }
 
 /** The version of the contract above; the page says which it speaks. */

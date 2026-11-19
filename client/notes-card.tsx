@@ -6,7 +6,8 @@ import {
   type LayoutChangeEvent,
   type ScrollView as NativeScrollView,
 } from "react-native";
-import { Markdown, Modal, ScrollView } from "@getpaseo/plugin/client/ui";
+import { Markdown, ScrollView } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import type { z } from "zod";
 import type { NotesState, notesReadRpc } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";

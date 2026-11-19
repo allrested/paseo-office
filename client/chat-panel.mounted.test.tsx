@@ -119,7 +119,18 @@ function Harness({ value }: { value: OfficeState }) {
   const layout = { compact: compactLayout, platform: "web" } as const;
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  const draft: ChatDraft = { text, setText, replyTo, setReplyTo };
+  const [recipient, setRecipient] = useState<string | null>(null);
+  const [images, setImages] = useState<ChatDraft["images"]>([]);
+  const draft: ChatDraft = {
+    text,
+    setText,
+    replyTo,
+    setReplyTo,
+    recipient,
+    setRecipient,
+    images,
+    setImages,
+  };
   const styles = useOfficeStyles(THEME, layout.compact, false);
   const link: OfficeLink = {
     select: (agentId) => void selected.push(agentId),
@@ -192,10 +203,14 @@ function row(id: string): HTMLElement {
 
 const box = () => labelled("Message") as HTMLTextAreaElement;
 
-async function type(text: string): Promise<void> {
-  const field = box();
+async function type(text: string, label = "Message"): Promise<void> {
+  const field = labelled(label);
+  const proto =
+    field instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
     field.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -278,6 +293,83 @@ test("empty: the line that says how to start", async () => {
 
   await chat({ op: "add", message: msg() });
   expect(container.textContent).not.toContain(CHAT_EMPTY);
+});
+
+test("the To picker targets one session by id and can switch back to the whole group", async () => {
+  await mount();
+  await snapshot([], [FIX, DOCS]);
+  expect(container.textContent).toContain("3 members");
+  await press("To: Whole group");
+  await press("Fix login, Lobby");
+  await type("Check permissions");
+  await press("Send");
+  expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Check permissions", to: FIX.id });
+  await press("To: Fix login");
+  await press("Whole group, Send to the group chat");
+  await type("Thanks everyone!");
+  await press("Send");
+  expect(call).toHaveBeenLastCalledWith({ op: "send", text: "Thanks everyone!" });
+});
+
+test("the poll composer posts choices, retains them on error, and reopens after a successful post", async () => {
+  await mount();
+  await snapshot([]);
+  await press("Create poll");
+  await type("Next deploy?", "Poll question");
+  await type("Monday\nTuesday", "Poll choices");
+  call.mockResolvedValueOnce({ ok: false, error: "Host offline." });
+  await press("Post poll");
+  expect(labelled("Poll question")).toHaveProperty("value", "Next deploy?");
+  await press("Post poll");
+  expect(call).toHaveBeenLastCalledWith({
+    op: "poll",
+    question: "Next deploy?",
+    options: ["Monday", "Tuesday"],
+  });
+  expect(maybe("Poll question")).toBeNull();
+  await press("Create poll");
+  expect(labelled("Poll question")).toHaveProperty("value", "");
+});
+
+test("the pin banner isolates a message and disappears when its author recalls it", async () => {
+  await mount();
+  const a = msg(),
+    b = msg();
+  await snapshot([a, b], [FIX]);
+  await press("Pin message", row(a.id));
+  expect(call).toHaveBeenLastCalledWith({ op: "pin", id: a.id });
+  await chat({ op: "all", messages: [a, b], pinned: a.id });
+  await press("Pinned message");
+  expect(maybeRow(b.id)).toBeNull();
+  await press("Pinned message");
+  expect(row(b.id)).toBeDefined();
+  await chat({ op: "update", message: { ...a, recalled: true } });
+  expect(maybe("Pinned message")).toBeNull();
+});
+
+test("search filters messages, preserves the draft, and restores the unread divider", async () => {
+  resetChatSeen(at(9, 0));
+  await mount();
+  const old = msg({ at: at(8, 55), text: "Check tickets" });
+  const fresh = msg({ at: at(9, 3), text: "Deployed reports" });
+  await snapshot([old, fresh], [FIX]);
+  expect(follows(row(old.id), textElement("New messages"))).toBe(true);
+  expect(follows(textElement("New messages"), row(fresh.id))).toBe(true);
+  await type("Draft reply");
+  await press("Search chat");
+  const search = labelled("Search messages");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+      search,
+      "rePORT",
+    );
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(maybeRow(old.id)).toBeNull();
+  expect(row(fresh.id)).toBeDefined();
+  await press("Search chat");
+  expect(row(old.id)).toBeDefined();
+  expect(box().value).toBe("Draft reply");
 });
 
 test("messages oldest first: yours on the right without an avatar, an agent's with initials, name and time", async () => {
@@ -526,6 +618,9 @@ test("@ lists the team filtered by the words after it; Enter, Tab or a press put
   await snapshot([], [FIX, DOCS]);
   expect(maybe("Fix login, Lobby")).toBeNull();
 
+  await press("Mention someone");
+  expect(box().value).toBe("@");
+  expect(document.activeElement).toBe(box());
   await type("hi @fi");
   expect(maybe("Fix login, Lobby")).not.toBeNull();
   expect(maybe("Docs, Lobby")).toBeNull();

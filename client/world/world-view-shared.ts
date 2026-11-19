@@ -12,6 +12,8 @@ import { sharedWorldLoader } from "./world-loader.js";
 
 /** What the scene's callbacks and its start read: always the last render's. */
 export interface WorldLatest {
+  scene?: WorldStartOptions["scene"];
+  night?: boolean | undefined;
   street?: { kit: string | null } | null;
   model: OfficeModel;
   theme: PluginTheme;
@@ -41,6 +43,7 @@ export function worldStartOptions(
   latest: { readonly current: WorldLatest },
   extras: {
     focus(): void;
+    onToggleFullscreen?: () => void;
     brand: WorldBrand;
     plan: WorldPlan;
     photo?: false;
@@ -51,9 +54,11 @@ export function worldStartOptions(
   const { focus } = extras;
   const { colors } = latest.current.theme;
   return {
+    ...(latest.current.scene ? { scene: latest.current.scene } : {}),
     ...(latest.current.street ? { street: latest.current.street } : {}),
     plan: extras.plan,
-    dark: isDarkTheme(colors),
+    ...(extras.onToggleFullscreen ? { onToggleFullscreen: extras.onToggleFullscreen } : {}),
+    dark: latest.current.night ?? isDarkTheme(colors),
     colors,
     brand: extras.brand,
     ...(isWordsLanguage(extras.language) && extras.words !== undefined

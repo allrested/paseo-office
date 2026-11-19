@@ -11,3 +11,11 @@ export function streetDefault(layout: StreetLayout): boolean {
 export function useStreetSwitch(layout: StreetLayout) {
   return useDeviceSwitch("street", streetDefault(layout));
 }
+
+/** Earlier devices saved only whether the city street was visible. */
+export function useOfficeScene(layout: StreetLayout) {
+  const legacy = useStreetSwitch(layout);
+  const scene = useDeviceSwitch("scene", legacy.on ? "city" : "plain");
+  const lighting = useDeviceSwitch("lighting", "auto");
+  return { scene, lighting, unsaved: scene.unsaved || lighting.unsaved };
+}

@@ -147,7 +147,7 @@ The Headquarters wing (`src/office/world/pro/wing.js`) is imported from upstream
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
-connection, replay, the demo and alternate landscapes. Of the camera toolbar and photo mode, the list
+connection, replay and the demo. Paseo supplies the fullscreen session rail and workspace and hosts the team messenger around upstream’s chat engine. Of the camera toolbar and photo mode, the list
 button is left out on purpose.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
@@ -162,7 +162,7 @@ with `// PASEO: stand-in`. Most export what is asked of them and do nothing. The
 | `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons; `togglePop` does nothing |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
 | `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
-| `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
+| `world/backdrops/index.js`  | Builds the selected Plain, City, Countryside, or Beach backdrop and its day and night window views. Photo mode can hold either lighting setting. |
 
 The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
 follow the app's theme (`paseo.clock.hint` in `OURS`). A person already in the office whose status
@@ -231,6 +231,6 @@ upstream added to its start-up list may need a stand-in or a place in `DENY`.
 
 ### Street assets and source changes
 
-The city, its population, and the staff outings come from the pinned checkout. The importer skips the alternate backdrops, the eight chain-specific shop modules, and every logo image. Shops use generic fittings and signs drawn in `world/backdrops/paseo-signs.js`. The ATM uses a plain square. Street audio waits for the street and sound switches. The optional Kenney Car Kit (CC0) is recorded in the manifest. The server sends it separately through `office.world.street`.
+The city, its population, staff outings, countryside and beach come from the pinned checkout. The alternate landscapes use upstream's `countryside.js`, `beach.js` and `shared.js`. The importer skips the eight chain-specific shop modules and every logo image. Shops use generic fittings and signs drawn in `world/backdrops/paseo-signs.js`. The ATM uses a plain square. Street audio waits for the street and sound switches. The optional Kenney Car Kit (CC0) is recorded in the manifest. The server sends it separately through `office.world.street`.
 
 After an upstream update run the importer, run `node scripts/genericise-street.mjs --check`, review changes in the hand-edited shops, ATM, traffic, audio and outings modules, and rebuild both generated files with `npm run build:world`.

@@ -764,12 +764,25 @@ test("the street entry delivers the tag to the photo booth and the CLI reading t
   const street = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
   // @ts-expect-error vendored JavaScript has no declarations
   const { host: streetHost } = await import("../../vendor/my-office/src/office/paseo-host.js");
+  expect(streetHost.scene).toBe("city");
   street.photoRelease("v2.4.0");
   street.setClaudeVersion({ version: "2.2.0", at: 123 });
   expect(h.photoRelease).toHaveBeenCalledWith("v2.4.0");
   expect(streetHost.claudeVersion()).toEqual({ version: "2.2.0", at: 123 });
   expect(h.lookForUpgrade).toHaveBeenCalled();
 });
+
+test.each(["plain", "countryside", "beach"])(
+  "starting %s ignores a stale city payload",
+  async (scene) => {
+    await startPage({ scene, street: { kit: "city vehicles" } });
+    // @ts-expect-error vendored JavaScript has no declarations
+    const { host: sceneHost } = await import("../../vendor/my-office/src/office/paseo-host.js");
+    expect(sceneHost.scene).toBe(scene);
+    expect(sceneHost.street).toBe(false);
+    expect(sceneHost.streetKit).toBeNull();
+  },
+);
 
 test("only a farewell and promotion are sent to the host tenure ledger", async () => {
   const onTenure = vi.fn(),

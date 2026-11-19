@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { ChatChange, ChatMessage, OfficeAgent } from "../shared/contracts.js";
+import type { ChatChange, ChatImage, ChatMessage, OfficeAgent } from "../shared/contracts.js";
 import { chatT } from "../shared/chat-words.js";
 import {
   CHAT_CLOCK_MS,
@@ -63,6 +63,7 @@ function deferred() {
 async function harness(options: { at?: number; store?: ChatStore } = {}) {
   const clock = createFakeClock(options.at ?? MORNING);
   const sent: [string, string][] = [];
+  const attachments: ChatImage[][] = [];
   const asked: string[] = [];
   const turns: (string | null)[] = [];
   const changes: ChatChange[] = [];
@@ -87,7 +88,7 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
     store,
     clock,
     tr: chatT,
-    send: async (id, prompt) => {
+    send: async (id, prompt, images) => {
       if (failure.hold) {
         const wait = deferred();
         held.push(wait.finish);
@@ -95,6 +96,7 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
       }
       if (failure.send) throw failure.send;
       sent.push([id, prompt]);
+      if (images) attachments.push(images);
     },
     lastAnswer: async (id, turnId) => {
       asked.push(id);
@@ -106,7 +108,20 @@ async function harness(options: { at?: number; store?: ChatStore } = {}) {
     emit: (change) => changes.push(change),
     log: (message) => logs.push(message),
   });
-  return { service, clock, sent, asked, turns, changes, saved, logs, answers, failure, held };
+  return {
+    service,
+    clock,
+    sent,
+    attachments,
+    asked,
+    turns,
+    changes,
+    saved,
+    logs,
+    answers,
+    failure,
+    held,
+  };
 }
 type Harness = Awaited<ReturnType<typeof harness>>;
 
@@ -239,6 +254,56 @@ test("a prompt names a member that is a prefix of a longer one once", async () =
   await send(h, "@Mjd-1 go");
   expect(h.sent).toEqual([["m1", `${PROMPT_PREFIX}@Mjd-1 go`]]);
   expect(typing(h)).toEqual(["Mjd-1"]);
+});
+
+test("choosing To sends the named session by id even when several agents share its title", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Builder"), agent("a2", "Builder")));
+  const text = "Check whether @Builder already fixed the date links.";
+  expect(await h.service.request({ op: "send", text, to: "a2" })).toEqual({ ok: true });
+  expect(h.sent).toEqual([["a2", PROMPT_PREFIX + text]]);
+  expect(mine(h)).toEqual([expect.objectContaining({ text })]);
+  h.service.view(view(agent("a1", "Builder")));
+  expect(await h.service.request({ op: "send", text, to: "a2" })).toMatchObject({ ok: false });
+  expect(h.sent).toHaveLength(1);
+  expect(mine(h)).toHaveLength(1);
+});
+
+test("an image-only prompt reaches the chosen session and the shared chat contains only its count", async () => {
+  const h = await harness();
+  h.service.view(view(agent("a1", "Builder")));
+  const images: ChatImage[] = [{ mimeType: "image/jpeg", data: "YXR0YWNobWVudA==" }];
+  expect(await h.service.request({ op: "send", images })).toMatchObject({ ok: false });
+  expect(h.sent).toHaveLength(0);
+  expect(await h.service.request({ op: "send", images, to: "a1" })).toEqual({ ok: true });
+  expect(h.attachments).toEqual([images]);
+  expect(h.sent).toEqual([["a1", PROMPT_PREFIX + "1 image"]]);
+  expect(mine(h)).toEqual([expect.objectContaining({ text: "1 image" })]);
+  expect(JSON.stringify(h.service.snapshot())).not.toContain(images[0].data);
+});
+
+test("a custom poll pins itself, takes a vote, and another message can replace the pin", async () => {
+  const h = await harness();
+  expect(
+    await h.service.request({
+      op: "poll",
+      question: "Which release?",
+      options: ["Today", "Tomorrow"],
+    }),
+  ).toEqual({ ok: true });
+  const poll = messages(h).find((m) => m.kind === "poll")!;
+  expect(poll.poll?.opts.map((o) => o.t)).toEqual(["Today", "Tomorrow"]);
+  expect(h.service.snapshot().pinned).toBe(poll.id);
+  await h.service.request({ op: "vote", id: poll.id, index: 1 });
+  expect(messages(h).find((m) => m.id === poll.id)?.poll?.opts[1].by).toEqual(["me"]);
+  await send(h, "Read the changelog.");
+  const message = mine(h).at(-1)!;
+  expect(await h.service.request({ op: "pin", id: message.id })).toEqual({ ok: true });
+  expect(h.changes.at(-1)).toMatchObject({ op: "all", pinned: message.id });
+  await h.service.request({ op: "recall", id: message.id });
+  expect(h.service.snapshot().pinned).toBeUndefined();
+  expect(await h.service.request({ op: "pin", id: message.id })).toMatchObject({ ok: false });
+  expect(await h.service.request({ op: "pin", id: "gone" })).toMatchObject({ ok: false });
 });
 
 test("an archived agent matches nobody: no prompt, no answer", async () => {
@@ -916,7 +981,11 @@ test("lines are told to subscribers as changes, and not while the engine is bein
 
   // A pinned poll tells the whole conversation again.
   await send(h, "lunch?");
-  expect(h.changes.at(-1)).toEqual({ op: "all", messages: messages(h) });
+  expect(h.changes.at(-1)).toEqual({
+    op: "all",
+    messages: messages(h),
+    pinned: h.service.snapshot().pinned,
+  });
 });
 
 test("the same scene moment from two devices becomes one staff line", async () => {

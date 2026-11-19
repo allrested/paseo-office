@@ -30,7 +30,7 @@ export interface SessionContext extends SessionPaneContext {
 /** What a pane takes from the surface, the same for every session; never the office model. */
 export interface SessionPaneContext {
   actions: AgentActions;
-  navigation: PluginSurfaceProps["navigation"];
+  showWorkspace?(agentId: string): void;
   closeSession(agentId: string): void;
 }
 
@@ -46,8 +46,14 @@ export function sessionOf(
   };
 }
 
+export function sessionChildren(model: OfficeModel, agentId: string): OfficeAgent[] {
+  return [...model.agents.values()].filter((agent) => agent.parentAgentId === agentId);
+}
+
 export interface SessionPaneProps {
   agentId: string;
+  subagents?: readonly OfficeAgent[];
+  onOpenSubagent?(id: string): void;
   /** The agent as the office lists it; null when it does not. */
   agent: OfficeAgent | null;
   room: string | null;
@@ -70,8 +76,10 @@ function samePane(before: SessionPaneProps, after: SessionPaneProps): boolean {
     before.reply === after.reply &&
     before.setReply === after.setReply &&
     before.context.actions === after.context.actions &&
-    before.context.navigation === after.context.navigation &&
+    before.context.showWorkspace === after.context.showWorkspace &&
     before.context.closeSession === after.context.closeSession &&
+    before.onOpenSubagent === after.onOpenSubagent &&
+    JSON.stringify(before.subagents) === JSON.stringify(after.subagents) &&
     before.styles === after.styles &&
     before.layout === after.layout &&
     JSON.stringify(before.agent) === JSON.stringify(after.agent)
@@ -81,6 +89,8 @@ function samePane(before: SessionPaneProps, after: SessionPaneProps): boolean {
 /** One open session as the column or the sheet shows it. */
 export const SessionPane = memo(function SessionPane({
   agentId,
+  subagents,
+  onOpenSubagent,
   agent,
   room,
   reply,
@@ -89,14 +99,14 @@ export const SessionPane = memo(function SessionPane({
   styles,
   layout,
 }: SessionPaneProps) {
-  const { actions, navigation, closeSession } = context;
+  const { actions, showWorkspace, closeSession } = context;
   const draft = useMemo(
     () => ({ text: reply, setText: (next: SetStateAction<string>) => setReply(agentId, next) }),
     [reply, setReply, agentId],
   );
   const onOpenWorkspace = useMemo(
-    () => (navigation ? () => navigation.openAgent({ agentId }) : undefined),
-    [navigation, agentId],
+    () => (showWorkspace ? () => showWorkspace(agentId) : undefined),
+    [showWorkspace, agentId],
   );
   const onClose = useCallback(() => closeSession(agentId), [closeSession, agentId]);
   return (
@@ -105,6 +115,8 @@ export const SessionPane = memo(function SessionPane({
       agent={agent}
       agentId={agentId}
       room={room}
+      subagents={subagents}
+      onOpenSubagent={onOpenSubagent}
       draft={draft}
       actions={actions}
       styles={styles}

@@ -217,6 +217,89 @@ test("reopening an open task and finishing a done one change nothing", async () 
   expect(store.saved).toHaveLength(2);
 });
 
+function lobbyTask(seq: number, fields: Partial<Post> = {}): Post {
+  return post(seq, { board: "lobby", kind: "task", state: "open", ...fields });
+}
+
+test("lobby pickup serializes competing agents and tasks, even across a restart", async () => {
+  const { service, store } = await harness(file([lobbyTask(1), lobbyTask(2)]));
+  const [claim, otherAgent, secondTask] = await Promise.all([
+    service.claimLobbyTask("p1", "a", 1),
+    service.claimLobbyTask("p1", "b", 1),
+    service.claimLobbyTask("p2", "a", 2),
+  ]);
+  expect(claim).toMatchObject({ id: "p1", seq: 3, claimedBy: "a", state: "claimed" });
+  expect([otherAgent, secondTask]).toEqual([null, null]);
+  expect(store.saved).toHaveLength(1);
+
+  const restarted = (await harness(await store.load())).service;
+  expect(await restarted.claimLobbyTask("p2", "a", 2)).toBeNull();
+  expect(await restarted.claimLobbyTask("p2", "b", 2)).toMatchObject({ id: "p2", claimedBy: "b" });
+});
+
+test("a late rollback cannot reopen an acknowledged delivery", async () => {
+  const { service } = await harness(file([lobbyTask(1)]));
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  expect(claim?.pickupMessageId).toBeTruthy();
+  if (!claim) throw new Error("expected a claim");
+  await service.confirmLobbyDelivery(claim);
+  await service.releaseLobbyTask(claim);
+  expect(service.postsOf("lobby")[0]).toMatchObject({ state: "claimed", claimedBy: "a" });
+  expect(service.postsOf("lobby")[0]).not.toHaveProperty("pickupMessageId");
+});
+
+test("pickup skips directed posts, notes, room tasks, stale tasks, and the author's own tasks", async () => {
+  const { service, store } = await harness(
+    file([
+      lobbyTask(1, { to: "a" }),
+      post(2, { board: "lobby" }),
+      lobbyTask(3, { board: "w1" }),
+      lobbyTask(4, { state: "done" }),
+      lobbyTask(5, { author: "a" }),
+      lobbyTask(6),
+    ]),
+  );
+  for (const seq of [1, 2, 3, 4, 5]) {
+    expect(await service.claimLobbyTask(`p${seq}`, "a", seq)).toBeNull();
+  }
+  expect(await service.claimLobbyTask("p6", "a", 1)).toBeNull();
+  expect(store.saved).toHaveLength(0);
+  await service.setWakesPaused(true);
+  expect(await service.claimLobbyTask("p6", "a", 6)).toBeNull();
+});
+
+test("releasing a failed delivery preserves manual changes, including a newer claim by the same agent", async () => {
+  const { service, store } = await harness(file([lobbyTask(1)]));
+  const first = await service.claimLobbyTask("p1", "a", 1);
+  if (!first) throw new Error("expected an initial claim");
+  await service.update({ id: first.id, actor: "user", action: "reopen" });
+  const second = await service.update({ id: first.id, actor: "a", action: "claim" });
+  if (!second.ok) throw new Error(second.error);
+  await service.releaseLobbyTask(first);
+  await service.releaseLobbyTask({ ...second.post, claimedBy: "b" });
+  expect(service.boards().lobby).toEqual([second.post]);
+  await service.update({ id: first.id, actor: "user", action: "done" });
+  await service.releaseLobbyTask(second.post);
+  expect((await store.load()).posts[0]?.state).toBe("done");
+});
+
+test("pickup and release propagate save errors and can be retried with their original revision", async () => {
+  const { service, store } = await harness(file([lobbyTask(1)]));
+  store.failNext = true;
+  await expect(service.claimLobbyTask("p1", "a", 1)).rejects.toThrow("disk full");
+  expect((await store.load()).posts[0]).toEqual(lobbyTask(1));
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  if (!claim) throw new Error("expected the retry to claim the task");
+  store.failNext = true;
+  await expect(service.releaseLobbyTask(claim)).rejects.toThrow("disk full");
+  expect((await store.load()).posts[0]).toEqual(claim);
+  await service.releaseLobbyTask(claim);
+  await service.releaseLobbyTask(claim);
+  expect((await store.load()).posts[0]).toMatchObject({ state: "open", seq: 3 });
+  expect((await store.load()).posts[0]).not.toHaveProperty("claimedBy");
+  expect(store.saved).toHaveLength(2);
+});
+
 test("notes have no state, and unknown ids are refused", async () => {
   const { service } = await harness();
   await service.post({ board: "w1", kind: "note", text: "fyi", author: "a" });

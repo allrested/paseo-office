@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettings } from "@getpaseo/plugin/client";
-import { officeDeviceSettings } from "../shared/settings.js";
+import { officeDeviceSettings, type OfficeScene, type OfficeLighting } from "../shared/settings.js";
 
 export interface DeviceSwitch {
   /** The switch as the person left it (a tap shows at once); null while the device's setting is read or unreadable. */
@@ -11,8 +11,8 @@ export interface DeviceSwitch {
 }
 
 /** A save of the tap against a revision, and whether the store took it. */
-interface Tried {
-  value: boolean;
+interface Tried<Value> {
+  value: Value;
   revision: string;
   stored: boolean;
 }
@@ -23,14 +23,22 @@ interface Tried {
  * tried again on the revision a reload shows; a refusal that moved nothing is not, and the switch
  * then holds the tap until the next tap or the surface closes (`unsaved`).
  */
-export function useDeviceSwitch(
-  field: "street" | "sound" | "sessionsHidden",
-  fallback: boolean,
-): DeviceSwitch {
+interface Preferences {
+  street: boolean;
+  sound: boolean;
+  sessionsHidden: boolean;
+  scene: OfficeScene;
+  lighting: OfficeLighting;
+}
+
+export function useDeviceSwitch<Field extends keyof Preferences>(
+  field: Field,
+  fallback: Preferences[Field],
+) {
   const settings = useSettings(officeDeviceSettings);
   const stored = settings.status === "ready" ? settings : null;
-  const [wanted, setWanted] = useState<boolean | null>(null);
-  const [tried, setTried] = useState<Tried | null>(null);
+  const [wanted, setWanted] = useState<Preferences[Field] | null>(null);
+  const [tried, setTried] = useState<Tried<Preferences[Field]> | null>(null);
   const [saving, setSaving] = useState(false);
   const mounted = useRef(true);
   useEffect(() => {
@@ -51,7 +59,7 @@ export function useDeviceSwitch(
     // Waiting for the store to show a save it took, or given up on a refusal: not saved again.
     if (tried?.value === wanted && tried.revision === revision) return;
     setSaving(true);
-    async function keep(value: boolean): Promise<void> {
+    async function keep(value: Preferences[Field]): Promise<void> {
       const ok = await save({ ...values, [field]: value }, revision);
       if (!ok) await reload().catch(() => undefined);
       if (!mounted.current) return;
@@ -60,7 +68,7 @@ export function useDeviceSwitch(
     }
     void keep(wanted);
   }, [wanted, stored, saving, tried, save, reload, field]);
-  const set = useCallback((next: boolean) => {
+  const set = useCallback((next: Preferences[Field]) => {
     setTried(null);
     setWanted(next);
   }, []);
@@ -73,7 +81,8 @@ export function useDeviceSwitch(
   // The floor waits for the street choice before starting. A finished, unreadable
   // document falls back to the layout default and can still be overridden for this visit.
   const streetUnreadable =
-    field === "street" && (settings.status === "error" || settings.status === "invalid");
+    (field === "street" || field === "scene" || field === "lighting") &&
+    (settings.status === "error" || settings.status === "invalid");
   const on = wanted ?? stored?.values[field] ?? (stored || streetUnreadable ? fallback : null);
   return { on, unsaved: unsaved || (wanted !== null && streetUnreadable), set };
 }

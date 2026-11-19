@@ -178,6 +178,38 @@ test("without a way to the workspace, Open in workspace is not drawn", async () 
   expect(maybe("Close")).not.toBeNull();
 });
 
+test("session detail shows reported usage, filters live steps and opens a child without losing a draft", async () => {
+  const onOpenSubagent = vi.fn();
+  const child = { ...AGENT, id: "a2", parentAgentId: AGENT.id, title: "Check types" };
+  conversation = ready([
+    { kind: "agent", key: "1", text: "I’ll run the checks." },
+    { kind: "tool", key: "2", text: "Running tsc" },
+  ]);
+  await draw({
+    agent: {
+      ...AGENT,
+      model: "Sonnet",
+      context: { usedTokens: 500, maxTokens: 1000 },
+      costUsd: 1.25,
+    },
+    subagents: [child],
+    onOpenSubagent,
+  });
+  expect(container.textContent).toContain("Sonnet");
+  expect(container.textContent).toContain("50%");
+  expect(container.textContent).toContain("$1.25");
+  await type("Keep this draft");
+  await press("Session steps");
+  expect(maybe("Running tsc")).not.toBeNull();
+  expect(maybe("Builder: I’ll run the checks.")).toBeNull();
+  await press("Session subagents");
+  await press("Open Check types, Idle");
+  expect(onOpenSubagent).toHaveBeenCalledWith("a2");
+  await press("Session chat");
+  expect(maybe("Builder: I’ll run the checks.")).not.toBeNull();
+  expect(box().value).toBe("Keep this draft");
+});
+
 test("rows draw in order; the two voices are told apart by name; a tool is one line", async () => {
   conversation = ready([
     { kind: "you", key: "1", text: "Fix the login" },

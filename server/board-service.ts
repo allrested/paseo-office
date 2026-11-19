@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import {
   BOARD_POST_MAX,
   DONE_TASK_TTL_MS,
+  LOBBY,
   POST_TEXT_MAX,
   READ_POST_MAX,
   type DeleteResult,
@@ -49,9 +51,16 @@ export interface BoardServicePorts {
 export interface BoardService {
   start(): Promise<void>;
   boards(): Record<string, Post[]>;
+  postsOf(board: string): Post[];
   wakesPaused(): boolean;
   post(input: NewPost): Promise<PostResult>;
   update(input: PostUpdate): Promise<PostResult>;
+  /** Returns null if the task changed or the agent can no longer pick it up. */
+  claimLobbyTask(id: string, agentId: string, expectedSeq: number): Promise<Post | null>;
+  /** Reopens only this revision of the claim after its dispatch failed. */
+  releaseLobbyTask(claim: Post): Promise<void>;
+  confirmLobbyDelivery(claim: Post): Promise<void>;
+  finishLobbyClaim(claim: Post): Promise<void>;
   remove(id: string): Promise<DeleteResult>;
   /** Deletes every done task of `board`. */
   clearDone(board: string): Promise<DeleteResult>;
@@ -189,25 +198,32 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       return { ok: true, value: { ...post, state: "claimed", claimedBy: input.actor } };
     }
     if (input.action === "done") {
-      return post.state === "done"
-        ? { ok: true, value: null }
-        : { ok: true, value: { ...post, state: "done" } };
+      const done = { ...post, state: "done" as const };
+      delete done.pickupMessageId;
+      return post.state === "done" ? { ok: true, value: null } : { ok: true, value: done };
     }
     // Like a repeated claim: an open task that nobody holds is not changed by a reopen.
     if (post.state === "open" && post.claimedBy === undefined) return { ok: true, value: null };
     return { ok: true, value: { ...withoutClaim(post), state: "open" } };
   }
 
-  async function updatePost(input: PostUpdate): Promise<PostResult> {
+  async function updatePost(input: PostUpdate, pickupMessageId?: string): Promise<PostResult> {
     const post = data.posts.find((item) => item.id === input.id);
     if (!post) return { ok: false, error: `Unable to update ${input.id}: no such post` };
     const next = nextState(post, input);
     if (!next.ok) return next;
     if (next.value === null) return { ok: true, post };
     const changed: Post = { ...next.value, seq: data.nextSeq, updatedAt: now() };
+    if (pickupMessageId) changed.pickupMessageId = pickupMessageId;
     const posts = data.posts.map((item) => (item.id === post.id ? changed : item));
     const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
     return saved.ok ? { ok: true, post: changed } : saved;
+  }
+
+  async function updateForPickup(input: PostUpdate, pickupMessageId?: string): Promise<Post> {
+    const result = await updatePost(input, pickupMessageId);
+    if (!result.ok) throw new Error(result.error);
+    return result.post;
   }
 
   async function prunePosts(): Promise<void> {
@@ -229,6 +245,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         data = await ports.store.load();
         await prunePosts();
       }),
+    postsOf,
     boards() {
       const grouped: Record<string, Post[]> = {};
       for (const board of new Set(data.posts.map((item) => item.board)))
@@ -238,6 +255,68 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     wakesPaused: () => data.wakesPaused,
     post: (input) => exclusive(() => createPost(input)),
     update: (input) => exclusive(() => updatePost(input)),
+    claimLobbyTask: (id, agentId, expectedSeq) =>
+      exclusive(async () => {
+        const lobby = postsOf(LOBBY);
+        const task = lobby.find((post) => post.id === id);
+        if (
+          data.wakesPaused ||
+          task?.seq !== expectedSeq ||
+          task.kind !== "task" ||
+          task.state !== "open" ||
+          task.to !== undefined ||
+          task.claimedBy !== undefined ||
+          task.author === agentId
+        )
+          return null;
+        if (lobby.some((post) => post.state === "claimed" && post.claimedBy === agentId))
+          return null;
+        return updateForPickup({ id, actor: agentId, action: "claim" }, randomUUID());
+      }),
+    finishLobbyClaim: (claim) =>
+      exclusive(async () => {
+        const current = postsOf(LOBBY).find((p) => p.id === claim.id);
+        if (
+          current?.state === "claimed" &&
+          current.seq === claim.seq &&
+          current.claimedBy &&
+          current.claimedBy === claim.claimedBy
+        ) {
+          await updateForPickup({ id: current.id, action: "done", actor: current.claimedBy });
+        }
+      }),
+    confirmLobbyDelivery: (claim) =>
+      exclusive(async () => {
+        const current = data.posts.find((post) => post.id === claim.id);
+        if (
+          !current?.pickupMessageId ||
+          current.seq !== claim.seq ||
+          current.pickupMessageId !== claim.pickupMessageId
+        )
+          return;
+        const delivered = { ...current };
+        delete delivered.pickupMessageId;
+        const saved = await commit(
+          { ...data, posts: data.posts.map((p) => (p.id === claim.id ? delivered : p)) },
+          [],
+        );
+        if (!saved.ok) throw new Error(saved.error);
+      }),
+    releaseLobbyTask: (claim) =>
+      exclusive(async () => {
+        const task = data.posts.find((post) => post.id === claim.id);
+        if (
+          task?.board === LOBBY &&
+          !!task.pickupMessageId &&
+          task.pickupMessageId === claim.pickupMessageId &&
+          task.seq === claim.seq &&
+          task.state === "claimed" &&
+          claim.claimedBy !== undefined &&
+          task.claimedBy === claim.claimedBy
+        ) {
+          await updateForPickup({ id: task.id, actor: claim.claimedBy, action: "reopen" });
+        }
+      }),
     remove: (id) =>
       exclusive(async (): Promise<DeleteResult> => {
         const post = data.posts.find((item) => item.id === id);

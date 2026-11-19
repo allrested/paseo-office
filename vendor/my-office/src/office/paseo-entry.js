@@ -319,8 +319,10 @@ const api = {
       ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }
       : () => {};
     host.life = typeof options.onLife === 'function' ? (kind, vars) => options.onLife(kind, vars) : () => {};
-    host.street = options.street != null;
-    host.streetKit = options.street?.kit ?? null;
+    // Before the scenery picker, the optional street payload selected the city.
+    host.scene = options.scene ?? (options.street != null ? 'city' : 'plain');
+    host.street = host.scene === 'city';
+    host.streetKit = host.street ? options.street?.kit ?? null : null;
     host.photo = options.photo !== false;
     host.limits = () => limits;
     host.boardRows = () => boardRows;
@@ -352,7 +354,7 @@ const api = {
     sound.subscribe(() => sfx.set(sound.on));
     sound.request = (next) => { setOn(next); options.onSound?.(next); };
     stopWatchingAudio = watchAudio(window);
-    cameraBar.setup();
+    cameraBar.setup(options.onToggleFullscreen);
     // Escape closes the place card and gives the keyboard back to the chip that opened it.
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || document.getElementById('plc').hidden || document.body.classList.contains('is-photo')) return;
@@ -399,6 +401,9 @@ const api = {
     stopWatchingAudio();
     renderer.dispose();
     renderer.forceContextLoss();
+  },
+  setFullscreen(active) {
+    if (started && !stopped) document.getElementById('btn-full').setAttribute('aria-pressed', String(active));
   },
   /** The app's theme changed. */
   setTheme({ dark, colors } = {}) {

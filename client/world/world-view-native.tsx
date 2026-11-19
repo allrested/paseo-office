@@ -41,6 +41,8 @@ function WorldViewNativeScene({
   theme,
   styles,
   plan,
+  scene,
+  night,
   street,
   focusRoomId,
   focusRequest,
@@ -80,6 +82,8 @@ function WorldViewNativeScene({
     onBell,
     onLife,
     onTenure,
+    scene,
+    night,
     street,
     onSound: sound.set,
     onProblem,
@@ -101,6 +105,8 @@ function WorldViewNativeScene({
       onBell,
       onLife,
       onTenure,
+      scene,
+      night,
       street,
       onSound: sound.set,
       onProblem,
@@ -155,6 +161,7 @@ function WorldViewNativeScene({
     weather,
     incidents,
     streetNote: street?.kit === null,
+    night,
     sound: sound.on,
     plan,
   });
@@ -190,12 +197,13 @@ function WorldViewNativeScene({
  * The office in 3D on the phone's script frame, on the host's plan. A changed plan unmounts the
  * `ScriptFrame` and mounts a new one: the scene's page starts once.
  */
-export function WorldViewNative({ plan, streetOn = false, ...rest }: WorldViewProps) {
-  const { street, loading } = useStreetStart(streetOn);
+export function WorldViewNative({ plan, streetOn = false, scene, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(scene ? scene === "city" : streetOn);
   if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
   return (
     <WorldViewNativeScene
-      key={plan + String(street !== null)}
+      key={plan + (scene ?? String(street !== null))}
+      scene={scene}
       street={street}
       plan={plan}
       {...rest}

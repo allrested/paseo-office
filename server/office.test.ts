@@ -3,7 +3,13 @@ import type { AgentToolContext } from "@getpaseo/plugin/server";
 import type { Post, WakeState } from "../shared/contracts.js";
 import { EMPTY_BOARDS, type BoardStore, type BoardsFile } from "./board-store.js";
 import { createFakeClock, settle } from "./fake-clock.js";
-import { PRUNE_INTERVAL_MS, createOffice, wakeAuthorLabel, type OfficeHub } from "./office.js";
+import {
+  PRUNE_INTERVAL_MS,
+  createOffice,
+  wakeAuthorLabel,
+  type OfficeHub,
+  type OfficeAgentPorts,
+} from "./office.js";
 import type { WakeTarget } from "./mention-queue.js";
 
 interface RecordingHub extends OfficeHub {
@@ -76,18 +82,22 @@ function setup(initial?: BoardsFile) {
   const prompts: string[] = [];
   const sources: (string | null)[] = [];
   const logs: string[] = [];
-  const build = () =>
+  const build = (overrides?: Partial<OfficeAgentPorts>) =>
     createOffice({
       store,
       clock,
       hub,
       agents: {
+        lobbyCandidates: async () =>
+          [...targets.keys()].filter((id) => targets.get(id) === "wakeable"),
+        lobbyEligible: async (id) => targets.get(id) === "wakeable",
         status: async (agentId) => targets.get(agentId) ?? "gone",
         resolve: async (agentId) => FULL_IDS.get(agentId) ?? null,
         send: async (agentId, prompt, source) => {
           prompts.push(`${agentId}: ${prompt}`);
           sources.push(source);
         },
+        ...overrides,
       },
       log: (message) => logs.push(message),
     });
@@ -291,4 +301,150 @@ test("an office stopped while its boards load starts no timer and tells the hub 
   await office.ready;
   expect(hub.events).toEqual([]);
   expect(clock.pending()).toBe(0);
+});
+
+test("a stored lobby backlog waits for enabled tools and wakes, and hands the next task to a freed agent", async () => {
+  const { office, build, clock, targets, store, prompts } = start();
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "One" });
+  await office.post({ board: "lobby", kind: "note", text: "Discussion" });
+  await office.post({ board: "w1", kind: "task", text: "Workspace only" });
+  await office.post({ board: "lobby", kind: "task", text: "Two" });
+  await office.setWakesPaused(true);
+  await office.stop();
+  const next = build();
+  next.setPickupEnabled(true);
+  await next.ready;
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([]);
+  targets.set("b", "busy");
+  await next.setWakesPaused(false);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  targets.set("b", "wakeable");
+  next.turnEnded("b");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts.find((p) => p.id === "p1")).toMatchObject({
+    state: "claimed",
+    claimedBy: "b",
+  });
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("One");
+  next.turnEnded("b");
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await next.update({ id: "p1", action: "done" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(2);
+  expect(prompts[1]).toContain("Two");
+  await next.stop();
+});
+
+test("a lost receipt survives reload and retries the same prompt and identifier without blocking another agent", async () => {
+  const { build, clock, targets, store } = setup();
+  targets.set("c", "wakeable");
+  const attempts: { id: string; prompt: string; messageId: string | undefined }[] = [];
+  let first = true;
+  const send: OfficeAgentPorts["send"] = async (id, prompt, _source, messageId) => {
+    attempts.push({ id, prompt, messageId });
+    if (first) {
+      first = false;
+      throw new Error("lost connection");
+    }
+  };
+  const office = build({ send });
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "First" });
+  await office.post({ board: "lobby", kind: "task", text: "Second" });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(attempts.map((a) => a.id)).toEqual(["b", "c"]);
+  expect(store.current().posts.find((p) => p.id === "p1")?.pickupMessageId).toBe(
+    attempts[0]?.messageId,
+  );
+  expect(store.current().posts.find((p) => p.id === "p2")).not.toHaveProperty("pickupMessageId");
+  await office.stop();
+  const reloaded = build({ send });
+  reloaded.setPickupEnabled(true);
+  await reloaded.ready;
+  clock.advance(0);
+  await settle();
+  expect(attempts).toHaveLength(3);
+  expect(attempts[0]?.messageId).toBeTruthy();
+  expect(attempts[2]).toEqual(attempts[0]);
+  expect(store.current().posts.every((p) => p.state === "claimed" && !p.pickupMessageId)).toBe(
+    true,
+  );
+  await reloaded.stop();
+});
+
+test("a pending permission discovered after claiming sends nothing and releases the task", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build({ lobbyEligible: async () => false });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Wait" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(store.current().posts[0]).toMatchObject({ state: "open" });
+  expect(store.current().posts[0]).not.toHaveProperty("claimedBy");
+  await office.stop();
+});
+
+test("explicit mentions share the hourly wake budget with lobby assignments", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  for (let i = 0; i < 6; i++) {
+    await office.post({ board: "w1", kind: "note", text: "Please look", to: "b" });
+    await settle();
+  }
+  await office.post({ board: "lobby", kind: "task", text: "Backlog" });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(6);
+  clock.advance(60 * 60 * 1000);
+  office.turnEnded("b");
+  await settle();
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(7);
+  expect(prompts[6]).toContain("Backlog");
+  await office.stop();
+});
+
+test("a session without its board tool can confirm just its current assignment", async () => {
+  const { office, prompts, store, clock } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  const line = "Completed office task p1 (assignment 2).";
+  expect(prompts[0]).toContain(line);
+  await office.checkCompletion("b", async () => "I need more information.");
+  await office.checkCompletion("other", async () => line);
+  expect(store.current().posts[0]?.state).toBe("claimed");
+  await office.checkCompletion("b", async () => {
+    await office.update({ id: "p1", action: "reopen" });
+    return line;
+  });
+  expect(store.current().posts[0]?.state).toBe("open");
+  clock.advance(0);
+  await settle();
+  await office.checkCompletion("b", async () => line);
+  expect(store.current().posts[0]?.state).toBe("claimed");
+  await office.checkCompletion(
+    "b",
+    async () => "Verified.\nCompleted office task p1 (assignment 4).",
+  );
+  expect(store.current().posts[0]?.state).toBe("done");
+  await office.stop();
 });

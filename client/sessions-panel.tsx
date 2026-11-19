@@ -1,17 +1,20 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, type ViewStyle } from "react-native";
+import type { ChecklistProgress } from "../shared/contracts.js";
+import { useRowClock } from "./structure-view.js";
 import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { agentTitle, buildOfficeModel, dotTone } from "../shared/model.js";
 import { loadProblem } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";
 import { ActionButton } from "./action-button.js";
 import { NewAgentForm } from "./new-agent-form.js";
-import { NO_MATCH, SEARCH_LABEL, tabCounts, type ListTab } from "./list-text.js";
+import { NO_MATCH, SEARCH_LABEL, tabCounts, timeText, type ListTab } from "./list-text.js";
 import type { ColumnPanelProps, OfficeLink } from "./office-link.js";
 import {
   NO_AGENTS,
   avatarInitials,
   sessionDetail,
+  sessionMeter,
   sessionSections,
   type GroupedSession,
   type SessionGroup,
@@ -19,19 +22,54 @@ import {
 import type { OfficeStyles } from "./styles.js";
 
 interface AgentRowProps {
+  now: number;
+  progress?: ChecklistProgress;
   entry: GroupedSession;
   link: OfficeLink;
   styles: OfficeStyles;
 }
 
-function AgentRow({ entry, link, styles }: AgentRowProps) {
+type Meter = NonNullable<ReturnType<typeof sessionMeter>>;
+
+function SessionMeter({ meter, styles }: { meter: Meter; styles: OfficeStyles }) {
+  const ui = styles.sessions;
+  const fill = useMemo(
+    (): ViewStyle[] => [
+      meter.kind === "tasks" ? ui.tasksFill : ui.contextFill,
+      { width: `${meter.percent}%` },
+    ],
+    [meter.kind, meter.percent, ui],
+  );
+  return (
+    <View style={ui.meterRow}>
+      <View
+        accessibilityRole="progressbar"
+        accessibilityLabel={meter.label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={meter.percent}
+        style={ui.track}
+      >
+        <View style={fill} />
+      </View>
+      <Text style={ui.meterText}>{meter.label}</Text>
+    </View>
+  );
+}
+
+function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
   const { row, room, level } = entry;
   const { agent } = row;
   const ui = styles.sessions;
   const title = agentTitle(agent);
-  const tone = dotTone(agent);
+  const tone =
+    row.waitingOn && agent.status === "idle" && !agent.permissions.length
+      ? "running"
+      : dotTone(agent);
   const state = stateLabel(agent);
   const text = sessionDetail(entry);
+  const time = timeText(row, now);
+  const meter = sessionMeter(agent, progress);
   const press = useCallback(() => link.select(agent.id), [link, agent.id]);
   let accent: typeof ui.error | undefined;
   let detailColor: typeof ui.warningText | undefined;
@@ -43,6 +81,10 @@ function AgentRow({ entry, link, styles }: AgentRowProps) {
     accent = ui.error;
     detailColor = ui.errorText;
   }
+  const clockStyle = useMemo(
+    () => [ui.clock, detailColor, tone === "running" && ui.workingClock],
+    [ui, tone, detailColor],
+  );
   const rowStyle = useMemo(() => [ui.row, accent], [ui, accent]);
   const detailStyle = useMemo(() => [ui.detail, detailColor], [ui, detailColor]);
   const [hovered, setHovered] = useState(false);
@@ -54,7 +96,7 @@ function AgentRow({ entry, link, styles }: AgentRowProps) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${title}: ${state}`}
-        accessibilityHint={text || room.name}
+        accessibilityHint={[text || room.name, time, meter?.label].filter(Boolean).join(", ")}
         onPress={press}
         onHoverIn={hoverIn}
         onHoverOut={hoverOut}
@@ -77,12 +119,18 @@ function AgentRow({ entry, link, styles }: AgentRowProps) {
                 <Text numberOfLines={1} style={ui.project}>
                   {room.name}
                 </Text>
+                {time ? (
+                  <Text numberOfLines={1} style={clockStyle}>
+                    {time}
+                  </Text>
+                ) : null}
               </View>
               {text ? (
                 <Text style={detailStyle} numberOfLines={1}>
                   {text}
                 </Text>
               ) : null}
+              {meter ? <SessionMeter meter={meter} styles={styles} /> : null}
             </View>
           </>
         )}
@@ -101,7 +149,11 @@ function SectionHeading({
   group,
   rows,
   styles,
+  expanded,
+  onToggle,
 }: {
+  expanded: boolean;
+  onToggle(): void;
   group: SessionGroup;
   rows: GroupedSession[];
   styles: OfficeStyles;
@@ -121,13 +173,27 @@ function SectionHeading({
       : ui.warningText;
   }
   const headingStyle = useMemo(() => [ui.headingText, accent], [ui, accent]);
-  return (
-    <View style={ui.heading}>
+  const chevron = useMemo(() => [ui.chevron, expanded ? ui.down : ui.right], [ui, expanded]);
+  const heading = (
+    <>
       <Text accessibilityRole="header" style={headingStyle}>
         {title}
       </Text>
       <Text style={ui.headingCount}>{rows.length}</Text>
-    </View>
+      {group === "resting" ? <View style={chevron} /> : null}
+    </>
+  );
+  if (group !== "resting") return <View style={ui.heading}>{heading}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Resting sessions"
+      aria-expanded={expanded}
+      onPress={onToggle}
+      style={ui.heading}
+    >
+      {heading}
+    </Pressable>
   );
 }
 
@@ -170,8 +236,11 @@ function SessionList({
 }: ColumnPanelProps & { onNewAgent(): void }) {
   const { state, loaded, subscription } = office;
   const [tab, setTab] = useState<ListTab>("all");
+  const [restingExpanded, setRestingExpanded] = useState(true);
+  const toggleResting = useCallback(() => setRestingExpanded((value) => !value), []);
   const [query, setQuery] = useState("");
   const model = useMemo(() => buildOfficeModel(state), [state]);
+  const now = useRowClock(model.rooms);
   // The counts ignore the search, as the List view's do.
   const counts = useMemo(() => tabCounts(model.rooms.flatMap((room) => room.rows)), [model]);
   const shown = useMemo(() => sessionSections(model, tab, query), [model, tab, query]);
@@ -179,6 +248,15 @@ function SessionList({
   const reset = useCallback(() => {
     setTab("all");
     setQuery("");
+    setRestingExpanded(true);
+  }, []);
+  const choose = useCallback((next: ListTab) => {
+    setTab(next);
+    if (next === "resting") setRestingExpanded(true);
+  }, []);
+  const changeQuery = useCallback((value: string) => {
+    setQuery(value);
+    if (value.trim()) setRestingExpanded(true);
   }, []);
   const ui = styles.sessions;
   const problem = loadProblem(subscription);
@@ -219,7 +297,7 @@ function SessionList({
                 tone={tone}
                 count={counts[group]}
                 chosen={tab === group}
-                choose={setTab}
+                choose={choose}
                 styles={styles}
               />
             ))}
@@ -229,7 +307,7 @@ function SessionList({
             placeholder="Search sessions"
             placeholderTextColor={styles.placeholderColor}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={changeQuery}
             style={ui.search}
           />
         </View>
@@ -246,10 +324,24 @@ function SessionList({
         {GROUPS.map((group) =>
           shown[group].length ? (
             <View key={group} style={ui.section}>
-              <SectionHeading group={group} rows={shown[group]} styles={styles} />
-              {shown[group].map((entry) => (
-                <AgentRow key={entry.row.agent.id} entry={entry} link={link} styles={styles} />
-              ))}
+              <SectionHeading
+                group={group}
+                rows={shown[group]}
+                styles={styles}
+                expanded={restingExpanded}
+                onToggle={toggleResting}
+              />
+              {(group !== "resting" || restingExpanded) &&
+                shown[group].map((entry) => (
+                  <AgentRow
+                    key={entry.row.agent.id}
+                    entry={entry}
+                    link={link}
+                    styles={styles}
+                    now={now}
+                    progress={state.checklistProgress?.[entry.row.agent.id]}
+                  />
+                ))}
             </View>
           ) : null,
         )}

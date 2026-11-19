@@ -230,3 +230,22 @@ test("approvals lead the list and update when the live request clears", async ()
   expect(headings()).toEqual(["Working", "Resting"]);
   expect(container.textContent).not.toContain("Run tests");
 });
+
+test("session rows show reported task counts and context separately, and resting rows can collapse", async () => {
+  await mount(
+    office({
+      agents: [AGENTS[0], { ...AGENTS[1], context: { usedTokens: 45, maxTokens: 100 } }],
+      checklistProgress: { a: { completed: 1, total: 4 } },
+    }),
+  );
+  const progress = labelled("A: Running").querySelector('[role="progressbar"]');
+  expect(progress?.getAttribute("aria-label")).toBe("1/4 tasks");
+  expect(progress?.getAttribute("aria-valuenow")).toBe("25");
+  expect(labelled("B: Idle").textContent).toContain("Context 45%");
+  expect(labelled("A: Running").textContent).toMatch(/\d+:\d{2}/);
+  await press("Resting sessions");
+  expect(labelled("Resting sessions").getAttribute("aria-expanded")).toBe("false");
+  expect(maybe("B: Idle")).toBeNull();
+  await press("Resting sessions");
+  expect(maybe("B: Idle")).not.toBeNull();
+});

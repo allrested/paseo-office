@@ -206,10 +206,11 @@ test("the notes schedule's failure shows under the Time zone field", async () =>
   expect(field.compareDocumentPosition(failure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("the wide device can turn off the street and keep its other settings", async () => {
+test("older devices keep their street choice and can switch to countryside in daylight", async () => {
   await mount();
-  const row = container.querySelector<HTMLElement>('[aria-label^="The street outside"]');
-  expect(row?.getAttribute("aria-checked")).toBe("true");
-  await act(async () => row?.click());
-  expect(deviceSaves).toEqual([{ ...deviceValues.current, street: false }]);
+  expect(labelled("City")?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => labelled("Countryside")?.click());
+  expect(deviceSaves).toContainEqual({ ...deviceValues.current, scene: "countryside" });
+  await act(async () => labelled("Day")?.click());
+  expect(deviceSaves).toContainEqual(expect.objectContaining({ lighting: "day" }));
 });

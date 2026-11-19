@@ -1,11 +1,13 @@
 import { stat } from "node:fs/promises";
+import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import { ACTIVITY_TAIL_LIMIT, startActivityPoller } from "./activity.js";
 import { lastAssistantText, type ChatServicePorts } from "./chat-service.js";
+import { PARENT_AGENT_ID_LABEL } from "./directory.js";
 import type { Hub, HubPorts } from "./hub.js";
 import type { JanitorPorts } from "./janitor.js";
 import { wakeTargetOf } from "./mention-queue.js";
 import { entryWritten, nodeNotesFs } from "./notes-files.js";
-import type { NotesPorts } from "./notes-writer.js";
+import { NOTES_WRITER_TITLE, type NotesPorts } from "./notes-writer.js";
 import type { OfficeAgentPorts } from "./office.js";
 import { openPaseoDirectory } from "./paseo-directory.js";
 import type { Paseo, PaseoHolder } from "./paseo-holder.js";
@@ -44,12 +46,52 @@ export function liveHubPorts(
   };
 }
 
+/** A finished-turn notification is normal for an available agent. Other attention needs the user. */
+function availableForLobby(agent: AgentSnapshotPayload): boolean {
+  const attention = agent.requiresAttention || agent.attentionReason;
+  return (
+    agent.status === "idle" &&
+    !agent.archivedAt &&
+    !agent.activeTurn &&
+    !agent.backgroundWork?.count &&
+    !agent.providerUnavailable &&
+    agent.pendingPermissions.length === 0 &&
+    (!attention || agent.attentionReason === "finished") &&
+    !agent.internal &&
+    !agent.background &&
+    !agent.labels?.[PARENT_AGENT_ID_LABEL]?.trim() &&
+    agent.title !== NOTES_WRITER_TITLE
+  );
+}
+
 /** Wake ports on the daemon's own API; the holder is set by every hook and handler. */
 export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
   // Resolves null for an agent the daemon does not know; rejects only for an empty id or a start
   // of an id that several agents share.
   const refresh = (agentId: string) => holder.require().agents.ref(agentId).refresh();
   return {
+    async lobbyCandidates() {
+      if (!holder.held()) return [];
+      const agents = holder.require().agents;
+      const ids = new Set<string>();
+      let cursor: string | undefined;
+      do {
+        const result = await agents.list({
+          filter: { statuses: ["idle"] },
+          sort: [{ key: "updated_at", direction: "asc" }],
+          page: { limit: 200, cursor },
+        });
+        for (const { agent } of result.entries) {
+          if (availableForLobby(agent)) ids.add(agent.id);
+        }
+        cursor = result.pageInfo.nextCursor ?? undefined;
+      } while (cursor);
+      return [...ids];
+    },
+    async lobbyEligible(agentId) {
+      const result = await refresh(agentId);
+      return result !== null && availableForLobby(result.agent);
+    },
     async status(agentId) {
       const result = await refresh(agentId);
       return wakeTargetOf(result === null ? null : result.agent);
@@ -61,14 +103,16 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
     },
     // A turn may start between the status read and the send. A prompt with a source agent joins
     // it (the daemon steers agent messages); one as from the user would cut it unless it steers.
-    send: (agentId, prompt, source) =>
+    send: (agentId, prompt, source, messageId) =>
       holder
         .require()
         .agents.ref(agentId)
-        .send(
-          prompt,
-          source === null ? { activeTurnBehavior: "steer" } : { sourceAgentId: source },
-        ),
+        .send(prompt, {
+          ...(source === null
+            ? { activeTurnBehavior: "steer" as const }
+            : { sourceAgentId: source }),
+          ...(messageId ? { messageId } : {}),
+        }),
   };
 }
 
@@ -76,8 +120,11 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
 export function liveChatPorts(holder: PaseoHolder): Pick<ChatServicePorts, "send" | "lastAnswer"> {
   return {
     // Steers a running turn, as a wake from the user does, so a busy agent is not cut off.
-    send: async (agentId, prompt) =>
-      holder.require().agents.ref(agentId).send(prompt, { activeTurnBehavior: "steer" }),
+    send: async (agentId, prompt, images) =>
+      holder
+        .require()
+        .agents.ref(agentId)
+        .send(prompt, { activeTurnBehavior: "steer", ...(images ? { images } : {}) }),
     // The hook's own recipe (PluginHookEvents["agent.turn.after"]): the latest whole turn, kept
     // only when it is the turn that ended. A null turn id has no entries.
     async lastAnswer(agentId, turnId) {

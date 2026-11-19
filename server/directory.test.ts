@@ -510,3 +510,14 @@ test("the first complete directory view includes the workspace folder", async ()
   expect(views[0]?.folders).toEqual({ w1: "/work" });
   await stop();
 });
+
+test("only a current permission wait gets the host's attention timestamp", () => {
+  const input = agentInput({
+    pendingPermissions: [{ id: "p", name: "Bash", kind: "tool" }],
+    attentionReason: "permission",
+    attentionTimestamp: "2026-11-19T14:00:00Z",
+  });
+  expect(projectAgent(input)?.permissionSince).toBe(input.attentionTimestamp);
+  expect(projectAgent({ ...input, pendingPermissions: [] })?.permissionSince).toBeUndefined();
+  expect(projectAgent({ ...input, attentionReason: "finished" })?.permissionSince).toBeUndefined();
+});

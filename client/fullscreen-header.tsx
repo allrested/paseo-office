@@ -53,6 +53,7 @@ interface FullscreenHeaderProps {
   badges: ColumnBadges;
   sidebars: SidebarControls;
   modes: ReactNode;
+  onOffice(): void;
   children: ReactNode;
   color: string;
   styles: OfficeStyles;
@@ -63,6 +64,7 @@ export function FullscreenHeader({
   sidebars,
   badges,
   modes,
+  onOffice,
   children,
   color,
   styles,
@@ -74,10 +76,15 @@ export function FullscreenHeader({
   return (
     <View style={styles.fullscreenHeader}>
       <View style={styles.headerTools}>
-        <View style={styles.headerBrand}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Office 3D"
+          onPress={onOffice}
+          style={styles.headerBrand}
+        >
           <Icon name="Building2" size={20} color={styles.brandIcon.color} />
           <Text style={styles.brandText}>Office 3D</Text>
-        </View>
+        </Pressable>
         <View style={styles.headerModes}>{modes}</View>
       </View>
       <View style={styles.headerTools}>

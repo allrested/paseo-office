@@ -307,12 +307,13 @@ export function createOfficePlugin(
   // then the chat call waits, and a snapshot has no chat.
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
+  const chatPorts = liveChatPorts(holder);
   async function startChat(): Promise<void> {
     const service = await createChatService({
       store: deps.chatStore,
       clock: deps.clock,
       tr: chatT,
-      ...liveChatPorts(holder),
+      ...chatPorts,
       emit: (change) => hub.chatChange(change),
       log,
     });
@@ -323,8 +324,12 @@ export function createOfficePlugin(
   const chatReady = startChat().catch((error: unknown) =>
     log(`[office] chat unavailable: ${errorMessage(error)}`),
   );
+  let agentToolsOn = false;
+  void holder.wait().then(() => office.setPickupEnabled(agentToolsOn));
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {
+    agentToolsOn = false;
+    office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
     notesSchedule.fail(message);
@@ -339,6 +344,8 @@ export function createOfficePlugin(
       settingsUnreadable(state.error);
       return;
     }
+    agentToolsOn = state.values.agentTools;
+    office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
     // The writer reads the folder again, and its push carries the schedule's error with it.
@@ -540,6 +547,13 @@ export function createOfficePlugin(
         holder.remember(context.paseo);
         office.noteAgent(agent);
         office.turnEnded(agent.id);
+        if (outcome.kind === "completed" && turnId !== null) {
+          await office
+            .checkCompletion(agent.id, () => chatPorts.lastAnswer(agent.id, turnId))
+            .catch((error: unknown) =>
+              log(`[office] lobby completion check failed: ${errorMessage(error)}`),
+            );
+        }
         await (
           await lifeReady
         )?.turnEnded(agent.id, async () => {
@@ -619,7 +633,7 @@ export function createOfficePlugin(
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
-    office.stop();
+    await office.stop();
     // A chat still loading would start its clock after this stop.
     await chatReady;
     stopWatching?.();

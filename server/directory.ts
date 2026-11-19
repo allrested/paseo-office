@@ -56,6 +56,8 @@ export interface DirectoryAgentInput {
   createdAt: string;
   /** When anything about the agent last changed on the host. */
   updatedAt?: string;
+  attentionTimestamp?: string | null;
+  attentionReason?: string | null;
   labels?: Readonly<Record<string, string>>;
   pendingPermissions: readonly DirectoryPermissionInput[];
   archivedAt?: string | null;
@@ -223,10 +225,22 @@ function costOf(agent: DirectoryAgentInput): number | undefined {
   return cost !== undefined && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
 }
 
-/** When the agent was last prompted, for an agent that is starting or running only. */
-function promptedAtOf(agent: DirectoryAgentInput, status: AgentStatus): string | undefined {
-  if (status !== "running" && status !== "initializing") return undefined;
-  return agent.lastUserMessageAt || undefined;
+/** Timestamps the host has for the row's turn, rest, or pending permission. */
+function stateTimes(
+  agent: DirectoryAgentInput,
+  status: AgentStatus,
+): Pick<OfficeAgent, "promptedAt" | "idleSince" | "permissionSince"> {
+  const times: Pick<OfficeAgent, "promptedAt" | "idleSince" | "permissionSince"> = {};
+  if ((status === "running" || status === "initializing") && agent.lastUserMessageAt)
+    times.promptedAt = agent.lastUserMessageAt;
+  if (status === "idle" && agent.updatedAt) times.idleSince = agent.updatedAt;
+  if (
+    agent.pendingPermissions.length &&
+    agent.attentionReason === "permission" &&
+    agent.attentionTimestamp
+  )
+    times.permissionSince = agent.attentionTimestamp;
+  return times;
 }
 
 /** The office's view of an agent, or null when the office does not show it. */
@@ -237,7 +251,6 @@ export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
   const parent = agent.labels?.[PARENT_AGENT_ID_LABEL]?.trim() ?? "";
   const context = contextOf(agent);
   const cost = costOf(agent);
-  const promptedAt = promptedAtOf(agent, status.data);
   const number = storedNumber(agent.metadata?.[NUMBER_KEY]);
   const next = storedNumber(agent.metadata?.[NEXT_KEY]);
   return {
@@ -259,12 +272,11 @@ export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
       };
     }),
     createdAt: agent.createdAt,
+    ...stateTimes(agent, status.data),
     ...(context === undefined ? {} : { context }),
     ...(number === undefined ? {} : { number }),
     ...(next === undefined ? {} : { next }),
-    ...(status.data === "idle" && agent.updatedAt ? { idleSince: agent.updatedAt } : {}),
     ...(cost === undefined ? {} : { costUsd: cost }),
-    ...(promptedAt === undefined ? {} : { promptedAt }),
   };
 }
 

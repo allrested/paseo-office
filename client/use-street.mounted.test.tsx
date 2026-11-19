@@ -9,7 +9,7 @@ import type { SettingsState } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { officeDeviceSettings } from "../shared/settings.js";
 import { stockSave } from "./stock-save.test.js";
-import { streetDefault, useStreetSwitch } from "./use-street.js";
+import { streetDefault, useOfficeScene, useStreetSwitch } from "./use-street.js";
 import type { DeviceSwitch } from "./use-device-switch.js";
 
 type Device = SettingsState<typeof officeDeviceSettings.schema>;
@@ -160,4 +160,53 @@ test.each([
   await act(async () => current.set(false));
   expect(current.on).toBe(false);
   expect(current.unsaved).toBe(true);
+});
+
+let scenery: ReturnType<typeof useOfficeScene>;
+function SceneryProbe({ compact }: { compact: boolean }) {
+  scenery = useOfficeScene({ platform: "web", compact });
+  return null;
+}
+const mountScenery = (compact = false) =>
+  act(async () => root.render(<SceneryProbe compact={compact} />));
+
+test("the first scene waits for the device, then uses its saved choice, legacy street, or layout", async () => {
+  stored = { status: "loading" };
+  await mountScenery();
+  expect(scenery.scene.on).toBeNull();
+  expect(scenery.lighting.on).toBeNull();
+  stored = ready({ street: false });
+  await mountScenery();
+  expect(scenery.scene.on).toBe("plain");
+  stored = ready({ street: true });
+  await mountScenery(true);
+  expect(scenery.scene.on).toBe("city");
+  expect(scenery.lighting.on).toBe("auto");
+  stored = ready({ street: true, scene: "beach", lighting: "night" });
+  await mountScenery(true);
+  expect(scenery.scene.on).toBe("beach");
+  expect(scenery.lighting.on).toBe("night");
+  stored = ready();
+  await mountScenery();
+  expect(scenery.scene.on).toBe("city");
+  await mountScenery(true);
+  expect(scenery.scene.on).toBe("plain");
+  expect(saved).toEqual([]);
+});
+
+test("scenery and lighting survive a cold mount while keeping the legacy street preference", async () => {
+  stored = ready({ street: true });
+  await mountScenery();
+  await act(async () => scenery.scene.set("countryside"));
+  await settle();
+  await act(async () => scenery.lighting.set("day"));
+  await settle();
+  expect(saved.at(-1)?.values).toMatchObject({
+    street: true,
+    scene: "countryside",
+    lighting: "day",
+  });
+  await act(async () => root.render(null));
+  await mountScenery(true);
+  expect([scenery.scene.on, scenery.lighting.on]).toEqual(["countryside", "day"]);
 });

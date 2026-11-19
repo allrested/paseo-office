@@ -24,6 +24,8 @@ import type { ConversationRow } from "./conversation-model.js";
 import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
+import { SegmentPill } from "./segment-pill.js";
+import { SessionIdentity, SubagentRow } from "./session-panel-detail.js";
 import {
   ANSWER_IN_WORKSPACE,
   CANNOT_ANSWER_HERE,
@@ -34,7 +36,6 @@ import {
   UNLISTED_LINE,
   composerPlaceholder,
   rowLabel,
-  statusLine,
 } from "./session-text.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
@@ -61,7 +62,11 @@ export interface SessionPanelProps {
   /** Leaves the office for the agent's workspace; absent where the host cannot. */
   onOpenWorkspace: (() => void) | undefined;
   onClose(): void;
+  subagents?: readonly OfficeAgent[];
+  onOpenSubagent?(id: string): void;
 }
+
+type SessionDetailTab = "chat" | "steps" | "subagents";
 
 type KeyPress = NativeSyntheticEvent<
   TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean }
@@ -81,12 +86,7 @@ function Header({ agent, room, onOpenWorkspace, onClose, styles }: HeaderProps) 
       {agent === null ? (
         <Text style={styles.muted}>{UNLISTED_LINE}</Text>
       ) : (
-        <>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {agentTitle(agent)}
-          </Text>
-          <Text style={styles.chatMeta}>{statusLine(agent, room)}</Text>
-        </>
+        <SessionIdentity agent={agent} room={room} styles={styles} />
       )}
       <View style={styles.actions}>
         {onOpenWorkspace ? (
@@ -139,14 +139,16 @@ const Row = memo(function Row({ row, name, styles }: RowProps) {
     <View
       accessible
       accessibilityLabel={label}
-      style={row.kind === "you" ? styles.sessionRowYou : styles.sessionRow}
+      style={row.kind === "you" ? styles.chatRowMine : styles.chatRow}
     >
-      {row.kind === "you" || row.kind === "agent" ? (
-        <Text style={styles.chatName}>{row.kind === "you" ? "You" : name}</Text>
-      ) : null}
-      <Text selectable style={words}>
-        {row.text}
-      </Text>
+      <View style={row.kind === "you" ? styles.chatBubbleMine : styles.chatBubble}>
+        {row.kind === "you" || row.kind === "agent" ? (
+          <Text style={styles.chatName}>{row.kind === "you" ? "You" : name}</Text>
+        ) : null}
+        <Text selectable style={words}>
+          {row.text}
+        </Text>
+      </View>
     </View>
   );
 }, sameRow);
@@ -163,12 +165,13 @@ function Alert({ text, styles }: { text: string; styles: OfficeStyles }) {
 
 interface RowsProps {
   conversation: Conversation;
+  steps: boolean;
   name: string;
   styles: OfficeStyles;
 }
 
 /** What the list holds: its state while it has none, else Show earlier and the rows. */
-function Rows({ conversation, name, styles }: RowsProps): ReactNode {
+function Rows({ conversation, steps, name, styles }: RowsProps): ReactNode {
   const { status, rows } = conversation;
   if (status === "loading") return <Text style={styles.muted}>{LOADING}</Text>;
   if (status === "error") {
@@ -184,6 +187,7 @@ function Rows({ conversation, name, styles }: RowsProps): ReactNode {
       </>
     );
   }
+  const shown = steps ? rows.filter((row) => row.kind === "tool" || row.kind === "notice") : rows;
   return (
     <>
       {conversation.earlierFailed ? <Alert text={EARLIER_FAILED} styles={styles} /> : null}
@@ -198,8 +202,10 @@ function Rows({ conversation, name, styles }: RowsProps): ReactNode {
           />
         </View>
       ) : null}
-      {rows.length === 0 ? <Text style={styles.muted}>{NOTHING_SAID}</Text> : null}
-      {rows.map((row) => (
+      {shown.length === 0 ? (
+        <Text style={styles.muted}>{steps ? "No steps in the loaded history." : NOTHING_SAID}</Text>
+      ) : null}
+      {shown.map((row) => (
         <Row key={row.key} row={row} name={name} styles={styles} />
       ))}
     </>
@@ -327,8 +333,11 @@ export function SessionPanel({
   layout,
   onOpenWorkspace,
   onClose,
+  subagents,
+  onOpenSubagent,
 }: SessionPanelProps) {
   const conversation = useConversation(agentId);
+  const [tab, setTab] = useState<SessionDetailTab>("chat");
   const { scroller, onScroll, followEnd } = useFollowEnd();
   const touchScreen = useMemo(
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
@@ -344,6 +353,37 @@ export function SessionPanel({
         onClose={onClose}
         styles={styles}
       />
+      <View style={styles.segments} role="group" aria-label="Session details">
+        <SegmentPill<SessionDetailTab>
+          value="chat"
+          name="Session chat"
+          text="Chat"
+          on={tab === "chat"}
+          disabled={false}
+          onPress={setTab}
+          styles={styles}
+        />
+        <SegmentPill<SessionDetailTab>
+          value="steps"
+          name="Session steps"
+          text="Steps"
+          on={tab === "steps"}
+          disabled={false}
+          onPress={setTab}
+          styles={styles}
+        />
+        {subagents && onOpenSubagent && (
+          <SegmentPill<SessionDetailTab>
+            value="subagents"
+            name="Session subagents"
+            text={subagents.length ? `Subagents · ${subagents.length}` : "Subagents"}
+            on={tab === "subagents"}
+            disabled={false}
+            onPress={setTab}
+            styles={styles}
+          />
+        )}
+      </View>
       <ScrollView
         ref={scroller}
         contentContainerStyle={styles.sessionList}
@@ -353,7 +393,18 @@ export function SessionPanel({
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       >
-        <Rows conversation={conversation} name={name} styles={styles} />
+        {tab === "subagents" && subagents && onOpenSubagent ? (
+          <>
+            {subagents.length === 0 && (
+              <Text style={styles.muted}>No subagents in this session.</Text>
+            )}
+            {subagents.map((child) => (
+              <SubagentRow key={child.id} agent={child} onOpen={onOpenSubagent} styles={styles} />
+            ))}
+          </>
+        ) : (
+          <Rows conversation={conversation} steps={tab === "steps"} name={name} styles={styles} />
+        )}
       </ScrollView>
       {agent === null ? null : (
         <>

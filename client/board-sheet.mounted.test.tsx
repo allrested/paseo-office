@@ -435,9 +435,15 @@ test("the lobby adds a to-do with Enter and with Add, and keeps the agent choice
   expect(document.activeElement).toBe(byLabel("Add a to-do"));
 
   await type("Add a to-do", "Check the build");
-  await press("Wake an agent with it: Nobody");
+  await press("Send task to: Any idle agent");
+  expect(title()).toBe("Send task to");
+  expect(radios()).toEqual([
+    "Any idle agent: An available agent picks up the task automatically.",
+    "Builder: Lobby · Idle",
+  ]);
   await press("Builder: Lobby · Idle");
   expect(title()).toBe("Lobby board");
+  byLabel("Send task to: Builder");
   expect(fieldText("Add a to-do")).toBe("Check the build");
   await press("Add");
 
@@ -446,7 +452,18 @@ test("the lobby adds a to-do with Enter and with Add, and keeps the agent choice
     { board: "lobby", kind: "task", text: "Check the build", to: "2" },
   ]);
   expect(fieldText("Add a to-do")).toBe("");
-  byLabel("Wake an agent with it: Nobody");
+  byLabel("Send task to: Any idle agent");
+});
+
+test("a paused lobby task waits for wakes to resume, including the automatic choice", async () => {
+  const rooms = lobbyRooms([], [agent("2", { title: "Builder" })]);
+  await mount({ rooms, roomId: "lobby", wakesPaused: true });
+  expect(container.textContent).toContain("Automatic pickup resumes when you turn on Wake agents.");
+  await press("Send task to: Any idle agent");
+  await press("Builder: shop-api · Idle");
+  expect(container.textContent).toContain("The agent gets this post when you turn it on.");
+  await mount({ rooms, roomId: "lobby" });
+  expect(container.textContent).not.toContain("Wake agents is off");
 });
 
 test("a to-do the host refuses keeps its text and says why", async () => {
@@ -496,7 +513,7 @@ test("ticking sends done, unticking sends reopen, and a pending box takes no sec
   refusal = new Error("Unable to finish p2: it is a note");
   await press("Rotate keys");
   // Under its own row, and the box still shows the board's state.
-  expect(byLabel("Rotate keys").parentElement?.textContent).toContain(
+  expect(byLabel("Rotate keys").parentElement?.parentElement?.textContent).toContain(
     "Unable to finish p2: it is a note",
   );
   expect(byLabel("Rotate keys").getAttribute("aria-checked")).toBe("false");
@@ -544,7 +561,7 @@ test("a to-do arriving while typing keeps the typed text", async () => {
   const first = post(1, { text: "Rotate keys" });
   await mount({ rooms: lobbyRooms([first], agents), roomId: "lobby" });
   await type("Add a to-do", "half");
-  await press("Wake an agent with it: Nobody");
+  await press("Send task to: Any idle agent");
   await press("Builder: Lobby · Idle");
 
   // An agent ticks the first to-do and adds another.
@@ -558,13 +575,13 @@ test("a to-do arriving while typing keeps the typed text", async () => {
   ]);
   expect(byLabel("Rotate keys").getAttribute("aria-checked")).toBe("true");
   expect(fieldText("Add a to-do")).toBe("half");
-  byLabel("Wake an agent with it: Builder");
+  byLabel("Send task to: Builder");
 });
 
-test("a to-do's Delete asks first", async () => {
+test("a to-do's delete icon names the task and asks first", async () => {
   await mount({ rooms: lobbyRooms([post(1, { text: "Rotate keys" })]), roomId: "lobby" });
 
-  await press("Delete");
+  await press("Delete task: Rotate keys");
   expect(asked).toEqual([]);
   expect(container.textContent).toContain("Delete this post?");
   await press("Delete");
@@ -585,7 +602,6 @@ test("notes show under the list only when there are notes", async () => {
     "Clear finished",
     "Rotate keys",
     "claimed by a1 · for a1",
-    "Delete",
     "Notes",
     "Note · user",
     "The demo is on Thursday",

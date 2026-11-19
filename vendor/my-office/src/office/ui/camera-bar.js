@@ -283,7 +283,7 @@ function speaker(on) {
 }
 
 /** Run by paseo-entry.js once the loop is set up. */
-export function setup() {
+export function setup(onToggleFullscreen) {
   /* ---------- camera toolbar ---------- */
   fitFloor();
   // Upstream's switch for the automatic camera: on unless the device's storage says off.
@@ -316,12 +316,10 @@ export function setup() {
     if (fp.on) { fpCam.fov = Math.min(90, fpCam.fov + 8); fpCam.updateProjectionMatrix(); return; }
     setView(null); state.zoomGoal = Math.max(controls.minZoom, (state.zoomGoal ?? camera.zoom) / 1.2);
   });
-  if (!document.fullscreenEnabled) $('btn-full').hidden = true;
-  $('btn-full').addEventListener('click', () => {
-    if (document.fullscreenElement) document.exitFullscreen?.();
-    else document.documentElement.requestFullscreen?.().catch(() => host.toast(t('ui.cameraToolbar.noFullscreen')));
-  });
-  document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
+  // The web host expands the whole office, including its Sessions and Activity sidebars.
+  const full = $('btn-full');
+  full.hidden = !onToggleFullscreen;
+  if (onToggleFullscreen) full.addEventListener('click', onToggleFullscreen);
   // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite
   // of what the button showed when the press began. The press's own probe (it hears the pointerup or the key before
   // this click, and a key even before this button does) may change things first: it may find audio and turn sound on

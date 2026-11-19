@@ -126,10 +126,14 @@ function initialsOf(name: string): string {
 export function avatarOf(message: ChatMessage): { initials: string; color: string } | null {
   if (message.kind === "sys" || message.from === undefined || isYours(message)) return null;
   const name = message.name ?? message.from;
-  if (message.from === DIRECTOR) {
+  return memberAvatar(message.from, name);
+}
+
+export function memberAvatar(id: string, name: string): { initials: string; color: string } {
+  if (id === DIRECTOR) {
     return { initials: [...name].slice(0, 1).join("").toUpperCase(), color: DIRECTOR_COLOR };
   }
-  const shirt = SHIRTS[lookOf(message.from).shirt] ?? SHIRTS[0];
+  const shirt = SHIRTS[lookOf(id).shirt] ?? SHIRTS[0];
   return { initials: initialsOf(name), color: shirt.shirt };
 }
 

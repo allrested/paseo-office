@@ -12,7 +12,7 @@ import { useLife } from "./use-life.js";
 import { useStreetStart } from "./use-street-kit.js";
 import { useSceneWords } from "./use-scene-words.js";
 import { useWorldFeed } from "./use-world-feed.js";
-import type { WorldApi } from "./world-api.js";
+import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { readBrand } from "../web-env.web.js";
 import { focusApp, openWorldFrame } from "./world-frame.web.js";
 import { WorldLoading } from "./world-loading.js";
@@ -25,7 +25,10 @@ import {
 } from "./world-view-shared.js";
 
 export interface WorldViewProps {
+  scene?: WorldStartOptions["scene"];
+  night?: boolean | undefined;
   streetOn?: boolean | null;
+  fullscreen?: { active: boolean; toggle(): void };
   model: OfficeModel;
   theme: PluginTheme;
   styles: OfficeStyles;
@@ -96,9 +99,12 @@ type WorldSceneProps = Omit<WorldViewProps, "plan"> & {
  */
 function WorldScene({
   model,
+  fullscreen,
   theme,
   styles,
   plan,
+  scene,
+  night,
   street,
   focusRoomId,
   focusRequest,
@@ -119,6 +125,7 @@ function WorldScene({
   sound,
 }: WorldSceneProps) {
   const containerId = useId();
+  const onToggleFullscreen = fullscreen?.toggle;
   const onBell = useStandupBell();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
@@ -141,6 +148,8 @@ function WorldScene({
     onBell,
     onLife,
     onTenure,
+    scene,
+    night,
     street,
     onSound: sound.set,
     onProblem,
@@ -162,6 +171,8 @@ function WorldScene({
       onBell,
       onLife,
       onTenure,
+      scene,
+      night,
       street,
       onSound: sound.set,
       onProblem,
@@ -182,6 +193,8 @@ function WorldScene({
     onBell,
     onLife,
     onTenure,
+    scene,
+    night,
     street,
     sound.set,
     onProblem,
@@ -207,12 +220,13 @@ function WorldScene({
     if (container === null) return undefined;
     let live = true;
     const frame = openWorldFrame({ container, script, title: "Office in 3D" });
-    function start(scene: WorldApi): void {
+    function start(world: WorldApi): void {
       if (!live) return;
       try {
-        scene.start(
+        world.start(
           worldStartOptions(latest, {
             focus: focusApp,
+            onToggleFullscreen,
             // Read when the office starts: a page's brand does not change while the page lives.
             brand: worldBrand(readBrand()),
             language: words.language,
@@ -224,7 +238,7 @@ function WorldScene({
         latest.current.onProblem(messageOf(error));
         return;
       }
-      setApi(scene);
+      setApi(world);
     }
     frame.api.then(start, (error: unknown) => {
       if (live) latest.current.onProblem(messageOf(error));
@@ -234,7 +248,21 @@ function WorldScene({
       setApi(null);
       frame.dispose();
     };
-  }, [script, sized, containerId, plan, words.status, words.language, words.words]);
+  }, [
+    script,
+    sized,
+    containerId,
+    plan,
+    words.status,
+    words.language,
+    words.words,
+    onToggleFullscreen,
+  ]);
+
+  const fullscreenActive = fullscreen?.active ?? false;
+  useEffect(() => {
+    api?.setFullscreen?.(fullscreenActive);
+  }, [api, fullscreenActive]);
 
   const { note: feedNote } = useWorldFeed(api, {
     model,
@@ -248,6 +276,7 @@ function WorldScene({
     weather,
     incidents,
     streetNote: street?.kit === null,
+    night,
     sound: sound.on,
     plan,
   });
@@ -269,8 +298,16 @@ function WorldScene({
  * The office in 3D, on the host's plan. A scene page starts once, so each plan is a scene of its
  * own: a changed plan takes the frame out and opens a new one.
  */
-export function WorldView({ plan, streetOn = false, ...rest }: WorldViewProps) {
-  const { street, loading } = useStreetStart(streetOn);
+export function WorldView({ plan, streetOn = false, scene, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(scene ? scene === "city" : streetOn);
   if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
-  return <WorldScene key={plan + String(street !== null)} street={street} plan={plan} {...rest} />;
+  return (
+    <WorldScene
+      key={plan + (scene ?? String(street !== null))}
+      scene={scene}
+      street={street}
+      plan={plan}
+      {...rest}
+    />
+  );
 }

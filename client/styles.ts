@@ -1,4 +1,5 @@
 import { sessionStyles } from "./session-styles.js";
+import { messengerStyles } from "./messenger-styles.js";
 import { useMemo } from "react";
 import { Platform, type TextStyle, type ViewStyle } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -12,6 +13,7 @@ export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
   sessions: ReturnType<typeof sessionStyles>;
+  messenger: ReturnType<typeof messengerStyles>;
   fullscreenHeader: ViewStyle;
   headerTools: ViewStyle;
   headerBrand: ViewStyle;
@@ -83,6 +85,7 @@ export interface OfficeStyles {
   columnSheet: ViewStyle;
   columnSheetHead: ViewStyle;
   columnSheetTitle: TextStyle;
+  dialogBody: ViewStyle;
   /** The row of switches: it wraps on a phone, and every line ends on the trailing rail. */
   headerControls: ViewStyle;
   /** The switches' failures, one line each, under their row. */
@@ -254,6 +257,15 @@ export interface OfficeStyles {
   boardPosts: ViewStyle;
   /** One post in the sheet with its buttons. */
   boardPost: ViewStyle;
+  lobbyForm: ViewStyle;
+  lobbySection: ViewStyle;
+  lobbyHeading: TextStyle;
+  lobbyRecipient: ViewStyle;
+  lobbyTask: ViewStyle;
+  lobbyTaskLine: ViewStyle;
+  lobbyDelete: ViewStyle;
+  lobbyDeleteText: TextStyle;
+  lobbyConfirm: ViewStyle;
   post: ViewStyle;
   postMeta: TextStyle;
   postText: TextStyle;
@@ -345,10 +357,8 @@ export interface OfficeStyles {
   chatReactionOn: ViewStyle;
   /** React, Reply and Recall: on a wide web screen they keep their place while hidden. */
   chatActions: ViewStyle;
-  chatActionsHidden: ViewStyle;
   /** The typing line keeps its height while nobody types, so the list does not move. */
   chatTyping: TextStyle;
-  chatBox: ViewStyle;
   /** The @ list under the box. */
   chatMentions: ViewStyle;
   /** The count on the header's Chat button: white on the accent, as a badge is. */
@@ -510,7 +520,9 @@ export function useOfficeStyles(
     const todoRow: ViewStyle = {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 8,
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
       minHeight: TOUCH_CONTROL,
       paddingVertical: 12,
     };
@@ -531,7 +543,7 @@ export function useOfficeStyles(
       maxWidth: "80%",
       paddingVertical: 8,
       paddingHorizontal: 12,
-      borderRadius: 12,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface1,
@@ -757,6 +769,7 @@ export function useOfficeStyles(
         backgroundColor: colors.surface0,
       },
       sheetScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 },
+      dialogBody: { padding: compact ? 16 : 22, gap: 16 },
       // The floor's top quarter stays in view over the sheet, so the office is still there.
       columnSheet: {
         position: "absolute",
@@ -1115,12 +1128,57 @@ export function useOfficeStyles(
       // A post and its buttons are one block: closer to each other than to the next post.
       boardPosts: { gap: 16 },
       boardPost: { gap: 8 },
+      lobbyForm: {
+        padding: 12,
+        gap: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+      },
+      lobbyRecipient: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        maxWidth: "100%",
+        minHeight: controlHeight,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        gap: 8,
+        overflow: "hidden",
+      },
+      lobbySection: { gap: 6 },
+      lobbyHeading: {
+        ...small,
+        color: colors.foregroundMuted,
+        letterSpacing: 0.7,
+        fontWeight: "700",
+        textTransform: "uppercase",
+      },
+      lobbyTask: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        paddingHorizontal: 12,
+      },
+      lobbyTaskLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+      lobbyDelete: {
+        minWidth: controlHeight,
+        minHeight: controlHeight,
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 6,
+        paddingHorizontal: 4,
+      },
+      lobbyDeleteText: { ...small, fontWeight: "500", color: colors.foregroundMuted },
+      lobbyConfirm: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 10, gap: 8 },
       post: { gap: 4, paddingVertical: 4 },
       postMeta: { ...small, color: colors.foregroundMuted },
       postText: { ...base, color: colors.foreground },
       todoRow,
       todoRowDisabled: { ...todoRow, opacity: 0.5 },
-      todoTextDone: { ...base, color: colors.foregroundMuted },
+      todoTextDone: { ...base, color: colors.foregroundMuted, textDecorationLine: "line-through" },
       chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
       // The padding leaves room for a chip's focus ring inside the scroller, and the scroller
       // reaches out by as much, so the chips at rest still stand on the sheet's rails.
@@ -1189,6 +1247,7 @@ export function useOfficeStyles(
       },
       sceneNoteText: { ...small, color: colors.foregroundMuted },
       sessions: sessionStyles(colors, touch),
+      messenger: messengerStyles(theme, compact, touch),
       sessionFilter: { flexGrow: 1, paddingHorizontal: 4 },
       activityTop: { paddingHorizontal: pad, paddingTop: pad, paddingBottom: 12, gap: 10 },
       activityHeading: {
@@ -1238,7 +1297,7 @@ export function useOfficeStyles(
       panelCount: { color: colors.foregroundMuted },
       panelFeed: { paddingBottom: 24 },
       panelTime: { ...small, flexShrink: 0, color: colors.foregroundMuted },
-      chatList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
+      chatList: { paddingHorizontal: pad, paddingVertical: 14, gap: 12 },
       chatRow,
       chatRowMine: { ...chatRow, justifyContent: "flex-end" },
       chatAvatar: {
@@ -1282,14 +1341,12 @@ export function useOfficeStyles(
       // The segment's chosen fill is a layer of its own, which a style cannot add: the outline.
       chatReactionOn: { ...chatReaction, borderColor: colors.foreground },
       chatActions,
-      chatActionsHidden: { ...chatActions, opacity: 0 },
       chatTyping: {
         ...small,
         minHeight: small.lineHeight,
         color: colors.foregroundMuted,
         paddingHorizontal: pad,
       },
-      chatBox: { padding: pad, gap: 8, borderTopWidth: 1, borderTopColor: colors.border },
       chatMentions: {
         borderWidth: 1,
         borderColor: colors.border,

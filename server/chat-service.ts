@@ -5,6 +5,7 @@ import {
   CHAT_TEXT_MAX,
   ChatMessageSchema,
   type ChatChange,
+  type ChatImage,
   type ChatMessage,
   type ChatRequest,
   type ChatResult,
@@ -41,7 +42,7 @@ export interface ChatServicePorts {
   clock: Clock;
   tr: Translate;
   /** Sends a prompt that steers a running turn. */
-  send(agentId: string, prompt: string): Promise<void>;
+  send(agentId: string, prompt: string, images?: ChatImage[]): Promise<void>;
   /** The last assistant message of the turn `turnId`, read from the agent's timeline; null when there is none. */
   lastAnswer(agentId: string, turnId: string | null): Promise<string | null>;
   emit(change: ChatChange): void;
@@ -155,6 +156,12 @@ interface Waiting {
   reply: { id: string; name: string; text: string };
 }
 
+function imageCountLabel(images: ChatImage[] | undefined): string {
+  const count = images?.length ?? 0;
+  if (!count) return "";
+  return count === 1 ? "1 image" : `${count} images`;
+}
+
 const OK: ChatResult = { ok: true };
 const NO_PERMISSIONS: ReadonlySet<string> = new Set();
 
@@ -219,7 +226,7 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
       if (message !== null) ports.emit({ op: op === "update" ? "update" : "add", message });
       return;
     }
-    ports.emit({ op: "all", messages: wireMessages() });
+    ports.emit({ op: "all", messages: wireMessages(), pinned: engine.state.pinned });
   }
 
   const engine: ChatEngine = createChatEngine({
@@ -278,39 +285,76 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
     waiting.delete(agentId);
   }
 
-  function prompt(member: ChatMember, text: string, reply: Waiting["reply"]): void {
+  function prompt(
+    member: ChatMember,
+    text: string,
+    reply: Waiting["reply"],
+    images?: ChatImage[],
+  ): void {
     const entry: Waiting = { member, reply };
     waiting.set(member.id, [...(waiting.get(member.id) ?? []), entry]);
     engine.working(member.id, true);
-    ports.send(member.id, PROMPT_PREFIX + text).catch((error: unknown) => {
+    ports.send(member.id, PROMPT_PREFIX + text, images).catch((error: unknown) => {
       release(member.id, [entry]);
       engine.system(`Could not reach ${member.name}: ${errorMessage(error)}.`);
     });
   }
 
+  function postMessage(
+    input: Extract<ChatRequest, { op: "send" }>,
+    text: string,
+    sticker: number | null,
+    imageLabel: string,
+  ) {
+    const captured: EngineMessage[] = [];
+    capture = captured;
+    try {
+      if (input.to !== undefined) {
+        // A directed turn gets the session's actual answer. The engine's group send also
+        // schedules simulated replies and interprets words like "meeting" as a scene action.
+        const original = input.replyTo && engine.byId(input.replyTo);
+        const reply =
+          original && !original.recalled
+            ? {
+                id: original.id,
+                name: original.name ?? tr("chat.you"),
+                text: short(original.text || tr("chat.sticker"), 90),
+              }
+            : null;
+        const posted = imageLabel && input.text?.trim() ? `${text}\n(${imageLabel})` : text;
+        engine.say("me", posted, { now: true, sticker, reply });
+      } else {
+        engine.send({ text, sticker, replyTo: input.replyTo ?? null });
+      }
+    } finally {
+      capture = null;
+    }
+    return captured.find((message) => message.from === "me");
+  }
+
   function send(input: Extract<ChatRequest, { op: "send" }>): ChatResult {
-    const text = (input.text ?? "").trim().slice(0, CHAT_TEXT_MAX);
+    const imageLabel = imageCountLabel(input.images);
+    if (imageLabel && !input.to) return { ok: false, error: "Choose a session to send images." };
+    const text = (input.text ?? "").trim().slice(0, CHAT_TEXT_MAX) || imageLabel;
     const sticker = input.sticker ?? null;
     if (text === "" && sticker === null) return { ok: false, error: "There is nothing to send." };
     if (sticker !== null && tr("chat.stickers", null, "list")[sticker] === undefined) {
       return { ok: false, error: "There is no such sticker." };
     }
     const team = members();
-    const targets = mentionedIds(text, team).flatMap(
-      (id) => team.find((member) => member.id === id) ?? [],
-    );
-    const captured: EngineMessage[] = [];
-    capture = captured;
-    try {
-      engine.send({ text, sticker, replyTo: input.replyTo ?? null });
-    } finally {
-      capture = null;
+    const recipient = input.to === undefined ? undefined : roster.get(input.to);
+    if (input.to !== undefined && recipient === undefined) {
+      return { ok: false, error: "That session has left the office. Choose another recipient." };
     }
-    const mine = captured.find((message) => message.from === "me");
+    const targets = recipient
+      ? [recipient]
+      : mentionedIds(text, team).flatMap((id) => team.find((member) => member.id === id) ?? []);
+    const mine = postMessage(input, text, sticker, imageLabel);
     if (mine === undefined) return OK;
-    const quote = { id: mine.id, name: tr("chat.boss"), text: short(text, 90) };
+    const words = text || (sticker === null ? "" : tr("chat.stickers", null, "list")[sticker]);
+    const quote = { id: mine.id, name: tr("chat.boss"), text: short(words, 90) };
     // Not awaited: a send that fails is a line in the chat, not an error of this call.
-    for (const member of targets) prompt(member, text, quote);
+    for (const member of targets) prompt(member, words, quote, input.images);
     return OK;
   }
 
@@ -342,7 +386,11 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
   }
 
   return {
-    snapshot: () => ({ messages: wireMessages(), typing: [...engine.state.typing] }),
+    snapshot: () => ({
+      messages: wireMessages(),
+      typing: [...engine.state.typing],
+      ...(engine.state.pinned ? { pinned: engine.state.pinned } : {}),
+    }),
 
     view(next) {
       if (next === null) {
@@ -426,6 +474,16 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
         case "vote":
           engine.vote(input.id, "me", input.index);
           return OK;
+        case "poll":
+          engine.poll("me", input.question, input.options);
+          return OK;
+        case "pin": {
+          const message = engine.byId(input.id);
+          if (!message || message.recalled || message.kind === "sys")
+            return { ok: false, error: "This message cannot be pinned." };
+          if (engine.state.pinned !== input.id) engine.pin(input.id, tr("chat.boss"));
+          return OK;
+        }
         case "rsvp":
           engine.rsvp(input.id, "me", input.yes);
           return OK;

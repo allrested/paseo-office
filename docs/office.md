@@ -79,9 +79,7 @@ turn, and is offered only on a host whose SDK has an agent's
 
 "Open session" shows the session in the office's column (see below) in every app, and the card
 closes as it does. Every way in (the card, an Activity card, the List's "Open session",
-the 3D office's walk-in) calls the surface's one `openSession`. Leaving for the agent's workspace
-is the session panel's own "Open in workspace", drawn only where the app gives the plugin
-`navigation`.
+the 3D office's walk-in) calls the surface's one `openSession`. **Open in workspace** opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
 
 ## Views
 
@@ -111,8 +109,7 @@ that `/` focuses on the web. Each row adds its context, its turn's clock or how 
 rested, and its cost (`client/list-text.ts`).
 
 In browsers that support fullscreen, the Full screen button beside the view switch expands the
-office. Wide screens show Sessions on the left, the floor in the center, and Activity, Chat, and
-open conversations on the right. Select an agent to read the conversation, reply, or answer a
+office. Wide screens show Sessions on the left, the floor in the center, and Activity or an open conversation on the right. **Team chat** opens a floating messenger over the floor. Select an agent to read the conversation, reply, or answer a
 permission request. Use **Sessions** and **Details** in the top bar to hide either sidebar or both.
 The device remembers your choice. Restoring Sessions brings back its search and filter, and
 restoring Details brings back the conversation and reply draft. Narrow screens open these panels
@@ -139,22 +136,14 @@ reasoning), the requests waiting on the agent with Approve and Deny, a reply box
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
 says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
-tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a
-question is answered in the workspace, where the app gives one: the panel then says "Answer this in
-the workspace." and offers
-"Open in workspace"; in an app that gives none it says "This cannot be answered here."
-Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
-there. A tab leaves only when it is closed: an agent the office does not list (closed, archived, or
-created a moment ago and not yet in the list) keeps its tab, which says so, with "Open in
-workspace" where the app gives one and no reply box; the tab is the normal panel once the agent is
-listed. On a compact layout the sheet shows the session with a Back to Sessions button;
+tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. For a plan, a question, attachments, model changes or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 Open sessions and the chosen tab last while the office is mounted, not across a reload.
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
   something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,
   Janitor, Stand-up, Reviews, QA and Library.
-- **Sessions** lists every agent by room, with sub-agents under their parent. Its "New agent"
+- **Sessions** groups agents by status. Green marks working agents, amber marks agents that need you and gray marks resting agents. Task bars count completed checklist items. When only context usage is available it has its own label. Searching and status filters work together. Its "New agent"
   button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
   a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
   of the providers that are ready and enabled; and the first prompt. Create starts the agent in
@@ -173,7 +162,12 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
   app run. It fills only while an office surface is open.
 - **Chat** is my-office's team chat engine, running on the office's server
   (`server/chat-service.ts`, with the engine in `shared/upstream/`). An `@` to an agent prompts it
-  and posts its answer.
+  and posts its answer. In fullscreen, **Team chat** floats over the floor. Open **To** and
+  choose a session to send it a prompt. On the web you can attach up to four images to that
+  prompt. The shared chat shows the image count and the session’s reply. The image files go
+  to the chosen session. Use the toolbar to mention someone, send a sticker or create a poll.
+  Polls take two to six choices and pin themselves. You can also pin a message from its row.
+  Select the pinned banner to read it, or use **Search chat** to find an earlier message. Messages support quoted replies, reactions, pins, search and polls. On web, selecting a recipient also lets you attach images. The chosen session receives the images and the group sees an attachment label.
 
 The panels read the surface's one `office.state` subscription.
 
@@ -366,8 +360,13 @@ lounge, and the janitor stays at the cart. The 2D floor has no incident alarm.
 
 Each room has a board, and the lobby has one for the host: posts are tasks (open, claimed, done) or
 notes, kept in `<PASEO_HOME>/office/boards.json` (200 per board, done tasks dropped after 7 days).
-The lobby's board is the office's to-do list: a to-do is a lobby task, and "Clear finished" deletes
-the done ones. It also shows each agent's unfinished checklist steps, text included, which the
+The lobby's to-do list defaults to **Any idle agent**. An available interactive session picks up
+each open task and appears on the board as its claimant. The claim stays until the task is marked
+done or reopened. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
+pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
+A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
+
+The lobby also shows each agent's unfinished checklist steps, text included, which the
 "doing now" read takes from the newest `todo` item among the agent's newest timeline items. The
 steps stay after the agent stops and go when it is archived or closed. The server keeps them in
 memory, and only while an office surface is open: after the last one closes or the daemon restarts,
@@ -383,8 +382,8 @@ off gets none of them, and a provider that lists `send_agent_prompt` in
 A post that names an agent wakes it when it is idle, at most 6 times an hour per agent. Posts that
 wait for an agent go out as one prompt per author: an agent's posts carry that agent as the source,
 the user's posts arrive as a user prompt. A post naming an agent that has not run a turn yet is
-delivered after that agent's first turn or the next post that names it. The "Wake agents" setting
-holds every wake until it is turned back on; wakes that wait are not kept across a daemon restart.
+delivered after that agent's first turn or the next post that names it. Pending mention
+notifications are held in memory.
 
 ## Settings
 
@@ -441,8 +440,8 @@ the workspace descriptor the daemon keeps current for the sidebar (`projectWorks
 `server/directory.ts`). A blocker is an agent that waits for your answer or stopped on an error, or
 a pull request with failing checks, requested changes or conflicts.
 
-"Ask for an update" posts one note per idle agent on its room's board, each naming its agent,
-because a wake needs a name; the agent answers with `office_post`, and its note shows in the
+"Ask for an update" posts one note per idle agent on its room's board, each naming its agent.
+The agent answers with `office_post`, and its note shows in the
 report. An agent is asked once per opening of the card, and the button is off while "Wake agents"
 is off. "Copy as text" copies the report.
 
@@ -559,8 +558,7 @@ The Reviews entry is in the Attention tab while a workspace has an open or draft
 card is a queue: what waits for a review first, then what was sent back, the approved and the
 drafts, each with its branch, its base, the size of the checkout's changes, its checks and its
 conflicts, from the same descriptor as the stand-up. No SDK call fetches a diff or submits a
-verdict, so the card sends you on: "Open workspace" shows the workspace, where the app has the
-diff, and the link opens the pull request on its forge.
+verdict. **Open workspace** opens the workbench over the office to show the diff. The pull request link opens its forge.
 
 "Ask for a review" posts a note to the team's newest idle agent. The note's first line starts with
 `Review request:` and its second is the pull request's address; that is how the office finds the
@@ -635,7 +633,7 @@ For most agent lines, reception can speak when nobody is resting. Chat photos ar
 
 ## The street
 
-“The street outside” in plugin settings controls the optional city backdrop. The device saves the optional boolean `street` in `office-device`. A wide web layout defaults to on. Compact layouts and native apps default to off. Changing the setting opens a fresh scene. The street lights follow the app theme. In Walk mode take the lift at the door to reach the pavement.
+Choose **Change outdoor scene** (the mountains button) in 3D or open Office settings. Select **City**, **Countryside**, **Beach** or **Plain**. **Lighting** offers **App theme**, **Day** and **Night**. Countryside with Day lighting gives the green landscape shown in my-office. Choosing a different environment rebuilds the floor; changing the lighting keeps the camera. Each device remembers its choices. Older devices retain their saved street preference as City or Plain. The city supports taking the lift to the pavement in Walk mode.
 
 The device requests the CC0 car models from `office.world.street` and passes the string to the isolated scene in the `street.kit` start option. A failed request leaves procedural traffic and shops available and shows a floor note. The day’s street activities include shopping trips, the guard, lunch, evening drinks, the photo studio and pickleball. The upstream chain modules and branded artwork are excluded. Plain canvas signs carry the names from `scripts/street-brands.mjs`. See the street section of [the source inventory](../vendor/SOURCES.md) when importing upstream changes.
 

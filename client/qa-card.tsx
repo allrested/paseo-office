@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { ExternalLink, Modal } from "@getpaseo/plugin/client/ui";
+import { ExternalLink } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import { ActionButton, failureText } from "./action-button.js";
 import {
   QA_HELP,

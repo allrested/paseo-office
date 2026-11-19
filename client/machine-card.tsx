@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { Text, View, type ViewStyle } from "react-native";
-import { Modal } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import type { Machine, MachineAgent } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
 import {

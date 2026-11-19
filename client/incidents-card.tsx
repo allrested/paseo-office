@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { ExternalLink, Modal } from "@getpaseo/plugin/client/ui";
+import { ExternalLink } from "@getpaseo/plugin/client/ui";
+import { OfficeModal as Modal } from "./office-modal.js";
 import type { IncidentsState } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { incidentProblems, incidentRows, type IncidentRow } from "./incidents-text.js";

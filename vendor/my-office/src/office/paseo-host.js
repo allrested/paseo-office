@@ -3,6 +3,7 @@
 export const host = {
   /** 'pro' (the company floor), 'cozy' (one open room) or 'hq' (department rooms). */
   plan: 'pro',
+  scene: 'plain',
   street: false,
   streetKit: null,
   claudeReading: null,

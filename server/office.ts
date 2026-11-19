@@ -1,5 +1,6 @@
 import type { AgentToolDefinition } from "@getpaseo/plugin/server";
 import {
+  LOBBY,
   USER_AUTHOR,
   type DeleteResult,
   type Post,
@@ -14,17 +15,20 @@ import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
 import { createMentionQueue, type MentionQueue, type WakeTarget } from "./mention-queue.js";
+import { completionLine, createLobbyPickup, type LobbyPickup } from "./lobby-pickup.js";
 import { oneLine } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 
 export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface OfficeAgentPorts {
+  lobbyCandidates(): Promise<string[]>;
+  lobbyEligible(agentId: string): Promise<boolean>;
   status(agentId: string): Promise<WakeTarget>;
   /** The full id of the agent that `agentId` names or starts, or null when it can get no post. */
   resolve(agentId: string): Promise<string | null>;
   /** `source` is the agent whose posts the prompt carries, or null for a prompt as from the user. */
-  send(agentId: string, prompt: string, source: string | null): Promise<void>;
+  send(agentId: string, prompt: string, source: string | null, messageId?: string): Promise<void>;
 }
 
 export type OfficeHub = Pick<Hub, "setBoards" | "setBoard" | "removeBoard" | "setWake">;
@@ -47,10 +51,12 @@ export interface Office {
   remove(id: string): Promise<DeleteResult>;
   clearDone(board: string): Promise<DeleteResult>;
   setWakesPaused(paused: boolean): Promise<WakeState>;
+  setPickupEnabled(enabled: boolean): void;
   turnEnded(agentId: string): void;
+  checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
   agentGone(agentId: string): void;
   workspaceArchived(workspaceId: string): Promise<void>;
-  stop(): void;
+  stop(): Promise<void>;
 }
 
 /** How a wake prompt names a post's author; the id lets the woken agent answer with `to`. */
@@ -65,6 +71,8 @@ export function createOffice(deps: OfficeDeps): Office {
   // agent is named by its bare id until one of those sees it again.
   const titles = new Map<string, string>();
   let queue: MentionQueue | null = null;
+  let pickup: LobbyPickup | null = null;
+  let pickupEnabled = false;
   let stopped = false;
   let cancelPrune: (() => void) | null = null;
 
@@ -76,7 +84,10 @@ export function createOffice(deps: OfficeDeps): Office {
     clock,
     log,
     label,
-    onBoard: (board, posts) => hub.setBoard(board, posts),
+    onBoard: (board, posts) => {
+      hub.setBoard(board, posts);
+      if (board === LOBBY) pickup?.refresh();
+    },
     onBoardRemoved: (board) => hub.removeBoard(board),
   });
 
@@ -121,6 +132,15 @@ export function createOffice(deps: OfficeDeps): Office {
         },
         service.wakesPaused(),
       );
+      pickup = createLobbyPickup({
+        service,
+        agents: deps.agents,
+        queue,
+        clock,
+        enabled: () => pickupEnabled && !service.wakesPaused(),
+        log,
+      });
+      pickup.refresh();
       hub.setBoards(service.boards());
       hub.setWake(queue.state());
       schedulePrune();
@@ -169,10 +189,27 @@ export function createOffice(deps: OfficeDeps): Office {
       const wakeQueue = await requireQueue();
       await service.setWakesPaused(paused);
       wakeQueue.setPaused(paused);
+      pickup?.refresh();
       return wakeQueue.state();
+    },
+    setPickupEnabled(enabled) {
+      pickupEnabled = enabled;
+      pickup?.refresh();
     },
     turnEnded(agentId) {
       queue?.turnEnded(agentId);
+      pickup?.refresh();
+    },
+    async checkCompletion(agentId, lastAnswer) {
+      await ready;
+      const claim = service
+        .postsOf(LOBBY)
+        .find((p) => p.state === "claimed" && p.claimedBy === agentId);
+      if (!claim) return;
+      const text = await lastAnswer();
+      if (text?.trimEnd().split("\n").at(-1)?.trim() === completionLine(claim)) {
+        await service.finishLobbyClaim(claim);
+      }
     },
     agentGone(agentId) {
       queue?.agentGone(agentId);
@@ -181,11 +218,12 @@ export function createOffice(deps: OfficeDeps): Office {
       await ready;
       await service.removeBoard(workspaceId);
     },
-    stop() {
+    async stop() {
       stopped = true;
       cancelPrune?.();
       cancelPrune = null;
       queue?.stop();
+      await pickup?.stop();
     },
   };
 }

@@ -136,22 +136,24 @@ function clockText(promptedAt: string | undefined, now: number): string | null {
 }
 
 /** How long ago a resting agent's last change was: "now", "5m ago", "2h ago", "3d ago". */
-function agoText(idleSince: string | undefined, now: number): string | null {
+function agoText(idleSince: string | undefined, now: number, waiting = false): string | null {
   const since = idleSince === undefined ? Number.NaN : Date.parse(idleSince);
   if (!Number.isFinite(since)) return null;
   const ms = Math.max(0, now - since);
-  if (ms < MINUTE) return "now";
-  if (ms < HOUR) return `${Math.floor(ms / MINUTE)}m ago`;
-  if (ms < DAY) return `${Math.floor(ms / HOUR)}h ago`;
-  return `${Math.floor(ms / DAY)}d ago`;
+  if (ms < MINUTE) return waiting ? "Waiting <1m" : "now";
+  let duration = `${Math.floor(ms / DAY)}d`;
+  if (ms < HOUR) duration = `${Math.floor(ms / MINUTE)}m`;
+  else if (ms < DAY) duration = `${Math.floor(ms / HOUR)}h`;
+  return waiting ? `Waiting ${duration}` : `${duration} ago`;
 }
 
 /**
  * The row's time: the turn's clock while it runs, how long it has rested while it is idle. An
- * agent that needs you, is starting or has stopped on an error shows none.
+ * agent with a permission request uses its attention timestamp when the host provides one.
  */
 export function timeText(row: OfficeRow, now: number): string | null {
   const { agent } = row;
+  if (agent.permissions.length) return agoText(agent.permissionSince, now, true);
   if (attentionReason(agent) !== null) return null;
   if (agent.status === "running") return clockText(agent.promptedAt, now);
   if (agent.status === "idle") return agoText(agent.idleSince, now);
