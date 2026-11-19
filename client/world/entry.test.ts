@@ -480,11 +480,13 @@ test("the wall screen's tooltip says what it opens", async () => {
   expect(without.get("tv")?.hint).toBe("Open the Host panel");
 });
 
-test("the frame's page lets the office go full screen", () => {
+test("the frame leaves fullscreen to the office surface", () => {
   const container = document.createElement("div");
   const frame = openWorldFrame({ container, script: "", title: "Office in 3D" });
 
-  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe("fullscreen; autoplay");
+  expect(container.querySelector("iframe")?.getAttribute("allow")).toBe(
+    "fullscreen 'none'; autoplay",
+  );
   frame.dispose();
 });
 
