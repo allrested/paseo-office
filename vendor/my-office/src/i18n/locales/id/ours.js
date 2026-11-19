@@ -21,9 +21,9 @@ export default {
   // (the bell is rung by Paseo's stand-up card)
   'people.meet.standup': 'Stand-up, semuanya: lagi ngerjain apa?',
   'world.dev.lost': { other: '{n} agen meninggalkan proses yang masih berjalan' },
-  'places.library.today': { other: '{n} kali baca sejak kantor dibuka' },
-  'places.window.empty': 'Belum ada yang mencari di web sejak kantor dibuka.',
-  'places.window.today': { other: '{n} pencarian web sejak kantor dibuka' },
+  'places.library.today': { other: '{n} kali baca sejak tampilan kantor ini dibuka' },
+  'places.window.empty': 'Belum ada yang mencari di web sejak tampilan kantor ini dibuka.',
+  'places.window.today': { other: '{n} pencarian web sejak tampilan kantor ini dibuka' },
   'places.deploy.sub': 'Setiap commit membuat printer mencetak. Roket meluncur setiap kali deploy berhasil.',
   'paseo.deploy.failed': 'Deploy gagal',
   // (the same words as the whiteboard's row: shared/model.ts waitingOnText)
@@ -37,7 +37,7 @@ export default {
   'tips.person.text': 'Klik seseorang untuk membuka kartunya. Di sana kamu bisa melihat apa yang sedang dia kerjakan dan membuka sesinya.',
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
   'paseo.notes': 'Catatan stand-up',
-  'places.deploy.today': { other: '{n} kali deploy sejak kantor dibuka' },
+  'places.deploy.today': { other: '{n} kali deploy sejak tampilan kantor ini dibuka' },
   'places.live.deployToday': '{n} sejauh ini',
   // (first-person play is not taken: nobody walks in to pick up a cue; and the box asks no price)
   'props.billiards.hint': 'Ajak dua orang yang sedang senggang untuk main biliar',
