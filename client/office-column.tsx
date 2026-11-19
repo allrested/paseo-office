@@ -122,8 +122,12 @@ function SessionTab({
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
   const hoverOut = useCallback(() => setHovered(false), []);
+  // A button the keyboard reaches is shown: opacity 0 does not take it out of the tab order.
+  const [focused, setFocused] = useState(false);
+  const focusIn = useCallback(() => setFocused(true), []);
+  const focusOut = useCallback(() => setFocused(false), []);
   let closeStyle = styles.sessionTabClose;
-  if (!touch && !selected && !hovered) closeStyle = styles.sessionTabCloseHidden;
+  if (!touch && !selected && !hovered && !focused) closeStyle = styles.sessionTabCloseHidden;
   return (
     <View style={styles.sessionTab}>
       {selected ? <View style={styles.segmentFill} /> : null}
@@ -147,6 +151,8 @@ function SessionTab({
         onPress={close}
         onHoverIn={hoverIn}
         onHoverOut={hoverOut}
+        onFocus={focusIn}
+        onBlur={focusOut}
         style={closeStyle}
       >
         <Icon name="X" size={iconSize - 4} color={color} />

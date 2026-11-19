@@ -63,6 +63,7 @@ export function closeSession(tabs: SessionTabs, agentId: string): SessionTabs {
 }
 
 export function showTab(tabs: SessionTabs, tab: ColumnTab): SessionTabs {
+  if (tabs.view.kind === "tab" && tabs.view.tab === tab) return tabs;
   return { open: tabs.open, view: { kind: "tab", tab } };
 }
 

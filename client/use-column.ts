@@ -36,9 +36,9 @@ export interface ColumnState {
 }
 
 /**
- * The column's state. The open sessions and the chosen tab live as long as the surface; the width and collapsed are the
- * device's. A change shows at once and is saved behind it; one the device refuses holds until the
- * office is closed.
+ * The column's state. The open sessions and the chosen tab live as long as the surface; the width
+ * and collapsed are the device's. A change shows at once and is saved behind it; one the device
+ * refuses holds until the office is closed.
  */
 export function useColumn(): ColumnState {
   const settings = useSettings(officeColumnSettings);

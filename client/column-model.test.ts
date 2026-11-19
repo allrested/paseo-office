@@ -94,6 +94,12 @@ test("a fixed tab shows without closing any session", () => {
   });
 });
 
+test("showing the tab already shown returns the same tabs", () => {
+  const shown = showTab(openSession(NO_SESSIONS, "a"), "chat");
+  expect(showTab(shown, "chat")).toBe(shown);
+  expect(showTab(NO_SESSIONS, "sessions")).toBe(NO_SESSIONS);
+});
+
 test("a session whose agent is gone is dropped", () => {
   const two = openSession(openSession(NO_SESSIONS, "a"), "b");
   expect(keepKnown(two, new Set(["a"]))).toEqual({

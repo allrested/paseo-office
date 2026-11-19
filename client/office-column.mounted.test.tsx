@@ -250,3 +250,22 @@ test("opening a session opens a collapsed column", async () => {
   expect(container.textContent).toContain("panel:session:a");
   expect(saves).toEqual([{ width: 360, collapsed: false }]);
 });
+
+/** What a session tab's close button's opacity says: "0" while it is hidden. */
+function closeOpacity(label: string): string {
+  return getComputedStyle(control(label)).opacity;
+}
+
+test("a hidden close button shows once the keyboard reaches it", async () => {
+  await mount();
+  await act(async () => control("open a").click());
+  await act(async () => control("open b").click());
+  // Alpha is not chosen and not hovered: its close button is out of sight.
+  expect(closeOpacity("Close Alpha work")).toBe("0");
+
+  await act(async () => control("Close Alpha work").focus());
+  expect(closeOpacity("Close Alpha work")).not.toBe("0");
+
+  await act(async () => control("Close Alpha work").blur());
+  expect(closeOpacity("Close Alpha work")).toBe("0");
+});
