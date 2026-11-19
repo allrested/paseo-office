@@ -215,6 +215,7 @@ interface RoomCardProps {
   onSelectAgent(agentId: string): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
+  onOpenDuties(): void;
 }
 
 function RoomCard({
@@ -227,6 +228,7 @@ function RoomCard({
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
+  onOpenDuties,
 }: RoomCardProps) {
   return (
     <View style={styles.card}>
@@ -255,7 +257,13 @@ function RoomCard({
           onOpenSession={onOpenSession}
         />
       ))}
-      <RoomBoard room={room} name={name} styles={styles} onOpenBoard={onOpenBoard} />
+      <RoomBoard
+        room={room}
+        name={name}
+        styles={styles}
+        onOpenBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+      />
     </View>
   );
 }
@@ -372,6 +380,8 @@ export interface StructureViewProps {
   /** Opens an agent's session from its row, in the office's column. The surface always supplies it. */
   onOpenSession?(agentId: string): void;
   onOpenBoard(roomId: string): void;
+  /** The duty board's editor, from the lobby's card: the way to it without the 3D floor. */
+  onOpenDuties(): void;
 }
 
 /**
@@ -387,6 +397,7 @@ export function StructureView({
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
+  onOpenDuties,
 }: StructureViewProps) {
   const [tab, setTab] = useState<ListTab>("all");
   const [query, setQuery] = useState("");
@@ -420,6 +431,7 @@ export function StructureView({
           onSelectAgent={onSelectAgent}
           onOpenSession={onOpenSession}
           onOpenBoard={onOpenBoard}
+          onOpenDuties={onOpenDuties}
         />
       ))}
     </ScrollView>

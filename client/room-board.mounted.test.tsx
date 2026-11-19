@@ -47,9 +47,22 @@ function officeRoom(id: string, boards: OfficeSnapshot["boards"]): OfficeRoom {
 const nameOf = (author: string) => author;
 const ignore = () => undefined;
 
+let dutiesOpened = 0;
+const openDuties = () => {
+  dutiesOpened += 1;
+};
+
 function Harness({ room }: { room: OfficeRoom }) {
   const styles = useOfficeStyles(THEME, false, false);
-  return <RoomBoard room={room} name={nameOf} styles={styles} onOpenBoard={ignore} />;
+  return (
+    <RoomBoard
+      room={room}
+      name={nameOf}
+      styles={styles}
+      onOpenBoard={ignore}
+      onOpenDuties={openDuties}
+    />
+  );
 }
 
 let container: HTMLElement;
@@ -93,6 +106,7 @@ test("the lobby card previews open to-dos and counts only open ones", async () =
   expect(lines()).toEqual([
     "To-do",
     "Open board",
+    "Duty board",
     "Task · open · user",
     "Rotate the keys",
     "Task · claimed by a1 · user",
@@ -111,7 +125,9 @@ test("the lobby card previews open to-dos and counts only open ones", async () =
     }),
   );
 
-  expect(lines()).toEqual(["To-do", "No to-dos", "Open board"]);
+  expect(lines()).toEqual(["To-do", "No to-dos", "Open board", "Duty board"]);
+  await act(async () => container.querySelector<HTMLElement>('[aria-label="Duty board"]')?.click());
+  expect(dutiesOpened).toBe(1);
 });
 
 test("a workspace card still previews its posts", async () => {

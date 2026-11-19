@@ -37,6 +37,8 @@ import { sheetLeavesFirstOn } from "./agent-picker-text.js";
 import { AttentionStrip, type StripCard } from "./attention-strip.js";
 import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
+import { DutySheet } from "./duty-sheet.js";
+import { useDutyActions } from "./use-duty-actions.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
 import { TeamChatPreview } from "./team-chat-preview.js";
@@ -653,6 +655,8 @@ interface SurfaceBodyProps {
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
+  /** The duty board's editor: the 3D pantry's board and the List's lobby card open it. */
+  onOpenDuties(): void;
   machine: Machine | null;
   onOpenMachine(): void;
   /** The 3D wall screen's: absent on an app that cannot show Resources beside the floor. */
@@ -693,6 +697,7 @@ function SurfaceBody({
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
+  onOpenDuties,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -794,6 +799,7 @@ function SurfaceBody({
       onSelectAgent={onSelectAgent}
       onOpenSession={onOpenSession}
       onOpenBoard={onOpenBoard}
+      onOpenDuties={onOpenDuties}
     />
   );
 }
@@ -1724,6 +1730,8 @@ export function OfficeSurface(
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   const board = useBoardSheet(model, live);
+  const dutyCard = useCardOpening(live);
+  const dutyActions = useDutyActions();
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
   const incidentsCard = useCardOpening(live);
@@ -1884,6 +1892,7 @@ export function OfficeSurface(
     draft,
     newAgent,
     ...chatTasks,
+    onDuties: dutyCard.show,
     onGroupPhoto,
   };
   const sessions = useMemo(
@@ -1965,6 +1974,7 @@ export function OfficeSurface(
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
             onOpenBoard={board.open}
+            onOpenDuties={dutyCard.show}
             machine={machine}
             onOpenMachine={openMachine}
             onOpenResources={openResources}
@@ -2107,6 +2117,15 @@ export function OfficeSurface(
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
         onClose={board.close}
+      />
+      <DutySheet
+        open={dutyCard.open}
+        list={model.dutyList}
+        rows={model.duties}
+        name={name}
+        actions={dutyActions}
+        styles={styles}
+        onClose={dutyCard.close}
       />
       {full.integrated && (
         <OfficeMessenger

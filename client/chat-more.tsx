@@ -9,6 +9,7 @@ import type { OfficeStyles } from "./styles.js";
 
 export interface ChatShortcuts {
   onBoard?(): void;
+  onDuties?(): void;
   onNewAgent?(): void;
   onGroupPhoto?(): Promise<void>;
 }
@@ -19,6 +20,7 @@ export function ChatMore({
   styles,
   onClose,
   onBoard,
+  onDuties,
   onNewAgent,
   onGroupPhoto,
   onUse,
@@ -35,6 +37,10 @@ export function ChatMore({
     onClose();
     onBoard?.();
   }, [onClose, onBoard]);
+  const dutyBoard = useCallback(() => {
+    onClose();
+    onDuties?.();
+  }, [onClose, onDuties]);
   const newAgent = useCallback(() => {
     onClose();
     onNewAgent?.();
@@ -78,6 +84,14 @@ export function ChatMore({
               label="Lobby board"
               pendingLabel="Lobby board"
               onPress={board}
+              styles={styles}
+            />
+          )}
+          {onDuties && (
+            <ActionButton
+              label="Duty board"
+              pendingLabel="Duty board"
+              onPress={dutyBoard}
               styles={styles}
             />
           )}
