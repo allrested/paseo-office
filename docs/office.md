@@ -375,6 +375,8 @@ done or reopened. Choose a specific agent to send it the task when idle. Turning
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
 
+New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
+
 The lobby also shows each agent's unfinished checklist steps, text included, which the
 "doing now" read takes from the newest `todo` item among the agent's newest timeline items. The
 steps stay after the agent stops and go when it is archived or closed. The server keeps them in

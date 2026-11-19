@@ -52,8 +52,14 @@ interface Listeners {
   onBoardRemoved?: (board: string) => void;
 }
 
-/** A service that has not loaded its boards yet. */
-function build(initial?: BoardsFile, listeners: Listeners = {}): Harness {
+type WorkspaceOf = (agentId: string) => Promise<string | null>;
+
+/** A service that has not loaded its boards yet. Agents have no workspace unless one is given. */
+function build(
+  initial?: BoardsFile,
+  listeners: Listeners = {},
+  workspaceOf: WorkspaceOf = async () => null,
+): Harness {
   const store = memoryStore(initial);
   const clock = createFakeClock(T0);
   const events: string[] = [];
@@ -66,12 +72,17 @@ function build(initial?: BoardsFile, listeners: Listeners = {}): Harness {
       listeners.onBoard ??
       ((board, posts) => events.push(`board ${board} ${posts.map((item) => item.id).join(",")}`)),
     onBoardRemoved: listeners.onBoardRemoved ?? ((board) => events.push(`removed ${board}`)),
+    workspaceOf,
   });
   return { service, store, clock, events };
 }
 
-async function harness(initial?: BoardsFile, listeners?: Listeners): Promise<Harness> {
-  const built = build(initial, listeners);
+async function harness(
+  initial?: BoardsFile,
+  listeners?: Listeners,
+  workspaceOf?: WorkspaceOf,
+): Promise<Harness> {
+  const built = build(initial, listeners, workspaceOf);
   await built.service.start();
   return built;
 }
@@ -482,4 +493,264 @@ test("a listener that throws is logged and the change still stands", async () =>
     "log [office] board listener failed: hub down",
     "log [office] board listener failed: hub gone",
   ]);
+});
+
+const ROOMS = new Map([
+  ["a", "w1"],
+  ["b", "w2"],
+]);
+const roomOf: WorkspaceOf = async (agentId) => ROOMS.get(agentId) ?? null;
+const AT_T0 = new Date(T0).toISOString();
+
+/** A lobby task claimed by "a" through the tool, and the copy on a's board. */
+async function claimedByA(initial: Post[] = [lobbyTask(1)]): Promise<Harness> {
+  const built = await harness(file(initial), undefined, roomOf);
+  const claimed = await built.service.update({ id: "p1", action: "claim", actor: "a" });
+  if (!claimed.ok) throw new Error(claimed.error);
+  return built;
+}
+
+function find(service: BoardService, id: string): Post | undefined {
+  return Object.values(service.boards())
+    .flat()
+    .find((item) => item.id === id);
+}
+
+test("claiming a lobby task puts a linked copy on the claimer's board in one save", async () => {
+  const { service, store, events } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claimed = await service.update({ id: "p1", action: "claim", actor: "a" });
+  expect(claimed).toEqual({
+    ok: true,
+    post: {
+      ...lobbyTask(1),
+      state: "claimed",
+      claimedBy: "a",
+      seq: 2,
+      updatedAt: AT_T0,
+      link: "p3",
+    },
+  });
+  expect(service.boards().w1).toEqual([
+    {
+      id: "p3",
+      seq: 3,
+      board: "w1",
+      kind: "task",
+      text: "post 1",
+      author: "user",
+      state: "claimed",
+      claimedBy: "a",
+      link: "p1",
+      createdAt: AT_T0,
+      updatedAt: AT_T0,
+    },
+  ]);
+  expect(store.saved).toHaveLength(1);
+  expect(store.saved[0]?.nextSeq).toBe(4);
+  expect(events).toEqual(["board lobby p1", "board w1 p3"]);
+  // A repeated claim changes nothing and makes no second copy.
+  expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toEqual(claimed);
+  expect(store.saved).toHaveLength(1);
+  expect(service.boards().w1).toHaveLength(1);
+});
+
+test("an agent without a workspace and the user get no copy", async () => {
+  const { service } = await harness(file([lobbyTask(1), lobbyTask(2)]), undefined, roomOf);
+  const loner = await service.update({ id: "p1", action: "claim", actor: "c" });
+  const user = await service.update({ id: "p2", action: "claim", actor: "user" });
+  expect(loner.ok && loner.post).not.toHaveProperty("link");
+  expect(user.ok && user.post).not.toHaveProperty("link");
+  expect(Object.keys(service.boards())).toEqual(["lobby"]);
+});
+
+test("a room task claimed the normal way gets no copy", async () => {
+  const { service } = await harness(
+    file([post(1, { kind: "task", state: "open" })]),
+    undefined,
+    roomOf,
+  );
+  const claimed = await service.update({ id: "p1", action: "claim", actor: "b" });
+  expect(claimed.ok && claimed.post).not.toHaveProperty("link");
+  expect(Object.keys(service.boards())).toEqual(["w1"]);
+});
+
+test("the automatic pickup's claim makes the copy and keeps its assignment fields", async () => {
+  const { service, events } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claim = await service.claimLobbyTask("p1", "b", 1);
+  expect(claim).toMatchObject({ id: "p1", seq: 2, state: "claimed", claimedBy: "b", link: "p3" });
+  expect(claim?.pickupMessageId).toBeTruthy();
+  expect(service.boards().w2).toEqual([
+    expect.objectContaining({ id: "p3", seq: 3, claimedBy: "b", state: "claimed", link: "p1" }),
+  ]);
+  expect(find(service, "p3")).not.toHaveProperty("pickupMessageId");
+  expect(events).toEqual(["board lobby p1", "board w2 p3"]);
+});
+
+test("done on the lobby task marks its copy done, in one save", async () => {
+  const { service, store, events } = await claimedByA();
+  const done = await service.update({ id: "p1", action: "done", actor: "user" });
+  expect(done.ok && done.post).toMatchObject({ state: "done", seq: 4, link: "p3" });
+  expect(find(service, "p3")).toMatchObject({ state: "done", seq: 5, claimedBy: "a", link: "p1" });
+  expect(store.saved).toHaveLength(2);
+  expect(store.saved.at(-1)?.nextSeq).toBe(6);
+  expect(events.slice(-2)).toEqual(["board lobby p1", "board w1 p3"]);
+});
+
+test("done on the copy marks the lobby task done", async () => {
+  const { service, store, events } = await claimedByA();
+  const done = await service.update({ id: "p3", action: "done", actor: "a" });
+  expect(done.ok && done.post).toMatchObject({ id: "p3", state: "done", seq: 4 });
+  expect(find(service, "p1")).toMatchObject({ state: "done", seq: 5, claimedBy: "a", link: "p3" });
+  expect(store.saved).toHaveLength(2);
+  expect(events.slice(-2).sort()).toEqual(["board lobby p1", "board w1 p3"]);
+});
+
+test("a completion line finishes both the lobby task and its copy", async () => {
+  const { service } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  if (!claim) throw new Error("expected a claim");
+  await service.finishLobbyClaim(claim);
+  expect(find(service, "p1")?.state).toBe("done");
+  expect(find(service, "p3")?.state).toBe("done");
+});
+
+test("reopening the lobby task frees it, deletes the copy and clears the link", async () => {
+  const { service, store, events } = await claimedByA();
+  const reopened = await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(reopened.ok && reopened.post).toEqual({ ...lobbyTask(1), seq: 4, updatedAt: AT_T0 });
+  expect(service.boards().w1 ?? []).toEqual([]);
+  expect(store.saved).toHaveLength(2);
+  expect(events.slice(-2)).toEqual(["board lobby p1", "board w1 "]);
+});
+
+test("reopening a done lobby task also deletes its done copy", async () => {
+  const { service } = await claimedByA();
+  await service.update({ id: "p1", action: "done", actor: "a" });
+  await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(find(service, "p1")).toMatchObject({ state: "open" });
+  expect(find(service, "p1")).not.toHaveProperty("link");
+  expect(find(service, "p3")).toBeUndefined();
+});
+
+test("reopening the copy reopens the lobby task and deletes the copy", async () => {
+  const { service, store, events } = await claimedByA();
+  const reopened = await service.update({ id: "p3", action: "reopen", actor: "a" });
+  expect(reopened.ok && reopened.post).toEqual({ ...lobbyTask(1), seq: 4, updatedAt: AT_T0 });
+  expect(find(service, "p3")).toBeUndefined();
+  expect(store.saved).toHaveLength(2);
+  expect(events.slice(-2).sort()).toEqual(["board lobby p1", "board w1 "]);
+  // Once open, the lobby task can be claimed again, with a fresh copy.
+  await service.update({ id: "p1", action: "claim", actor: "b" });
+  expect(service.boards().w2).toEqual([expect.objectContaining({ id: "p6", link: "p1" })]);
+});
+
+test("releasing a failed pickup reopens the lobby task and deletes its copy", async () => {
+  const { service } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  if (!claim) throw new Error("expected a claim");
+  await service.releaseLobbyTask(claim);
+  expect(find(service, "p1")).toMatchObject({ state: "open" });
+  expect(find(service, "p1")).not.toHaveProperty("link");
+  expect(find(service, "p1")).not.toHaveProperty("claimedBy");
+  expect(find(service, "p3")).toBeUndefined();
+});
+
+test("deleting the lobby task deletes its copy; deleting the copy only clears the link", async () => {
+  const first = await claimedByA();
+  expect(await first.service.remove("p1")).toEqual({ ok: true });
+  expect(first.service.boards()).toEqual({});
+  expect(first.store.saved).toHaveLength(2);
+  expect(first.events.slice(-2)).toEqual(["board lobby ", "board w1 "]);
+
+  const second = await claimedByA();
+  const before = find(second.service, "p1");
+  expect(await second.service.remove("p3")).toEqual({ ok: true });
+  const after = find(second.service, "p1");
+  expect(after).toMatchObject({ state: "claimed", claimedBy: "a", seq: before?.seq });
+  expect(after).not.toHaveProperty("link");
+  expect(second.events.slice(-2).sort()).toEqual(["board lobby p1", "board w1 "]);
+});
+
+test("clearing, pruning or removing the copy's board leaves no live link to it", async () => {
+  const cleared = await claimedByA();
+  await cleared.service.update({ id: "p3", action: "done", actor: "a" });
+  await cleared.service.clearDone("w1");
+  expect(find(cleared.service, "p1")).not.toHaveProperty("link");
+
+  const pruned = await claimedByA();
+  await pruned.service.update({ id: "p1", action: "done", actor: "a" });
+  pruned.clock.advance(7 * DAY + 1);
+  await pruned.service.prune();
+  expect(pruned.service.boards()).toEqual({});
+
+  const removed = await claimedByA();
+  await removed.service.removeBoard("w1");
+  expect(find(removed.service, "p1")).toMatchObject({ state: "claimed", claimedBy: "a" });
+  expect(find(removed.service, "p1")).not.toHaveProperty("link");
+  expect(removed.events.slice(-2)).toEqual(["board lobby p1", "removed w1"]);
+});
+
+test("a link to a missing post is ignored", async () => {
+  const dangling = lobbyTask(1, { state: "claimed", claimedBy: "c", link: "p9" });
+  const { service } = await harness(file([dangling]), undefined, roomOf);
+  await service.update({ id: "p1", action: "done", actor: "c" });
+  await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(Object.keys(service.boards())).toEqual(["lobby"]);
+  // A claim by an agent with a room makes a copy rather than trusting the dead link.
+  await service.update({ id: "p1", action: "claim", actor: "a" });
+  expect(find(service, "p1")?.link).toBe(service.boards().w1?.[0]?.id);
+});
+
+test("start gives an already claimed lobby task its copy", async () => {
+  const claimed = lobbyTask(1, { state: "claimed", claimedBy: "a", seq: 5, pickupMessageId: "m" });
+  const { service, store, events } = await harness(
+    { version: 1, nextSeq: 6, wakesPaused: false, posts: [claimed, lobbyTask(2)] },
+    undefined,
+    roomOf,
+  );
+  // The lobby task keeps its seq, so its assignment's completion line still matches.
+  expect(find(service, "p1")).toEqual({ ...claimed, link: "p6" });
+  expect(service.boards().w1).toEqual([
+    expect.objectContaining({ id: "p6", seq: 6, claimedBy: "a", state: "claimed", link: "p1" }),
+  ]);
+  expect(store.saved).toHaveLength(1);
+  expect(events).toEqual(["board lobby p2,p1", "board w1 p6"]);
+  // A second start finds the copy and makes no other.
+  const again = await harness(await store.load(), undefined, roomOf);
+  expect(again.store.saved).toHaveLength(0);
+});
+
+test("a workspace lookup that fails is logged; the claim and the start go on without a copy", async () => {
+  const failing: WorkspaceOf = async () => {
+    throw new Error("daemon away");
+  };
+  const claimed = lobbyTask(1, { state: "claimed", claimedBy: "a" });
+  const { service, events } = await harness(file([claimed, lobbyTask(2)]), undefined, failing);
+  expect(events).toEqual(["log [office] no workspace for a: daemon away"]);
+  const result = await service.update({ id: "p2", action: "claim", actor: "b" });
+  expect(result.ok && result.post).toMatchObject({ state: "claimed", claimedBy: "b" });
+  expect(result.ok && result.post).not.toHaveProperty("link");
+  expect(Object.keys(service.boards())).toEqual(["lobby"]);
+  expect(events.at(-2)).toBe("log [office] no workspace for b: daemon away");
+});
+
+test("a room board full of open tasks takes no copy, and the claim stands", async () => {
+  const full = Array.from({ length: 200 }, (_, index) =>
+    post(index + 2, { kind: "task", state: "open" }),
+  );
+  const { service, events } = await harness(file([lobbyTask(1), ...full]), undefined, roomOf);
+  const result = await service.update({ id: "p1", action: "claim", actor: "a" });
+  expect(result.ok && result.post).toMatchObject({ state: "claimed", claimedBy: "a" });
+  expect(result.ok && result.post).not.toHaveProperty("link");
+  expect(service.boards().w1).toHaveLength(200);
+  expect(events).toContain(
+    "log [office] no copy of p1 on w1: the board holds 200 open or claimed tasks",
+  );
+});
+
+test("a boards file from before links loads unchanged", async () => {
+  const old = file([lobbyTask(1, { state: "claimed", claimedBy: "user" }), post(2)]);
+  const { service, store } = await harness(old, undefined, roomOf);
+  expect(store.saved).toHaveLength(0);
+  expect(service.boards()).toEqual({ lobby: [old.posts[0]], w1: [old.posts[1]] });
 });

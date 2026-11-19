@@ -24,8 +24,13 @@ interface PickupPorts {
   log(message: string): void;
 }
 
-function unassigned(task: Post): boolean {
-  return task.kind === "task" && task.state === "open" && !task.to && !task.claimedBy;
+function awaitingPickup(task: Post): boolean {
+  return (
+    task.kind === "task" &&
+    task.state === "open" &&
+    (!task.to || !!task.namedPickup) &&
+    !task.claimedBy
+  );
 }
 
 export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
@@ -34,12 +39,17 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   let scanning: Promise<void> | null = null;
   let cancel: (() => void) | undefined;
 
-  const active = () => !stopped && ports.enabled();
+  const active = () => !stopped && !service.wakesPaused();
+  const canDispatch = (task: Post) => Boolean(task.namedPickup) || ports.enabled();
 
   function hasWork(): boolean {
     return (
       active() &&
-      service.postsOf(LOBBY).some((task) => unassigned(task) || Boolean(task.pickupMessageId))
+      service
+        .postsOf(LOBBY)
+        .some(
+          (task) => canDispatch(task) && (awaitingPickup(task) || Boolean(task.pickupMessageId)),
+        )
     );
   }
 
@@ -55,11 +65,16 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   }
 
   async function dispatch(task: Post, agentId: string, available: () => boolean): Promise<boolean> {
+    const eligible = () =>
+      task.namedPickup
+        ? agents.status(agentId).then((status) => status === "wakeable")
+        : agents.lobbyEligible(agentId);
+    if (task.namedPickup && !(await eligible())) return false;
     const recovering = Boolean(task.pickupMessageId);
     const claim = recovering ? task : await service.claimLobbyTask(task.id, agentId, task.seq);
     if (!claim?.pickupMessageId) return false;
     // Check again after saving the claim. Never reassign an earlier send whose receipt was lost.
-    if (!(await agents.lobbyEligible(agentId)) || !active() || !available()) {
+    if (!(await eligible()) || !canDispatch(task) || !active() || !available()) {
       if (!recovering) await service.releaseLobbyTask(claim);
       return false;
     }
@@ -77,22 +92,32 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     return true;
   }
 
-  function nextFor(agentId: string): Post | undefined {
+  function nextFor(agentId: string, automatic: boolean): Post | undefined {
     const board = service.postsOf(LOBBY);
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
-    if (existing) return existing.pickupMessageId ? existing : undefined;
+    if (existing) return existing.pickupMessageId && canDispatch(existing) ? existing : undefined;
     return board
-      .filter((p) => unassigned(p) && p.author !== agentId)
+      .filter(
+        (p) => awaitingPickup(p) && p.author !== agentId && (p.to ? p.to === agentId : automatic),
+      )
       .sort(
         (a, b) =>
-          a.createdAt.localeCompare(b.createdAt) || Number(a.id.slice(1)) - Number(b.id.slice(1)),
+          Number(Boolean(b.to)) - Number(Boolean(a.to)) ||
+          a.createdAt.localeCompare(b.createdAt) ||
+          Number(a.id.slice(1)) - Number(b.id.slice(1)),
       )[0];
   }
 
   async function scan(): Promise<void> {
-    for (const agentId of await agents.lobbyCandidates()) {
+    const named = service
+      .postsOf(LOBBY)
+      .flatMap((p) =>
+        p.namedPickup && p.to && (awaitingPickup(p) || p.pickupMessageId) ? [p.to] : [],
+      );
+    const automatic = new Set(ports.enabled() ? await agents.lobbyCandidates() : []);
+    for (const agentId of new Set([...named, ...automatic])) {
       if (!hasWork()) break;
-      const next = nextFor(agentId);
+      const next = nextFor(agentId, automatic.has(agentId));
       if (!next) continue;
       try {
         await queue.tryPickup(agentId, (available) => dispatch(next, agentId, available));

@@ -157,8 +157,12 @@ export const PostSchema = z.object({
   /** Tasks only. */
   state: TaskStateSchema.optional(),
   claimedBy: z.string().optional(),
+  /** Named lobby tasks created with tracked pickup. Older named posts may already have woken their agent. */
+  namedPickup: z.literal(true).optional(),
   /** Persisted until Paseo acknowledges an automatic lobby assignment. */
   pickupMessageId: z.string().optional(),
+  /** A claimed lobby task's copy on the claimer's board, and the copy's lobby task: each other's id. */
+  link: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

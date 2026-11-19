@@ -5,6 +5,7 @@ import {
   LOBBY,
   POST_TEXT_MAX,
   READ_POST_MAX,
+  USER_AUTHOR,
   type DeleteResult,
   type Post,
   type PostKind,
@@ -46,6 +47,8 @@ export interface BoardServicePorts {
   label(author: string): string;
   onBoard(board: string, posts: readonly Post[]): void;
   onBoardRemoved(board: string): void;
+  /** The workspace an agent works in, or null for none; its board gets the agent's lobby claims. */
+  workspaceOf(agentId: string): Promise<string | null>;
 }
 
 export interface BoardService {
@@ -99,6 +102,7 @@ function withoutClaim(post: Post): Post {
     updatedAt: post.updatedAt,
   };
   if (post.to !== undefined) next.to = post.to;
+  if (post.namedPickup) next.namedPickup = true;
   if (post.state !== undefined) next.state = post.state;
   return next;
 }
@@ -132,8 +136,24 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     }
   }
 
+  /** Drops each link whose post is gone, and adds the boards of the posts it changes. */
+  function withoutDeadLinks(next: BoardsFile, touched: string[]): BoardsFile {
+    const ids = new Set(next.posts.map((item) => item.id));
+    if (next.posts.every((item) => item.link === undefined || ids.has(item.link))) return next;
+    const posts = next.posts.map((item) => {
+      if (item.link === undefined || ids.has(item.link)) return item;
+      touched.push(item.board);
+      const unlinked = { ...item };
+      delete unlinked.link;
+      return unlinked;
+    });
+    return { ...next, posts };
+  }
+
   /** Saves `next`, then makes it current and announces the touched boards. */
-  async function commit(next: BoardsFile, touched: readonly string[]): Promise<Outcome<null>> {
+  async function commit(proposed: BoardsFile, changed: readonly string[]): Promise<Outcome<null>> {
+    const touched = [...changed];
+    const next = withoutDeadLinks(proposed, touched);
     try {
       await ports.store.save(next);
     } catch (error) {
@@ -171,6 +191,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     };
     if (input.to !== undefined) created.to = input.to;
     if (input.kind === "task") created.state = "open";
+    if (input.board === LOBBY && input.kind === "task" && input.to && input.to !== input.author)
+      created.namedPickup = true;
     // Make room among the existing posts, so the new one is never the one dropped.
     const kept = trimBoard(postsOf(input.board), BOARD_POST_MAX - 1);
     if (kept.length >= BOARD_POST_MAX) {
@@ -180,6 +202,58 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const posts = [...others, ...kept, created];
     const saved = await commit({ ...data, nextSeq: seq + 1, posts }, [input.board]);
     return saved.ok ? { ok: true, post: created } : saved;
+  }
+
+  /** The post linked with `post`, if it still exists and links back. */
+  function partnerOf(post: Post): Post | undefined {
+    if (post.link === undefined) return undefined;
+    const other = data.posts.find((item) => item.id === post.link);
+    return other?.link === post.id ? other : undefined;
+  }
+
+  /** A lookup that fails is logged: the claim stands without a copy. */
+  async function roomOf(agentId: string): Promise<string | null> {
+    try {
+      return await ports.workspaceOf(agentId);
+    } catch (error) {
+      ports.log(`[office] no workspace for ${agentId}: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  /** `posts` with a copy of the lobby task on `room`, trimmed as a new post is; null when full. */
+  function withCopy(
+    posts: readonly Post[],
+    task: Post,
+    claimer: string,
+    room: string,
+    seq: number,
+  ): { posts: Post[]; copy: Post } | null {
+    const kept = trimBoard(
+      posts.filter((item) => item.board === room),
+      BOARD_POST_MAX - 1,
+    );
+    if (kept.length >= BOARD_POST_MAX) {
+      ports.log(
+        `[office] no copy of ${task.id} on ${room}: the board holds 200 open or claimed tasks`,
+      );
+      return null;
+    }
+    const stamp = now();
+    const copy: Post = {
+      id: `p${seq}`,
+      seq,
+      board: room,
+      kind: "task",
+      text: task.text,
+      author: task.author,
+      state: "claimed",
+      claimedBy: claimer,
+      link: task.id,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    return { posts: [...posts.filter((item) => item.board !== room), ...kept, copy], copy };
   }
 
   function nextState(post: Post, input: PostUpdate): Outcome<Post | null> {
@@ -213,11 +287,82 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const next = nextState(post, input);
     if (!next.ok) return next;
     if (next.value === null) return { ok: true, post };
-    const changed: Post = { ...next.value, seq: data.nextSeq, updatedAt: now() };
+    const partner = partnerOf(post);
+    if (partner?.board === LOBBY && next.value.state === "open")
+      return reopenFromCopy(post, partner);
+    const room =
+      partner === undefined &&
+      post.board === LOBBY &&
+      next.value.state === "claimed" &&
+      input.actor !== USER_AUTHOR
+        ? await roomOf(input.actor)
+        : null;
+    let seq = data.nextSeq;
+    const changed: Post = { ...next.value, seq: seq++, updatedAt: now() };
     if (pickupMessageId) changed.pickupMessageId = pickupMessageId;
-    const posts = data.posts.map((item) => (item.id === post.id ? changed : item));
-    const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
+    let posts = data.posts.map((item) => (item.id === post.id ? changed : item));
+    const touched = [post.board];
+    if (partner !== undefined && changed.state === "open") {
+      // The lobby task is free again: its copy goes, whatever its state.
+      posts = posts.filter((item) => item.id !== partner.id);
+      touched.push(partner.board);
+    } else if (partner !== undefined && changed.state === "done" && partner.state !== "done") {
+      const done: Post = { ...partner, state: "done", seq: seq++, updatedAt: now() };
+      delete done.pickupMessageId;
+      posts = posts.map((item) => (item.id === partner.id ? done : item));
+      touched.push(partner.board);
+    } else if (room !== null) {
+      const added = withCopy(posts, changed, input.actor, room, seq);
+      if (added !== null) {
+        seq++;
+        changed.link = added.copy.id;
+        posts = added.posts;
+        touched.push(room);
+      }
+    }
+    const saved = await commit({ ...data, nextSeq: seq, posts }, touched);
     return saved.ok ? { ok: true, post: changed } : saved;
+  }
+
+  /** Reopening a copy reopens its lobby task and deletes the copy; the result is the lobby task. */
+  async function reopenFromCopy(copy: Post, task: Post): Promise<PostResult> {
+    // A linked lobby task is claimed or done, so a reopen always frees it.
+    const reopened: Post = {
+      ...withoutClaim(task),
+      state: "open",
+      seq: data.nextSeq,
+      updatedAt: now(),
+    };
+    const posts = data.posts
+      .filter((item) => item.id !== copy.id)
+      .map((item) => (item.id === task.id ? reopened : item));
+    const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [
+      task.board,
+      copy.board,
+    ]);
+    return saved.ok ? { ok: true, post: reopened } : saved;
+  }
+
+  /** Gives each lobby task claimed by an agent, without a copy, one on the agent's board. */
+  async function copyClaims(): Promise<void> {
+    let posts = data.posts;
+    let seq = data.nextSeq;
+    const touched: string[] = [];
+    for (const task of postsOf(LOBBY)) {
+      const claimer = task.claimedBy;
+      if (task.kind !== "task" || task.state !== "claimed" || partnerOf(task)) continue;
+      if (claimer === undefined || claimer === USER_AUTHOR) continue;
+      const room = await roomOf(claimer);
+      if (room === null) continue;
+      const added = withCopy(posts, task, claimer, room, seq);
+      if (added === null) continue;
+      // The task keeps its seq, so the completion line of its assignment still matches.
+      const linked = { ...task, link: added.copy.id };
+      posts = added.posts.map((item) => (item.id === task.id ? linked : item));
+      seq++;
+      touched.push(LOBBY, room);
+    }
+    if (touched.length > 0) await commit({ ...data, nextSeq: seq, posts }, touched);
   }
 
   async function updateForPickup(input: PostUpdate, pickupMessageId?: string): Promise<Post> {
@@ -243,6 +388,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     start: () =>
       exclusive(async () => {
         data = await ports.store.load();
+        await copyClaims();
         await prunePosts();
       }),
     postsOf,
@@ -264,7 +410,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           task?.seq !== expectedSeq ||
           task.kind !== "task" ||
           task.state !== "open" ||
-          task.to !== undefined ||
+          (task.to !== undefined && (!task.namedPickup || task.to !== agentId)) ||
           task.claimedBy !== undefined ||
           task.author === agentId
         )
@@ -321,8 +467,14 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       exclusive(async (): Promise<DeleteResult> => {
         const post = data.posts.find((item) => item.id === id);
         if (!post) return { ok: false, error: `Unable to delete ${id}: no such post` };
-        const posts = data.posts.filter((item) => item.id !== id);
-        const saved = await commit({ ...data, posts }, [post.board]);
+        // A lobby task takes its copy with it; a deleted copy only unlinks its lobby task.
+        const partner = post.board === LOBBY ? partnerOf(post) : undefined;
+        const gone = new Set([id, ...(partner ? [partner.id] : [])]);
+        const posts = data.posts.filter((item) => !gone.has(item.id));
+        const saved = await commit({ ...data, posts }, [
+          post.board,
+          ...(partner ? [partner.board] : []),
+        ]);
         return saved.ok ? { ok: true } : saved;
       }),
     clearDone: (board) =>
