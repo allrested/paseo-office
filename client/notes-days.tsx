@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
 
 /** The row's label, and the setting a refused save names. */
@@ -16,45 +17,6 @@ const DAY_NAMES = [
   "Friday",
   "Saturday",
 ] as const;
-
-interface DayProps {
-  day: number;
-  name: string;
-  on: boolean;
-  disabled: boolean;
-  onPress(day: number): void;
-  styles: OfficeStyles;
-}
-
-function Day({ day, name, on, disabled, onPress, styles }: DayProps) {
-  const press = useCallback(() => onPress(day), [onPress, day]);
-  const [hovered, setHovered] = useState(false);
-  const hoverIn = useCallback(() => setHovered(true), []);
-  const hoverOut = useCallback(() => setHovered(false), []);
-  const [pressed, setPressed] = useState(false);
-  const pressIn = useCallback(() => setPressed(true), []);
-  const pressOut = useCallback(() => setPressed(false), []);
-  let fill = null;
-  if (on) fill = styles.segmentFill;
-  else if (hovered || pressed) fill = styles.segmentHoverFill;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={name}
-      aria-pressed={on}
-      disabled={disabled}
-      onPress={press}
-      onPressIn={pressIn}
-      onPressOut={pressOut}
-      onHoverIn={hoverIn}
-      onHoverOut={hoverOut}
-      style={styles.segment}
-    >
-      {fill === null ? null : <View style={fill} />}
-      <Text style={on ? styles.segmentTextSelected : styles.segmentText}>{name.slice(0, 3)}</Text>
-    </Pressable>
-  );
-}
 
 export interface NotesDaysProps {
   /** The stored days, 0 for Sunday; null while the settings are read or cannot be read. */
@@ -109,10 +71,11 @@ export function NotesDays({ value, onSave, problem, styles }: NotesDaysProps) {
         style={disabled ? styles.notesDaysDisabled : styles.notesDays}
       >
         {DAY_NAMES.map((name, day) => (
-          <Day
+          <SegmentPill
             key={name}
-            day={day}
+            value={day}
             name={name}
+            text={name.slice(0, 3)}
             on={days?.includes(day) ?? false}
             disabled={disabled}
             onPress={toggle}

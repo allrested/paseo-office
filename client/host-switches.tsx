@@ -3,9 +3,10 @@ import { Text, View } from "react-native";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
 import { TextInput } from "@getpaseo/plugin/client/ui";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
-import { officeHostSettings } from "../shared/settings.js";
+import { officeHostSettings, type FloorPlanChoice } from "../shared/settings.js";
 import { failureText } from "./action-button.js";
 import { wakeSummary } from "./board-text.js";
+import { FLOOR_PLAN_LABEL, FloorPlanRow } from "./floor-plan-row.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
 import type { OfficeStyles } from "./styles.js";
@@ -19,6 +20,7 @@ type HostSetting =
   | "Notes folder"
   | "Time zone"
   | typeof NOTES_DAYS_LABEL
+  | typeof FLOOR_PLAN_LABEL
   | "Jira projects"
   | "Sentry organisation"
   | "Sentry projects"
@@ -48,6 +50,11 @@ function storedValues(settings: HostSettings): HostValues | null {
   return settings.status === "invalid" ? DEFAULTS : null;
 }
 
+/** The stored floor plan; null while the settings are read or cannot be read. */
+function storedPlan(values: HostValues | null): FloorPlanChoice | null {
+  return values === null ? null : values.floorPlan;
+}
+
 export interface HostSwitchesProps {
   /** Null until the office has loaded and while its data is frozen: the switch is then not usable. */
   wake: WakeState | null;
@@ -66,8 +73,8 @@ export interface HostSwitchesProps {
 /**
  * The header's switches. Host-wide: "Wake agents" pauses every wake, and "Agent tools" adds the
  * board tools to sessions opened from then on. Each follows the tap at once and goes back if the
- * host refuses it, with the reason on a line under the row. Under them, the stand-up notes'
- * folder, time zone and days, then the trackers the incidents check reads.
+ * host refuses it, with the reason on a line under the row. Under them, the 3D floor's plan, then
+ * the stand-up notes' folder, time zone and days, then the trackers the incidents check reads.
  */
 export function HostSwitches({
   wake,
@@ -143,6 +150,10 @@ export function HostSwitches({
     (next: number[]) => change(NOTES_DAYS_LABEL, { notesDays: next }),
     [change],
   );
+  const savePlan = useCallback(
+    (next: FloorPlanChoice) => change(FLOOR_PLAN_LABEL, { floorPlan: next }),
+    [change],
+  );
   const saveProblem = useCallback(
     (setting: HostSetting): string | null =>
       saveError !== null && lastChange === setting
@@ -179,6 +190,14 @@ export function HostSwitches({
           styles={styles}
         />
         {children}
+      </View>
+      <View style={styles.headerFields}>
+        <FloorPlanRow
+          value={storedPlan(stored)}
+          onSave={savePlan}
+          problem={saveProblem(FLOOR_PLAN_LABEL)}
+          styles={styles}
+        />
       </View>
       <View style={styles.headerFields}>
         <SettingField

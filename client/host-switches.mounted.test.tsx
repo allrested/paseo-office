@@ -337,6 +337,96 @@ test("with no day chosen the hint says nothing runs at 8:00 and the bell still d
   );
 });
 
+const planRow = () => {
+  const found = container.querySelector('[role="group"][aria-label="Floor plan"]');
+  if (!found) throw new Error("No Floor plan row");
+  return found as HTMLElement;
+};
+/** Each plan's button as `<name> <aria-pressed>`, in the row's order. */
+const planButtons = () =>
+  [...planRow().querySelectorAll('[role="button"]')].map(
+    (button) => `${button.getAttribute("aria-label")} ${button.getAttribute("aria-pressed")}`,
+  );
+async function pressPlan(name: string): Promise<void> {
+  await act(async () =>
+    planRow().querySelector<HTMLElement>(`[role="button"][aria-label="${name}"]`)?.click(),
+  );
+}
+
+test("the floor plan row has two buttons, the stored one pressed", async () => {
+  await mount();
+  expect(planButtons()).toEqual(["Company floor true", "Cozy room false"]);
+  stored = { ...stored, floorPlan: "cozy" };
+  await mount();
+  expect(planButtons()).toEqual(["Company floor false", "Cozy room true"]);
+});
+
+test("the hint says the plan is for the 3D floor only, and what a change does", async () => {
+  await mount();
+  const text = planRow().parentElement?.textContent ?? "";
+  expect(text).toContain("The 3D floor only");
+  expect(text).toContain("2D floor and the List");
+  expect(text).toContain("Company floor has 12 desks");
+  expect(text).toContain("Cozy room 9");
+  expect(text).toContain("starts the 3D view again");
+});
+
+test("a pressed plan saves the whole document with only the plan changed", async () => {
+  let reply: (saved: boolean) => void = () => undefined;
+  answer = new Promise((resolve) => {
+    reply = resolve;
+  });
+  await mount();
+  await pressPlan("Cozy room");
+  // The press shows at once, before the host has answered.
+  expect(planButtons()).toEqual(["Company floor false", "Cozy room true"]);
+  expect(saved).toEqual([{ values: { ...stored, floorPlan: "cozy" }, revision: "r1" }]);
+  await act(async () => reply(true));
+});
+
+test("while the host has not answered the plan, the row takes no other press", async () => {
+  let reply: (saved: boolean) => void = () => undefined;
+  answer = new Promise((resolve) => {
+    reply = resolve;
+  });
+  await mount();
+  await pressPlan("Cozy room");
+  await pressPlan("Company floor");
+  expect(saved.map((save) => save.values.floorPlan)).toEqual(["cozy"]);
+  const disabled = () =>
+    [...planRow().querySelectorAll('[role="button"]')].map((button) =>
+      button.getAttribute("aria-disabled"),
+    );
+  expect(disabled()).toEqual(["true", "true"]);
+
+  await act(async () => reply(true));
+  answer = null;
+  // The host now holds the cozy room.
+  stored = { ...stored, floorPlan: "cozy" };
+  await mount();
+  expect(disabled()).toEqual([null, null]);
+  await pressPlan("Company floor");
+  expect(saved.map((save) => save.values.floorPlan)).toEqual(["cozy", "pro"]);
+});
+
+test("pressing the plan already stored saves nothing", async () => {
+  await mount();
+  await pressPlan("Company floor");
+  expect(saved).toEqual([]);
+});
+
+test("a refused plan goes back and shows the reason under the row", async () => {
+  answer = Promise.resolve(false);
+  await mount();
+  await pressPlan("Cozy room");
+  saveError = "Settings changed on another client. Reload before saving again.";
+  await mount();
+  expect(planButtons()).toEqual(["Company floor true", "Cozy room false"]);
+  expect(planRow().parentElement?.textContent).toContain(
+    "Unable to save the Floor plan setting: Settings changed on another client.",
+  );
+});
+
 const JIRA_HINT =
   "Project keys, comma separated. Needs ATLASSIAN_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN on the host.";
 const JIRA_UNSET =
