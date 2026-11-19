@@ -7,6 +7,8 @@
 // Photo mode's bar and the walk's overlay are built here too: upstream's PhotoBar.tsx and
 // FirstPersonHud.tsx are React, and ui/photo.js and interact/first-person.js find their elements by id.
 // The Sound button is Paseo's own: the switch is the host's device setting (paseo-sound.js).
+// The toolbar uses upstream's labels in the scene's language.
+import { t } from '../../i18n/index.js';
 import * as THREE from '../../../three/three.module.min.js';
 import { state } from '../core/state.js';
 import { camera, controls, fpCam } from '../scene/renderer.js';
@@ -62,43 +64,46 @@ const VIEWS = {
  * The toolbar's, the walk's overlay's and the photo bar's markup, as upstream's CameraToolbar.tsx,
  * FirstPersonHud.tsx and PhotoBar.tsx draw them.
  */
-const BAR = `
-    <div class="toolbar" role="toolbar" aria-label="View">
+const barMarkup = () => {
+  const label = (key) => t(key).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  return `
+    <div class="toolbar" role="toolbar" aria-label="${label('ui.cameraToolbar.label')}">
       <div class="tb-seg">
-        <button type="button" class="seg-btn" data-view="home" aria-label="Overview" title="Overview" aria-pressed="true"><span data-icon="home"></span><span>Overview</span></button>
-        <button type="button" class="seg-btn" data-view="desks" aria-label="Desks" title="Desks" aria-pressed="false"><span data-icon="monitor"></span><span>Desks</span></button>
-        <button type="button" class="seg-btn" data-view="meeting" aria-label="Meeting room" title="Meeting room" aria-pressed="false"><span data-icon="users"></span><span>Meeting room</span></button>
-        <button type="button" class="seg-btn" data-view="server" aria-label="Servers" title="Servers" aria-pressed="false"><span data-icon="server"></span><span>Servers</span></button>
+        <button type="button" class="seg-btn" data-view="home" aria-label="${label('ui.cameraToolbar.home')}" title="${label('ui.cameraToolbar.home')}" aria-pressed="true"><span data-icon="home"></span><span>${label('ui.cameraToolbar.home')}</span></button>
+        <button type="button" class="seg-btn" data-view="desks" aria-label="${label('ui.cameraToolbar.desks')}" title="${label('ui.cameraToolbar.desks')}" aria-pressed="false"><span data-icon="monitor"></span><span>${label('ui.cameraToolbar.desks')}</span></button>
+        <button type="button" class="seg-btn" data-view="meeting" aria-label="${label('ui.cameraToolbar.meeting')}" title="${label('ui.cameraToolbar.meeting')}" aria-pressed="false"><span data-icon="users"></span><span>${label('ui.cameraToolbar.meeting')}</span></button>
+        <button type="button" class="seg-btn" data-view="server" aria-label="${label('ui.cameraToolbar.server')}" title="${label('ui.cameraToolbar.server')}" aria-pressed="false"><span data-icon="server"></span><span>${label('ui.cameraToolbar.server')}</span></button>
       </div>
-      <div class="tb-zoom"><button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out"><span data-icon="minus"></span></button><span id="zoom-val">100%</span><button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in"><span data-icon="plus"></span></button></div>
+      <div class="tb-zoom"><button type="button" id="zoom-out" aria-label="${label('ui.cameraToolbar.zoomOut')}" title="${label('ui.cameraToolbar.zoomOut')}"><span data-icon="minus"></span></button><span id="zoom-val">100%</span><button type="button" id="zoom-in" aria-label="${label('ui.cameraToolbar.zoomIn')}" title="${label('ui.cameraToolbar.zoomIn')}"><span data-icon="plus"></span></button></div>
       <div class="tb-tools">
-        <button type="button" class="tb-full" id="btn-full" aria-label="Full screen" title="Full screen"><span data-icon="maximize"></span></button>
-        <button type="button" class="tb-full" id="btn-photo" aria-label="Photo mode" title="Photo mode"><span data-icon="camera"></span></button>
-        <button type="button" class="tb-full" id="btn-sound" aria-pressed="false" aria-label="Sound" title="Sound"><span id="sound-ico"></span></button>
+        <button type="button" class="tb-full" id="btn-full" aria-label="${label('ui.cameraToolbar.fullscreen')}" title="${label('ui.cameraToolbar.fullscreen')}"><span data-icon="maximize"></span></button>
+        <button type="button" class="tb-full" id="btn-photo" aria-label="${label('ui.photo.label')}" title="${label('ui.photo.label')}"><span data-icon="camera"></span></button>
+        <button type="button" class="tb-full" id="btn-sound" aria-pressed="false" aria-label="${label('ui.topBar.toggles.sound')}" title="${label('ui.topBar.toggles.sound')}"><span id="sound-ico"></span></button>
       </div>
-      <button type="button" class="tb-fp" id="btn-fp" aria-pressed="false" aria-label="Walk in" title="Walk in"><span data-icon="walk"></span><span>Walk in</span></button>
+      <button type="button" class="tb-fp" id="btn-fp" aria-pressed="false" aria-label="${label('ui.cameraToolbar.walkIn')}" title="${label('ui.cameraToolbar.walkIn')}"><span data-icon="walk"></span><span>${label('ui.cameraToolbar.walkIn')}</span></button>
     </div>
     <div class="fp-hud" id="fp-hud" hidden>
       <i class="fp-cross" aria-hidden="true"></i>
       <button type="button" class="fp-near" id="fp-near" hidden></button>
-      <div class="fp-help"><b>Walking the office</b><span>W A S D to walk · drag to look · Shift to run · E to use what is in front of you (or wake someone up) · V to switch view · Esc to exit</span></div>
-      <button type="button" class="fp-exit" id="fp-exit"><span data-icon="x"></span><span>Exit</span></button>
+      <div class="fp-help"><b>${label('ui.firstPersonHud.title')}</b><span>${label('ui.firstPersonHud.keys')}</span></div>
+      <button type="button" class="fp-exit" id="fp-exit"><span data-icon="x"></span><span>${label('ui.firstPersonHud.exit')}</span></button>
       <div class="fp-joy" id="fp-joy" aria-hidden="true"><i></i></div>
     </div>
-    <div class="photo-bar" id="photo-bar" hidden role="toolbar" aria-label="Photo mode">
-      <p class="photo-hint">Drag to move · right-drag to turn · scroll to zoom where you point · P or Esc to leave</p>
+    <div class="photo-bar" id="photo-bar" hidden role="toolbar" aria-label="${label('ui.photo.label')}">
+      <p class="photo-hint">${label('ui.photo.hint')}</p>
       <div class="pb-row">
-        <button type="button" class="pb-tgl" id="ph-names" aria-pressed="true">Names</button>
-        <button type="button" class="pb-tgl" id="ph-mark" aria-pressed="true">Logo</button>
+        <button type="button" class="pb-tgl" id="ph-names" aria-pressed="true">${label('ui.photo.names')}</button>
+        <button type="button" class="pb-tgl" id="ph-mark" aria-pressed="true">${label('ui.photo.mark')}</button>
         <span class="pb-sep"></span>
-        <div class="pb-seg" title="Light for the photo: Auto follows the app's theme, Day and Night hold for this photo only"><button type="button" data-ph-time="auto" aria-pressed="true">Auto</button><button type="button" data-ph-time="day" aria-pressed="false">Day</button><button type="button" data-ph-time="night" aria-pressed="false">Night</button></div>
+        <div class="pb-seg" title="Light for the photo: Auto follows the app's theme, Day and Night hold for this photo only"><button type="button" data-ph-time="auto" aria-pressed="true">${label('ui.topBar.auto')}</button><button type="button" data-ph-time="day" aria-pressed="false">${label('ui.topBar.day')}</button><button type="button" data-ph-time="night" aria-pressed="false">${label('ui.topBar.night')}</button></div>
         <span class="pb-sep"></span>
-        <div class="pb-seg" title="Picture size"><button type="button" data-ph-size="screen" aria-pressed="false">Screen</button><button type="button" data-ph-size="fhd" aria-pressed="true">Full HD</button><button type="button" data-ph-size="4k" aria-pressed="false">4K</button></div>
-        <span class="pb-clipset" id="ph-clipset" hidden><span class="pb-sep"></span><div class="pb-seg" title="Clip shape: square for a feed, vertical 9:16 for short-video apps"><button type="button" data-clip-shape="square" aria-pressed="true">Square 1:1</button><button type="button" data-clip-shape="tall" aria-pressed="false">Vertical 9:16</button></div><button type="button" class="pb-tgl pb-music" id="ph-music" aria-pressed="true" title="Original lo-fi music, made in the browser"><span data-icon="music"></span><span>Music</span></button><button type="button" class="pb-clip" id="ph-clip" title="A 15-second video of the office, from morning to evening"><span data-icon="rec"></span><span>Clip 15 s</span></button></span>
-        <button type="button" class="pb-shoot" id="ph-shoot"><span data-icon="camera"></span><span>Take photo</span></button>
-        <button type="button" class="pb-exit" id="ph-exit" aria-label="Leave photo mode" title="Leave photo mode"><span data-icon="x"></span></button>
+        <div class="pb-seg" title="${label('ui.photo.sizeTitle')}"><button type="button" data-ph-size="screen" aria-pressed="false">${label('ui.photo.screen')}</button><button type="button" data-ph-size="fhd" aria-pressed="true">Full HD</button><button type="button" data-ph-size="4k" aria-pressed="false">4K</button></div>
+        <span class="pb-clipset" id="ph-clipset" hidden><span class="pb-sep"></span><div class="pb-seg" title="${label('ui.clip.shapeTitle')}"><button type="button" data-clip-shape="square" aria-pressed="true">${label('ui.clip.square')}</button><button type="button" data-clip-shape="tall" aria-pressed="false">${label('ui.clip.tall')}</button></div><button type="button" class="pb-tgl pb-music" id="ph-music" aria-pressed="true" title="${label('ui.clip.musicTitle')}"><span data-icon="music"></span><span>${label('ui.clip.music')}</span></button><button type="button" class="pb-clip" id="ph-clip" title="${label('ui.clip.buttonTitle')}"><span data-icon="rec"></span><span>${label('ui.clip.button')}</span></button></span>
+        <button type="button" class="pb-shoot" id="ph-shoot"><span data-icon="camera"></span><span>${label('ui.photo.shoot')}</span></button>
+        <button type="button" class="pb-exit" id="ph-exit" aria-label="${label('ui.photo.exit')}" title="${label('ui.photo.exit')}"><span data-icon="x"></span></button>
       </div>
     </div>`;
+};
 
 /**
  * Upstream's styles/stage.css lines 9 to 26, its walk (lines 32 to 56, with the pool table's score,
@@ -262,7 +267,7 @@ export function build() {
   style.textContent = STYLE;
   const wrap = document.getElementById('stage-wrap');
   wrap.append(style);
-  wrap.insertAdjacentHTML('beforeend', BAR);
+  wrap.insertAdjacentHTML('beforeend', barMarkup());
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -313,7 +318,7 @@ export function setup() {
   if (!document.fullscreenEnabled) $('btn-full').hidden = true;
   $('btn-full').addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen?.();
-    else document.documentElement.requestFullscreen?.().catch(() => host.toast("This browser won't go full screen."));
+    else document.documentElement.requestFullscreen?.().catch(() => host.toast(t('ui.cameraToolbar.noFullscreen')));
   });
   document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
   // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite
@@ -327,7 +332,7 @@ export function setup() {
   const soundButton = $('btn-sound'), soundIcon = $('sound-ico');
   soundIcon.style.display = 'inline-grid';
   const showSound = () => {
-    const label = available() ? 'Sound' : 'Sound is not available here';
+    const label = available() ? t('ui.topBar.toggles.sound') : 'Sound is not available here';
     soundButton.setAttribute('aria-pressed', String(sound.on));
     soundButton.setAttribute('aria-disabled', String(!available()));
     soundButton.setAttribute('aria-label', label);
