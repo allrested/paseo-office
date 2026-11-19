@@ -151,6 +151,7 @@ export type OfficeViewChoice = (typeof OFFICE_VIEWS)[number];
  * Per device. `view` is the view somebody chose. A device that never chose has only `threeD`,
  * from when the office had a 3D switch: off is the list, on leaves the choice to the device. A
  * save writes both. A client from before version 2 reads neither: it refuses the newer version.
+ * `street` controls the 3D street. When absent, wide web layouts show it.
  * `rungIncidents` is when this device rang its alarm for each incident, epoch ms by incident id.
  * `lastAgent` is the provider and model of the last agent started from the office, the next
  * form's start. Every save of this setting writes the document whole and carries it through.
@@ -161,6 +162,7 @@ export const officeDeviceSettings = defineSettings({
   version: 2,
   schema: z.object({
     threeD: z.boolean().default(true),
+    street: z.boolean().optional(),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),
     lastAgent: z.object({ provider: z.string(), model: z.string() }).optional(),

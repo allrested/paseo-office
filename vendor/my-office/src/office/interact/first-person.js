@@ -64,7 +64,7 @@ export function makeAvatar() {
 function showAvatar() { const v = fp.on && fp.third; if (fp.avatar) fp.avatar.visible = v; if (fp.tag) fp.tag.visible = v; }
 /* ---------- out on the street ---------- */
 // PASEO: the street is not taken (world/backdrops/ is not), so there is no lift to it.
-const street = () => null;
+const street = () => (THEMES && THEME === THEMES.city && THEME.live?.street) || null;
 // the way out of the building, on the pavement: the side of the block nearest the lift (or the door)
 const wayOut = (S) => { const x = lift ? LIFT_X : DOOR_OUT.x; return S.exits(x, DZ)[0] || null; };
 let fade = null;

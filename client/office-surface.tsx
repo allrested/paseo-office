@@ -96,6 +96,7 @@ import { ViewSwitch } from "./view-switch.js";
 import { hasWebGL2 } from "./web-env.web.js";
 import { hasScriptFrame } from "./world/script-frame-kit.js";
 import { useFloorPlan } from "./world/use-floor-plan.js";
+import { useStreetSwitch } from "./use-street.js";
 import { WorldView } from "./world/world-view.js";
 import { WorldViewNative } from "./world/world-view-native.js";
 
@@ -622,6 +623,7 @@ interface SurfaceBodyProps {
   platform: Platform;
   /** The device's Sound switch, which the 3D office follows and its button sets. */
   sound: SoundSwitch;
+  street: boolean | null;
 }
 
 function SurfaceBody({
@@ -654,6 +656,7 @@ function SurfaceBody({
   onSceneProblem,
   platform,
   sound,
+  street,
 }: SurfaceBodyProps) {
   const plan = useFloorPlan();
   const { life, tell } = useLife();
@@ -703,6 +706,7 @@ function SurfaceBody({
         onOpenIncidents={onOpenIncidents}
         onProblem={onSceneProblem}
         sound={sound}
+        streetOn={street}
       />
     );
   }
@@ -1222,6 +1226,7 @@ export function OfficeSurface(
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
   // One Sound switch for the floor: the 3D office follows it, and the corner shows a refused save.
+  const street = useStreetSwitch(layout);
   const sound = useSoundSwitch();
   const model = useMemo(() => buildOfficeModel(office.state), [office.state]);
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
@@ -1434,6 +1439,7 @@ export function OfficeSurface(
             onSceneProblem={setSceneProblem}
             platform={layout.platform}
             sound={sound}
+            street={street.on}
           />
           <PhoneSheet
             compact={compact}

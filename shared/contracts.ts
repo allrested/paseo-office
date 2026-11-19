@@ -675,3 +675,10 @@ export const tenureRpc = defineRpc({
   input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),
   output: z.object({ ok: z.boolean() }),
 });
+
+/** Optional car models for the street outside. */
+export const streetRpc = defineRpc({
+  name: "office.world.street",
+  input: z.object({}),
+  output: z.string(),
+});

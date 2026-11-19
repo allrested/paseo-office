@@ -153,6 +153,7 @@ export interface WorldStartOptions {
   /** The tenure list's two writes: a farewell was held, an intern was made permanent. */
   onTenure?(op: { op: "farewell" | "official"; name: string }): void;
 
+  street?: { kit: string | null };
   /**
    * The floor plan: "pro" is the company floor, "cozy" one open room, and "hq" headquarters. A page starts once, so a new
    * plan is a new page.

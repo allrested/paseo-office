@@ -190,3 +190,11 @@ test("the notes schedule's failure shows under the Time zone field", async () =>
   if (!failure || !field) throw new Error("The failure or the Time zone field is not drawn");
   expect(field.compareDocumentPosition(failure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
+
+test("the wide device can turn off the street and keep its other settings", async () => {
+  await mount();
+  const row = container.querySelector<HTMLElement>('[aria-label^="The street outside"]');
+  expect(row?.getAttribute("aria-checked")).toBe("true");
+  await act(async () => row?.click());
+  expect(deviceSaves).toEqual([{ ...deviceValues.current, street: false }]);
+});

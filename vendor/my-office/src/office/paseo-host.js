@@ -3,6 +3,9 @@
 export const host = {
   /** 'pro' (the company floor), 'cozy' (one open room) or 'hq' (department rooms). */
   plan: 'pro',
+  street: false,
+  streetKit: null,
+  claudeVersion: null,
   /** Paseo's dark theme draws the office by night. */
   night: false,
   /** The app's surface colour: the plain backdrop behind the floor. */

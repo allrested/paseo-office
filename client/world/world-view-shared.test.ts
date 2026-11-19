@@ -119,3 +119,11 @@ test("a press on the scene's Sound button goes to the latest handler, and keeps 
   expect(later).toHaveBeenCalledWith(true);
   expect(focus).not.toHaveBeenCalled();
 });
+
+test("passes the street kit only for an enabled device", () => {
+  const extras = { focus: vi.fn(), brand: BRAND, plan: "pro" as const };
+  expect(worldStartOptions(latest(), extras)).not.toHaveProperty("street");
+  expect(worldStartOptions(latest({ street: { kit: "{}" } }), extras).street).toEqual({
+    kit: "{}",
+  });
+});

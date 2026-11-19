@@ -6,6 +6,7 @@ import * as sceneRenderer from './scene/renderer.js';
 import * as sceneLights from './scene/lights.js';
 import * as sceneQuality from './scene/quality.js';
 import * as worldTerrace from './world/terrace.js';
+import * as worldBackdropsCity from './world/backdrops/city.js';
 import * as worldLayout from './world/layout.js';
 import * as worldCozyRoom from './world/cozy-room.js';
 import * as worldWindows from './world/windows.js';
@@ -50,12 +51,14 @@ import * as peopleTeamLines from './people/team-lines.js';
 import * as peopleDirector from './people/director.js';
 import * as peopleErrands from './people/errands.js';
 import * as peopleGatherings from './people/gatherings.js';
+import * as peopleOutings from './people/outings.js';
 import * as peopleComnha from './people/comnha.js';
 import * as peopleStaff from './people/staff.js';
 import * as peopleDuty from './people/duty.js';
 import * as peopleTeatime from './people/teatime.js';
 import * as peopleAccountant from './people/accountant.js';
 import * as peopleRounds from './people/rounds.js';
+import * as peopleGuard from './people/guard.js';
 import * as peopleHr from './people/hr.js';
 import * as peopleFoosball from './people/foosball.js';
 import * as peopleGaming from './people/gaming.js';
@@ -74,6 +77,7 @@ import * as lifeLiftService from './life/lift-service.js';
 import * as lifeDrill from './life/drill.js';
 import * as lifeDaySwaps from './life/day-swaps.js';
 import * as lifeTests from './life/tests.js';
+import * as lifePhotostrips from './life/photostrips.js';
 import * as lifePost from './life/post.js';
 import * as worldRoomUpdate from './world/room-update.js';
 import * as interactProps from './interact/props.js';
@@ -97,6 +101,7 @@ export const MODULES = [
   ['sceneLights', sceneLights],
   ['sceneQuality', sceneQuality],
   ['worldTerrace', worldTerrace],
+  ['worldBackdropsCity', worldBackdropsCity],
   ['worldLayout', worldLayout],
   ['worldCozyRoom', worldCozyRoom],
   ['worldWindows', worldWindows],
@@ -141,12 +146,14 @@ export const MODULES = [
   ['peopleDirector', peopleDirector],
   ['peopleErrands', peopleErrands],
   ['peopleGatherings', peopleGatherings],
+  ['peopleOutings', peopleOutings],
   ['peopleComnha', peopleComnha],
   ['peopleStaff', peopleStaff],
   ['peopleDuty', peopleDuty],
   ['peopleTeatime', peopleTeatime],
   ['peopleAccountant', peopleAccountant],
   ['peopleRounds', peopleRounds],
+  ['peopleGuard', peopleGuard],
   ['peopleHr', peopleHr],
   ['peopleFoosball', peopleFoosball],
   ['peopleGaming', peopleGaming],
@@ -165,6 +172,7 @@ export const MODULES = [
   ['lifeDrill', lifeDrill],
   ['lifeDaySwaps', lifeDaySwaps],
   ['lifeTests', lifeTests],
+  ['lifePhotostrips', lifePhotostrips],
   ['lifePost', lifePost],
   ['worldRoomUpdate', worldRoomUpdate],
   ['interactProps', interactProps],

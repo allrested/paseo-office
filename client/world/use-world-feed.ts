@@ -38,6 +38,7 @@ export interface WorldFeedInput {
   weather?: WeatherScene | undefined;
   incidents: IncidentsState | undefined;
   /** The device's Sound switch; null while it is read: nothing is sent then. */
+  streetNote?: boolean;
   sound: boolean | null;
   /** The floor plan the scene was started on: its desks seat the people. */
   plan: WorldPlan;
@@ -63,6 +64,7 @@ export function useWorldFeed(
     meeting,
     weather,
     incidents,
+    streetNote,
     sound,
     plan,
   }: WorldFeedInput,
@@ -158,5 +160,15 @@ export function useWorldFeed(
     world.current?.select(focusRequest.agentId);
   }, [focusRequest]);
 
-  return { note: api === null ? null : floorNote(model.agents.size, people.overflow) };
+  return {
+    note:
+      api === null
+        ? null
+        : [
+            floorNote(model.agents.size, people.overflow),
+            streetNote ? "The street's cars could not be loaded." : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
+  };
 }

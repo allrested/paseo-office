@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
+import { useStreetStart } from "./use-street-kit.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
 import { createWorldBridge, type WorldBridge } from "./world-bridge.js";
@@ -19,7 +20,10 @@ import type { WorldViewProps } from "./world-view.js";
 
 const noFocus = () => undefined;
 
-type WorldViewNativeSceneProps = Omit<WorldViewProps, "plan"> & { plan: WorldPlan };
+type WorldViewNativeSceneProps = Omit<WorldViewProps, "plan"> & {
+  plan: WorldPlan;
+  street: { kit: string | null } | null;
+};
 
 /**
  * The office in 3D where there is no DOM to open a frame in: a ScriptFrame of the kit runs the
@@ -35,6 +39,7 @@ function WorldViewNativeScene({
   theme,
   styles,
   plan,
+  street,
   focusRoomId,
   focusRequest,
   selectedAgentId,
@@ -74,6 +79,7 @@ function WorldViewNativeScene({
     onBell,
     onLife,
     onTenure,
+    street,
     onSound: sound.set,
     onProblem,
   });
@@ -94,6 +100,7 @@ function WorldViewNativeScene({
       onBell,
       onLife,
       onTenure,
+      street,
       onSound: sound.set,
       onProblem,
     };
@@ -144,6 +151,7 @@ function WorldViewNativeScene({
     meeting,
     weather,
     incidents,
+    streetNote: street?.kit === null,
     sound: sound.on,
     plan,
   });
@@ -176,7 +184,15 @@ function WorldViewNativeScene({
  * The office in 3D on the phone's script frame, on the host's plan. A changed plan unmounts the
  * `ScriptFrame` and mounts a new one: the scene's page starts once.
  */
-export function WorldViewNative({ plan, ...rest }: WorldViewProps) {
-  if (plan === null) return <WorldLoading styles={rest.styles} />;
-  return <WorldViewNativeScene key={plan} plan={plan} {...rest} />;
+export function WorldViewNative({ plan, streetOn = false, ...rest }: WorldViewProps) {
+  const { street, loading } = useStreetStart(streetOn);
+  if (loading || plan === null) return <WorldLoading styles={rest.styles} />;
+  return (
+    <WorldViewNativeScene
+      key={plan + String(street !== null)}
+      street={street}
+      plan={plan}
+      {...rest}
+    />
+  );
 }

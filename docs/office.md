@@ -606,3 +606,9 @@ use the office clock and the people already seated.
 | Named or resting agent | Nap, wake, tea, returning team, microwave, make-up day, long break, chore complaint                         |
 
 For most agent lines, reception can speak when nobody is resting. Chat photos are omitted.
+
+## The street
+
+“The street outside” in plugin settings controls the optional city backdrop. The device saves the optional boolean `street` in `office-device`. A wide web layout defaults to on. Compact layouts and native apps default to off. Changing the setting opens a fresh scene. The street lights follow the app theme. In Walk mode take the lift at the door to reach the pavement.
+
+The device requests the CC0 car models from `office.world.street` and passes the string to the isolated scene in the `street.kit` start option. A failed request leaves procedural traffic and shops available and shows a floor note. The day’s street activities include shopping trips, the guard, lunch, evening drinks, the photo studio and pickleball. The upstream chain modules and branded artwork are excluded. Plain canvas signs carry the names from `scripts/street-brands.mjs`. See the street section of [the source inventory](../vendor/SOURCES.md) when importing upstream changes.

@@ -312,6 +312,8 @@ const api = {
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
     host.tenure = (op) => options.onTenure?.(op);
     host.life = (kind, vars) => options.onLife?.(kind, vars);
+    host.street = options.street != null;
+    host.streetKit = options.street?.kit ?? null;
     host.photo = options.photo !== false;
     host.limits = () => limits;
     host.boardRows = () => boardRows;

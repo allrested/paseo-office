@@ -85,6 +85,7 @@ import {
   skillsRpc,
   updateRpc,
   worldRpc,
+  streetRpc,
 } from "./shared/contracts.js";
 import { chatT } from "./shared/chat-words.js";
 import { officeHostSettings } from "./shared/settings.js";
@@ -348,6 +349,7 @@ export function createOfficePlugin(
     holder.remember(context.paseo);
     return hub.attach(context);
   });
+  server.handle(streetRpc, () => guarded("street", () => deps.world.readStreet()));
   server.handle(worldRpc, () => guarded("world", () => deps.world.read()));
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
   server.handle(machineSubscription, (_input, context) => {
