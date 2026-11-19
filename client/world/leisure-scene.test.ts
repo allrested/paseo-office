@@ -6,7 +6,9 @@ import { beforeEach, expect, test, vi } from "vitest";
 // @ts-expect-error vendored JavaScript has no declarations
 import { state } from "../../vendor/my-office/src/office/core/state.js";
 // @ts-expect-error vendored JavaScript has no declarations
-import { leisureNow, updateLeisure } from "../../vendor/my-office/src/office/paseo-leisure.js";
+import * as leisure from "../../vendor/my-office/src/office/paseo-leisure.js";
+
+const { leisureNow, requestLoungeAction, updateLeisure } = leisure;
 
 const h = vi.hoisted(() => ({
   sessions: new Map<string, { id: string; status: string }>(),
@@ -45,15 +47,17 @@ vi.mock("../../vendor/my-office/src/office/interact/props.js", () => ({
 vi.mock("../../vendor/my-office/src/office/people/navigation.js", () => ({
   STATIONS: h.stations,
   standBy() {},
-  wayTo() {},
+  wayTo: (_w: unknown, x: number, z: number) => ({ x, z }),
 }));
 vi.mock("../../vendor/my-office/src/office/people/breaks.js", () => ({ COFFEE_Q: [] }));
 vi.mock("../../vendor/my-office/src/office/people/workers.js", () => ({
+  dn: (s: { id: string }) => s.id,
   sessions: h.sessions,
   workers: h.workers,
 }));
 vi.mock("../../vendor/my-office/src/office/people/errands.js", () => ({
-  asleep: () => false,
+  asleep: (w: Person) => w.root.visible && w.station === "desk",
+  free: () => false,
   quip() {},
 }));
 vi.mock("../../vendor/my-office/src/office/people/gatherings.js", () => ({
@@ -260,4 +264,38 @@ test("the lively floor starts nothing during upstream's midday nap", () => {
   h.nap = true;
   openNow();
   expect(h.quiet).toBe(true);
+});
+
+test("a Lounge button sends a free agent to the prop and runs its effect on arrival", () => {
+  const working = person("working");
+  prompt(working);
+  const away = person("away");
+  away.root.visible = false;
+  const agent = person("ready");
+  const errand = vi.fn((job: { arrived(): void }) => job);
+  Object.assign(agent, { errand });
+  const effect = vi.fn();
+  const request = (kind: string) => requestLoungeAction(kind, { x: 2, z: 3 }, "Action", effect);
+
+  expect(request("fish")).toBe("paseo.lounge.assigned");
+  expect(errand).toHaveBeenCalledWith(expect.objectContaining({ spot: { x: 2, z: 3 } }));
+  expect(request("fish")).toBe("paseo.lounge.inProgress");
+  expect(request("arcade")).toBe("paseo.lounge.noAgent");
+  expect(effect).not.toHaveBeenCalled();
+  const job = errand.mock.calls[0]![0];
+  job.arrived();
+  expect(effect).toHaveBeenCalledOnce();
+});
+
+test("work arriving during the walk takes priority over the requested Lounge effect", () => {
+  const agent = person("interrupted");
+  const errand = vi.fn((job: { arrived(): void }) => job);
+  Object.assign(agent, { errand });
+  const effect = vi.fn();
+  expect(requestLoungeAction("rocket", { x: 2, z: 3 }, "Launch", effect)).toBe(
+    "paseo.lounge.assigned",
+  );
+  prompt(agent);
+  errand.mock.calls[0]![0].arrived();
+  expect(effect).not.toHaveBeenCalled();
 });

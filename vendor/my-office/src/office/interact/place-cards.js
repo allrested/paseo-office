@@ -11,7 +11,12 @@ import { colorOf, dn, dnOf, sessions, workers } from '../people/workers.js';
 import { director } from '../people/director.js';
 import { TIER_METAL, trophyData } from '../life/trophies.js';
 import { launchRocket } from '../world/room-update.js';
-import { cap } from '../ui/activity.js';
+import { AQ } from '../world/props/aquarium.js';
+import { ARC } from '../world/props/arcade.js';
+import { SOFA } from '../world/props/cat.js';
+import { ROCKET_HOME } from '../world/furniture/rocket.js';
+import { availableInLounge, requestLoungeAction } from '../paseo-leisure.js';
+import { cap, toast } from '../ui/activity.js';
 import { openSession } from '../ui/session-drawer.js';
 import { setView } from '../ui/camera-bar.js';
 import { brewCoffee, catToSofa, feedFish } from './props.js';
@@ -149,8 +154,17 @@ function placeContent(id) {
     }
     case 'lounge': {
       const body = el('div'), row = el('div', 'pl-foot-row');
-      row.append(plButton(tr('places.lounge.feed'), feedFish), plButton(tr('places.lounge.coin'), () => { state.arcCoin = state.sim + 3; sfx.play('coin'); }), plButton(tr('places.lounge.cat'), catToSofa), plButton(tr('places.lounge.rocket'), () => { launchRocket(); sfx.play('deploy'); }, 'btn--accent'));
-      const rest = list.filter((s) => s.status === 'rest'), box = el('div', 'pl-rows');
+      const button = (key, kind, target, effect, cls) => {
+        const label = tr('places.lounge.' + key);
+        return plButton(label, () => { toast(requestLoungeAction(kind, target, label, effect)); queuePlace(); }, cls);
+      };
+      row.append(
+        button('feed', 'fish', AQ, feedFish),
+        button('coin', 'arcade', ARC, () => { state.arcCoin = state.sim + 3; sfx.play('coin'); }),
+        button('cat', 'cat', SOFA, catToSofa),
+        button('rocket', 'rocket', ROCKET_HOME, () => { launchRocket(); sfx.play('deploy'); }, 'btn--accent'),
+      );
+      const rest = list.filter(availableInLounge), box = el('div', 'pl-rows');
       for (const s of rest.slice(0, 6)) box.append(plRow({ ic: 'coffee', color: colorOf(s), title: dn(s), meta: s.lastPrompt ? tr('places.lounge.done', { prompt: short(s.lastPrompt, 44) }) : tr('places.lounge.noPrompt'), onClick: () => openSession(s.id) }));
       body.append(rest.length ? box : plEmpty(tr('places.lounge.empty')));
       // PASEO: upstream marks the lounge with its sparkle; the cup that marks who rests there says what the place is for.
