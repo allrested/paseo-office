@@ -22,6 +22,9 @@ agents of the Mock provider in a workspace. A sixth, the same day, was a second 
 after the fixes the fifth one led to, and a seventh a third look, after the two fixes the sixth led
 to.
 
+An eighth look, on 2026-11-19, was of the floor plans (see "The floor plans"). It was installed by
+Git, with twelve agents of the Mock provider in a workspace.
+
 ## Install
 
 `paseo plugin install file://<path to the clone>` cloned the repository, compiled the plugin and
@@ -325,10 +328,56 @@ frames, and a script in the scene's frame that listed each `pointerdown`, `point
 Not looked at again in the third look: 390 px, a touch screen, Enter in place of Space, and the
 tooltip over the note.
 
+## The floor plans
+
+The look was at commit `26165fc4c17ccc4f3e5cb0c746cc49725d6ca65a`, installed by Git on the same
+stock 0.16.2. `paseo plugin ls` showed `office` `running`, from git, at that commit, and the log
+held `Loading plugin` and `Plugin ready`, three seconds apart, and no error. The workspace "Acme
+shop" had twelve Mock agents: working, resting and waiting on a plan approval. The browser console
+held no error or warning from the plugin in any of the five runs, at either width.
+
+- The setting (1280 and 390 px): the settings page has a row "Floor plan" with "Company floor" and
+  "Cozy room", "Company floor" pressed at first, and under it "The 3D floor only: the 2D floor and
+  the List are the same on both. Company floor has 12 desks, Cozy room 9. Changing it starts the 3D
+  view again." A press on "Cozy room" showed it pressed 0.3 s later, with no "Unable to save" line,
+  and the host's settings document then held `floorPlan: "cozy"` at version 4. The buttons are 32
+  px high with a mouse and 44 px on a touch screen; at 390 px the row and its hint fit the width.
+- An open office follows a save (1280 px): with the office open on the company floor, the gear
+  over the floor opened the settings, "Cozy room" was pressed, and the browser's Back returned to
+  the office. Without a reload the page had a new frame "Office in 3D" in under 12 s, the only one,
+  drawing the cozy room.
+- The company floor (1280 and 390 px): drawn as in the earlier looks, with the director, the lobby
+  and the "Stand-up notes" label, and no line about desks with twelve agents.
+- The cozy room (1280 and 390 px): one open room, nine desks in three rows of three, a library
+  wall, a coffee corner, the aquarium, the arcade, a round meeting table, the racks and the
+  rocket. Its labels were "Library", "Window · web search", "Server room", "Launch pad",
+  "Whiteboard", "Entrance", "Coffee corner" and "Meeting room": no director, no lobby, no
+  "Stand-up notes". Over the floor the page said "3 agents have no desk on this floor. The list
+  shows everyone."
+- The cozy room's views (1280 and 390 px): Desks showed the nine desks at 175%, Meeting room the
+  round table at 230%, Servers the racks and the rocket at 220%, and Overview the whole room at
+  100%; each pressed button showed pressed, the others not.
+- Walk in on the cozy room (1280 px): the button turned the walk on with its "Walking the office"
+  line and Exit button; W moved the view forward toward the desks; Escape left it. Photo mode
+  opened with its own bar and the toolbar gone, and Escape left it, at both widths.
+- The plan switched back and forth (1280 and 390 px): on the settings page the two buttons were
+  pressed in turn, seven presses, 2.5 s apart. Each showed pressed with no "Unable to save" line.
+  While the settings page was up the page held no scene frame after the first change. Back on the
+  office there was one frame, the company floor that was pressed last, and the stored value was
+  `"pro"`.
+
+Seen and left: on the cozy room at 1280 px with more than nine agents, the walk's "Walking the
+office" line starts about 3 px above the bottom edge of the page's line about desks, so the two
+touch.
+
 ## Not seen, and why
 
 | What                                                                         | Why                                                                                                                                                     |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The phone app's 3D view on a change of floor plan                            | Only a browser was used. To check on a phone: "Loading", then the other plan, with no error, twice running                                              |
+| Memory after several changes of floor plan                                   | The look's browser cannot report it                                                                                                                     |
+| A cozy room's resting agents at the fish and the arcade, and going home      | Needs a day: rest from 08:00 to 21:00, and the walk home after 21:00                                                                                    |
+| A floor plan saved on one device seen on another                             | One browser was used. The setting is the host's, so another device reads it when its office opens                                                       |
 | The card for an agent                                                        | The fourth look had Mock agents at desks; no card was opened                                                                                            |
 | A resting agent's tag on the 3D floor                                        | Shown only while it walks, is hovered or chosen; none of these done                                                                                     |
 | The view choice kept across a reload                                         | The fourth look read the key after each press, not after a reload                                                                                       |

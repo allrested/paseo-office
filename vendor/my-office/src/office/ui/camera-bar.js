@@ -2,7 +2,8 @@
 // full screen and its Walk in button are taken; its automatic camera and list mode are not. One view
 // is Paseo's own: the whole floor, fitted to the frame. Upstream's opening view is sized for its own
 // page; Paseo's frame is a screen or a workspace tab of any shape, so Overview is that fitted view
-// and the other three are upstream's places at a factor of its zoom, those of the floor plan in use.
+// and the other three are upstream's places at a factor of its zoom, those of the floor plan in
+// use.
 // Photo mode's bar and the walk's overlay are built here too: upstream's PhotoBar.tsx and
 // FirstPersonHud.tsx are React, and ui/photo.js and interact/first-person.js find their elements by id.
 // The Sound button is Paseo's own: the switch is the host's device setting (paseo-sound.js).
