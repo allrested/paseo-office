@@ -25,6 +25,11 @@ let subscriptionStatus: "live" | "error" | "closed";
 /** The office's events, once its subscription is drawn. */
 let deliver: ((event: OfficeEvent) => void) | null;
 
+/** What a send does: a test says, per agent, whether it fails or waits. */
+const sends = vi.hoisted(() => ({
+  run: async (_agentId: string, _text: string): Promise<void> => undefined,
+}));
+
 // One object for every render, as the host's SDK object is. An agent's timeline holds one line.
 const sdk = vi.hoisted(() => ({
   workspaces: {
@@ -57,8 +62,8 @@ const sdk = vi.hoisted(() => ({
     }),
   },
   agents: {
-    ref: () => ({
-      send: async () => undefined,
+    ref: (agentId: string) => ({
+      send: (text: string) => sends.run(agentId, text),
       respondToPermission: async () => undefined,
       cancel: async () => undefined,
       timeline: {
@@ -953,4 +958,74 @@ test("a half-typed reply survives a dismissed sheet on a phone, and Close clears
   await act(async () => again.click());
   await press("Open session");
   expect(reply()).toBe("");
+});
+
+const BO: OfficeAgent = { ...ADA, id: "bo", title: "Bo" };
+
+/** The agent's card from the floor's list, and its Open session. */
+async function openSessionOf(title: string): Promise<void> {
+  const row = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find((button) =>
+    button.getAttribute("aria-label")?.startsWith(`${title}:`),
+  );
+  if (!row) throw new Error(`No row for ${title}`);
+  await act(async () => row.click());
+  await press("Open session");
+}
+
+async function typeMessage(text: string): Promise<void> {
+  const field = labelled("Message") as HTMLTextAreaElement | null;
+  if (!field) throw new Error("The session has no Message box");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+test("a refused send in one session leaves no error under another, and the other can send", async () => {
+  compact = false;
+  const delivered: string[] = [];
+  sends.run = async (agentId, text) => {
+    if (agentId === "ada") throw new Error("the daemon refused");
+    delivered.push(`${agentId}:${text}`);
+  };
+  await mount();
+  await act(async () =>
+    deliver?.({ type: "snapshot", state: { ...OFFICE_WITH_ONE_AGENT, agents: [ADA, BO] } }),
+  );
+  await openSessionOf("Ada");
+  await openSessionOf("Bo");
+  await pressTab("Ada");
+  await typeMessage("hello");
+  await press("Send");
+  expect(container.textContent).toContain("the daemon refused");
+
+  await pressTab("Bo");
+  expect(container.textContent).not.toContain("the daemon refused");
+  await typeMessage("hi");
+  await press("Send");
+  expect(delivered).toEqual(["bo:hi"]);
+});
+
+test("a send still pending in one session does not stop another session's Send", async () => {
+  compact = false;
+  const delivered: string[] = [];
+  sends.run = (agentId, text) => {
+    if (agentId === "ada") return new Promise(() => undefined);
+    delivered.push(`${agentId}:${text}`);
+    return Promise.resolve();
+  };
+  await mount();
+  await act(async () =>
+    deliver?.({ type: "snapshot", state: { ...OFFICE_WITH_ONE_AGENT, agents: [ADA, BO] } }),
+  );
+  await openSessionOf("Ada");
+  await openSessionOf("Bo");
+  await pressTab("Ada");
+  await typeMessage("hello");
+  await press("Send");
+
+  await pressTab("Bo");
+  await typeMessage("hi");
+  await press("Send");
+  expect(delivered).toEqual(["bo:hi"]);
 });
