@@ -1,0 +1,28 @@
+import { useCallback, useRef } from "react";
+import type {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView as NativeScrollView,
+} from "react-native";
+
+/** How close to its end the list still counts as at the bottom. */
+const BOTTOM_SLACK = 24;
+
+/**
+ * A list that stays at its end while the reader is there. Give `scroller` as the list's ref and
+ * `onScroll`, `followEnd` as its onScroll, onContentSizeChange and onLayout (a list that shrinks
+ * also follows: a bar or the keyboard takes room below it).
+ */
+export function useFollowEnd() {
+  const atBottom = useRef(true);
+  const scroller = useRef<NativeScrollView>(null);
+  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    atBottom.current =
+      contentSize.height - contentOffset.y - layoutMeasurement.height < BOTTOM_SLACK;
+  }, []);
+  const followEnd = useCallback(() => {
+    if (atBottom.current) scroller.current?.scrollToEnd({ animated: false });
+  }, []);
+  return { scroller, onScroll, followEnd };
+}

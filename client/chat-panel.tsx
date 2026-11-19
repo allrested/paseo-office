@@ -12,9 +12,7 @@ import {
   Pressable,
   Text,
   View,
-  type NativeScrollEvent,
   type NativeSyntheticEvent,
-  type ScrollView as NativeScrollView,
   type TextInputKeyPressEventData,
   type ViewStyle,
 } from "react-native";
@@ -49,6 +47,7 @@ import {
   type MentionOption,
 } from "./chat-text.js";
 import { markChatSeen } from "./chat-seen.js";
+import { useFollowEnd } from "./follow-end.js";
 import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import type { OfficeStyles } from "./styles.js";
@@ -60,9 +59,6 @@ type Run = (input: ChatRequest) => Promise<boolean>;
 type KeyPress = NativeSyntheticEvent<
   TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean }
 >;
-
-/** How close to its end the list still counts as at the bottom. */
-const BOTTOM_SLACK = 24;
 
 /**
  * The box after a send went through: what was sent leaves the start of it, and what was typed
@@ -675,17 +671,7 @@ export function ChatPanel({
     if (newest > 0) markChatSeen(newest);
   }, [newest]);
   // Stays at the bottom while you are there.
-  const atBottom = useRef(true);
-  const scroller = useRef<NativeScrollView>(null);
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    atBottom.current =
-      contentSize.height - contentOffset.y - layoutMeasurement.height < BOTTOM_SLACK;
-  }, []);
-  // Also when the list shrinks: the Reply bar, the @ list or the keyboard takes room below it.
-  const followEnd = useCallback(() => {
-    if (atBottom.current) scroller.current?.scrollToEnd({ animated: false });
-  }, []);
+  const { scroller, onScroll, followEnd } = useFollowEnd();
 
   const run = useCallback(
     async (input: ChatRequest): Promise<boolean> => {

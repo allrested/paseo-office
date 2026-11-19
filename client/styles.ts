@@ -37,6 +37,13 @@ export interface OfficeStyles {
   columnTabsScroll: ViewStyle;
   /** An open session's tab: its pill, the button to press, and the close button beside it. */
   sessionTab: ViewStyle;
+  /** The session panel: its header, the list of rows, a tool's one line, and the composer. */
+  sessionHead: ViewStyle;
+  sessionList: ViewStyle;
+  sessionRow: ViewStyle;
+  sessionRowYou: ViewStyle;
+  sessionTool: TextStyle;
+  sessionComposer: ViewStyle;
   sessionTabMain: ViewStyle;
   sessionTabClose: ViewStyle;
   sessionTabCloseHidden: ViewStyle;
@@ -576,6 +583,31 @@ export function useOfficeStyles(
       },
       columnTabsVertical: { alignItems: "center", gap: 4 },
       columnTabsScroll: { flexShrink: 1 },
+      sessionHead: {
+        paddingHorizontal: pad,
+        paddingVertical: 8,
+        gap: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      },
+      sessionList: { paddingHorizontal: pad, paddingVertical: 12, gap: 8 },
+      sessionRow: { gap: 2 },
+      sessionRowYou: {
+        gap: 2,
+        alignSelf: "flex-end",
+        maxWidth: "90%",
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: colors.surface2,
+      },
+      sessionTool: { ...small, fontFamily: MONOSPACE, color: colors.foregroundMuted },
+      sessionComposer: {
+        paddingHorizontal: pad,
+        paddingVertical: 8,
+        gap: 8,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
       sessionTab: {
         minHeight: controlHeight,
         flexDirection: "row",
