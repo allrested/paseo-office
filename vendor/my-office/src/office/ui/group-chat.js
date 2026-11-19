@@ -2,3 +2,5 @@
 // nowhere.
 export function chatLife() {}
 export function chatSay() {}
+// (the chat does not keep a picture: the office's server drops a photo's data)
+export function chatPhoto() { return null; }

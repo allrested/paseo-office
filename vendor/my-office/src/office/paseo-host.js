@@ -32,6 +32,10 @@ export const host = {
   photo: true,
   /** A short line the office says once. */
   toast() {},
+  /** The scene tells the host a tenure write: { op: 'farewell' | 'official', name }. */
+  tenure() {},
+  /** The scene says a line in the team chat: (kind, vars), as upstream's chatLife is called. */
+  life() {},
   /** Usage windows, as upstream's plan card has them: [{ key, pct, resetsAt }]. */
   limits: () => [],
   /** The whiteboard's rows: [{ id, name, color, text, state: 'doing' | 'wait' | 'done' }]. */

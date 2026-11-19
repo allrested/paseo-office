@@ -1,8 +1,9 @@
 // PASEO: the lively floor. An agent at rest does not sleep the day away at its desk: after a gap it gets up for a game
 // (upstream's pool, foosball, TV match and karaoke, through their own starters), a nap on the sofa, the fish, the arcade,
 // a cup in the dining room or the restroom, with upstream's own moves (errand(), visitWc(), feedFish(), brewCoffee()).
-// paseo-leisure-plan.js decides who, when and what; this file moves the people. The stand-in of life/nap.js calls
-// updateLeisure every frame, once paseo-entry.js has set it there.
+// paseo-leisure-plan.js decides who, when and what; this file moves the people. ui/activity.js's updateMarkers calls
+// updateLeisure every frame, once paseo-entry.js has set it there. It starts nothing during upstream's midday nap
+// (life/nap.js napOn).
 import { state } from './core/state.js';
 import { PRO, nowMs, officeNow, rand, reduceMotion, replay } from './core/env.js';
 import { AQ } from './world/props/aquarium.js';
@@ -20,6 +21,7 @@ import { tvMatch, tvState } from './people/gaming.js';
 import { karaoke, ktvState } from './people/karaoke.js';
 import { t as tr } from '../i18n/index.js';
 import { LEISURE, called, createPlan } from './paseo-leisure-plan.js';
+import { napOn } from './life/nap.js';
 
 const plan = createPlan();
 const solo = new Map();   // session id -> { w, kind, e (the errand; null in the restroom), seat (the cup's chair), sat }
@@ -134,7 +136,7 @@ export function updateLeisure() {
   lookAt = state.sim + 1;
   const agents = [];
   for (const [id, w] of workers) { const s = sessions.get(id); agents.push({ id, resting: resting(w, s), idle: idle(w, s) }); }
-  const next = plan.step({ now: state.sim, wall: nowMs(), hour: officeNow().getHours(), quiet: reduceMotion || !!gatheringNow(), agents, open: openNow() });
+  const next = plan.step({ now: state.sim, wall: nowMs(), hour: officeNow().getHours(), quiet: reduceMotion || !!gatheringNow() || napOn, agents, open: openNow() });
   if (!next) return;
   if (!leisureNow(next.id, next.kind)) plan.declined(next.id, state.sim, nowMs());
 }

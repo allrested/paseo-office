@@ -24,6 +24,10 @@ const h = vi.hoisted(() => ({
   closePlace: vi.fn(),
   sound: [] as boolean[],
   soundAsked: [] as boolean[],
+  setTenure: vi.fn(),
+  setLiftService: vi.fn(),
+  tenureAsked: [] as unknown[],
+  lines: [] as unknown[][],
   /** How many times the wall clock's own act ran (upstream's cycleTime). */
   clockCycled: 0,
   /** What the camera bar's autoCam() answers: whether the camera may glide now. */
@@ -132,6 +136,12 @@ vi.mock("../../vendor/my-office/src/office/world/props/shredder.js", () => ({
 vi.mock("../../vendor/my-office/src/office/life/tests.js", () => ({ clearRun() {}, onTest() {} }));
 vi.mock("../../vendor/my-office/src/office/life/your-turn.js", () => ({ onTurnDone() {} }));
 // The sounds need a page's audio: the test hears which one played.
+vi.mock("../../vendor/my-office/src/office/people/farewell.js", () => ({
+  setTenure: h.setTenure,
+}));
+vi.mock("../../vendor/my-office/src/office/life/lift-service.js", () => ({
+  setLiftService: h.setLiftService,
+}));
 vi.mock("../../vendor/my-office/src/office/audio/sfx.js", () => ({
   sfx: { play: (name: string) => h.played.push(name), set: (on: boolean) => h.sound.push(on) },
   setup() {},
@@ -156,6 +166,8 @@ interface World {
   meet(): void;
   gather(): void;
   setSound(on: boolean): void;
+  setTenure(data: object | null): void;
+  setLiftService(info: object | null): void;
 }
 const world = (globalThis as unknown as { PaseoOfficeWorld: World }).PaseoOfficeWorld;
 // A page with Web Audio whose context runs: the entry's probe finds it ready, and the switch can be
@@ -176,6 +188,8 @@ Object.assign(window, {
 world.start({
   brand: { name: "Acme" },
   onSound: (on: boolean) => h.soundAsked.push(on),
+  onTenure: (op: unknown) => h.tenureAsked.push(op),
+  onLife: (kind: string, vars: object) => h.lines.push([kind, vars]),
   onIncidents: () => {
     h.incidentsOpened += 1;
   },
@@ -690,4 +704,29 @@ test("no glide when the camera may not move, for a newcomer, or for a change tha
   h.workers.set("b", { id: "b", push() {} });
   world.setSessions([session("a"), { ...session("b"), status: "wait" }]); // b is new to the scene
   expect(h.panned).toEqual([]);
+});
+
+test("the host's tenure list and the lift's servicing reach the scenes that read them", () => {
+  const tenure = { days: 30, choices: [30], projects: [] };
+  world.setTenure(tenure);
+  world.setTenure(null);
+  world.setLiftService({ left: 1000, total: 180000, newBuild: false, sticker: null });
+
+  expect(h.setTenure.mock.calls).toEqual([[tenure]]);
+  expect(h.setLiftService.mock.calls).toEqual([
+    [{ left: 1000, total: 180000, newBuild: false, sticker: null }],
+  ]);
+});
+
+test("the scenes tell the host a farewell, a promotion and a chat line, and nothing else", () => {
+  host.tenure({ op: "farewell", name: "api" });
+  host.tenure({ op: "official", name: "web" });
+  host.tenure({ op: "config", days: 0 });
+  host.life("parcel", { id: "a1" });
+
+  expect(h.tenureAsked).toEqual([
+    { op: "farewell", name: "api" },
+    { op: "official", name: "web" },
+  ]);
+  expect(h.lines).toEqual([["parcel", { id: "a1" }]]);
 });

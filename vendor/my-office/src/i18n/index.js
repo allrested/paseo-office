@@ -60,6 +60,8 @@ const OURS = {
   'paseo.leisure.fish': 'Feeding the fish',
   'paseo.leisure.arcade': 'One round at the arcade',
   'paseo.leisure.cup': 'Making a coffee',
+  // the lift's sticker (life/lift-service.js): the build is the office plugin's, not upstream's
+  'life.liftService.stickerWhat': 'Office {version}',
   'paseo.leisure.wc': 'Back in a minute',
   // (an incident is one Paseo's office found in a tracker, not three failures in five minutes: the newest on the banner)
   'incident.banner': 'Incident: {key} {title}',

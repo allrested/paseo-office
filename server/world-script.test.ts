@@ -78,7 +78,8 @@ describe("the embedded scene", () => {
     // The scene with three.js r160; a jump means a module the port leaves out came back in.
     // (Measured 1,144,567 after the camera extras.)
     expect(script.length).toBeGreaterThan(1_000_000);
-    expect(script.length).toBeLessThan(1_200_000);
+    // 1,260,855 measured with piece 5's staff scenes (about 116,000 more); pieces 6 to 8 add more.
+    expect(script.length).toBeLessThan(1_400_000);
     // Node's globals would throw in the page: upstream's build flag was the one use.
     expect(script).not.toContain("process.env");
     expect(script).not.toMatch(/\brequire\(/);
@@ -165,6 +166,27 @@ describe("the embedded scene", () => {
     expect(script).not.toMatch(/\bfrosty:\(?\w*\)?=>/);
   });
 
+  it("bundles the staff scenes, which make no network call", () => {
+    const script = WORLD_SCRIPT;
+    for (const area of [
+      "people.hr.",
+      "people.accountant.",
+      "people.duty.",
+      "people.staff.",
+      "life.liftService.",
+      "life.drill.",
+      "life.altar.",
+    ]) {
+      expect(script).toContain(area);
+    }
+    // The tenure list and the lift come from the host, the chat lines go to it.
+    expect(script).toContain("setTenure");
+    expect(script).toContain("setLiftService");
+    expect(script).toContain("onTenure");
+    expect(script).toContain("onLife");
+    expect(script).not.toContain("fetch(");
+    expect(script).not.toContain("/api/");
+  });
   it("names no real shop, app or product: the names are made-up ones", () => {
     expect(leftIn(unescaped(WORLD_SCRIPT))).toEqual([]);
   });

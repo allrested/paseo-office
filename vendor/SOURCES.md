@@ -41,7 +41,16 @@ offered on a desktop or in a browser only (a recorder, a capturable canvas, a fi
 `host.photo`); its markup and styles are in `ui/camera-bar.js`. Its music is made in the page and
 goes into the recording, never to the speakers.
 
-Nine copied files are changed by hand, and each change starts with `// PASEO:`:
+The staff and daily-life scenes that happen on the office floor are taken: lunch from home at the
+pantry's microwaves (`people/comnha.js`, with `src/shared/comnha.js`), the duty roster
+(`duty.js`), Friday's tea (`teatime.js`), the accountant (`accountant.js`), the director's rounds
+(`rounds.js`), HR's desk and the month's birthdays (`hr.js`), a project's farewell and return
+(`farewell.js`), the interns (`interns.js`), reception, the cleaner and the courier (`staff.js`),
+the lobby's altar (`life/altar.js`), the lift's servicing (`life/lift-service.js`), the post
+(`life/post.js`), the fire drill (`life/drill.js`), the swapped days off (`life/day-swaps.js`) and
+the midday nap (`life/nap.js`). Three of them are changed by hand (below).
+
+Twelve copied files are changed by hand, and each change starts with `// PASEO:`:
 
 - `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
   gap); the engine and every other sound are upstream's.
@@ -55,6 +64,13 @@ Nine copied files are changed by hand, and each change starts with `// PASEO:`:
   repository state).
 - `src/office/life/tests.js`: `clearRun` puts out the lamp of a test run whose end Paseo never
   learns.
+- `src/office/people/farewell.js`: the tenure list comes from the host (`setTenure`) and a farewell
+  held is told to it (`host.tenure`), not fetched from or posted to upstream's server; every page
+  tells it, not only upstream's local one.
+- `src/office/people/interns.js`: an intern made permanent is told to the host (`host.tenure`),
+  the same way.
+- `src/office/people/staff.js`: the courier's label has a plain box mark; the real logo's path
+  data is gone.
 - `src/office/ui/photo.js`: the mark painted into a photo is the host's brand name (Paseo's when
   there is none), the file is named `office-YYYY-MM-DD-HHMM.png`, and a host with `photo` false
   has no Photo mode (the button is hidden and `enterPhoto` returns), and leaving photo mode calls
@@ -89,6 +105,8 @@ the swap would change nothing in it. It changed these, and nothing else in them:
 - `src/office/world/props/tv-games.js`
 - `src/office/interact/first-person.js`, which is also changed by hand (above)
 - `src/office/audio/sfx.js`, which is also changed by hand (above)
+- `src/office/people/comnha.js`
+- `src/office/people/staff.js`, which is also changed by hand (above)
 - `src/office/ui/timelapse.js`, which is also changed by hand (above)
 
 The import tool runs the same swap on what it copies: a file whose only note is the names one is
@@ -125,25 +143,27 @@ and `people.director`, which keeps upstream's emoji.
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
-connection, the replay, the demo, other languages, the street outside
-with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
-the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, the list
-button is left out on purpose.
+connection, the replay, the demo, other languages, the street outside with its shops, the six staff
+scenes that happen on the street (lunch out, the guard, drinks after work, the photo booth,
+pickleball, the outings), the seasons and the weather. The plugin takes the office floor only. Of
+the camera toolbar and photo mode, the list button is left out on purpose.
 
 The kept modules still import those files, so each has a stand-in at the same path that starts
 with `// PASEO: stand-in`. Most export what is asked of them and do nothing. These do work:
 
 | Stand-in                    | What it does                                                           |
 | --------------------------- | ---------------------------------------------------------------------- |
-| `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command |
+| `i18n/index.js`             | English only; drops the emoji upstream ends its lines with; Paseo's wording where upstream's line needs a file name or a command; the lift's sticker says "Office" and the scene's build |
 | `ui/session-drawer.js`      | A chosen person is told to Paseo, which opens its agent card           |
 | `ui/whiteboard.js`          | Draws Paseo's rows on the board; picks people and furniture            |
 | `ui/camera-bar.js`          | Builds upstream's toolbar and photo mode's bar; Overview is the floor fitted to the frame, the other three views are upstream's places for the floor plan in use; zoom and full screen, the Sound button, and Walk in with its overlay; the automatic camera: upstream's `autoCam` and `panTo`, copied, with a glide ending when anything else takes the camera; `state.isLocal` for the tour |
 | `ui/settings.js`            | `setTimeMode`: Auto is the app's theme, Day and Night are held for a photo or a clip (`world/backdrops/index.js` `holdNight`); `syncTimeBtns` marks photo mode's buttons; `togglePop` does nothing |
 | `ui/mac-drawer.js`          | Holds the host's readings Paseo sets; opens Paseo's panel when it has one |
-| `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor |
+| `ui/activity.js`            | Passes the scene's toasts to Paseo; where Paseo gives none, `paseo-entry.js` shows them in a note over the floor; runs Paseo's lively floor every frame |
 | `world/backdrops/index.js`  | A plain backdrop in the app's surface colour; day and night; a held day or night for a photo |
-| `life/nap.js`               | No midday nap; calls Paseo's lively floor every frame                  |
+| `people/outings.js`         | `resting`, `called`, `resume` are upstream's; there is no street (`street()` is null) |
+| `people/guard.js`           | No guard's post; the drill's marshal is off                            |
+| `life/rain.js`              | No rain, so the wet-floor sign never shows                             |
 
 The entry makes the wall clock inert: its click changes nothing and its tooltip says the lights
 follow the app's theme (`paseo.clock.hint` in `OURS`). A person already in the office whose status
@@ -162,8 +182,8 @@ stylesheet, in Paseo's design language, the tour's cards included), `paseo-modul
 brand; the entry puts it on the material upstream's floor made), and the lively floor:
 `paseo-leisure-plan.js` (who gets up from a rest, when and for what; no scene in it, so
 `client/world/leisure.test.ts` runs it) and `paseo-leisure.js` (which moves the people with
-upstream's own moves and starts upstream's games through their starters). The stand-in of
-`life/nap.js` runs it every frame: the scene's loop already calls `updateNap`.
+upstream's own moves and starts upstream's games through their starters). `ui/activity.js`'s
+`updateMarkers` runs it every frame, and it starts nothing during upstream's midday nap.
 
 The library's place card is not shown: `paseo-entry.js` gives the place an `open`, so its chip
 and the bookshelf open Paseo's Library card.

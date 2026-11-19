@@ -26,7 +26,7 @@ import { OFFICE_MARK, PRO_FX } from './world/pro/pieces.js';
 import { SIGN, drawSign } from './paseo-sign.js';
 import { followHostFocus } from './paseo-focus.js';
 import { ringWithEveryone, updateLeisure } from './paseo-leisure.js';
-import { everyFrame } from './life/nap.js';
+import { everyFrame } from './ui/activity.js';
 import { dropSub, sessions, spawnSub, subAct, subs, workers } from './people/workers.js';
 import { director } from './people/director.js';
 import { STATIONS } from './people/navigation.js';
@@ -41,6 +41,8 @@ import * as lifeIncidents from './life/incidents.js';
 import { sfx } from './audio/sfx.js';
 import { setOn, sound, watchAudio } from './paseo-sound.js';
 import { t as tr } from '../i18n/index.js';
+import { setTenure } from './people/farewell.js';
+import { setLiftService } from './life/lift-service.js';
 
 const VERSION = 1;
 let started = false;
@@ -283,7 +285,7 @@ const api = {
    * (the server racks), onResources() (the server room's wall screen), onLibrary() (the library's
    * chip and the bookshelf), onBell() (a click on the meeting table's bell), onNotes() (the label over
    * the meeting room's screen, on the company floor), onOpen(id) (E by a person while walking: their
-   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
+   * session), onIncidents() (the incidents' banner), onSound(on) (a press on the Sound button asks for the switch to be on or off: the host stores it and answers with `setSound`), onTenure({ op, name }) (a farewell held, an intern made permanent), onLife(kind, vars) (a moment for the team chat) and onToast(text) (without it the scene shows the text itself, in a note over the floor).
    * Throws when the world cannot be built (no WebGL, a module failed).
    */
   start(options = {}) {
@@ -302,6 +304,10 @@ const api = {
     host.notes = typeof options.onNotes === 'function' ? () => options.onNotes() : null;
     host.open = typeof options.onOpen === 'function' ? (id) => options.onOpen(id) : null;
     host.photo = options.photo !== false;
+    host.tenure = typeof options.onTenure === 'function'
+      ? (op) => { if (op?.op === 'farewell' || op?.op === 'official') options.onTenure({ op: op.op, name: String(op.name ?? '').slice(0, 200) }); }
+      : () => {};
+    host.life = typeof options.onLife === 'function' ? (kind, vars) => options.onLife(kind, vars) : () => {};
     host.limits = () => limits;
     host.boardRows = () => boardRows;
     problem = (message) => options.onProblem?.(message);
@@ -390,8 +396,8 @@ const api = {
   /** The host's Sound switch. On plays upstream's sounds once a press has started audio; off, and anywhere audio cannot start, plays none. */
   setSound(on) { if (!started || stopped) return; setOn(on === true); },
   /**
-   * Everyone in the office now, in upstream's session shape: { id, name, title, dir, git: { repo },
-   * status: 'work' | 'wait' | 'rest', agent, lastPrompt, doneAt, last, stuck, subs, usage: { ctx, ctxMax } }.
+   * Everyone in the office now, in upstream's session shape: { id, name, title, dir, git: { repo, born },
+   * status: 'work' | 'wait' | 'rest', agent, lastPrompt, doneAt, last, stuck, subs, usage: { ctx, ctxMax, cost } }.
    * The first list is seated at once; later a newcomer walks in from the lift and someone who is
    * gone walks out. `usage` is the context window in tokens: the paper on the desk and in its bin.
    * `doneAt` is when someone resting came to rest (ms). The last event the scene saw of a person stays, and its time
@@ -478,6 +484,10 @@ const api = {
   },
   /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
   setLimits(list) { limits = Array.isArray(list) ? list : []; },
+  /** The tenure list: { days, choices, projects: [{ name, last, days, turns, due, farewell, back, intern, ready, official }] }. */
+  setTenure(data) { if (!started || stopped || !data) return; setTenure(data); },
+  /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
+  setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
 };
 
 globalThis.PaseoOfficeWorld = api;

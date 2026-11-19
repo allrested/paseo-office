@@ -30,7 +30,7 @@ if (!FROM || !THREE) {
 }
 
 /**
- * Not taken: upstream's panels, chat window, replay, demo, the street, and the daily-life scenes.
+ * Not taken: upstream's panels, chat window, replay, demo, the street and the six staff scenes that happen on it, the seasons and the weather.
  * The lounge's four games are taken (people/billiards.js, gaming.js, foosball.js, karaoke.js). life/incidents.js is
  * taken trimmed by hand, so it stays denied here and only its exports are checked.
  */
@@ -39,8 +39,8 @@ const DENY = [
   /^office\/(demo|replay)\//,
   /^office\/world\/backdrops\//,
   /^office\/world\/pro\/wing\.js$/,
-  /^office\/people\/(outings|comnha|comtrua|duty|teatime|accountant|rounds|guard|hr|farewell|interns|nhau|photobooth|pickle|staff)\.js$/,
-  /^office\/life\/(seasons|rain|weather|altar|lift-service|drill|day-swaps|photostrips|post|incidents|nap)\.js$/,
+  /^office\/people\/(outings|comtrua|guard|nhau|photobooth|pickle)\.js$/,
+  /^office\/life\/(seasons|rain|weather|photostrips|incidents)\.js$/,
   /^office\/main\.js$/,
   /^i18n\/index\.js$/,
   /^i18n\/locales\/(?!en\/)/,
