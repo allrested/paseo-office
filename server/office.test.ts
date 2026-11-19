@@ -511,3 +511,37 @@ test("an agent cannot claim a pretend duty; the 3D office's report of one acted 
   });
   await office.stop();
 });
+
+test("on the duty board an agent finishes or reopens only a duty it holds; the owner's hand marks any", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([CUPS, BUILD]);
+  await office.syncDuties({ duties: [CUPS, BUILD], day: TODAY, due: [CUPS, BUILD], dayOf });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const as = (agentId: string, id: string, action: string) =>
+    update?.execute({ id, action }, toolContext({ id: agentId, title: null }));
+  const refused = (text: string) => ({ text, isError: true });
+  // A pretend duty has no holder: no agent finishes it.
+  expect(await as("a", "p1", "done")).toEqual(
+    refused("Unable to finish p1: it is a pretend duty, which the 3D office acts out"),
+  );
+  expect(await as("a", "p2", "done")).toEqual(refused("Unable to finish p2: claim it first"));
+  expect(await as("b", "p2", "claim")).not.toHaveProperty("isError");
+  expect(await as("a", "p2", "done")).toEqual(refused("Unable to finish p2: claimed by b"));
+  expect(await as("a", "p2", "reopen")).toEqual(refused("Unable to reopen p2: claimed by b"));
+  // The holder lets it go, as the pickup's release does, and finishes it, as its finish does.
+  expect(await as("b", "p2", "reopen")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "claim")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "done")).not.toHaveProperty("isError");
+  expect(await as("b", "p2", "reopen")).toEqual(refused("Unable to reopen p2: it is done"));
+  // The owner's hand, from the duty board's editor.
+  expect(await office.update({ id: "p2", action: "reopen" })).toMatchObject({
+    ok: true,
+    post: { state: "open" },
+  });
+  expect(await office.update({ id: "p1", action: "done" })).toMatchObject({
+    ok: true,
+    post: { state: "done" },
+  });
+  await office.stop();
+});

@@ -414,12 +414,13 @@ A duty with instructions goes to an idle agent as a lobby to-do does, under the 
 task or duty at a time per agent, the wake limits, **Wake agents** and **Agent tools**. Its prompt
 starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
 completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
-a duty with `office_update`. Nobody posts to the duty board, not even from the office.
+a duty with `office_update`. An agent finishes or reopens only a duty it holds; from the duty board
+you mark any. Nobody posts to the duty board, not even from the office.
 
-A duty without instructions is pretend. No agent is asked, and an agent cannot claim it. On the 3D
-floor a free person acts it out during that chore's hours, and the view tells the host, which
-records it as done by that agent. When two devices both act it out, the first to report wins. With
-no 3D office open during those hours, it stays open and is owed.
+A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor
+finish it. On the 3D floor a free person acts it out during that chore's hours, and the view tells
+the host, which records it as done by that agent. When two devices both act it out, the first to
+report wins. With no 3D office open during those hours, it stays open and is owed.
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it

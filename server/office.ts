@@ -24,6 +24,8 @@ import type { Clock } from "./timers.js";
 
 export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
+const PRETEND = "it is a pretend duty, which the 3D office acts out";
+
 export interface OfficeAgentPorts {
   lobbyCandidates(): Promise<string[]>;
   lobbyEligible(agentId: string): Promise<boolean>;
@@ -96,12 +98,19 @@ export function createOffice(deps: OfficeDeps): Office {
     return post.board === DUTY && duty !== undefined && duty.instructions.trim() !== "";
   }
 
-  /** Nobody claims a pretend duty: the 3D office acts it out, and the owner ticks it. */
+  /**
+   * On the duty board nobody claims a pretend duty: the 3D office acts it out, and the owner ticks
+   * it. An agent finishes or reopens only a duty it holds; the owner's hand marks any.
+   */
   function refuse(post: Post, input: PostUpdate): string | null {
-    const pretend = post.board === DUTY && !instructed(post);
-    return pretend && input.action === "claim"
-      ? "it is a pretend duty, which the 3D office acts out"
-      : null;
+    if (post.board !== DUTY) return null;
+    const pretend = !instructed(post);
+    if (input.action === "claim") return pretend ? PRETEND : null;
+    if (input.actor === USER_AUTHOR) return null;
+    if (post.state === "claimed" && post.claimedBy === input.actor) return null;
+    if (pretend) return PRETEND;
+    if (post.state === "done") return "it is done";
+    return post.claimedBy === undefined ? "claim it first" : `claimed by ${label(post.claimedBy)}`;
   }
 
   const service = createBoardService({
