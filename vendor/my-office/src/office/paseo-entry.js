@@ -145,7 +145,8 @@ function makeNotesLabel() {
   label.addEventListener('click', open);
   asButton(label, open);
   const o = new CSS2DObject(label);
-  o.position.set(0.2, 2.525, -7.95);
+  // Tết hangs its red banner above this screen. Lift the label over the banner as well.
+  o.position.set(0.2, SEASON === 'tet' ? 4.2 : 2.525, -7.95);
   o.center.set(0.5, 1);
   scene.add(o);
 }

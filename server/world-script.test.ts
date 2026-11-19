@@ -65,7 +65,7 @@ describe("the embedded scene", () => {
     expect(script).toContain("onNotes");
     expect(script).toContain("Stand-up notes");
     // The label stands on the screen's top edge, clear of the meeting room's chip.
-    expect(script).toContain(".set(.2,2.525,-7.95)");
+    expect(script).toMatch(/\.set\(\.2,\w+==="tet"\?4\.2:2\.525,-7\.95\)/);
     expect(script).toContain(".center.set(.5,1)");
     // A deploy that failed has its own line in the bubble.
     expect(script).toContain("paseo.deploy.failed");

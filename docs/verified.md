@@ -461,7 +461,14 @@ English decorations hint. Rain code 63 drew 2,124 streaks, storm code 95 drew 3,
 of their start points lay inside the room. The entrance props were visible in rain and storms
 and hidden in fog and clear weather. Code 45 changed the fog range to 14–52. The Halloween
 seasonal sky was overcast, Christmas and Lunar New Year were clear. None of the three scenes
-made a network request or raised an error after loading.
+made a network request or raised an error after loading. A separate light-surface capture at 390 px showed the Lunar New Year peach
+tree and red wall banner. The upstream pale blue streaks were visible against the cream
+background, so the rain material retains its original colour.
+
+The first projection check found the Stand-up notes label crossing the Lunar New Year banner
+at both 1280 and 390 px. The label now sits above the banner during this season. Checking the
+projected banner corners against the actual HTML label in the default camera confirmed a gap
+at both widths.
 
 These checks used a local service, date overrides and software WebGL. The live Open-Meteo
 service, a calendar-driven holiday on a real device, audible thunder, screen-reader output and
