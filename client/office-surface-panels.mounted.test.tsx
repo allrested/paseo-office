@@ -228,12 +228,12 @@ beforeAll(async () => {
   ({ OfficeSurface } = await import("./office-surface.js"));
 });
 
-async function mount(): Promise<void> {
+async function mount(params: Record<string, string> = {}): Promise<void> {
   const props = {
     theme: THEME,
     layout: { compact, platform: "web" },
     host: { id: "host", label: "Host" },
-    params: {},
+    params,
     ...(settingsWay ? { onOpenSettings: () => void (settingsOpened += 1) } : {}),
     ...(withNavigation
       ? {
@@ -1113,6 +1113,18 @@ test("the floor receives the weather and service failures appear in Attention", 
   expect(container.textContent).toContain("Weather service failed");
 });
 
+test("restoring the fullscreen route inside Paseo leaves Sessions to the host sidebar", async () => {
+  compact = false;
+  view = "3d";
+  floor.webgl = true;
+  await mount({ layout: "fullscreen" });
+  await sizeSurface(1440);
+  expect(labelled("Hide details sidebar")).not.toBeNull();
+  expect(container.querySelector('[data-testid="office-sessions-sidebar"]')).toBeNull();
+  expect(labelled("Hide sessions sidebar")).toBeNull();
+  expect(labelled("Show sessions sidebar")).toBeNull();
+});
+
 test("wide fullscreen gives Sessions its own rail and opens the chosen conversation beside the floor", async () => {
   compact = false;
   floor.webgl = true;
@@ -1249,6 +1261,7 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     target = null;
     await act(async () => void document.dispatchEvent(new Event("fullscreenchange")));
     expect(labelled("Full screen")).not.toBeNull();
+    expect(container.querySelector('[data-testid="office-sessions-sidebar"]')).toBeNull();
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
   } finally {
     Reflect.deleteProperty(document, "fullscreenEnabled");

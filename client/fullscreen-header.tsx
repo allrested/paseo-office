@@ -6,6 +6,7 @@ import type { ColumnState } from "./use-column.js";
 import type { OfficeStyles } from "./styles.js";
 
 export interface SidebarControls {
+  sessionsAvailable: boolean;
   sessionsOpen: boolean;
   column: ColumnState;
   hideSessions(hidden: boolean): void;
@@ -88,14 +89,16 @@ export function FullscreenHeader({
         <View style={styles.headerModes}>{modes}</View>
       </View>
       <View style={styles.headerTools}>
-        <SidebarButton
-          name="Sessions"
-          icon={sessionsOpen ? "PanelLeftClose" : "PanelLeftOpen"}
-          expanded={sessionsOpen}
-          toggle={sessions}
-          color={color}
-          styles={styles}
-        />
+        {sidebars.sessionsAvailable && (
+          <SidebarButton
+            name="Sessions"
+            icon={sessionsOpen ? "PanelLeftClose" : "PanelLeftOpen"}
+            expanded={sessionsOpen}
+            toggle={sessions}
+            color={color}
+            styles={styles}
+          />
+        )}
         {collapsed && (
           <ColumnTabs
             hideSessions

@@ -1501,6 +1501,7 @@ function useFullscreen(props: OfficeSurfaceProps, launcher: SidebarLauncher | un
 
 function useFullscreenPanels(
   active: boolean,
+  fullscreen: boolean,
   compact: boolean,
   surfaceWidth: number,
   column: ColumnState,
@@ -1509,6 +1510,7 @@ function useFullscreenPanels(
   selectFromStrip: (id: string) => void,
 ) {
   const docked = active && !compact && surfaceWidth > 0;
+  const sessionsAvailable = docked && fullscreen;
   const { on: sessionsHidden, set: hideSessions } = useDeviceSwitch("sessionsHidden", false);
   const sessionsOpen = sessionsHidden !== true;
   const sidebarWidth = Math.max(SESSION_RAIL_MIN, Math.min(312, Math.round(surfaceWidth * 0.24)));
@@ -1516,6 +1518,7 @@ function useFullscreenPanels(
   const sidebars: SidebarControls | undefined = docked
     ? {
         sessionsOpen,
+        sessionsAvailable,
         column,
         hideSessions,
       }
@@ -1534,13 +1537,14 @@ function useFullscreenPanels(
   );
   return {
     docked,
+    sessionsAvailable,
     sidebars,
     sessionsOpen,
     railSize,
     link,
     selectAgent,
     selectFromStrip: active ? openSession : selectFromStrip,
-    width: docked && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
+    width: sessionsAvailable && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
     column: useMemo(
       () =>
         docked && column.view.kind === "tab" && column.view.tab === "sessions"
@@ -1708,7 +1712,7 @@ export function OfficeSurface(
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
     layout.compact,
     styles,
-    full.integrated,
+    full.active,
   );
   const column = useOfficeColumn(compact, full.integrated, openTeam);
   const machine = useMemo(() => namedMachine(reading, model.agents), [reading, model.agents]);
@@ -1757,6 +1761,7 @@ export function OfficeSurface(
   const { openSession } = sheet;
   const panels = useFullscreenPanels(
     full.integrated,
+    full.active,
     compact,
     surfaceWidth,
     column,
@@ -1932,7 +1937,7 @@ export function OfficeSurface(
       />
       {panels.docked && controls}
       <View style={styles.officeRow}>
-        {panels.docked ? (
+        {panels.sessionsAvailable ? (
           <SessionsSidebar
             {...panel}
             link={panels.link}
