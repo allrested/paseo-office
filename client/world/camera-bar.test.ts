@@ -286,6 +286,80 @@ test("a press while audio is blocked whose own probe ends blocked says so once i
   }
 });
 
+test("a key press on the blocked button, with sound asked for, leaves sound on once its own probe starts audio", async () => {
+  open();
+  const stopWatching = await blockedAudio();
+  // The stored setting says on; blocked, so nothing plays yet.
+  setOn(true);
+  expect(sound.on).toBe(false);
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => {
+    asked.push(next);
+    setOn(next);
+  };
+  try {
+    audio(true);
+    // Space as a browser delivers it: the key down, which the probe hears, then the click on its release.
+    page("btn-sound").dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    // The probe found audio, and sound came on by itself, as asked for. The click must not undo it.
+    expect(sound.on).toBe(true);
+    click("#btn-sound");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(asked).toEqual([true]);
+    expect(sound.on).toBe(true);
+    expect(page("btn-sound").getAttribute("aria-pressed")).toBe("true");
+    expect(h.toast).not.toHaveBeenCalled();
+  } finally {
+    stopWatching();
+    delete (window as unknown as Record<string, unknown>).AudioContext;
+  }
+});
+
+test("the first press in a page that never lets audio start says so once its probe has ended, and asks for nothing", async () => {
+  open();
+  audio(false);
+  const stopWatching = watchAudio(window, 1500);
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => asked.push(next);
+  try {
+    page("btn-sound").dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    pressSound();
+    expect(asked).toEqual([]);
+    expect(h.toast).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(asked).toEqual([]);
+    expect(h.toast).toHaveBeenCalledTimes(1);
+    expect(h.toast).toHaveBeenCalledWith("This app does not let the office play sound.");
+  } finally {
+    stopWatching();
+    delete (window as unknown as Record<string, unknown>).AudioContext;
+  }
+});
+
+test("a press that goes down on the button and comes up elsewhere leaves nothing behind for a later press", async () => {
+  open();
+  const asked: boolean[] = [];
+  sound.request = (next: boolean) => asked.push(next);
+  // Down on the button while sound is off (it would mean "on"), up somewhere else: no click.
+  page("btn-sound").dispatchEvent(new Event("pointerdown", { bubbles: true }));
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(0);
+  // The host turns sound on meanwhile. A click that brings no press of its own asks for the opposite of what shows.
+  setOn(true);
+  click("#btn-sound");
+  expect(asked).toEqual([false]);
+});
+
+test("a press on the speaker's drawing is the button's press: the drawing takes no pointer events", () => {
+  build();
+  const css = document
+    .querySelector(".toolbar")
+    ?.parentElement?.querySelector("style")?.textContent;
+  // The drawing is replaced when the state changes; a press that began on a node since removed would make no click.
+  expect(css).toContain("#sound-ico { pointer-events: none; }");
+});
+
 test("the disabled button's icon is drawn dimmed, not its tooltip, and its hover does not light it", () => {
   build();
   const css = document

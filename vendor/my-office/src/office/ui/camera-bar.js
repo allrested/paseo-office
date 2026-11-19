@@ -101,6 +101,7 @@ const STYLE = `
 .tb-zoom button:hover, .tb-full:hover { background: rgba(255, 255, 255, .07); color: #E8ECF4; }
 .tb-full[aria-pressed="true"] { background: #263040; color: var(--o-accent, #EF8A5F); }
 /* (the icon is dimmed, not the button: an opacity on it would dim its tooltip too) */
+#sound-ico { pointer-events: none; }
 .tb-full[aria-disabled="true"] { cursor: not-allowed; }
 .tb-full[aria-disabled="true"] > span { opacity: .45; }
 .tb-full[aria-disabled="true"]:hover { background: none; color: #8D97AA; }
@@ -270,10 +271,12 @@ export function setup() {
     else document.documentElement.requestFullscreen?.().catch(() => host.toast("This browser won't go full screen."));
   });
   document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
-  // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite,
-  // inside the press, which is what lets the page's audio start. Where audio is blocked, the press's own probe (it hears
-  // the pointerup or key before this click) may yet start it: the press waits for it, turns sound on if it did, and
-  // says it cannot only if it did not. With no Web Audio it says so at once.
+  // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite
+  // of what the button showed when the press began. The press's own probe (it hears the pointerup or the key before
+  // this click) may change things first: it may find audio and turn sound on by itself where it was asked for, or find
+  // none. So the press waits for the probe, then asks for what it meant, and says it cannot only if audio did not
+  // start. With no Web Audio it says so at once. The drawing takes no pointer events (see the styles): it is replaced
+  // when the state changes, and a press that began on a node since removed would make no click.
   const soundButton = $('btn-sound'), soundIcon = $('sound-ico');
   soundIcon.style.display = 'inline-grid';
   const showSound = () => {
@@ -284,9 +287,22 @@ export function setup() {
     soundButton.title = label;
     soundIcon.replaceChildren(speaker(sound.on));
   };
+  const meant = () => (available() ? !sound.on : true);
+  let intent = null;
+  const mark = () => { intent = meant(); };
+  // (a press that ends off the button makes no click: its meaning must not wait for some later press)
+  const unmark = () => setTimeout(() => { intent = null; });
+  soundButton.addEventListener('pointerdown', () => {
+    mark();
+    for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, unmark, { capture: true, once: true });
+  });
+  soundButton.addEventListener('keydown', (event) => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) mark(); });
+  soundButton.addEventListener('keyup', unmark);
+  soundButton.addEventListener('blur', unmark);
   soundButton.addEventListener('click', () => {
-    if (available()) { sound.request(!sound.on); return; }
-    whenProbed(() => { if (available()) sound.request(true); else host.toast('This app does not let the office play sound.'); });
+    const want = intent ?? meant();
+    intent = null;
+    whenProbed(() => { if (available()) sound.request(want); else host.toast('This app does not let the office play sound.'); });
   });
   sound.subscribe(showSound);
   showSound();
