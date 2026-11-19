@@ -1560,3 +1560,23 @@ test("the duty board's 08:00 run takes the instant it was due, so a run a millis
   await office.leave();
   await stop();
 });
+
+test("a notes time zone the host does not know leaves the duty board on the host's zone", async () => {
+  const unknownZone: SettingsState = {
+    ...ON,
+    values: { ...ON.values, notesTimeZone: "Mars/Olympus_Mons" },
+  };
+  const { recorded, context, logs, stop } = setup(async () => unknownZone, { duties: null });
+  await settle();
+  expect(recorded.schedules).toContain("upsert duty-board 0 8 * * * Asia/Riyadh");
+  expect(logs.filter((line) => line.includes("duty board"))).toEqual([]);
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { duties?: { day: string | null }; boards: Record<string, { id: string }[]> }
+    | undefined;
+  expect(snapshot?.duties?.day).toBe("2026-11-11");
+  expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
+  await office.leave();
+  await stop();
+});

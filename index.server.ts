@@ -145,6 +145,16 @@ export interface MachineHost {
   sleep(ms: number): Promise<void>;
 }
 
+/** `zone`, or `hostTimeZone` when this host's Intl does not know it. */
+function knownZone(zone: string, hostTimeZone: string): string {
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return zone;
+  } catch {
+    return hostTimeZone;
+  }
+}
+
 /** Why a turn did not complete, for the notes writer; null for one that did. */
 function turnProblem(outcome: PluginTurnOutcome): string | null {
   switch (outcome.kind) {
@@ -239,14 +249,14 @@ export function createOfficePlugin(
     log,
   });
   // The duty list, posted on the duty board at 08:00 in the notes' zone, and caught up at the
-  // start and at each save. A zone that cannot be read is the host's.
+  // start and at each save. A zone that cannot be read, or that Intl does not know, is the host's.
   const duties = createDutyService({
     file: deps.dutiesFile,
     board: office,
     schedules: deps.schedules,
     zone: () =>
       readHostSettings().then(
-        (values) => notesTimeZone(values, deps.hostTimeZone),
+        (values) => knownZone(notesTimeZone(values, deps.hostTimeZone), deps.hostTimeZone),
         () => deps.hostTimeZone,
       ),
     now: () => deps.clock.now(),
