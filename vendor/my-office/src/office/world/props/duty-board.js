@@ -49,17 +49,17 @@ export function drawBoard(b) {
     g.textAlign = 'center'; g.fillStyle = '#2E9E4A'; g.font = `900 46px ${FONT}`; g.fillText(tr(`people.duty.board.${b.off}`), W / 2, 160);
     g.fillStyle = '#5E6670'; g.font = `600 22px ${FONT}`; g.fillText(tr('people.duty.board.noDuty'), W / 2, 214);
   } else if (!b.rows.length) {
-    g.textAlign = 'center'; g.fillStyle = '#5E6670'; g.font = `600 24px ${FONT}`; g.fillText(b.none || tr('people.duty.board.nobody'), W / 2, 170);
+    g.textAlign = 'center'; g.fillStyle = '#5E6670'; g.font = `600 24px ${FONT}`; g.fillText(b.none || tr('people.duty.board.nobody'), W / 2, 170);   // PASEO: the host's words when no duty is due
   } else {
     const step = Math.min(52, Math.floor(232 / b.rows.length)), px = Math.max(13, Math.min(25, Math.round(step * 0.48)));   // PASEO
     b.rows.forEach((r, i) => {
-      const y = 92 + i * step;
-      if (r.chore) icon(g, r.chore, 38, y);
+      const y = 92 + i * step;   // PASEO: the rows share the board's height
+      if (r.chore) icon(g, r.chore, 38, y);   // PASEO: no marker for a duty with no chore
       const label = r.label ?? tr(`people.duty.chores.${r.chore}`);   // PASEO: a duty of the host's, by its name
-      g.textAlign = 'left'; g.fillStyle = r.owed ? '#C8261B' : '#1E232B'; g.font = `800 ${px}px ${FONT}`; fitText(g, label, 196); g.fillText(label, 60, y);
-      g.fillStyle = r.at ? '#7A8494' : '#1F4E9E'; g.font = `700 ${px}px ${FONT}`; const name = r.name || '—'; fitText(g, name, 150); g.fillText(name, 262, y);
+      g.textAlign = 'left'; g.fillStyle = r.owed ? '#C8261B' : '#1E232B'; g.font = `800 ${px}px ${FONT}`; fitText(g, label, 196); g.fillText(label, 60, y);   // PASEO: the duty's label, red when owed, at the rows' size, fitted
+      g.fillStyle = r.at ? '#7A8494' : '#1F4E9E'; g.font = `700 ${px}px ${FONT}`; const name = r.name || '—'; fitText(g, name, 150); g.fillText(name, 262, y);   // PASEO: at the rows' size
       g.textAlign = 'right';
-      if (r.at) { g.fillStyle = '#2E9E4A'; g.font = `900 26px ${FONT}`; g.fillText(r.label ? '✓' : `✓ ${r.at}`, W - 20, y); g.strokeStyle = 'rgba(46,158,74,.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(60, y + 2); g.lineTo(412, y + 2); g.stroke(); }
+      if (r.at) { g.fillStyle = '#2E9E4A'; g.font = `900 26px ${FONT}`; g.fillText(r.label ? '✓' : `✓ ${r.at}`, W - 20, y); g.strokeStyle = 'rgba(46,158,74,.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(60, y + 2); g.lineTo(412, y + 2); g.stroke(); }   // PASEO: a host row's tick has no time
       else if (r.busy) { g.fillStyle = '#E8742A'; g.font = `700 20px ${FONT}`; g.fillText(tr('people.duty.board.doing'), W - 20, y); }
     });
     if (b.owe.length) {

@@ -16,7 +16,7 @@ import { state } from '../core/state.js';
 import { PRO, officeNow, pad2, rand, reduceMotion, replay } from '../core/env.js';
 import { mat } from '../scene/blocks.js';
 import { stairsVisit } from '../world/entrance.js';
-import { BOARD_AT, SINK, drawBoard, setPile } from '../world/props/duty-board.js';
+import { BOARD_AT, SINK, drawBoard, setPile } from '../world/props/duty-board.js';   // PASEO: BOARD_AT, where the board hangs
 import { spotAt, standBy } from './navigation.js';
 import { free, later, plantSpot, plantsToWater, pour } from './errands.js';
 import { dn, sessions, workers } from './workers.js';
@@ -71,14 +71,14 @@ const drop = (m) => { if (m) { m.removeFromParent(); m.geometry.dispose(); } };
 /* ---------- doing a chore ---------- */
 const alive = (J) => job === J && J.w.chore?.duty === J.chore && !J.w.leaving;
 function start(chore, w, owed, given = null) {   // PASEO: `given`, a duty of the host's board ('board': no chore of its own)
-  const J = job = { chore, w, owed, stage: 'up', held: null, left: 0, given };
-  w.chore = { duty: chore, where: { ic: chore === 'plants' ? 'sparkle' : 'coffee', text: tr('people.duty.where', { what: given ? given.name : tr(`people.duty.chores.${chore}`) }) } };
+  const J = job = { chore, w, owed, stage: 'up', held: null, left: 0, given };   // PASEO: `given` kept on the job
+  w.chore = { duty: chore, where: { ic: chore === 'plants' ? 'sparkle' : 'coffee', text: tr('people.duty.where', { what: given ? given.name : tr(`people.duty.chores.${chore}`) }) } };   // PASEO: a duty of the host's by its own name
   w.station = 'duty'; w.restAt = Infinity; w.hush(); w.anim = 'wake';
   later(reduceMotion ? 0.3 : 1.4, () => {
     if (!alive(J)) return;
     w.anim = 'idle'; if (chore !== 'board') say(w, owed && !given ? 'owe' : `${chore}Go`);   // PASEO: a 'board' duty says nothing; an owed duty of the host's, nobody complained of, gets no apology
     J.stage = 'go';
-    ({ cups, trash, plants, table, board })[chore](J);
+    ({ cups, trash, plants, table, board })[chore](J);   // PASEO: `board`
   });
   queueUi(); show();
 }
@@ -154,7 +154,7 @@ function finish(J, line) {
   const w = J.w;
   st = done(st, J.chore, minutes(), J.owed); save();
   if (J.given) handBack(J);   // PASEO
-  job = null; if (line) say(w, line, 3500); w.anim = 'idle';
+  job = null; if (line) say(w, line, 3500); w.anim = 'idle';   // PASEO: a `board` duty ends with no line
   w.goTo(w.homeSpot(), () => { if (w.chore?.duty === J.chore) w.chore = null; resume(w, false); queueUi(); });
   queueUi(); show();
 }
