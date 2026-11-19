@@ -39,7 +39,13 @@ import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
 import { ChatPanel } from "./chat-panel.js";
 import { unreadCount, unreadLabel } from "./chat-text.js";
-import { COLUMN_MIN, FLOOR_MIN, countLabel, type ColumnTab } from "./column-model.js";
+import {
+  COLUMN_MIN,
+  FLOOR_MIN,
+  countLabel,
+  type ColumnTab,
+  type ColumnView,
+} from "./column-model.js";
 import { IncidentsCard } from "./incidents-card.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
@@ -54,7 +60,7 @@ import {
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
 import { ColumnBar, ColumnSheet } from "./column-sheet.js";
-import { OfficeColumn, type ColumnBadges } from "./office-column.js";
+import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { SessionsPanel } from "./sessions-panel.js";
 import { PixelOffice } from "./pixel/pixel-office.js";
@@ -919,10 +925,18 @@ function useColumnSheet(link: OfficeLink) {
     }),
     [link],
   );
-  return { sheetTab, setSheetTab, closeSheet, sheetLink };
+  const sheetView = useMemo(
+    (): ColumnView | null => (sheetTab === null ? null : { kind: "tab", tab: sheetTab }),
+    [sheetTab],
+  );
+  return { sheetTab, sheetView, setSheetTab, closeSheet, sheetLink };
 }
 
 type ColumnSheetState = ReturnType<typeof useColumnSheet>;
+
+/** The sheet and the column hold no session tab until a way in opens one. */
+const NO_SESSION_TABS: readonly ColumnSession[] = [];
+const noop = (): void => undefined;
 
 interface PhoneSheetProps extends Omit<ColumnPanelProps, "link"> {
   compact: boolean;
@@ -937,11 +951,14 @@ function PhoneSheet({ compact, sheet, color, attention, ...panel }: PhoneSheetPr
   if (!compact) return null;
   return (
     <ColumnSheet
-      open={sheet.sheetTab}
+      open={sheet.sheetView}
+      sessionTitle={null}
       color={color}
       iconSize={20}
       platform={panel.layout.platform}
       onClose={sheet.closeSheet}
+      onBack={noop}
+      onCloseSession={noop}
       styles={panel.styles}
     >
       {sheet.sheetTab === null ? null : (
@@ -964,7 +981,8 @@ function PhoneBar({ compact, sheet, badges, color, styles }: PhoneBarProps) {
   if (!compact) return null;
   return (
     <ColumnBar
-      open={sheet.sheetTab}
+      open={sheet.sheetView}
+      sessions={NO_SESSION_TABS}
       badges={badges}
       color={color}
       iconSize={20}
@@ -984,6 +1002,7 @@ interface WideColumnProps extends ColumnPanelProps {
   badges: ColumnBadges;
   color: string;
   iconSize: number;
+  touch: boolean;
   attention: ReactNode;
 }
 
@@ -995,14 +1014,19 @@ function WideColumn({
   badges,
   color,
   iconSize,
+  touch,
   onDragging,
   attention,
   ...panel
 }: WideColumnProps) {
   if (compact) return null;
+  // A session's panel is drawn once a way in opens one; until then Sessions stands in.
+  const tab = column.view.kind === "tab" ? column.view.tab : "sessions";
   return (
     <OfficeColumn
       column={column}
+      sessions={NO_SESSION_TABS}
+      touch={touch}
       surfaceWidth={surfaceWidth}
       badges={badges}
       color={color}
@@ -1010,7 +1034,7 @@ function WideColumn({
       onDragging={onDragging}
       styles={panel.styles}
     >
-      <ColumnPanel tab={column.tab} attention={attention} {...panel} />
+      <ColumnPanel tab={tab} attention={attention} {...panel} />
     </OfficeColumn>
   );
 }
@@ -1293,6 +1317,7 @@ export function OfficeSurface(
           badges={badges}
           color={color}
           iconSize={touchScreen ? 20 : 16}
+          touch={touchScreen}
           onDragging={setDragging}
           link={link}
           {...panel}

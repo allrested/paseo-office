@@ -1,6 +1,17 @@
 import { expect, test } from "vitest";
 import { officeColumnSettings } from "../shared/settings.js";
-import { COLUMN_TABS, clampColumn, countLabel } from "./column-model.js";
+import {
+  COLUMN_TABS,
+  NO_SESSIONS,
+  clampColumn,
+  closeSession,
+  countLabel,
+  keepKnown,
+  openSession,
+  showTab,
+} from "./column-model.js";
+
+const view = (agentId: string) => ({ kind: "session" as const, agentId });
 
 test("the tabs are Attention, Sessions, Activity and Chat, in that order", () => {
   expect(COLUMN_TABS.map((each) => each.label)).toEqual([
@@ -37,4 +48,57 @@ test("a count shows as a number, capped, and nothing at zero", () => {
 
 test("a device that never set the column has it open at the default width", () => {
   expect(officeColumnSettings.schema.parse({})).toEqual({ width: 360, collapsed: false });
+});
+
+test("the column starts on Sessions with no session open", () => {
+  expect(NO_SESSIONS).toEqual({
+    open: [],
+    view: { kind: "tab", tab: "sessions" },
+  });
+});
+
+test("opening a session adds its tab at the end and shows it", () => {
+  const one = openSession(NO_SESSIONS, "a");
+  const two = openSession(one, "b");
+  expect(two).toEqual({ open: ["a", "b"], view: view("b") });
+});
+
+test("opening a session that is open selects its tab and keeps the order", () => {
+  const tabs = openSession(openSession(openSession(NO_SESSIONS, "a"), "b"), "a");
+  expect(tabs).toEqual({ open: ["a", "b"], view: view("a") });
+});
+
+test("closing the shown session shows the one to its left, or Sessions", () => {
+  const two = openSession(openSession(NO_SESSIONS, "a"), "b");
+  expect(closeSession(two, "b")).toEqual({ open: ["a"], view: view("a") });
+  expect(closeSession(closeSession(two, "b"), "a")).toEqual(NO_SESSIONS);
+});
+
+test("closing the first of several shown sessions shows the next one", () => {
+  const two = openSession(openSession(NO_SESSIONS, "a"), "b");
+  const onFirst = openSession(two, "a");
+  expect(closeSession(onFirst, "a")).toEqual({ open: ["b"], view: view("b") });
+});
+
+test("closing a session that is not shown leaves the view", () => {
+  const two = openSession(openSession(NO_SESSIONS, "a"), "b");
+  expect(closeSession(two, "a")).toEqual({ open: ["b"], view: view("b") });
+  expect(closeSession(two, "zz")).toBe(two);
+});
+
+test("a fixed tab shows without closing any session", () => {
+  const one = openSession(NO_SESSIONS, "a");
+  expect(showTab(one, "chat")).toEqual({
+    open: ["a"],
+    view: { kind: "tab", tab: "chat" },
+  });
+});
+
+test("a session whose agent is gone is dropped", () => {
+  const two = openSession(openSession(NO_SESSIONS, "a"), "b");
+  expect(keepKnown(two, new Set(["a"]))).toEqual({
+    open: ["a"],
+    view: view("a"),
+  });
+  expect(keepKnown(two, new Set(["a", "b"]))).toBe(two);
 });

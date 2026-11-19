@@ -34,6 +34,12 @@ export interface OfficeStyles {
   columnTabs: ViewStyle;
   /** A tab or the collapse button: a segment as wide as the controls are tall, so four fit 280 px. */
   columnTab: ViewStyle;
+  columnTabsScroll: ViewStyle;
+  /** An open session's tab: its pill, the button to press, and the close button beside it. */
+  sessionTab: ViewStyle;
+  sessionTabMain: ViewStyle;
+  sessionTabClose: ViewStyle;
+  sessionTabCloseHidden: ViewStyle;
   columnTabsVertical: ViewStyle;
   /** The chosen tab's panel. */
   columnBody: ViewStyle;
@@ -569,6 +575,38 @@ export function useOfficeStyles(
         overflow: "hidden",
       },
       columnTabsVertical: { alignItems: "center", gap: 4 },
+      columnTabsScroll: { flexShrink: 1 },
+      sessionTab: {
+        minHeight: controlHeight,
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: 9999,
+        overflow: "hidden",
+      },
+      sessionTabMain: {
+        minHeight: controlHeight,
+        maxWidth: 160,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingLeft: 12,
+        flexShrink: 1,
+      },
+      sessionTabClose: {
+        minHeight: controlHeight,
+        minWidth: 28,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingRight: 8,
+      },
+      sessionTabCloseHidden: {
+        minHeight: controlHeight,
+        minWidth: 28,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingRight: 8,
+        opacity: 0,
+      },
       columnBody: { flex: 1 },
       columnAttention: { paddingVertical: 8 },
       columnBar: {

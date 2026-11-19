@@ -29,3 +29,47 @@ export function countLabel(count: number): string | null {
   if (count <= 0) return null;
   return count > 99 ? "99+" : String(count);
 }
+
+/** What the column shows: one of its fixed tabs, or an open session. */
+export type ColumnView = { kind: "tab"; tab: ColumnTab } | { kind: "session"; agentId: string };
+
+export interface SessionTabs {
+  /** Open sessions, in the order they were opened. */
+  open: readonly string[];
+  view: ColumnView;
+}
+
+export const NO_SESSIONS: SessionTabs = {
+  open: [],
+  view: { kind: "tab", tab: "sessions" },
+};
+
+/** Opens the agent's session, or selects its tab when it is open already. */
+export function openSession(tabs: SessionTabs, agentId: string): SessionTabs {
+  const open = tabs.open.includes(agentId) ? tabs.open : [...tabs.open, agentId];
+  return { open, view: { kind: "session", agentId } };
+}
+
+/** Closes it. When it was showing, the tab to its left shows: a session, or Sessions. */
+export function closeSession(tabs: SessionTabs, agentId: string): SessionTabs {
+  const index = tabs.open.indexOf(agentId);
+  if (index < 0) return tabs;
+  const open = tabs.open.filter((each) => each !== agentId);
+  const shown = tabs.view.kind === "session" && tabs.view.agentId === agentId;
+  if (!shown) return { open, view: tabs.view };
+  const next = open[Math.max(0, index - 1)];
+  if (next === undefined) return NO_SESSIONS;
+  return { open, view: { kind: "session", agentId: next } };
+}
+
+export function showTab(tabs: SessionTabs, tab: ColumnTab): SessionTabs {
+  return { open: tabs.open, view: { kind: "tab", tab } };
+}
+
+/** Drops sessions whose agent is gone from `known`; the view moves as `closeSession` moves it. */
+export function keepKnown(tabs: SessionTabs, known: ReadonlySet<string>): SessionTabs {
+  return tabs.open.reduce(
+    (current, agentId) => (known.has(agentId) ? current : closeSession(current, agentId)),
+    tabs,
+  );
+}

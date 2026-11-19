@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 // The column, mounted with a stand-in for the device's setting: its tabs, its badges, its rail.
-import { act, createElement, useMemo, type ReactNode } from "react";
+import { act, createElement, useCallback, useMemo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { OfficeColumn } from "./office-column.js";
@@ -49,22 +49,42 @@ function recordDrag(next: boolean): void {
 }
 let root: Root;
 
+const TITLES: Record<string, string> = { a: "Alpha work", b: "Beta work" };
+
 function Harness({ chat }: { chat: string | null }): ReactNode {
   const styles = useOfficeStyles(THEME, false, false);
   const column = useColumn();
   const badges = useMemo(() => ({ attention: "2", chat }), [chat]);
+  const sessions = useMemo(
+    () =>
+      column.sessions.map((agentId) => ({
+        agentId,
+        title: TITLES[agentId] ?? agentId,
+        tone: "running" as const,
+      })),
+    [column.sessions],
+  );
+  const { view, openSession } = column;
+  const openA = useCallback(() => openSession("a"), [openSession]);
+  const openB = useCallback(() => openSession("b"), [openSession]);
   return (
-    <OfficeColumn
-      column={column}
-      surfaceWidth={1280}
-      badges={badges}
-      color="#000000"
-      iconSize={16}
-      onDragging={recordDrag}
-      styles={styles}
-    >
-      <Text>{`panel:${column.tab}`}</Text>
-    </OfficeColumn>
+    <>
+      <Pressable accessibilityLabel="open a" onPress={openA} />
+      <Pressable accessibilityLabel="open b" onPress={openB} />
+      <OfficeColumn
+        column={column}
+        sessions={sessions}
+        touch={false}
+        surfaceWidth={1280}
+        badges={badges}
+        color="#000000"
+        iconSize={16}
+        onDragging={recordDrag}
+        styles={styles}
+      >
+        <Text>{`panel:${view.kind === "tab" ? view.tab : `session:${view.agentId}`}`}</Text>
+      </OfficeColumn>
+    </>
   );
 }
 
@@ -77,6 +97,15 @@ function tab(label: string): HTMLElement {
   if (!found) throw new Error(`No tab is labelled "${label}"`);
   return found;
 }
+
+function control(label: string): HTMLElement {
+  const found = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+  if (!found) throw new Error(`Nothing is labelled "${label}"`);
+  return found;
+}
+
+const tabLabels = () =>
+  [...container.querySelectorAll('[role="tab"]')].map((each) => each.getAttribute("aria-label"));
 
 beforeEach(() => {
   saves = [];
@@ -157,4 +186,67 @@ test("a drag of the handle says when it starts and when it ends", async () => {
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
   });
   expect(dragging).toEqual([true, false]);
+});
+
+test("opening a session adds its tab after the four, chosen, with its panel", async () => {
+  await mount();
+  await act(async () => control("open a").click());
+  await act(async () => control("open b").click());
+
+  expect(tabLabels()).toEqual([
+    "Attention, 2 new",
+    "Sessions",
+    "Activity",
+    "Chat",
+    "Alpha work",
+    "Beta work",
+  ]);
+  expect(tab("Beta work").getAttribute("aria-selected")).toBe("true");
+  expect(tab("Sessions").getAttribute("aria-selected")).toBe("false");
+  expect(container.textContent).toContain("panel:session:b");
+});
+
+test("a fixed tab's press leaves the session's tab where it is", async () => {
+  await mount();
+  await act(async () => control("open a").click());
+  await act(async () => tab("Activity").click());
+
+  expect(container.textContent).toContain("panel:activity");
+  expect(tab("Alpha work").getAttribute("aria-selected")).toBe("false");
+  await act(async () => tab("Alpha work").click());
+  expect(container.textContent).toContain("panel:session:a");
+});
+
+test("Close removes the session's tab and shows the tab to its left", async () => {
+  await mount();
+  await act(async () => control("open a").click());
+  await act(async () => control("open b").click());
+  await act(async () => control("Close Beta work").click());
+  expect(tabLabels()).toEqual(["Attention, 2 new", "Sessions", "Activity", "Chat", "Alpha work"]);
+  expect(container.textContent).toContain("panel:session:a");
+
+  await act(async () => control("Close Alpha work").click());
+  expect(tab("Sessions").getAttribute("aria-selected")).toBe("true");
+  expect(container.textContent).toContain("panel:sessions");
+});
+
+test("the rail counts the open sessions on Sessions, and a press opens the column on it", async () => {
+  await mount();
+  await act(async () => control("open a").click());
+  await act(async () => control("open b").click());
+  await act(async () => control("Collapse the column").click());
+
+  expect(tabLabels()).toEqual(["Attention, 2 new", "Sessions, 2 open", "Activity", "Chat"]);
+  await act(async () => tab("Sessions").click());
+  expect(container.textContent).toContain("panel:sessions");
+  expect(tab("Alpha work")).toBeTruthy();
+});
+
+test("opening a session opens a collapsed column", async () => {
+  storedColumn = { width: 360, collapsed: true };
+  await mount();
+  await act(async () => control("open a").click());
+
+  expect(container.textContent).toContain("panel:session:a");
+  expect(saves).toEqual([{ width: 360, collapsed: false }]);
 });

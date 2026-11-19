@@ -1,21 +1,27 @@
 import { useCallback, useEffect, type ReactNode } from "react";
 import { KeyboardAvoidingView, Pressable, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import { COLUMN_TABS, type ColumnTab } from "./column-model.js";
-import { ColumnTabs, type ColumnBadges } from "./office-column.js";
+import { COLUMN_TABS, type ColumnTab, type ColumnView } from "./column-model.js";
+import { ColumnTabs, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import type { OfficeStyles } from "./styles.js";
 
 export interface ColumnSheetProps {
-  /** The tab the sheet shows; null while it is closed. */
-  open: ColumnTab | null;
+  /** What the sheet shows; null while it is closed. */
+  open: ColumnView | null;
+  /** The open session's title, while the sheet shows a session. */
+  sessionTitle: string | null;
   /** The theme's foreground, which an icon-only control's glyph rests at. */
   color: string;
   iconSize: number;
   /** "web" listens for Escape; "ios" lifts the sheet's body over the keyboard. */
   platform: "ios" | "android" | "web";
   onClose(): void;
+  /** From a session back to Sessions; the session stays open. */
+  onBack(): void;
+  /** Closes the shown session's tab. */
+  onCloseSession(): void;
   styles: OfficeStyles;
-  /** The open tab's panel. */
+  /** The open tab's or session's panel. */
   children: ReactNode;
 }
 
@@ -27,10 +33,13 @@ export interface ColumnSheetProps {
  */
 export function ColumnSheet({
   open,
+  sessionTitle,
   color,
   iconSize,
   platform,
   onClose,
+  onBack,
+  onCloseSession,
   styles,
   children,
 }: ColumnSheetProps) {
@@ -43,7 +52,10 @@ export function ColumnSheet({
     return () => document.removeEventListener("keydown", onKey);
   }, [platform, open, onClose]);
   if (open === null) return null;
-  const title = COLUMN_TABS.find((each) => each.tab === open)?.label ?? "";
+  const session = open.kind === "session";
+  const title = session
+    ? (sessionTitle ?? "Session")
+    : (COLUMN_TABS.find((each) => each.tab === open.tab)?.label ?? "");
   return (
     <>
       <Pressable
@@ -54,13 +66,23 @@ export function ColumnSheet({
       />
       <View testID="office-column-sheet" style={styles.columnSheet}>
         <View style={styles.columnSheetHead}>
-          <Text accessibilityRole="header" style={styles.columnSheetTitle}>
+          {session ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back to Sessions"
+              onPress={onBack}
+              style={styles.segment}
+            >
+              <Icon name="ArrowLeft" size={iconSize} color={color} />
+            </Pressable>
+          ) : null}
+          <Text accessibilityRole="header" numberOfLines={1} style={styles.columnSheetTitle}>
             {title}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close"
-            onPress={onClose}
+            accessibilityLabel={session ? `Close ${title}` : "Close"}
+            onPress={session ? onCloseSession : onClose}
             style={styles.segment}
           >
             <Icon name="X" size={iconSize} color={color} />
@@ -78,9 +100,13 @@ export function ColumnSheet({
   );
 }
 
+const ignore = (): void => undefined;
+
 export interface ColumnBarProps {
-  /** The tab the sheet shows; null while it is closed. */
-  open: ColumnTab | null;
+  /** What the sheet shows; null while it is closed. */
+  open: ColumnView | null;
+  /** The open sessions: the Sessions tab carries their count. */
+  sessions: readonly ColumnSession[];
   badges: ColumnBadges;
   color: string;
   iconSize: number;
@@ -92,6 +118,7 @@ export interface ColumnBarProps {
 /** The phone's bar of the column's tabs, under the floor: a press opens that tab's sheet. */
 export function ColumnBar({
   open,
+  sessions,
   badges,
   color,
   iconSize,
@@ -99,10 +126,11 @@ export function ColumnBar({
   onClose,
   styles,
 }: ColumnBarProps) {
-  // The open tab's own press closes the sheet, as a second press on a toggle does.
+  // The open tab's own press closes the sheet, as a second press on a toggle does. A session's
+  // sheet has no tab chosen: Sessions takes it back to the list.
   const press = useCallback(
     (tab: ColumnTab) => {
-      if (tab === open) onClose();
+      if (open?.kind === "tab" && open.tab === tab) onClose();
       else onOpen(tab);
     },
     [open, onOpen, onClose],
@@ -110,13 +138,18 @@ export function ColumnBar({
   return (
     <View style={styles.columnBar}>
       <ColumnTabs
-        tab={open}
+        view={open}
         badges={badges}
+        sessions={sessions}
+        sessionTabs={false}
+        touch
         color={color}
         iconSize={iconSize}
         labels={false}
         vertical={false}
         onPress={press}
+        onSession={ignore}
+        onClose={ignore}
         styles={styles}
       />
     </View>

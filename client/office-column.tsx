@@ -1,7 +1,14 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { PanResponder, Pressable, Text, View } from "react-native";
+import { PanResponder, Pressable, ScrollView, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import { COLUMN_TABS, clampColumn, type ColumnTab } from "./column-model.js";
+import type { DotTone } from "../shared/model.js";
+import {
+  COLUMN_TABS,
+  clampColumn,
+  countLabel,
+  type ColumnTab,
+  type ColumnView,
+} from "./column-model.js";
 import type { OfficeStyles } from "./styles.js";
 import type { ColumnState } from "./use-column.js";
 
@@ -12,12 +19,21 @@ export interface ColumnBadges {
   chat: string | null;
 }
 
+/** An open session as the column's tab draws it. */
+export interface ColumnSession {
+  agentId: string;
+  title: string;
+  tone: DotTone;
+}
+
 interface TabProps {
   tab: ColumnTab;
   label: string;
   icon: string;
   selected: boolean;
   count: string | null;
+  /** What the count counts: "new" for a badge, "open" for the sessions. */
+  countNote: string;
   showLabel: boolean;
   color: string;
   iconSize: number;
@@ -31,6 +47,7 @@ function Tab({
   icon,
   selected,
   count,
+  countNote,
   showLabel,
   color,
   iconSize,
@@ -50,7 +67,7 @@ function Tab({
   return (
     <Pressable
       accessibilityRole="tab"
-      accessibilityLabel={count ? `${label}, ${count} new` : label}
+      accessibilityLabel={count ? `${label}, ${count} ${countNote}` : label}
       aria-selected={selected}
       onPress={press}
       onPressIn={pressIn}
@@ -76,31 +93,105 @@ function Tab({
   );
 }
 
+interface SessionTabProps {
+  session: ColumnSession;
+  selected: boolean;
+  /** Touch has no hover: the close button is always there. */
+  touch: boolean;
+  color: string;
+  iconSize: number;
+  onSession(agentId: string): void;
+  onClose(agentId: string): void;
+  styles: OfficeStyles;
+}
+
+/** An open session's tab: its status dot and title, and a button to close it beside them. */
+function SessionTab({
+  session,
+  selected,
+  touch,
+  color,
+  iconSize,
+  onSession,
+  onClose,
+  styles,
+}: SessionTabProps) {
+  const { agentId, title, tone } = session;
+  const press = useCallback(() => onSession(agentId), [onSession, agentId]);
+  const close = useCallback(() => onClose(agentId), [onClose, agentId]);
+  const [hovered, setHovered] = useState(false);
+  const hoverIn = useCallback(() => setHovered(true), []);
+  const hoverOut = useCallback(() => setHovered(false), []);
+  let closeStyle = styles.sessionTabClose;
+  if (!touch && !selected && !hovered) closeStyle = styles.sessionTabCloseHidden;
+  return (
+    <View style={styles.sessionTab}>
+      {selected ? <View style={styles.segmentFill} /> : null}
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityLabel={title}
+        aria-selected={selected}
+        onPress={press}
+        onHoverIn={hoverIn}
+        onHoverOut={hoverOut}
+        style={styles.sessionTabMain}
+      >
+        <View style={styles.dot[tone]} />
+        <Text numberOfLines={1} style={selected ? styles.segmentTextSelected : styles.segmentText}>
+          {title}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Close ${title}`}
+        onPress={close}
+        onHoverIn={hoverIn}
+        onHoverOut={hoverOut}
+        style={closeStyle}
+      >
+        <Icon name="X" size={iconSize - 4} color={color} />
+      </Pressable>
+    </View>
+  );
+}
+
 export interface ColumnTabsProps {
-  /** The chosen tab; null where none shows as chosen (the rail, the phone's bar while closed). */
-  tab: ColumnTab | null;
+  /** What shows as chosen; null where none does (the rail, the phone's bar while closed). */
+  view: ColumnView | null;
   badges: ColumnBadges;
+  /** The open sessions: a tab each when `sessionTabs`, else a count on Sessions. */
+  sessions: readonly ColumnSession[];
+  sessionTabs: boolean;
+  touch: boolean;
   color: string;
   iconSize: number;
   /** Icons alone on the rail and the phone's bar; with the chosen tab's label in the column. */
   labels: boolean;
   vertical: boolean;
   onPress(tab: ColumnTab): void;
+  onSession(agentId: string): void;
+  onClose(agentId: string): void;
   styles: OfficeStyles;
 }
 
 /** The column's tabs: a row in the open column, a stack on its rail. */
 export function ColumnTabs({
-  tab,
+  view,
   badges,
+  sessions,
+  sessionTabs,
+  touch,
   color,
   iconSize,
   labels,
   vertical,
   onPress,
+  onSession,
+  onClose,
   styles,
 }: ColumnTabsProps) {
-  return (
+  const tab = view?.kind === "tab" ? view.tab : null;
+  const list = (
     <View
       role="tablist"
       aria-label="Office column"
@@ -108,8 +199,13 @@ export function ColumnTabs({
     >
       {COLUMN_TABS.map((each) => {
         let count: string | null = null;
+        let countNote = "new";
         if (each.tab === "attention") count = badges.attention;
         if (each.tab === "chat") count = badges.chat;
+        if (each.tab === "sessions" && !sessionTabs) {
+          count = countLabel(sessions.length);
+          countNote = "open";
+        }
         return (
           <Tab
             key={each.tab}
@@ -118,6 +214,7 @@ export function ColumnTabs({
             icon={each.icon}
             selected={each.tab === tab}
             count={count}
+            countNote={countNote}
             // Four labels do not fit a narrow column: the chosen tab alone says its name.
             showLabel={labels && each.tab === tab}
             color={color}
@@ -127,7 +224,29 @@ export function ColumnTabs({
           />
         );
       })}
+      {sessionTabs
+        ? sessions.map((each) => (
+            <SessionTab
+              key={each.agentId}
+              session={each}
+              selected={view?.kind === "session" && view.agentId === each.agentId}
+              touch={touch}
+              color={color}
+              iconSize={iconSize}
+              onSession={onSession}
+              onClose={onClose}
+              styles={styles}
+            />
+          ))
+        : null}
     </View>
+  );
+  if (!sessionTabs) return list;
+  // Many sessions scroll sideways rather than wrap.
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.columnTabsScroll}>
+      {list}
+    </ScrollView>
   );
 }
 
@@ -155,6 +274,10 @@ function IconButton({ label, icon, color, iconSize, onPress, styles }: IconButto
 
 export interface OfficeColumnProps {
   column: ColumnState;
+  /** The open sessions with their titles and status, in `column.sessions`' order. */
+  sessions: readonly ColumnSession[];
+  /** True on a touch screen, where a session tab's close button is always drawn. */
+  touch: boolean;
   /** The surface's width, for the column's most; 0 until measured. */
   surfaceWidth: number;
   badges: ColumnBadges;
@@ -167,7 +290,7 @@ export interface OfficeColumnProps {
    */
   onDragging(dragging: boolean): void;
   styles: OfficeStyles;
-  /** The chosen tab's panel. */
+  /** The chosen tab's or session's panel. */
   children: ReactNode;
 }
 
@@ -178,6 +301,8 @@ export interface OfficeColumnProps {
  */
 export function OfficeColumn({
   column,
+  sessions,
+  touch,
   surfaceWidth,
   badges,
   color,
@@ -186,7 +311,7 @@ export function OfficeColumn({
   styles,
   children,
 }: OfficeColumnProps) {
-  const { tab, collapsed, show, setCollapsed, setWidth } = column;
+  const { view, collapsed, show, openSession, closeSession, setCollapsed, setWidth } = column;
   const width = clampColumn(column.width, surfaceWidth);
   // The width while the handle is dragged; the device is told once, on release.
   const [dragged, setDragged] = useState<number | null>(null);
@@ -225,13 +350,18 @@ export function OfficeColumn({
     return (
       <View style={styles.columnRail}>
         <ColumnTabs
-          tab={null}
+          view={null}
           badges={badges}
+          sessions={sessions}
+          sessionTabs={false}
+          touch={touch}
           color={color}
           iconSize={iconSize}
           labels={false}
           vertical
           onPress={show}
+          onSession={openSession}
+          onClose={closeSession}
           styles={styles}
         />
       </View>
@@ -247,13 +377,18 @@ export function OfficeColumn({
       <View style={sized}>
         <View style={styles.columnHead}>
           <ColumnTabs
-            tab={tab}
+            view={view}
             badges={badges}
+            sessions={sessions}
+            sessionTabs
+            touch={touch}
             color={color}
             iconSize={iconSize}
             labels
             vertical={false}
             onPress={show}
+            onSession={openSession}
+            onClose={closeSession}
             styles={styles}
           />
           <IconButton
