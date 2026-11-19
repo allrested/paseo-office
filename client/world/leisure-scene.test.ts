@@ -4,16 +4,24 @@
 // upstream's restroom visit (people/workers.js visitWc and wcTick) sets on them.
 import { beforeEach, expect, test, vi } from "vitest";
 // @ts-expect-error vendored JavaScript has no declarations
+import { state } from "../../vendor/my-office/src/office/core/state.js";
+// @ts-expect-error vendored JavaScript has no declarations
 import { leisureNow, updateLeisure } from "../../vendor/my-office/src/office/paseo-leisure.js";
 
 const h = vi.hoisted(() => ({
   sessions: new Map<string, { id: string; status: string }>(),
   workers: new Map<string, Record<string, unknown>>(),
-  stations: { coffee: [], dining: [], wc: [] as { x: number; z: number; by: unknown }[] },
+  stations: { coffee: [], dining: [], wc: [] } as Record<string, { by: unknown }[]>,
+  /** The floor plan as core/env.js reads it: the company floor, or not. */
+  env: { PRO: true },
+  /** What the lively floor last told its plan is open now (paseo-leisure-plan.js step's `open`). */
+  open: null as Record<string, boolean> | null,
 }));
 
 vi.mock("../../vendor/my-office/src/office/core/env.js", () => ({
-  PRO: true,
+  get PRO() {
+    return h.env.PRO;
+  },
   nowMs: () => 0,
   // At 23:00 nobody starts an activity of their own.
   officeNow: () => new Date(2026, 10, 17, 23),
@@ -64,6 +72,25 @@ vi.mock("../../vendor/my-office/src/office/people/karaoke.js", () => ({
   ktvState: () => ({}),
 }));
 vi.mock("../../vendor/my-office/src/i18n/index.js", () => ({ t: (key: string) => key }));
+// The real plan, with what it is told is open recorded.
+vi.mock("../../vendor/my-office/src/office/paseo-leisure-plan.js", async (importOriginal) => {
+  const real = await importOriginal<{
+    createPlan(): { step(input: { open: Record<string, boolean> }): unknown };
+  }>();
+  return {
+    ...real,
+    createPlan: () => {
+      const plan = real.createPlan();
+      return {
+        ...plan,
+        step: (input: { open: Record<string, boolean> }) => {
+          h.open = input.open;
+          return plan.step(input);
+        },
+      };
+    },
+  };
+});
 
 interface Person {
   id: string;
@@ -120,7 +147,18 @@ function prompt(someone: Person) {
 beforeEach(() => {
   h.sessions.clear();
   h.workers.clear();
+  h.env.PRO = true;
+  h.stations.coffee = [];
+  h.stations.dining = [];
+  h.open = null;
 });
+
+/** One look of the lively floor at what is open: its plan is asked at most once a second of the scene. */
+function openNow(): Record<string, boolean> | null {
+  state.sim = (state.sim ?? 0) + 2;
+  updateLeisure();
+  return h.open;
+}
 
 test("a prompt calls someone out of upstream's own restroom visit at once, to the work", () => {
   const someone = person("a");
@@ -170,4 +208,34 @@ test("a prompt calls someone out of the lively floor's restroom visit straight t
   expect(someone.inStall).toBeNull();
   expect(someone.wcBusy).toBe(false);
   expect(someone.goHomeAndRest).not.toHaveBeenCalled();
+});
+
+test("on the cozy room nothing opens that needs the sofa, the games, the dining room or the restroom", () => {
+  // Two sofa seats, a dining chair and a stall: on the company floor each opens something.
+  h.stations.coffee = [{ by: null }, { by: null }];
+  h.stations.dining = [{ by: null }];
+  person("a");
+  expect(openNow()).toMatchObject({
+    pool: true,
+    foosball: true,
+    tv: true,
+    karaoke: true,
+    nap: true,
+    wc: true,
+  });
+
+  // Upstream's cozy room: no sofa or games (core/env.js PRO false), and its STATIONS have no
+  // restroom and no dining room (people/navigation.js); COFFEE_Q is [] here on either plan.
+  h.env.PRO = false;
+  delete h.stations.wc;
+  delete h.stations.dining;
+  expect(openNow()).toMatchObject({
+    pool: false,
+    foosball: false,
+    tv: false,
+    karaoke: false,
+    nap: false,
+    cup: false,
+    wc: false,
+  });
 });

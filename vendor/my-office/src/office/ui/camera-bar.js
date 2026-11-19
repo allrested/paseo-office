@@ -34,10 +34,14 @@ let home = false;
 let fitZoom = 0;
 
 /**
- * Upstream's views for the company floor, each a place to look at and a factor of the fitted zoom.
- * Overview is Paseo's own and is fitted, so it is not in the table.
+ * Upstream's views by floor plan, each a place to look at and a factor of the fitted zoom (upstream's
+ * ui/camera-bar.js keeps the same places per plan). Overview is Paseo's own and is fitted, so it is not
+ * in the tables.
  */
-const VIEWS = { desks: { t: [2.3, 0.6, 3.6], z: 1.9 }, meeting: { t: [-1.2, 0.6, -5.4], z: 2.0 }, server: { t: [-5.6, 1.0, -0.6], z: 2.4 } };
+const VIEWS = {
+  pro: { desks: { t: [2.3, 0.6, 3.6], z: 1.9 }, meeting: { t: [-1.2, 0.6, -5.4], z: 2.0 }, server: { t: [-5.6, 1.0, -0.6], z: 2.4 } },
+  cozy: { desks: { t: [0, 0.6, 0.4], z: 1.75 }, meeting: { t: [5.2, 0.6, 2.4], z: 2.3 }, server: { t: [5.4, 1.0, -4.4], z: 2.2 } },
+};
 
 /**
  * The toolbar's, the walk's overlay's and the photo bar's markup, as upstream's CameraToolbar.tsx,
@@ -209,7 +213,7 @@ export function fitFloor() {
 /** Flies to a view: Overview is the fitted floor, the others are upstream's places at a factor of its zoom. */
 export function goView(view) {
   if (view === 'home') { fitFloor(); setView('home'); return; }
-  const V = VIEWS[view];
+  const V = (VIEWS[host.plan] || VIEWS.pro)[view];
   if (!V || !focusTarget) return;
   focusTarget.set(...V.t);
   state.zoomGoal = THREE.MathUtils.clamp(V.z * fitZoom, controls.minZoom, controls.maxZoom);

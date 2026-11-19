@@ -12,6 +12,8 @@ const h = vi.hoisted(() => ({
   calls: [] as string[],
   closeSession: vi.fn(),
   toast: vi.fn(),
+  /** The floor plan the page was started on (paseo-host.js `plan`). */
+  plan: "pro" as string,
   set: vi.fn(),
   copy: vi.fn(),
   exitFp: vi.fn(),
@@ -41,7 +43,14 @@ vi.mock("../../vendor/my-office/src/office/core/loop.js", () => ({
 vi.mock("../../vendor/my-office/src/office/ui/session-drawer.js", () => ({
   closeSession: h.closeSession,
 }));
-vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({ host: { toast: h.toast } }));
+vi.mock("../../vendor/my-office/src/office/paseo-host.js", () => ({
+  host: {
+    get plan() {
+      return h.plan;
+    },
+    toast: h.toast,
+  },
+}));
 vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
   floorBounds: () => ({ x0: -7.85, x1: 15.3, z0: -7.85, z1: 11.3 }),
   fp: h.fp,
@@ -135,6 +144,7 @@ beforeEach(() => {
   });
   h.copy.mockReset();
   h.toast.mockReset();
+  h.plan = "pro";
   state.selectedId = null;
   state.zoomGoal = null;
   camera.zoom = 1;
@@ -403,6 +413,32 @@ test("Desks flies to upstream's place at 1.9 times the fitted zoom", () => {
   expect(h.set).toHaveBeenLastCalledWith(2.3, 0.6, 3.6);
   expect(state.zoomGoal).toBeCloseTo(fitted * 1.9);
   expect(pressed()).toEqual(["desks"]);
+});
+
+test("on the cozy room the views are upstream's places for it", () => {
+  h.plan = "cozy";
+  open();
+  const fitted = camera.zoom;
+
+  click("[data-view=desks]");
+  expect(h.set).toHaveBeenLastCalledWith(0, 0.6, 0.4);
+  expect(state.zoomGoal).toBeCloseTo(fitted * 1.75);
+
+  click("[data-view=meeting]");
+  expect(h.set).toHaveBeenLastCalledWith(5.2, 0.6, 2.4);
+  expect(state.zoomGoal).toBeCloseTo(fitted * 2.3);
+
+  goView("server");
+  expect(h.set).toHaveBeenLastCalledWith(5.4, 1.0, -4.4);
+  expect(state.zoomGoal).toBeCloseTo(fitted * 2.2);
+  expect(pressed()).toEqual(["server"]);
+});
+
+test("a plan the bar has no places for uses the company floor's", () => {
+  h.plan = "hq";
+  open();
+  click("[data-view=desks]");
+  expect(h.set).toHaveBeenLastCalledWith(2.3, 0.6, 3.6);
 });
 
 test("a view closes the chosen person first", () => {

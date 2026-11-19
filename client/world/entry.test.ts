@@ -554,6 +554,19 @@ test("without onOpen the scene has nothing to open a session with", async () => 
   expect(fresh.open).toBeNull();
 });
 
+test("the plan the host names is the scene's floor; headquarters is not offered", async () => {
+  const planOf = async (options: object) => {
+    await startPage(options);
+    // @ts-expect-error vendored JavaScript has no declarations
+    const { host: fresh } = await import("../../vendor/my-office/src/office/paseo-host.js");
+    return fresh.plan;
+  };
+  expect(await planOf({ plan: "cozy" })).toBe("cozy");
+  expect(await planOf({ plan: "pro" })).toBe("pro");
+  expect(await planOf({ plan: "hq" })).toBe("pro");
+  expect(await planOf({})).toBe("pro");
+});
+
 test("a start that says photo: false turns the host's photo switch off", async () => {
   await startPage({ photo: false });
   // @ts-expect-error vendored JavaScript has no declarations
