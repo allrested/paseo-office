@@ -5,7 +5,8 @@ export const host = {
   plan: 'pro',
   street: false,
   streetKit: null,
-  claudeVersion: null,
+  claudeReading: null,
+  claudeVersion: () => host.claudeReading,
   /** Paseo's dark theme draws the office by night. */
   night: false,
   /** The app's surface colour: the plain backdrop behind the floor. */

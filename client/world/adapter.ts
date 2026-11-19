@@ -7,6 +7,7 @@ import {
   type OfficeRow,
 } from "../../shared/model.js";
 import type {
+  WorkspacePullRequest,
   WeatherScene,
   ActivityKind,
   ActivityStep,
@@ -62,6 +63,7 @@ function rank(session: WorldSession): number {
 function toSession(
   row: OfficeRow,
   team: string,
+  checks: WorkspacePullRequest["checks"] | undefined,
   born: Readonly<Record<string, string>>,
 ): WorldSession {
   const { agent } = row;
@@ -74,7 +76,12 @@ function toSession(
     name: title,
     title,
     dir: team,
-    git: { repo: team, ...(Object.hasOwn(born, team) ? { born: born[team] } : {}) },
+    git: {
+      repo: team,
+      ...(checks === "failure" ? { ci: "red" as const } : {}),
+      ...(checks === "success" ? { ci: "green" as const } : {}),
+      ...(Object.hasOwn(born, team) ? { born: born[team] } : {}),
+    },
     status,
     agent: markOf(agent.provider),
     lastPrompt: "",
@@ -103,8 +110,10 @@ export function worldPeople(
   desks: number,
   born: Readonly<Record<string, string>> = {},
 ): WorldPeople {
-  const rows = model.rooms.flatMap((room) => room.rows.map((row) => ({ row, team: room.name })));
-  const all = rows.map(({ row, team }) => toSession(row, team, born));
+  const rows = model.rooms.flatMap((room) =>
+    room.rows.map((row) => ({ row, team: room.name, checks: room.workspace?.pullRequest?.checks })),
+  );
+  const all = rows.map(({ row, team, checks }) => toSession(row, team, checks, born));
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks

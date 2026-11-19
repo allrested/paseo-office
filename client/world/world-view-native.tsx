@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
+import { StreetEvents } from "./street-events.js";
 import { useStreetStart } from "./use-street-kit.js";
 import { useWorldFeed } from "./use-world-feed.js";
 import type { WorldApi } from "./world-api.js";
@@ -170,6 +171,7 @@ function WorldViewNativeScene({
           onError={onError}
         />
       ) : null}
+      {api && street ? <StreetEvents api={api} /> : null}
       {api === null ? <Text style={styles.sceneStatus}>Loading the 3D view...</Text> : null}
       {api !== null && note !== null ? (
         <View style={styles.sceneNote}>

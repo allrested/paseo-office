@@ -14,7 +14,7 @@ export interface WorldSession {
   title: string;
   /** The project's folder; the scene seats a project's people together. */
   dir: string;
-  git: { repo: string; born?: string };
+  git: { repo: string; ci?: "red" | "green"; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
   /** Which mark the scene puts on the person's screen. */
@@ -217,6 +217,8 @@ export interface WorldApi {
    * The host's readings. With null the server room is furniture: no chip, no hand, no tap, and
    * the wall screen shows no memory.
    */
+  photoRelease?(tag: string): void;
+  setClaudeVersion?(reading: { version: string; at: number } | null): void;
   setTenure?(data: WorldTenure): void;
   setLiftService?(info: WorldLiftService): void;
   setMachine(machine: WorldMachine | null): void;

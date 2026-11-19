@@ -4,6 +4,8 @@ import { WORLD_SCRIPT } from "./server/world.generated.js";
 import { createTenure, type TenureStore } from "./server/tenure.js";
 import { createLiftService } from "./server/lift-service.js";
 import { readRepoAge } from "./server/repo-age.js";
+import { createStreetWatch, streetReaders } from "./server/street-watch.js";
+import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeStore } from "./server/life-store.js";
 import { liftFile, tenureFile } from "./server/paths.js";
@@ -278,6 +280,8 @@ export function createOfficePlugin(
       for (const send of listeners.keys()) send({ type: "life", ...snapshot });
     },
   });
+  const streets = createStreetWatch(streetReaders(execCommand), deps.clock, log);
+  const stopStreet = hub.watch(streets.view);
   const stopLife = hub.watch(feed.view);
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
@@ -475,6 +479,7 @@ export function createOfficePlugin(
       send({ type: "life", ...feed.snapshot() });
     });
   });
+  server.handle(streetSubscription, (_input, context) => streets.attach(context));
   server.handle(tenureRpc, (input) => feed.write(input));
   // A check never rejects: a tracker that fails shows its problem on the Incidents card. It is
   // about now, so a run that waited checks when it resumes.
@@ -569,6 +574,8 @@ export function createOfficePlugin(
     stopIncidentsRuns();
     deps.schedules.stop();
     for (const remove of removeHooks) remove();
+    stopStreet();
+    streets.stop();
     stopLife();
     for (const close of listeners.values()) close();
     deps.tenureStore.flush();

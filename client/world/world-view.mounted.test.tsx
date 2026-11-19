@@ -15,6 +15,8 @@ import type { WorldApi, WorldStartOptions } from "./world-api.js";
 import { WorldView } from "./world-view.js";
 
 const frame = vi.hoisted(() => ({
+  photoRelease: vi.fn(),
+  setClaudeVersion: vi.fn(),
   focusApp: vi.fn(),
   started: null as WorldStartOptions | null,
   /** Every start, in order, and how many frames were taken out. */
@@ -24,8 +26,16 @@ const frame = vi.hoisted(() => ({
   loaded: { status: "ready", script: "" },
 }));
 
+let receiveStreet: (event: import("../../shared/contracts.js").StreetEvent) => void;
 vi.mock("@getpaseo/plugin/client", () => ({
   useRpc: () => async () => "car models",
+  useSubscription: (
+    _contract: unknown,
+    _input: unknown,
+    onEvent: (event: import("../../shared/contracts.js").StreetEvent) => void,
+  ) => {
+    receiveStreet = onEvent;
+  },
   useSettings: () => ({ status: "loading" }),
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({
@@ -47,6 +57,7 @@ vi.mock("./world-frame.web.js", () => ({
     // Every method does nothing but start; "then" stays absent so the promise resolves to it.
     const api = new Proxy({} as WorldApi, {
       get: (_, key) => {
+        if (key === "photoRelease" || key === "setClaudeVersion") return frame[key];
         if (key === "then") return undefined;
         if (key === "start") {
           return (options: WorldStartOptions) => {
@@ -264,6 +275,10 @@ test("the start gives the scene a Sound callback", async () => {
 test("changing the street setting starts a fresh scene with the selected assets", async () => {
   await act(async () => root.render(office("pro", ignore, MODEL, true)));
   expect(frame.starts.at(-1)?.street).toEqual({ kit: "car models" });
+  receiveStreet({ type: "release", tag: "v3.8.4" });
+  receiveStreet({ type: "claude", reading: null });
+  expect(frame.photoRelease).toHaveBeenCalledWith("v3.8.4");
+  expect(frame.setClaudeVersion).toHaveBeenCalledWith(null);
   await act(async () => root.render(office("pro", ignore, MODEL, false)));
   expect(frame.starts.at(-1)).not.toHaveProperty("street");
   expect(frame.disposed).toBe(1);
