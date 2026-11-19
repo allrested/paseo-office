@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { OfficeModal } from "./office-modal.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";
@@ -11,13 +11,7 @@ import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
 import { useOfficeScene } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
-import {
-  OFFICE_SCENES,
-  OFFICE_LIGHTING,
-  type OfficeScene,
-  type OfficeLighting,
-} from "../shared/settings.js";
-import { SegmentPill } from "./segment-pill.js";
+import { SceneChoices } from "./scene-picker.js";
 import { ViewSwitch } from "./view-switch.js";
 
 export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
@@ -110,57 +104,4 @@ export function useOfficeSettingsDialog(fullscreen: boolean, nativeSettings?: ()
     if (!fullscreen) close();
   }, [fullscreen, close]);
   return { open: fullscreen && open, show: fullscreen ? show : nativeSettings, close };
-}
-
-const SCENE_NAMES: Record<OfficeScene, string> = {
-  plain: "Plain",
-  city: "City",
-  countryside: "Countryside",
-  beach: "Beach",
-};
-const LIGHT_NAMES: Record<OfficeLighting, string> = {
-  auto: "App theme",
-  day: "Day",
-  night: "Night",
-};
-
-export function SceneChoices({
-  choice,
-  styles,
-}: {
-  choice: ReturnType<typeof useOfficeScene>;
-  styles: OfficeStyles;
-}) {
-  return (
-    <View style={styles.headerField}>
-      <Text style={styles.sheetLabel}>Outdoor scene</Text>
-      <View role="group" aria-label="Outdoor scene" style={styles.notesDays}>
-        {OFFICE_SCENES.map((value) => (
-          <SegmentPill
-            key={value}
-            value={value}
-            name={SCENE_NAMES[value]}
-            on={choice.scene.on === value}
-            disabled={choice.scene.on === null}
-            onPress={choice.scene.set}
-            styles={styles}
-          />
-        ))}
-      </View>
-      <Text style={styles.sheetLabel}>Lighting</Text>
-      <View role="group" aria-label="Lighting" style={styles.notesDays}>
-        {OFFICE_LIGHTING.map((value) => (
-          <SegmentPill
-            key={value}
-            value={value}
-            name={LIGHT_NAMES[value]}
-            on={choice.lighting.on === value}
-            disabled={choice.lighting.on === null}
-            onPress={choice.lighting.set}
-            styles={styles}
-          />
-        ))}
-      </View>
-    </View>
-  );
 }

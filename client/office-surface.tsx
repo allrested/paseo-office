@@ -55,6 +55,7 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
+import { SceneChoices } from "./scene-picker.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
 import {
@@ -75,7 +76,7 @@ import {
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
 import { OfficeDialogs, OfficeModal } from "./office-modal.js";
-import { FullscreenSettings, SceneChoices, useOfficeSettingsDialog } from "./office-settings.js";
+import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import type { ChatDraft, ColumnPanelProps, NewAgentDraft, OfficeLink } from "./office-link.js";
@@ -1652,8 +1653,12 @@ function SceneDialog({
   choice: ReturnType<typeof useOfficeScene>;
   styles: OfficeStyles;
 }) {
+  const icon = useMemo(
+    () => <Icon name="Mountain" size={18} color={styles.workspaceAccent} />,
+    [styles.workspaceAccent],
+  );
   return (
-    <OfficeModal title="Scene" open={open} onOpenChange={setOpen}>
+    <OfficeModal title="Scene" icon={icon} open={open} onOpenChange={setOpen}>
       <OfficeModal.Content>
         <SceneChoices choice={choice} styles={styles} />
       </OfficeModal.Content>
