@@ -87,8 +87,9 @@ ${check}
 ### Taking the update
 
 1. Run the import tool without \`--check\` (see \`vendor/SOURCES.md\`, "Taking a newer upstream"), then compare each file it kept because of a \`PASEO:\` note, and add any export a stand-in lacks.
-2. Run \`npm run build:world\`, then \`npm test\`.
-3. Look at the office in a browser: a module upstream added to its start-up list may need a stand-in or a place in \`DENY\`.
+2. Run \`node scripts/genericise-street.mjs\` for the names of shops, apps and products, and read the new text upstream brings for one the table (\`scripts/street-brands.mjs\`) lacks: add it with a made-up name and run the script again.
+3. Run \`npm run build:world\`, then \`npm test\`.
+4. Look at the office in a browser: a module upstream added to its start-up list may need a stand-in or a place in \`DENY\`.
 `;
     // What the body costs without the tool's output, with a margin for the notes and the fence.
     const room = MAX_BODY_CHARS - around("").length - 1000;

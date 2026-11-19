@@ -1,6 +1,7 @@
 // The real names the vendored scene's text carries (every file under vendor/my-office/src/ and
-// shared/upstream/, the street's included), and the made-up names they become. This file is the
-// one place a real name is written in this repository: it is the list the check refuses.
+// shared/upstream/, the street's included), and the made-up names they become. This table and its
+// tests are the one place a real name is written in this repository: it is the list the check
+// refuses.
 //
 // A name is matched as a whole word (no letter or digit, Vietnamese ones included, right before or
 // after it), in the case written here and in all caps, never lower-cased. `followedBy` and
@@ -9,19 +10,24 @@
 //
 // Keys are the identifiers upstream's code uses for a shop, an app, a vehicle or a product. They
 // ship as strings and property names, so they are renamed too, and a camelCase compound with them
-// (`mixueAsk`). A `quotedOnly` key is also an ordinary word: it is renamed only as a whole quoted
-// string or an object key, never as a CSS cursor, and its compounds only where listed here.
+// (`frostyAsk`). A `quotedOnly` key is also an ordinary word: it is renamed only as a whole quoted
+// string or an object key, never as a CSS cursor, and its compounds only where listed here. A
+// key with `within` is renamed only inside those exact pieces of text.
 export const BRANDS = [
   { real: "Thế Giới Di Động", madeUp: "Handset Hub", keys: [{ from: "tgdd", to: "handset" }] },
-  { real: "Điện Máy Xanh", madeUp: "Sky Electric", keys: [{ from: "dmx", to: "skyelectric" }] },
+  {
+    real: "Điện Máy Xanh",
+    madeUp: "Copperline Electronics",
+    keys: [{ from: "dmx", to: "copperline" }],
+  },
   { real: "Bách Hóa Xanh", madeUp: "Green Basket", keys: [{ from: "bhx", to: "basket" }] },
   {
     real: "Highlands Coffee",
-    madeUp: "Hilltop Coffee",
-    keys: [{ from: "highlands", to: "hilltop" }],
+    madeUp: "Plateau Coffee",
+    keys: [{ from: "highlands", to: "plateau" }],
   },
   // The chain as people say it.
-  { real: "Highlands", madeUp: "Hilltop" },
+  { real: "Highlands", madeUp: "Plateau" },
   {
     real: "Cộng Cà Phê",
     madeUp: "Olive Cafe",
@@ -31,8 +37,8 @@ export const BRANDS = [
       { from: "congWeekend", to: "olivecafeWeekend" },
     ],
   },
-  // The chain as people say it.
-  { real: "Cộng", madeUp: "Olive Cafe" },
+  // The chain as people say it; not in "Cộng Hòa" (the republic, and a street in Ho Chi Minh City).
+  { real: "Cộng", madeUp: "Olive Cafe", notFollowedBy: ["Hòa", "hòa"] },
   {
     real: "Phúc Long",
     madeUp: "Jade Tea House",
@@ -51,7 +57,7 @@ export const BRANDS = [
       { from: "circle-k", to: "kiosk" },
     ],
   },
-  { real: "GS25", madeUp: "Mart 24", keys: [{ from: "gs25", to: "mart24" }] },
+  { real: "GS25", madeUp: "Pebble Mart", keys: [{ from: "gs25", to: "pebble" }] },
   {
     real: "7-Eleven",
     madeUp: "Daily Stop",
@@ -60,10 +66,11 @@ export const BRANDS = [
       { from: "7-eleven", to: "dailystop" },
     ],
   },
-  { real: "Ministop", madeUp: "Minute Mart", keys: [{ from: "ministop", to: "minutemart" }] },
+  { real: "Ministop", madeUp: "Hourglass Mart", keys: [{ from: "ministop", to: "hourglass" }] },
   { real: "WinMart+", madeUp: "Greenway Market", keys: [{ from: "winmart", to: "greenway" }] },
   { real: "Mixue", madeUp: "Frosty Cone", keys: [{ from: "mixue", to: "frosty" }] },
-  // Phở 24, as the TV's football board writes it (its pixel font has no accents).
+  { real: "Phở 24", madeUp: "Phở Ngon" },
+  // Phở 24 as the TV's football board writes it (its pixel font has no accents).
   { real: "PHO 24", madeUp: "PHO NGON" },
   { real: "GrabFood", madeUp: "Ridely Food" },
   { real: "GrabBike", madeUp: "Ridely Bike" },
@@ -74,12 +81,14 @@ export const BRANDS = [
     notFollowedBy: ["me", "some", "a", "an", "the", "it", "them", "one", "my", "your", "our"],
     keys: [{ from: "grab", to: "ridely", quotedOnly: true }],
   },
-  // A second ride app. "Be" is also a word and no rule tells the two apart: only these phrases.
+  // A second ride app. "Be" is also a word, and "be" a two-letter string (a hex digit pair in
+  // three.js), and no rule tells them apart: the name only before "yellow", the key only in the
+  // racing game's two pieces of code.
   {
     real: "Be",
     madeUp: "Buzz",
     followedBy: ["yellow"],
-    keys: [{ from: "be", to: "buzz", quotedOnly: true }],
+    keys: [{ from: "be", to: "buzz", within: ["be: '#F6C51B'", "'box', 'be']"] }],
   },
   {
     real: "Xanh SM",
@@ -92,15 +101,15 @@ export const BRANDS = [
   { real: "V-Green", madeUp: "EcoVolt" },
   {
     real: "VinFast",
-    madeUp: "Volta",
+    madeUp: "Sorin",
     keys: [
-      { from: "vf3", to: "vt3" },
-      { from: "vf8", to: "vt8" },
+      { from: "vf3", to: "sr3" },
+      { from: "vf8", to: "sr8" },
     ],
   },
   { real: "Vietcombank", madeUp: "Lantern Bank" },
   { real: "Shopee", madeUp: "Bazaarly" },
-  { real: "Panadol", madeUp: "Painaway", keys: [{ from: "panadol", to: "painaway" }] },
+  { real: "Panadol", madeUp: "Kalmora", keys: [{ from: "panadol", to: "kalmora" }] },
   { real: "Hapacol", madeUp: "Feverease", keys: [{ from: "hapacol", to: "feverease" }] },
   { real: "TikTok", madeUp: "ClipClap" },
   // The second character look, named for the film studio's style.

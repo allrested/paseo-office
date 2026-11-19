@@ -8,6 +8,13 @@ import { embeddedWorldScript } from "./world-script.js";
 
 const BUILD = fileURLToPath(new URL("../scripts/build-world.mjs", import.meta.url));
 
+/** The script with esbuild's \x, \u and \u{} escapes read back, so a Vietnamese name is seen. */
+const unescaped = (script: string): string =>
+  script.replace(
+    /\\x([0-9a-fA-F]{2})|\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g,
+    (_, x, braced, u) => String.fromCodePoint(parseInt(x ?? braced ?? u, 16)),
+  );
+
 describe("the 3D office's page script", () => {
   it("is the embedded script, whenever it is read", async () => {
     const world = embeddedWorldScript();
@@ -115,13 +122,22 @@ describe("the embedded scene", () => {
     expect(script).toContain("is-incident");
     // Upstream's red light over the floor.
     expect(script).toContain("#FF2A2A");
-    // Upstream's sound engine, muted by its switch, with the siren alone: the Mixue shop's tune
-    // was one of the sounds left out.
+    // Upstream's sound engine, muted by its switch, with the siren alone: a shop's jingle (its
+    // sound named by the shop's made-up key) was one of the sounds left out.
     expect(script).toContain("office-sound");
-    expect(script).not.toContain("mixue");
+    expect(script).not.toMatch(/\bfrosty:\(?\w*\)?=>/);
   });
 
   it("names no real shop, app or product: the names are made-up ones", () => {
-    expect(leftIn(WORLD_SCRIPT)).toEqual([]);
+    expect(leftIn(unescaped(WORLD_SCRIPT))).toEqual([]);
+  });
+
+  it("reads a name the bundle writes with escapes", () => {
+    expect(leftIn("a Ph\\xFAc Long")).toEqual([]);
+    expect(leftIn(unescaped("a Ph\\xFAc Long, C\\u1ED9ng, C\\u{1ED9}ng C\\xE0 Ph\\xEA"))).toEqual([
+      "Cộng Cà Phê",
+      "Cộng",
+      "Phúc Long",
+    ]);
   });
 });

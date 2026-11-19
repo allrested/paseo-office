@@ -354,8 +354,8 @@ export function makeChibi(cfg = {}, scale = 1) {
   const band = add(cup, new THREE.CylinderGeometry(0.0525, 0.049, 0.035, 16), plainMat('#E21F26', { roughness: 0.9 }), 0, 0, 0);
   cup.visible = false; P.cup = cup; P.cupBand = band;
   // the stores' own takeaways (outings.js picks one by the chain), held like the drink: Corner Kiosk's mì ly (the lid peeled
-  // back, chopsticks in, steaming), Mart 24's tokbokki (red rice cakes, a fish-cake skewer), Daily Stop's onigiri and bánh
-  // bao, Minute Mart's soft-serve and fried chicken
+  // back, chopsticks in, steaming), Pebble Mart's tokbokki (red rice cakes, a fish-cake skewer), Daily Stop's onigiri and bánh
+  // bao, Hourglass Mart's soft-serve and fried chicken
   P.held = { cup };
   const hold = (k) => { const g = new THREE.Group(); g.position.set(0, -0.02, D.handR * 0.9); g.visible = false; P.armR.hand.add(g); P.held[k] = g; return g; };
   const stick = plainMat('#D9B98A', { roughness: 0.8 }), paper = plainMat('#FBF8F1', { roughness: 0.75 });

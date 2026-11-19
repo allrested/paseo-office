@@ -25,7 +25,7 @@ export default {
   items: {
     peachTea: 'a peach tea', noodle: 'a cup of noodles', sausage: 'a grilled sausage', bananaMilk: 'a Korean banana milk', ramyeon: 'machine-cooked ramyeon', tok: 'tokbokki with fish cake',
     coffee: 'a coffee', onigiri: 'an onigiri', bun: 'a bánh bao', water: 'a bottle of water', cone: 'a soft-serve cone', bubbleTea: 'a bubble milk tea', phinSuaDa: 'an iced milk coffee (phin sữa đá)', freezeTraXanh: 'a matcha freeze', phoneCase: 'a phone case', charger: 'a fast charging cable', chicken: 'fried chicken', milk: 'fresh milk',
-    oolongNuong: 'a roasted oolong milk tea', boGiaDuaNon: 'an avocado with young coconut (bơ già dừa non)', traSuaJadeTea: 'a Jade Tea House milk tea', traDao: 'a peach tea', painaway: 'a strip of Painaway Extra (12 tablets)', feverease: 'a strip of fizzy Feverease (4 tablets)',
+    oolongNuong: 'a roasted oolong milk tea', boGiaDuaNon: 'an avocado with young coconut (bơ già dừa non)', traSuaJadeTea: 'a Jade Tea House milk tea', traDao: 'a peach tea', kalmora: 'a strip of Kalmora Extra (12 tablets)', feverease: 'a strip of fizzy Feverease (4 tablets)',
     veg: 'fresh greens', eggs: 'eggs', meat: 'pork',
     cotDuaCaPhe: 'a coconut coffee (cốt dừa cà phê)', suaChuaCaPhe: 'a yoghurt coffee (sữa chua cà phê)', bacXiu: 'a bạc xỉu (milky coffee)',
     kettle: 'an electric kettle', batteries: 'a pair of AA batteries',

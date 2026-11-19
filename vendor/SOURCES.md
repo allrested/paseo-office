@@ -53,11 +53,13 @@ my-office's text and comments name real shops, apps and products: the convenienc
 cafés people pop out to, ride and delivery apps, a bank, medicines, a film studio's look. This
 plugin is public and ships no real brand's name, so `scripts/genericise-street.mjs` swaps each
 for a made-up one through one table, `scripts/street-brands.mjs` (the one list of the real
-names). It renames the keys upstream uses for them too (`mixue`, `grab`, the look
-`pixar`...), and their camelCase compounds (`mixueAsk`), in every file, so a key stays the same
-across files. It works on every `.js` under `my-office/src/` and `../shared/upstream/`, and
-puts `// PASEO: names ...` on the first line of each file it changes. It changed these, and
-nothing else in them:
+names). It renames the keys upstream uses for them too (they become `frosty`, `ridely`, the
+look `cartoon`...), and their camelCase compounds (`frostyAsk`), in every file, so a key stays
+the same across files. In code a name becomes something that still parses: a quoted key or
+property (`x['Pebble Mart']`) or an identifier (`NAVY_COFFEE_HOUSE`), the same in every file. It
+works on every `.js` under `my-office/src/` and `../shared/upstream/`, and puts
+`// PASEO: names ...` on the first line of each file it changes. A file is clean exactly when
+the swap would change nothing in it. It changed these, and nothing else in them:
 
 - `../shared/upstream/chat.js`
 - `src/i18n/locales/en/fp.js`, `people.js`, `settings.js`, `ui.js`, `world.js`

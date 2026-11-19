@@ -1,3 +1,3 @@
 // Types for the one export TypeScript tests import from genericise-street.mjs (allowJs is off).
-/** The table's real names still in the text, in table order. */
+/** What the names swap would still change in the text: real names, then real keys. */
 export function leftIn(text: string): string[];
