@@ -72,9 +72,39 @@ function Workspaces({ workspaces, value, onChoose, styles }: WorkspacesProps) {
   );
 }
 
-/** The Sessions tab's form for a new agent: workspace, provider, model and the first prompt. */
-export function NewAgentForm({ choice, change, onBack, onCreated, styles }: NewAgentFormProps) {
-  const agent = useNewAgent({ choice, change });
+interface ErrorBodyProps {
+  message: string | null;
+  onRetry(): void;
+  styles: OfficeStyles;
+}
+
+function ErrorBody({ message, onRetry, styles }: ErrorBodyProps) {
+  return (
+    <View style={styles.sheetField}>
+      <Text accessibilityRole="alert" style={styles.bannerText}>
+        {message}
+      </Text>
+      <View style={styles.actions}>
+        <ActionButton
+          label="Try again"
+          pendingLabel="Trying..."
+          onPress={onRetry}
+          styles={styles}
+        />
+      </View>
+    </View>
+  );
+}
+
+interface ReadyBodyProps {
+  agent: ReturnType<typeof useNewAgent>;
+  choice: NewAgentChoice;
+  change(patch: Partial<NewAgentChoice>): void;
+  onCreated(agentId: string): void;
+  styles: OfficeStyles;
+}
+
+function ReadyBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps) {
   const { create, chooseProvider } = agent;
   const chooseWorkspace = useCallback((workspaceId: string) => change({ workspaceId }), [change]);
   const chooseModel = useCallback((model: string) => change({ model }), [change]);
@@ -82,101 +112,109 @@ export function NewAgentForm({ choice, change, onBack, onCreated, styles }: NewA
   const submit = useCallback(async () => onCreated(await create()), [create, onCreated]);
   const problem = newAgentProblem(choice);
   const models = agent.providers.find((entry) => entry.id === choice.provider)?.models ?? [];
-  let body = null;
-  if (agent.status === "loading") body = <Text style={styles.sceneStatus}>Loading...</Text>;
-  else if (agent.status === "error") {
-    body = (
+  return (
+    <>
+      <Workspaces
+        workspaces={agent.workspaces}
+        value={choice.workspaceId}
+        onChoose={chooseWorkspace}
+        styles={styles}
+      />
       <View style={styles.sheetField}>
-        <Text accessibilityRole="alert" style={styles.bannerText}>
-          {agent.error}
-        </Text>
-        <View style={styles.actions}>
-          <ActionButton
-            label="Try again"
-            pendingLabel="Trying..."
-            onPress={agent.retry}
-            styles={styles}
-          />
+        <Text style={styles.sheetLabel}>Provider</Text>
+        <View role="group" aria-label="Provider" style={styles.panelChips}>
+          {agent.providers.map((entry) => (
+            <Pill<string>
+              key={entry.id}
+              value={entry.id}
+              label={entry.models.length === 0 ? `${entry.label} (No models)` : entry.label}
+              disabled={entry.models.length === 0}
+              on={entry.id === choice.provider}
+              toggle={false}
+              onPress={chooseProvider}
+              styles={styles}
+            />
+          ))}
         </View>
       </View>
-    );
-  } else if (agent.providers.length === 0) {
-    body = <Text style={styles.muted}>No provider is available.</Text>;
-  } else {
-    body = (
-      <>
-        <Workspaces
-          workspaces={agent.workspaces}
-          value={choice.workspaceId}
-          onChoose={chooseWorkspace}
+      <View style={styles.sheetField}>
+        <Text style={styles.sheetLabel}>Model</Text>
+        <View role="group" aria-label="Model" style={styles.panelChips}>
+          {models.map((entry) => (
+            <Pill<string>
+              key={entry.id}
+              value={entry.id}
+              label={entry.label}
+              on={entry.id === choice.model}
+              toggle={false}
+              onPress={chooseModel}
+              styles={styles}
+            />
+          ))}
+        </View>
+      </View>
+      <View style={styles.sheetField}>
+        <Text style={styles.sheetLabel}>First prompt</Text>
+        <TextInput
+          accessibilityLabel="First prompt"
+          placeholder="What should the agent do?"
+          placeholderTextColor={styles.placeholderColor}
+          value={choice.prompt}
+          onChangeText={setPrompt}
+          multiline
+          style={styles.input}
+        />
+      </View>
+      {problem === null ? null : <Text style={styles.muted}>{problem}</Text>}
+      <View style={styles.actions}>
+        <ActionButton
+          label="Create"
+          pendingLabel="Creating..."
+          onPress={submit}
+          disabled={problem !== null}
+          primary
           styles={styles}
         />
-        <View style={styles.sheetField}>
-          <Text style={styles.sheetLabel}>Provider</Text>
-          <View role="group" aria-label="Provider" style={styles.panelChips}>
-            {agent.providers.map((entry) => (
-              <Pill<string>
-                key={entry.id}
-                value={entry.id}
-                label={entry.models.length === 0 ? `${entry.label} (No models)` : entry.label}
-                disabled={entry.models.length === 0}
-                on={entry.id === choice.provider}
-                toggle={false}
-                onPress={chooseProvider}
-                styles={styles}
-              />
-            ))}
-          </View>
-        </View>
-        <View style={styles.sheetField}>
-          <Text style={styles.sheetLabel}>Model</Text>
-          <View role="group" aria-label="Model" style={styles.panelChips}>
-            {models.map((entry) => (
-              <Pill<string>
-                key={entry.id}
-                value={entry.id}
-                label={entry.label}
-                on={entry.id === choice.model}
-                toggle={false}
-                onPress={chooseModel}
-                styles={styles}
-              />
-            ))}
-          </View>
-        </View>
-        <View style={styles.sheetField}>
-          <Text style={styles.sheetLabel}>First prompt</Text>
-          <TextInput
-            accessibilityLabel="First prompt"
-            placeholder="What should the agent do?"
-            placeholderTextColor={styles.placeholderColor}
-            value={choice.prompt}
-            onChangeText={setPrompt}
-            multiline
-            style={styles.input}
-          />
-        </View>
-        {problem === null ? null : <Text style={styles.muted}>{problem}</Text>}
-        <View style={styles.actions}>
-          <ActionButton
-            label="Create"
-            pendingLabel="Creating..."
-            onPress={submit}
-            disabled={problem !== null}
-            primary
-            styles={styles}
-          />
-        </View>
-      </>
-    );
+      </View>
+    </>
+  );
+}
+
+/** The form's body for what has been read: loading, the reason it failed, or the fields. */
+function FormBody({ agent, choice, change, onCreated, styles }: ReadyBodyProps) {
+  if (agent.status === "loading") return <Text style={styles.sceneStatus}>Loading...</Text>;
+  if (agent.status === "error") {
+    return <ErrorBody message={agent.error} onRetry={agent.retry} styles={styles} />;
   }
+  if (agent.providers.length === 0)
+    return <Text style={styles.muted}>No provider is available.</Text>;
+  return (
+    <ReadyBody
+      agent={agent}
+      choice={choice}
+      change={change}
+      onCreated={onCreated}
+      styles={styles}
+    />
+  );
+}
+
+/** The Sessions tab's form for a new agent: workspace, provider, model and the first prompt. */
+export function NewAgentForm({ choice, change, onBack, onCreated, styles }: NewAgentFormProps) {
+  const agent = useNewAgent({ choice, change });
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.newAgentForm}>
         <View style={styles.actions}>
           <ActionButton label="Back" pendingLabel="Back" onPress={onBack} styles={styles} />
         </View>
-        {body}
+        <FormBody
+          agent={agent}
+          choice={choice}
+          change={change}
+          onCreated={onCreated}
+          styles={styles}
+        />
       </ScrollView>
     </View>
   );
