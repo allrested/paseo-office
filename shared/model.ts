@@ -2,12 +2,14 @@ import type {
   ActivityStep,
   ChecklistStep,
   Checklists,
+  Duty,
   OfficeAgent,
   OfficeSnapshot,
   OfficeWorkspace,
   Post,
 } from "./contracts.js";
-import { LOBBY } from "./names.js";
+import { dutyRows, type DutyRow } from "./duties.js";
+import { DUTY, LOBBY } from "./names.js";
 
 export const LOBBY_NAME = "Lobby";
 
@@ -66,6 +68,10 @@ export interface OfficeModel {
   roomOfAgent: ReadonlyMap<string, string>;
   /** The agents that wait on sub-agents, each with how many (`waitingOnOf`). */
   waitingOn: ReadonlyMap<string, number>;
+  /** The owner's duty list; null until the host has sent it. */
+  dutyList: readonly Duty[] | null;
+  /** The duty board's posts as the day's duties: today's, and the owed ones. */
+  duties: DutyRow[];
 }
 
 export type DotTone = "running" | "idle" | "starting" | "warning" | "danger";
@@ -292,6 +298,8 @@ export function buildOfficeModel(state: OfficeSnapshot): OfficeModel {
     agents,
     roomOfAgent,
     waitingOn,
+    dutyList: state.duties?.duties ?? null,
+    duties: dutyRows(state.duties, state.boards[DUTY] ?? []),
   };
 }
 

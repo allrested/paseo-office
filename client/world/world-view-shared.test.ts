@@ -12,6 +12,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 
 function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } {

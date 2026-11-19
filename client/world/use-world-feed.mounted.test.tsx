@@ -23,6 +23,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
 
