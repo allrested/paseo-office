@@ -165,7 +165,7 @@ function office(
       machine={null}
       onOpenMachine={ignore}
       onOpenResources={undefined}
-      onOpenSession={undefined}
+      onOpenAgentWorkspace={undefined}
       onOpenLibrary={ignore}
       onOpenNotes={ignore}
       meeting={false}

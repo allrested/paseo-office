@@ -111,7 +111,7 @@ async function mount(overrides: Partial<Parameters<typeof WorldViewNative>[0]> =
     machine: null,
     onOpenMachine: ignore,
     onOpenResources: undefined,
-    onOpenSession: undefined,
+    onOpenAgentWorkspace: undefined,
     onOpenLibrary: ignore,
     onOpenNotes: ignore,
     meeting: false,
@@ -164,7 +164,7 @@ test("start is the first message; photo is off; the feed follows in order", asyn
 });
 
 test("onOpen is given where the office can open a session", async () => {
-  await mount({ onOpenSession: ignore });
+  await mount({ onOpenAgentWorkspace: ignore });
   expect((calls()[0].args[0] as { callbacks: string[] }).callbacks).toContain("onOpen");
 });
 

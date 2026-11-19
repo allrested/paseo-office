@@ -656,6 +656,7 @@ interface SurfaceBodyProps {
   /** Null from the 3D office, when the chosen person is tapped again. */
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace(agentId: string): void;
   onOpenBoard(roomId: string): void;
   /**
    * The duty board's editor: the 3D pantry's board and the List's lobby card open it. Absent while
@@ -703,6 +704,7 @@ function SurfaceBody({
   name,
   onSelectAgent,
   onOpenSession,
+  onOpenAgentWorkspace,
   onOpenBoard,
   onOpenDuties,
   onDutyActed,
@@ -762,7 +764,7 @@ function SurfaceBody({
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
-        onOpenSession={onOpenSession}
+        onOpenAgentWorkspace={onOpenAgentWorkspace}
         onOpenLibrary={onOpenLibrary}
         onOpenNotes={onOpenNotes}
         meeting={meeting}
@@ -1974,6 +1976,7 @@ export function OfficeSurface(
             name={name}
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
+            onOpenAgentWorkspace={showAgentWorkspace}
             onOpenBoard={board.open}
             onOpenDuties={openDuties}
             onDutyActed={dutyActed}

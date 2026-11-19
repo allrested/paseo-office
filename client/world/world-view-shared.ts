@@ -23,7 +23,7 @@ export interface WorldLatest {
   onSelectBoard(roomId: string): void;
   onOpenMachine(): void;
   onOpenResources: (() => void) | undefined;
-  onOpenSession: ((agentId: string) => void) | undefined;
+  onOpenAgentWorkspace: ((agentId: string) => void) | undefined;
   onOpenLibrary(): void;
   onOpenNotes(): void;
   onOpenIncidents(): void;
@@ -101,14 +101,13 @@ export function worldStartOptions(
             latest.current.onOpenResources?.();
           },
         }),
-    // Given only where the office can open a session (the agent card's "Open session"): otherwise
-    // a person under E is chosen, as a click does. The keyboard goes with the session.
-    ...(latest.current.onOpenSession === undefined
+    // Give the workspace the keyboard when the walker interacts with a person.
+    ...(latest.current.onOpenAgentWorkspace === undefined
       ? {}
       : {
           onOpen: (agentId: string) => {
             focus();
-            latest.current.onOpenSession?.(agentId);
+            latest.current.onOpenAgentWorkspace?.(agentId);
           },
         }),
     onLife: (kind, vars) => latest.current.onLife?.(kind, vars),
