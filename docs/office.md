@@ -288,7 +288,8 @@ first starts is permanent); the lift is serviced for three minutes after the plu
 starts, five and a sticker with the build when the scene's build changed
 (`server/lift-service.ts`). The server sends these through `office.life`
 (`server/life-feed.ts`), again only when something the scenes read has changed. A team is a
-workspace, known by its name.
+workspace, known by its name. A renamed workspace is a new team to the list, and its old name goes
+quiet.
 
 A scene's line for the team chat leaves the scene as a kind and a few words. The server's table
 (`shared/life-lines.ts`, a copy of my-office's `chatLife`) gives each kind its sender (reception,
