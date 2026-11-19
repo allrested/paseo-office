@@ -617,3 +617,9 @@ showing Sessions, and the saved sidebar choice survived a page reload.
 
 The screenshots use the plugin’s real components and scene with sample session data.
 [With Sessions and Activity](fullscreen-office.png) · [With both sidebars hidden](fullscreen-floor.png)
+
+### Fullscreen workspace and team chat
+
+Stock Paseo 0.16.2 in Chromium rendered the Countryside scene in daylight with a scratch workspace, two sessions and a local test provider. A message addressed through **Team chat → To** reached the selected session, which replied in the group. The embedded workspace opened its Explorer, showed a changed file and created a terminal. Closing the workbench at desktop width returned to the same fullscreen scene iframe. The workbench also opened at 390 px.
+
+[Session and floor](fullscreen-workspace.webp) · [Floating team chat](fullscreen-team-chat.webp)
