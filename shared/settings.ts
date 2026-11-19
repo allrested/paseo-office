@@ -43,7 +43,7 @@ const HostValuesSchema = z.object({
   notesDays: z
     .array(z.number())
     .default([1, 2, 3, 4, 5])
-    .transform((days) => days.toSorted((a, b) => a - b)),
+    .transform((days) => [...days].sort((a, b) => a - b)),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),

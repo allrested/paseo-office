@@ -90,7 +90,7 @@ export function NotesDays({ value, onSave, problem, styles }: NotesDaysProps) {
       saving.current = true;
       const next = days.includes(day)
         ? days.filter((other) => other !== day)
-        : [...days, day].toSorted((a, b) => a - b);
+        : [...days, day].sort((a, b) => a - b);
       setWanted(next);
       void onSave(next).finally(() => {
         saving.current = false;
