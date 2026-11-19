@@ -298,11 +298,23 @@ test("a key press on the blocked button, with sound asked for, leaves sound on o
     setOn(next);
   };
   try {
-    audio(true);
-    // Space as a browser delivers it: the key down, which the probe hears, then the click on its release.
+    // A browser runs the probe's own end between the window's listener and the button's (a context that already
+    // runs settles in the microtasks after the first listener). Here the same order comes from a context that
+    // runs at once and whose `resume` throws: the probe then ends inside its own listener.
+    Object.assign(window, {
+      AudioContext: class {
+        state = "running";
+        resume(): never {
+          throw new Error("already running");
+        }
+        close() {
+          return Promise.resolve();
+        }
+      },
+    });
+    // Space as a browser delivers it: the key down, which the probe hears first, then the click on its release.
     page("btn-sound").dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-    await vi.advanceTimersByTimeAsync(0);
-    // The probe found audio, and sound came on by itself, as asked for. The click must not undo it.
+    // The probe found audio before the button heard the key, and sound came on by itself, as asked for.
     expect(sound.on).toBe(true);
     click("#btn-sound");
     await vi.advanceTimersByTimeAsync(0);

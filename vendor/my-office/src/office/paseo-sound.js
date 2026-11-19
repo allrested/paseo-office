@@ -62,6 +62,17 @@ export function whenProbed(done) {
   else done();
 }
 
+/** The last press that started a probe, with what the switch was when it arrived. */
+let seen = null;
+
+/**
+ * What `on` was, and whether audio could start (`can`), when the press `event` reached the probe: before the probe
+ * could change either. Null for an event that started no probe. A press's own probe may end between the window's
+ * listener and the pressed element's (a context that already runs settles in the microtasks after the first
+ * listener), so an element that asks what its press means must ask this, not the state it finds.
+ */
+export const before = (event) => (seen && seen.event === event ? seen : null);
+
 const QUIET_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Fn', 'OS']);
 
 /**
@@ -93,6 +104,7 @@ export function watchAudio(win = window, timeoutMs = 1500) {
     if (stopped || probing) return;
     if (event.type === 'keydown' && QUIET_KEYS.has(event.key)) return;
     if (win.navigator?.userActivation && !win.navigator.userActivation.isActive) return;
+    seen = { event, on: sound.on, can: available() };
     probe();
   }
   function probe() {

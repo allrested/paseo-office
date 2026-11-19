@@ -13,7 +13,7 @@ import { focusTarget } from '../core/loop.js';
 import { exitFp, floorBounds, fp } from '../interact/first-person.js';
 import { closeSession } from './session-drawer.js';
 import { host } from '../paseo-host.js';
-import { available, sound, whenProbed } from '../paseo-sound.js';
+import { available, before, sound, whenProbed } from '../paseo-sound.js';
 
 /** The floor's plinth past its walkable bounds, the foot of the plinth and the top of the walls. */
 const PLINTH = 1.5, FOOT = -1.3, WALL = 3.4;
@@ -273,10 +273,12 @@ export function setup() {
   document.addEventListener('fullscreenchange', () => $('btn-full').setAttribute('aria-pressed', String(!!document.fullscreenElement)));
   // PASEO: the Sound button. The switch is the host's device setting (paseo-sound.js); a press asks for the opposite
   // of what the button showed when the press began. The press's own probe (it hears the pointerup or the key before
-  // this click) may change things first: it may find audio and turn sound on by itself where it was asked for, or find
-  // none. So the press waits for the probe, then asks for what it meant, and says it cannot only if audio did not
-  // start. With no Web Audio it says so at once. The drawing takes no pointer events (see the styles): it is replaced
-  // when the state changes, and a press that began on a node since removed would make no click.
+  // this click, and a key even before this button does) may change things first: it may find audio and turn sound on
+  // by itself where it was asked for, or find none. So the press's meaning is taken at its start, from what the probe
+  // met (`before`) where the probe has already run; the press waits for the probe, then asks for what it meant, and
+  // says it cannot only if audio did not start. With no Web Audio it says so at once. The drawing takes no pointer
+  // events (see the styles): it is replaced when the state changes, and a press that began on a node since removed
+  // would make no click.
   const soundButton = $('btn-sound'), soundIcon = $('sound-ico');
   soundIcon.style.display = 'inline-grid';
   const showSound = () => {
@@ -287,16 +289,16 @@ export function setup() {
     soundButton.title = label;
     soundIcon.replaceChildren(speaker(sound.on));
   };
-  const meant = () => (available() ? !sound.on : true);
+  const meant = (met) => { const was = met ?? { on: sound.on, can: available() }; return was.can ? !was.on : true; };
   let intent = null;
-  const mark = () => { intent = meant(); };
+  const mark = (event) => { intent = meant(before(event)); };
   // (a press that ends off the button makes no click: its meaning must not wait for some later press)
   const unmark = () => setTimeout(() => { intent = null; });
-  soundButton.addEventListener('pointerdown', () => {
-    mark();
+  soundButton.addEventListener('pointerdown', (event) => {
+    mark(event);
     for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, unmark, { capture: true, once: true });
   });
-  soundButton.addEventListener('keydown', (event) => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) mark(); });
+  soundButton.addEventListener('keydown', (event) => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) mark(event); });
   soundButton.addEventListener('keyup', unmark);
   soundButton.addEventListener('blur', unmark);
   soundButton.addEventListener('click', () => {

@@ -78,6 +78,26 @@ test("nothing is made until a press; the first press tries one context, finds it
   expect(made.contexts).toBe(1);
 });
 
+test("the probe remembers what the switch was when a press reached it, for that press alone", async () => {
+  install("runs");
+  const m = await fresh();
+  stop = m.watchAudio(window);
+  // Blocked first, with sound asked for: nothing plays, and a press could not start audio as far as is known.
+  m.setOn(true);
+  install("hangs");
+  window.dispatchEvent(new Event("pointerup"));
+  await vi.advanceTimersByTimeAsync(1600);
+  expect(m.sound.audio).toBe("blocked");
+  install("runs");
+  const press = new Event("keydown");
+  window.dispatchEvent(press);
+  await settle();
+  // The press's own probe turned sound on; what the press met is still known.
+  expect(m.sound.on).toBe(true);
+  expect(m.before(press)).toMatchObject({ on: false, can: false });
+  expect(m.before(new Event("keydown"))).toBeNull();
+});
+
 test("a key press starts the probe too", async () => {
   install("runs");
   const m = await fresh();
