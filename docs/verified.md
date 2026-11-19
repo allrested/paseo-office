@@ -480,3 +480,25 @@ by the look's script, seconds late, found the clip already saved.
 | An incident's siren with Sound on and off                                       | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
 | Sound's note with reduced motion, in photo mode, and read by a screen reader    | Not tried                                                                                                                                               |
 | A refused full screen and my-office's game and karaoke lines in the note        | Not tried                                                                                                                                               |
+
+## Staff and daily life, indoors
+
+On 2026-11-19 the company floor started in Chromium with software WebGL at 1280 and 390 px.
+The standalone page loaded the piece 5 bundle and passed the normal world API three fixture
+agents across two teams, spending, a repository birthday, a tenure list and a lift undergoing
+servicing. Both pages created the scene canvas, with no page exception or request to an API.
+The 390 px page also created seven name tags. This check exercised the browser, not the native
+script frame or a signed-in provider.
+
+A separate check used the scene’s debug clock at 10:30 and advanced its update loop with GPU drawing paused. With three agents at $2.50 each, the accountant’s canvas wrote $5.00 and $2.50 for the two teams and $7.50 in total. The accountant was at her desk and HR was present. Both members of the fixture’s new team acquired intern lanyards and desk plates. The lift reported active servicing, a visible barrier and an on-duty technician.
+
+The desktop JavaScript heap sample was 147 MiB, compared with 128 MiB on the camera-extras
+baseline (`07f0420`). At 390 px the staff build used 182 MiB. The short desktop samples saw zero
+animation callbacks per second on the staff build and 0.4 on the baseline. The 390 px sample
+saw 0.4. The host was running multiple software renderers concurrently and the desktop and
+390 px screenshot requests timed out. These measurements cannot establish frame rate on a GPU
+or a phone.
+
+The ledger tests exercise the 30-day farewell and the 20-turn, two-day promotion. Phone
+performance, provider-reported costs, the quarterly drill and the time-specific staff ceremonies
+still need observation on the owner's host.
