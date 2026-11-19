@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { RegisterWorkspaceDock } from "./workspace-dock.js";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
@@ -127,6 +128,7 @@ function WorldScene({
   onProblem,
   sound,
 }: WorldSceneProps) {
+  const registerDock = useContext(RegisterWorkspaceDock);
   const containerId = useId();
   const onToggleFullscreen = fullscreen?.toggle;
   const onBell = useStandupBell();
@@ -241,6 +243,11 @@ function WorldScene({
         latest.current.onProblem(messageOf(error));
         return;
       }
+      registerDock?.(
+        container
+          ?.querySelector("iframe")
+          ?.contentDocument?.querySelector<HTMLButtonElement>("#btn-workspace") ?? null,
+      );
       setApi(world);
     }
     frame.api.then(start, (error: unknown) => {
@@ -249,9 +256,11 @@ function WorldScene({
     return () => {
       live = false;
       setApi(null);
+      registerDock?.(null);
       frame.dispose();
     };
   }, [
+    registerDock,
     script,
     sized,
     containerId,

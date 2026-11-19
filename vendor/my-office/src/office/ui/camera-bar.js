@@ -80,6 +80,7 @@ const barMarkup = () => {
         <button type="button" class="tb-full" id="btn-full" aria-label="${label('ui.cameraToolbar.fullscreen')}" title="${label('ui.cameraToolbar.fullscreen')}"><span data-icon="maximize"></span></button>
         <button type="button" class="tb-full" id="btn-photo" aria-label="${label('ui.photo.label')}" title="${label('ui.photo.label')}"><span data-icon="camera"></span></button>
         <button type="button" class="tb-full" id="btn-sound" aria-pressed="false" aria-label="${label('ui.topBar.toggles.sound')}" title="${label('ui.topBar.toggles.sound')}"><span id="sound-ico"></span></button>
+        <button type="button" class="tb-full" id="btn-workspace" hidden><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></button>
       </div>
       <button type="button" class="tb-fp" id="btn-fp" aria-pressed="false" aria-label="${label('ui.cameraToolbar.walkIn')}" title="${label('ui.cameraToolbar.walkIn')}"><span data-icon="walk"></span><span>${label('ui.cameraToolbar.walkIn')}</span></button>
     </div>
@@ -127,6 +128,11 @@ const STYLE = `
 .seg-btn:focus-visible { outline: 2px solid var(--o-accent, #EF8A5F); }
 .tb-zoom button, .tb-full { all: unset; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; color: #8D97AA; transition: background .15s, color .15s; }
 .tb-zoom button:hover, .tb-full:hover { background: rgba(255, 255, 255, .07); color: #E8ECF4; }
+#btn-workspace[hidden] { display: none; }
+#btn-workspace { color: var(--o-accent, #EF8A5F); }
+@media (max-width: 440px) {
+  .toolbar:has(#btn-workspace:not([hidden])) { flex-wrap: wrap; justify-content: center; width: max-content; }
+}
 .tb-full[aria-pressed="true"] { background: #263040; color: var(--o-accent, #EF8A5F); }
 /* (the icon is dimmed, not the button: an opacity on it would dim its tooltip too) */
 #sound-ico { pointer-events: none; }

@@ -13,6 +13,7 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
+import { RegisterWorkspaceDock } from "./world/workspace-dock.js";
 import { View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import {
@@ -40,6 +41,7 @@ export function useFullscreenDialog(): boolean {
   return useContext(Fullscreen) !== null;
 }
 
+const CameraDock = createContext<HTMLButtonElement | null>(null);
 const Fullscreen = createContext<DialogAppearance | null>(null);
 
 // The native dialog's top layer keeps it above the fullscreen scene and its iframe.
@@ -126,7 +128,14 @@ export function OfficeDialogs({
     () => (fullscreen ? { theme, styles } : null),
     [fullscreen, theme, styles],
   );
-  return <Fullscreen.Provider value={appearance}>{children}</Fullscreen.Provider>;
+  const [cameraButton, registerDock] = useState<HTMLButtonElement | null>(null);
+  return (
+    <RegisterWorkspaceDock.Provider value={registerDock}>
+      <CameraDock.Provider value={cameraButton}>
+        <Fullscreen.Provider value={appearance}>{children}</Fullscreen.Provider>
+      </CameraDock.Provider>
+    </RegisterWorkspaceDock.Provider>
+  );
 }
 
 /** Keep Tab inside this dialog even at its edges, where the browser can otherwise focus its toolbar. */
@@ -150,6 +159,18 @@ function cycleFocus(event: KeyboardEvent<HTMLDialogElement>): void {
   next?.focus();
 }
 
+function dockBounds(button: HTMLButtonElement, page: Document) {
+  const bounds = button.getBoundingClientRect();
+  if (button.ownerDocument === page) return bounds;
+  const frame = button.ownerDocument.defaultView?.frameElement?.getBoundingClientRect();
+  return {
+    left: (frame?.left ?? 0) + bounds.left,
+    top: (frame?.top ?? 0) + bounds.top,
+    width: bounds.width,
+    height: bounds.height,
+  };
+}
+
 function BrowserDialog({
   title,
   icon,
@@ -160,6 +181,7 @@ function BrowserDialog({
   children,
   theme: { colors },
 }: OfficeModalProps & DialogAppearance) {
+  const cameraButton = useContext(CameraDock);
   const dialog = useRef<HTMLDialogElement>(null);
   const restoreButton = useRef<HTMLButtonElement>(null);
   const minimizeButton = useRef<HTMLButtonElement>(null);
@@ -201,16 +223,29 @@ function BrowserDialog({
         opener.focus({ preventScroll: true });
     };
   }, []);
+  useLayoutEffect(() => {
+    if (!cameraButton || !dockRequest || !dockVisible) return;
+    const label = `Restore ${title}`;
+    cameraButton.setAttribute("aria-label", label);
+    cameraButton.title = label;
+    cameraButton.hidden = false;
+    cameraButton.addEventListener("click", restore);
+    return () => {
+      cameraButton.hidden = true;
+      cameraButton.removeEventListener("click", restore);
+    };
+  }, [cameraButton, dockRequest, dockVisible, restore, title]);
   // Closing a native dialog releases the floor and leaves its iframe and React children mounted.
   const wasMinimized = useRef(false);
   useLayoutEffect(() => {
     const element = dialog.current;
-    const button = restoreButton.current;
+    const button = cameraButton ?? restoreButton.current;
     if (!element || !button || (!minimized && !wasMinimized.current)) return;
+    if (minimized && wasMinimized.current && !element.open) return;
     wasMinimized.current = minimized;
     if (!element.open) element.showModal();
     const from = element.getBoundingClientRect();
-    const to = button.getBoundingClientRect();
+    const to = dockBounds(button, element.ownerDocument);
     const finish = () => {
       if (minimized) {
         element.close();
@@ -255,7 +290,7 @@ function BrowserDialog({
       animation.onfinish = null;
       animation.cancel();
     };
-  }, [minimized]);
+  }, [minimized, cameraButton]);
   const tokens = useMemo(
     () =>
       ({
@@ -321,7 +356,7 @@ function BrowserDialog({
           aria-label="Minimized workspaces"
           className="office-workspace-dock"
           style={tokens}
-          hidden={!dockVisible}
+          hidden={!dockVisible || !!cameraButton}
         >
           <button
             ref={restoreButton}
