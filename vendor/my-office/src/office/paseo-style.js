@@ -93,7 +93,7 @@ svg.ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .ptip-rows { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--o-border); }
 .ptip-rows[hidden] { display: none; }
 .ptip-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.ptip .ptip-row-name { color: var(--o-fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptip .ptip-row-name { color: var(--o-fg); min-width: 0; padding-right: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ptip .ptip-row-who { flex: none; font-weight: 600; color: var(--o-fg); white-space: nowrap; }
 .ptip .ptip-row--open .ptip-row-who { font-weight: 500; color: var(--o-muted); }
 .ptip .ptip-row--done .ptip-row-name, .ptip .ptip-row--done .ptip-row-who { color: var(--o-muted); }
