@@ -708,6 +708,40 @@ test("a phone's Open session shows the session in the sheet", async () => {
   expect(opened).toEqual([]);
 });
 
+test("opening the same session twice leaves one tab in the wide column", async () => {
+  compact = false;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  await pressTab("Sessions");
+  await pressFirst("Ada");
+  await press("Open session");
+
+  expect(container.querySelectorAll('[role="tab"][aria-label="Ada"]')).toHaveLength(1);
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+});
+
+test("a stopped notes writer opens in the column, and the app is not asked", async () => {
+  compact = false;
+  await mount();
+  const notes = {
+    ...BROKEN_NOTES,
+    scheduleError: null,
+    failedAgentId: "ada",
+    problem: "Rate limited",
+  };
+  await act(async () =>
+    deliver?.({ type: "snapshot", state: { ...OFFICE_WITH_ONE_AGENT, notes } }),
+  );
+  await openAttention();
+  await pressFirst("Stand-up");
+  await press("Open the writer");
+
+  expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
+  expect(opened).toEqual([]);
+});
+
 /** The phone's bar: Sessions, with its count of open sessions when it has one. */
 async function pressBarSessions(): Promise<void> {
   await act(async () =>

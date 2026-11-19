@@ -44,9 +44,9 @@ export interface WorldViewProps {
    */
   onOpenResources: (() => void) | undefined;
   /**
-   * E by a person while walking in: the agent card's "Open session". Absent only where the office
-   * has no navigation; with navigation but no side area it opens the agent's workspace, leaving the
-   * office, as the card does. Read when the office starts.
+   * E by a person while walking in: the agent card's "Open session". The surface always supplies
+   * it, and it opens the session in the office's column, as the card does. Read when the office
+   * starts.
    */
   onOpenSession: ((agentId: string) => void) | undefined;
   /** A tap on the library: its chip or the bookshelf. */

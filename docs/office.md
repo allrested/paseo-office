@@ -68,8 +68,9 @@ close a waiting agent.
 ## The agent card
 
 Tapping a row, a desk or a person opens the agent's card. It opens the session, sends a prompt,
-and answers a tool, mode or other permission; a plan or a question says to answer it in the
-session. Stop ends the running turn, and is offered only on a host whose SDK has an agent's
+and answers a tool, mode or other permission. A plan or a question is not answered on the card:
+it says "Answer in the session", and the card's own "Open session" is the way there. A row of the
+List or an Activity card puts an "Open session" button beside it instead. Stop ends the running turn, and is offered only on a host whose SDK has an agent's
 `cancel()` (`shared/host-extras.ts`); stock Paseo 0.16 does not.
 
 "Open session" shows the session in the office's column (see below) in every app, and the card
@@ -119,7 +120,9 @@ An open session is a tab after the four, with the agent's status dot and title a
 close it (`client/session-panel.tsx`, `client/use-conversation.ts`). A tab shows the
 conversation (your messages and the agent's replies as text, a tool call as one line, never the
 reasoning), the requests waiting on the agent with Approve and Deny, a reply box, and Stop while
-a turn runs on a host that can stop one. A plan or a question is answered in the workspace.
+a turn runs on a host that can stop one. A plan or a question is answered in the
+workspace, where the app gives one: the panel then says "Answer this in the workspace." and offers
+"Open in workspace"; in an app that gives none it says "This cannot be answered here."
 Attachments, images, slash commands, a changed model or mode and sub-agent tracks are not
 there. A tab leaves only when it is closed: an agent that leaves the office keeps its tab,
 which says so. On a compact layout the sheet shows the session with a Back to Sessions button;
@@ -346,7 +349,7 @@ One writer runs at a time, and the office keeps it in `<PASEO_HOME>/office/notes
 restart does not start a second. An entry counts as written only when its `## DD Month YYYY` header
 starts a line of the month's file after the writer's turn; the office then records the time and
 archives the writer. A writer that fails, is stopped or closed, or ends without the entry is left as
-it is and stays named, with a link to it, on the Stand-up card and the notes card; while it is at
+it is and stays named, with an "Open the writer" button that opens its session in the office's column, on the Stand-up card and the notes card; while it is at
 its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's line opens the
 notes card: a month's file as Markdown at its newest entry, read only. The server reads only
 `daily-standup-YYYYMM.md` directly in the notes folder.

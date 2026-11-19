@@ -51,9 +51,9 @@ let root: Root;
 
 const TITLES: Record<string, string> = { a: "Alpha work", b: "Beta work" };
 
-function Harness({ chat }: { chat: string | null }): ReactNode {
+function Harness({ chat, compact }: { chat: string | null; compact: boolean }): ReactNode {
   const styles = useOfficeStyles(THEME, false, false);
-  const column = useColumn();
+  const column = useColumn(compact);
   const badges = useMemo(() => ({ attention: "2", chat }), [chat]);
   const sessions = useMemo(
     () =>
@@ -71,6 +71,7 @@ function Harness({ chat }: { chat: string | null }): ReactNode {
     <>
       <Pressable accessibilityLabel="open a" onPress={openA} />
       <Pressable accessibilityLabel="open b" onPress={openB} />
+      <Text>{`chosen:${view.kind === "tab" ? view.tab : `session:${view.agentId}`}`}</Text>
       <OfficeColumn
         column={column}
         sessions={sessions}
@@ -88,8 +89,8 @@ function Harness({ chat }: { chat: string | null }): ReactNode {
   );
 }
 
-async function mount(chat: string | null = null): Promise<void> {
-  await act(async () => root.render(createElement(Harness, { chat })));
+async function mount(chat: string | null = null, compact = false): Promise<void> {
+  await act(async () => root.render(createElement(Harness, { chat, compact })));
 }
 
 function tab(label: string): HTMLElement {
@@ -249,6 +250,18 @@ test("opening a session opens a collapsed column", async () => {
 
   expect(container.textContent).toContain("panel:session:a");
   expect(saves).toEqual([{ width: 360, collapsed: false }]);
+});
+
+test("on a compact surface a session or a fixed tab opens without rewriting the saved column", async () => {
+  storedColumn = { width: 360, collapsed: true };
+  await mount(null, true);
+  await act(async () => control("open a").click());
+  expect(container.textContent).toContain("chosen:session:a");
+  await act(async () => tab("Chat").click());
+  expect(container.textContent).toContain("chosen:chat");
+
+  expect(saves).toEqual([]);
+  expect(storedColumn.collapsed).toBe(true);
 });
 
 /** What a session tab's close button's opacity says: "0" while it is hidden. */

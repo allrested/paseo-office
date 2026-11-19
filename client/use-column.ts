@@ -26,9 +26,9 @@ export interface ColumnState {
   /** The stored width, not yet clamped to a surface. */
   width: number;
   collapsed: boolean;
-  /** Selects the tab and opens a collapsed column. */
+  /** Selects the tab and, on a wide surface, opens a collapsed column. */
   show(tab: ColumnTab): void;
-  /** Opens the agent's session as a tab, or selects it; opens a collapsed column. */
+  /** Opens the agent's session as a tab, or selects it; on a wide surface opens a collapsed column. */
   openSession(agentId: string): void;
   closeSession(agentId: string): void;
   setCollapsed(next: boolean): void;
@@ -38,9 +38,10 @@ export interface ColumnState {
 /**
  * The column's state. The open sessions and the chosen tab live as long as the surface; the width
  * and collapsed are the device's. A change shows at once and is saved behind it; one the device
- * refuses holds until the office is closed.
+ * refuses holds until the office is closed. On a compact surface `collapsed` has no effect, so
+ * opening a tab or a session there leaves the saved one as the wide layout left it.
  */
-export function useColumn(): ColumnState {
+export function useColumn(compact: boolean): ColumnState {
   const settings = useSettings(officeColumnSettings);
   const stored = settings.status === "ready" ? settings.values : null;
   const revision =
@@ -60,16 +61,16 @@ export function useColumn(): ColumnState {
   const show = useCallback(
     (next: ColumnTab) => {
       setTabs((current) => showTab(current, next));
-      if (collapsed) change({ collapsed: false });
+      if (collapsed && !compact) change({ collapsed: false });
     },
-    [collapsed, change],
+    [collapsed, compact, change],
   );
   const openSession = useCallback(
     (agentId: string) => {
       setTabs((current) => openTab(current, agentId));
-      if (collapsed) change({ collapsed: false });
+      if (collapsed && !compact) change({ collapsed: false });
     },
-    [collapsed, change],
+    [collapsed, compact, change],
   );
   const closeSession = useCallback(
     (agentId: string) => setTabs((current) => closeTab(current, agentId)),

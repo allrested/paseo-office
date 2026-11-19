@@ -1176,11 +1176,11 @@ export function OfficeSurface(
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
   const model = useMemo(() => buildOfficeModel(office.state), [office.state]);
-  const column = useColumn();
   const { surfaceWidth, measure, compact, floorStyle, setDragging } = useSurfaceLayout(
     layout.compact,
     styles,
   );
+  const column = useColumn(compact);
   const machine = useMemo(() => namedMachine(reading, model.agents), [reading, model.agents]);
   const rooms = useMemo(
     () => orderRoomsForFocus(model.rooms, focusRoomId),
@@ -1201,14 +1201,6 @@ export function OfficeSurface(
     closeStandup();
     openNotes();
   }, [closeStandup, openNotes]);
-  const openWriter = useMemo(() => {
-    if (navigation === undefined) return undefined;
-    return (agentId: string) => {
-      closeStandup();
-      closeNotes();
-      navigation.openAgent({ agentId });
-    };
-  }, [navigation, closeStandup, closeNotes]);
   const showWorkspace = useMemo(() => {
     if (navigation === undefined) return undefined;
     return (workspaceId: string) => navigation.openWorkspace({ workspaceId });
@@ -1235,6 +1227,15 @@ export function OfficeSurface(
   // Every way in to a session ends in the column: its tab, or the phone's sheet.
   const sheet = useColumnSheet(column, compact, setSelectedId);
   const { openSession, link } = sheet;
+  // The writer opens in the column like any session; the office is left only by "Open in workspace".
+  const openWriter = useCallback(
+    (agentId: string) => {
+      closeStandup();
+      closeNotes();
+      openSession(agentId);
+    },
+    [closeStandup, closeNotes, openSession],
+  );
   const openResources = useMemo(
     () => resourcesOpener(navigation, openMachine),
     [navigation, openMachine],

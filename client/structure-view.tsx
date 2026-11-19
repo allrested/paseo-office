@@ -367,7 +367,7 @@ export interface StructureViewProps {
   /** How a post names its author, its claimer and the agent it is for. */
   name(author: string): string;
   onSelectAgent(agentId: string): void;
-  /** Opens an agent's session from its row. Absent on a host that gives no navigation. */
+  /** Opens an agent's session from its row, in the office's column. The surface always supplies it. */
   onOpenSession?(agentId: string): void;
   onOpenBoard(roomId: string): void;
 }
