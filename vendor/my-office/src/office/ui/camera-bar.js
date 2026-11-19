@@ -34,6 +34,20 @@ let home = false;
 /** The fitted view's zoom: the percent and the other views' factors are read from it. */
 let fitZoom = 0;
 
+/* The automatic camera: upstream's ui/camera-bar.js lines 13 to 19, unchanged but for `endPan`. A permission asked glides
+   the camera to the person for seven seconds, unless it is off, someone is walking, taking a photo or looking at a card, or
+   the camera was moved in the last thirty. */
+let panBack = null;
+let panTimer = 0;
+export const autoCam = () => state.camAuto && !fp.on && !state.photo && !state.selectedId && performance.now() - state.lastUserCam > 30000;
+export function panTo(w) {
+  if (!panBack) panBack = focusTarget.clone();
+  focusTarget.set(w.pos.x, 0.9, w.pos.y);
+  clearTimeout(panTimer); panTimer = setTimeout(() => { if (panBack && !state.selectedId) focusTarget.copy(panBack); panBack = null; }, 7000);
+}
+/** PASEO: upstream lets a glide's return undo a view the user chose meanwhile; here anything that takes the camera ends the glide. */
+function endPan() { panBack = null; clearTimeout(panTimer); }
+
 /**
  * Upstream's views by floor plan, each a place to look at and a factor of the fitted zoom (upstream's
  * ui/camera-bar.js keeps the same places per plan). Overview is Paseo's own and is fitted, so it is not
@@ -184,6 +198,7 @@ body.is-photo.photo-nonames .labels { display: none !important; }
 
 /** Marks the view the camera is on; `null` when it left it (a drag, a zoom, a person, a place's card). */
 export function setView(view) {
+  endPan();
   home = view === 'home';
   for (const b of document.querySelectorAll('.seg-btn')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
 }
@@ -192,6 +207,7 @@ const corner = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.
 
 /** Looks at the floor: its box, seen from the camera's side, centred and as large as fits (see COVER). */
 export function fitFloor() {
+  endPan();
   const b = floorBounds();
   camera.updateMatrixWorld(); camera.updateProjectionMatrix();
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -247,6 +263,11 @@ function speaker(on) {
 export function setup() {
   /* ---------- camera toolbar ---------- */
   fitFloor();
+  // Upstream's switch for the automatic camera: on unless the device's storage says off.
+  state.camAuto = true;
+  try { state.camAuto = localStorage.getItem('office-autocam') !== 'off'; } catch { /* storage blocked */ }
+  state.lastUserCam = -1e9;
+  controls.addEventListener('start', () => { state.lastUserCam = performance.now(); endPan(); });
   // While the mouse is on the toolbar it is held by its right edge: a view's name sliding out (on hover) then grows it to
   // the left, and the zoom and the tools stay where the pointer expects them. Centred again once it has shrunk.
   const bar = document.querySelector('.toolbar'), wrap = bar.parentElement;

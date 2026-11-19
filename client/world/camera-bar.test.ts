@@ -16,6 +16,8 @@ const h = vi.hoisted(() => ({
   plan: "pro" as string,
   set: vi.fn(),
   copy: vi.fn(),
+  /** What the focus target's clone gives: where a glide goes back to. */
+  clone: vi.fn(() => ({ home: true })),
   exitFp: vi.fn(),
   /** The walk's state: a test turns `on` to be walking. */
   fp: { on: false },
@@ -33,12 +35,25 @@ vi.mock("../../vendor/my-office/src/office/scene/renderer.js", async () => {
   camera.updateProjectionMatrix();
   return {
     camera,
-    controls: { target: new THREE.Vector3(0, 0, 0), minZoom: 0.5, maxZoom: 3.4, update() {} },
+    controls: {
+      target: new THREE.Vector3(0, 0, 0),
+      minZoom: 0.5,
+      maxZoom: 3.4,
+      update() {},
+      /** The controls' listeners: `fire("start")` is a drag of the floor beginning. */
+      listeners: {} as Record<string, (() => void)[]>,
+      addEventListener(type: string, listener: () => void) {
+        (this.listeners[type] ??= []).push(listener);
+      },
+      fire(type: string) {
+        for (const listener of this.listeners[type] ?? []) listener();
+      },
+    },
     fpCam: { fov: 70, updateProjectionMatrix() {} },
   };
 });
 vi.mock("../../vendor/my-office/src/office/core/loop.js", () => ({
-  focusTarget: { set: h.set, copy: h.copy },
+  focusTarget: { set: h.set, copy: h.copy, clone: h.clone },
 }));
 vi.mock("../../vendor/my-office/src/office/ui/session-drawer.js", () => ({
   closeSession: h.closeSession,
@@ -57,8 +72,15 @@ vi.mock("../../vendor/my-office/src/office/interact/first-person.js", () => ({
   exitFp: h.exitFp,
 }));
 
-// @ts-expect-error vendored JavaScript has no declarations
-import { build, goView, setView, setup } from "../../vendor/my-office/src/office/ui/camera-bar.js";
+import {
+  autoCam,
+  build,
+  goView,
+  panTo,
+  setView,
+  setup,
+  // @ts-expect-error vendored JavaScript has no declarations
+} from "../../vendor/my-office/src/office/ui/camera-bar.js";
 
 // @ts-expect-error vendored JavaScript has no declarations
 import { setOn, sound, watchAudio } from "../../vendor/my-office/src/office/paseo-sound.js";
@@ -143,6 +165,7 @@ beforeEach(() => {
     h.calls.push("set");
   });
   h.copy.mockReset();
+  h.clone.mockClear();
   h.toast.mockReset();
   h.plan = "pro";
   state.selectedId = null;
@@ -151,13 +174,21 @@ beforeEach(() => {
   h.fp.on = false;
   h.exitFp.mockReset();
   fpCam.fov = 70;
+  // (each page's setup() adds its own listener; the controls outlive the page)
+  (controls as unknown as { listeners: Record<string, unknown[]> }).listeners = {};
+  state.camAuto = undefined;
+  state.photo = false;
+  localStorage.clear();
   document.body.innerHTML = '<div id="stage-wrap"><div id="stage"></div></div>';
   sound.audio = "idle";
   sound.request = () => {};
   setOn(false);
 });
 
+/** Spies a test made that must not outlive it. */
+const onAfter: { mockRestore(): void }[] = [];
 afterEach(() => {
+  for (const spy of onAfter.splice(0)) spy.mockRestore();
   for (const [type, listener, options] of onDocument.mock.calls) {
     document.removeEventListener(type, listener, options);
   }
@@ -756,4 +787,86 @@ test("Escape does nothing while not walking", () => {
   open();
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   expect(h.exitFp).not.toHaveBeenCalled();
+});
+
+/** The page's clock, which the automatic camera's thirty seconds are read from; given back after each test. */
+function clock(start: number) {
+  const now = { value: start };
+  onAfter.push(vi.spyOn(performance, "now").mockImplementation(() => now.value));
+  return now;
+}
+
+/** A drag of the floor beginning: OrbitControls' 'start'. */
+const drag = () => (controls as unknown as { fire(type: string): void }).fire("start");
+
+/** A person as the camera glides to one: where they stand. */
+const person = { pos: { x: 3, y: 4 } };
+
+test("the automatic camera may glide while it is on and nobody uses the camera", () => {
+  clock(100_000);
+  open();
+  expect(state.camAuto).toBe(true);
+  expect(autoCam()).toBe(true);
+
+  state.selectedId = "a";
+  expect(autoCam()).toBe(false);
+  state.selectedId = null;
+  state.photo = true;
+  expect(autoCam()).toBe(false);
+  state.photo = false;
+  h.fp.on = true;
+  expect(autoCam()).toBe(false);
+  h.fp.on = false;
+  state.camAuto = false;
+  expect(autoCam()).toBe(false);
+});
+
+test("upstream's switch, office-autocam off, turns it off", () => {
+  localStorage.setItem("office-autocam", "off");
+  open();
+  expect(state.camAuto).toBe(false);
+});
+
+test("it waits thirty seconds after a touch of the controls", () => {
+  const now = clock(100_000);
+  open();
+  drag();
+  now.value += 29_000;
+  expect(autoCam()).toBe(false);
+  now.value += 2_000;
+  expect(autoCam()).toBe(true);
+});
+
+test("a glide looks at the person and goes back after seven seconds, once for two glides", () => {
+  open();
+  h.copy.mockClear();
+  panTo(person);
+  expect(h.set).toHaveBeenLastCalledWith(3, 0.9, 4);
+  panTo({ pos: { x: 5, y: 6 } });
+  vi.advanceTimersByTime(6_999);
+  expect(h.copy).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(2);
+  expect(h.copy).toHaveBeenCalledTimes(1);
+  expect(h.clone).toHaveBeenCalledTimes(1);
+  expect(h.copy).toHaveBeenCalledWith({ home: true });
+});
+
+test("anything else that takes the camera ends the glide, so it does not pull it back", () => {
+  open();
+  for (const takeIt of [() => setView(null), () => goView("desks"), drag]) {
+    h.copy.mockClear();
+    panTo(person);
+    takeIt();
+    vi.advanceTimersByTime(8_000);
+    expect(h.copy).not.toHaveBeenCalled();
+  }
+});
+
+test("a person chosen during the glide keeps the camera where it is when it ends", () => {
+  open();
+  h.copy.mockClear();
+  panTo(person);
+  state.selectedId = "a";
+  vi.advanceTimersByTime(8_000);
+  expect(h.copy).not.toHaveBeenCalled();
 });

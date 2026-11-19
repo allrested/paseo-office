@@ -263,6 +263,16 @@ function onEvent(e) {
   w.push(e.type === 'compact' ? shredAction(w, a) : a);
 }
 
+/**
+ * Upstream's ui/permissions.js onPerm: a permission asked glides the camera to the person, when it may. Here a person
+ * already in the scene whose status becomes `wait`; a newcomer is walking in and the first list is not a request.
+ */
+function glideToRequest(was, now) {
+  if (!was || was.status === 'wait' || now.status !== 'wait' || !cameraBar.autoCam()) return;
+  const w = workers.get(now.id);
+  if (w) cameraBar.panTo(w);
+}
+
 const api = {
   version: VERSION,
   /**
@@ -395,6 +405,7 @@ const api = {
       const was = sessions.get(s.id);   // (record() keeps the last event on the session object this one replaces)
       if (was) { s.last ??= was.last; if (!s.stuck) s.lastAt ??= was.lastAt; }   // (stopped on an error: no time, so no walk home at night)
       live.upsertSession(s, seated);
+      glideToRequest(was, s);
     }
     seated = true;
     state.connectedOnce = true;

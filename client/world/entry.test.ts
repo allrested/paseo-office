@@ -26,6 +26,10 @@ const h = vi.hoisted(() => ({
   soundAsked: [] as boolean[],
   /** How many times the wall clock's own act ran (upstream's cycleTime). */
   clockCycled: 0,
+  /** What the camera bar's autoCam() answers: whether the camera may glide now. */
+  autoCam: false,
+  /** Whom the camera glided to, in order. */
+  panned: [] as string[],
 }));
 
 vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
@@ -62,6 +66,8 @@ vi.mock("../../vendor/my-office/src/office/ui/camera-bar.js", () => ({
     h.built = true;
   },
   setup() {},
+  autoCam: () => h.autoCam,
+  panTo: (w: { id: string }) => h.panned.push(w.id),
 }));
 vi.mock("../../vendor/my-office/src/office/ui/event-text.js", () => ({
   ACT: { other: {} },
@@ -216,6 +222,8 @@ beforeEach(() => {
   h.soundAsked.length = 0;
   h.incidentsOpened = 0;
   h.rung = 0;
+  h.autoCam = false;
+  h.panned.length = 0;
   state.sim = 0;
   state.incidentUntil = 0;
   world.setIncidents([]);
@@ -657,4 +665,29 @@ test("the wall clock changes nothing: the lights follow the app's theme", async 
   expect(props.get("clock")?.hint).toBe("The lights follow the app's theme");
   props.get("clock")?.act();
   expect(h.clockCycled).toBe(0);
+});
+
+test("a person whose request begins is glided to, once, when the camera may move", () => {
+  seat("a"); // at rest
+  h.autoCam = true;
+  world.setSessions([{ ...session("a"), status: "wait" }]);
+  expect(h.panned).toEqual(["a"]);
+
+  world.setSessions([{ ...session("a"), status: "wait" }]); // still waiting: no second glide
+  expect(h.panned).toEqual(["a"]);
+});
+
+test("no glide when the camera may not move, for a newcomer, or for a change that is not a request", () => {
+  seat("a");
+  world.setSessions([{ ...session("a"), status: "wait" }]); // autoCam is off
+  expect(h.panned).toEqual([]);
+
+  h.autoCam = true;
+  world.setSessions([session("a")]);
+  world.setSessions([{ ...session("a"), status: "work" }]);
+  expect(h.panned).toEqual([]);
+
+  h.workers.set("b", { id: "b", push() {} });
+  world.setSessions([session("a"), { ...session("b"), status: "wait" }]); // b is new to the scene
+  expect(h.panned).toEqual([]);
 });
