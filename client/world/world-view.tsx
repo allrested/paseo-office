@@ -77,6 +77,10 @@ export interface WorldViewProps {
   incidents: IncidentsState | undefined;
   /** A tap on the incidents' banner. */
   onOpenIncidents(): void;
+  /** A tap on the pantry's duty board: the duty board's editor. */
+  onOpenDuties?: () => void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?: (id: string, agentId: string) => void;
   /** The script could not load, the office could not start, or the WebGL context was lost. */
   onProblem(message: string): void;
   /**
@@ -124,6 +128,8 @@ function WorldScene({
   weather,
   incidents,
   onOpenIncidents,
+  onOpenDuties,
+  onDutyActed,
   onProblem,
   sound,
 }: WorldSceneProps) {
@@ -150,6 +156,8 @@ function WorldScene({
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
     onTenure,
@@ -173,6 +181,8 @@ function WorldScene({
       onOpenLibrary,
       onOpenNotes,
       onOpenIncidents,
+      onOpenDuties,
+      onDutyActed,
       onBell,
       onLife,
       onTenure,
@@ -195,6 +205,8 @@ function WorldScene({
     onOpenLibrary,
     onOpenNotes,
     onOpenIncidents,
+    onOpenDuties,
+    onDutyActed,
     onBell,
     onLife,
     onTenure,

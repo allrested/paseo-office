@@ -33,6 +33,7 @@ let call: Mock<(input: ChatRequest) => Promise<ChatResult>>;
 let scroller: ScrollViewProps | null;
 let toEnd: number;
 const board = vi.fn(),
+  duties = vi.fn(),
   newAgent = vi.fn(),
   groupPhoto = vi.fn(async () => {});
 let quickDocument = quickSettings.schema.parse({});
@@ -159,6 +160,7 @@ function Harness({ value }: { value: OfficeState }) {
     draft,
     newAgent: NO_FORM,
     onBoard: board,
+    onDuties: duties,
     onNewAgent: newAgent,
     onGroupPhoto: groupPhoto,
   });
@@ -279,6 +281,7 @@ beforeEach(() => {
   toEnd = 0;
   quickDocument = quickSettings.schema.parse({});
   board.mockClear();
+  duties.mockClear();
   newAgent.mockClear();
   groupPhoto.mockClear();
   selected = [];
@@ -405,6 +408,9 @@ test("More opens the lobby or agent form, and retains a failed photo request to 
   await press("More chat actions");
   await press("Lobby board");
   expect(board).toHaveBeenCalledOnce();
+  await press("More chat actions");
+  await press("Duty board");
+  expect(duties).toHaveBeenCalledOnce();
   await press("More chat actions");
   await press("New agent");
   expect(newAgent).toHaveBeenCalledOnce();

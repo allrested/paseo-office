@@ -13,7 +13,12 @@ my-office's.
 - Shows every agent on the host as a floor: in 3D, in 2D pixel art, or as a list. Each workspace
   is a room, and each agent sits at a desk and walks to the kind of work it is doing. The 3D floor
   offers Company floor, Cozy room and Headquarters in Settings. Headquarters seats 44 agents. Its four department rooms fill as teams outgrow the six desk areas on the main floor.
-- The indoor staff deliver parcels, make rounds and tally reported spending. The teams have duty rosters, promotions and farewells.
+- The indoor staff deliver parcels, make rounds and tally reported spending. The teams have promotions and farewells.
+- Keeps a duty board in the pantry. You choose the duties: a name, the weekdays each is due and,
+  if an agent should do it, instructions. It starts with four pantry chores. At 8:00 on its days,
+  an idle agent gets a duty that has instructions the way it gets a lobby to-do. A duty without
+  instructions is only acted out by someone in the 3D office. Click the board in 3D, or use
+  **Duty board** on the List's lobby card or in the chat's More menu.
 - Open **Outdoor scene** in Office settings for City, Countryside, Beach or Plain. Lighting can follow the host or stay in Day or Night. The city has walk-in shops, traffic and six staff scenes. Shops and vehicles carry made-up names and locally drawn signs. The cafés, pharmacy and phone shop share the generic store fittings.
 - Dresses the 3D floor for Halloween, Christmas and Lunar New Year by the date. Weather can follow a hand-picked sky, the season or a service you choose.
 - Shows 3D signs, labels and speech in English, Vietnamese, Thai or Indonesian. Choose a language
@@ -31,7 +36,7 @@ my-office's.
   Hide both for an edge-to-edge floor, or open a conversation to reply and answer permission requests.
   Open **Team chat** for group messages, polls and photos of the floor. Choose **To** to give a session work. Choose **Open in workspace** in a session for the real web workbench without leaving Office. Session cards show status, elapsed time, and completed checklist items when the provider supplies them.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
-  that names an idle agent wakes it. With **Agent tools** and **Wake agents** enabled, available agents also claim unassigned lobby tasks in order.
+  that names an idle agent wakes it. With **Agent tools** and **Wake agents** enabled, available agents also claim unassigned lobby tasks and the day's duties that have instructions, in order.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
   agent on the host gets the office's stand-up report and writes a `## DD Month YYYY` entry into
   `daily-standup-YYYYMM.md` in a folder of notes you choose, following the stand-up notes
@@ -99,8 +104,8 @@ photo lighting group title are English in every language.
 - It reads agents, workspaces, status, spending when the provider reports it, and each agent’s kind
   of activity. On the host it runs Git once per workspace folder to read the first commit date.
 - The 3D scene receives people, kinds of activity, spending, repository birthdays, team tenure,
-  and the lift’s servicing time and build sticker. It receives no file names, commands or prompts and makes no
-  network calls. It sends chat moments with a name or count, and reports farewells and promotions.
+  the lift’s servicing time and build sticker, and the day's duties by name, holder and state (never their instructions). It receives no file names, commands or prompts and makes no
+  network calls. It sends chat moments with a name or count, reports farewells and promotions, and reports a duty someone acted out.
 - With the street enabled, the device receives the bundled Kenney Car Kit (CC0). While a street
   is open, the host checks local Git tags and the installed Claude CLI version. New tags can
   trigger the photo booth. The pickleball scene uses check results already available to Paseo.
@@ -109,7 +114,7 @@ photo lighting group title are English in every language.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
   plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
-  music choice, the duty roster with team members’ names, the fire drill day, and team farewells and returns. The column keeps when this device last had the chat open (`office-chat-seen`).
+  music choice, the cups in the pantry's sink, the fire drill day, and team farewells and returns. The column keeps when this device last had the chat open (`office-chat-seen`).
 - With Settings > Weather > From a service and an address set, the host reads that address while an
   office is open, at most once in 15 minutes. The request sets only the `Accept` header. The
   scene receives a weather code, temperature and cloud share. The host stores the address,
@@ -117,11 +122,12 @@ photo lighting group title are English in every language.
   Anyone who can open the settings page can see it there.
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The tracker settings never hold a token.
-- The stand-up notes writer and agent wakes send prompts to the host's agents and their providers.
-  In team chat, **Whole group** can send your message and up to six recent group or scene chat
-  lines to one available session for a conversational reply. **To**, an `@mention`, or a reply
-  to a session sends your message to the session you address.
-- It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
+- The stand-up notes writer, agent wakes and a duty with instructions send prompts to the host's
+  agents and their providers. In team chat, **Whole group** can send your message and up to six
+  recent group or scene chat lines to one available session for a conversational reply. **To**, an
+  `@mention`, or a reply to a session sends your message to the session you address.
+- It stores boards, the duty list, the chat, the stand-up notes' state and incidents under the
+  host's Paseo home,
   in `office/`, alongside the team ledger (`tenure.json`) and lift build (`lift.json`).
 
 ## Based on

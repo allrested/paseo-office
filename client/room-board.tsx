@@ -32,6 +32,8 @@ export interface RoomBoardProps {
   name(author: string): string;
   styles: OfficeStyles;
   onOpenBoard(roomId: string): void;
+  /** The duty board's editor: the lobby's card offers it beside its own board. */
+  onOpenDuties?(): void;
 }
 
 /**
@@ -39,7 +41,7 @@ export interface RoomBoardProps {
  * more the board holds. The lobby's shows its unfinished to-dos instead. An empty board is one
  * line, so a list of quiet rooms stays short.
  */
-export function RoomBoard({ room, name, styles, onOpenBoard }: RoomBoardProps) {
+export function RoomBoard({ room, name, styles, onOpenBoard, onOpenDuties }: RoomBoardProps) {
   const open = useCallback(() => onOpenBoard(room.id), [onOpenBoard, room.id]);
   const preview = useMemo(
     () => (room.lobby ? todoPreview(room.todos) : boardPreview(room.posts)),
@@ -54,7 +56,29 @@ export function RoomBoard({ room, name, styles, onOpenBoard }: RoomBoardProps) {
             <Text style={styles.postMeta}>{room.lobby ? "No to-dos" : "No posts"}</Text>
           ) : null}
         </View>
-        <ActionButton label="Open board" pendingLabel="Opening..." onPress={open} styles={styles} />
+        {room.lobby && onOpenDuties ? (
+          <View style={styles.actions}>
+            <ActionButton
+              label="Open board"
+              pendingLabel="Opening..."
+              onPress={open}
+              styles={styles}
+            />
+            <ActionButton
+              label="Duty board"
+              pendingLabel="Opening..."
+              onPress={onOpenDuties}
+              styles={styles}
+            />
+          </View>
+        ) : (
+          <ActionButton
+            label="Open board"
+            pendingLabel="Opening..."
+            onPress={open}
+            styles={styles}
+          />
+        )}
       </View>
       {preview.shown.map((post) => (
         <PostRow key={post.id} post={post} name={name} styles={styles} brief />

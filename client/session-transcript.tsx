@@ -21,24 +21,25 @@ function Assignment({
   original,
   styles,
 }: {
-  task: { id: string; body: string };
+  task: { id: string; body: string; kind: "lobby" | "duty" };
   original: string;
   styles: OfficeStyles;
 }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const s = styles.transcript;
+  const what = task.kind === "duty" ? "Duty" : "Lobby task";
   return (
     <View style={s.assignment}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Lobby task ${task.id}, original message`}
+        accessibilityLabel={`${what} ${task.id}, original message`}
         aria-expanded={expanded}
         onPress={toggle}
         style={s.disclosure}
       >
         <Icon name="ClipboardList" size={15} color={styles.brandIcon.color} />
-        <Text style={s.stepTitle}>Lobby task</Text>
+        <Text style={s.stepTitle}>{what}</Text>
         <Text style={s.taskId}>{task.id}</Text>
         <Icon
           name={expanded ? "ChevronUp" : "ChevronDown"}

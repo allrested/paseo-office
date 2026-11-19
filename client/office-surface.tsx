@@ -38,6 +38,8 @@ import { sheetLeavesFirstOn } from "./agent-picker-text.js";
 import { AttentionStrip, type StripCard } from "./attention-strip.js";
 import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
+import { DutySheet } from "./duty-sheet.js";
+import { useDutyActions } from "./use-duty-actions.js";
 import { authorName } from "./board-text.js";
 import { useChatSeen } from "./chat-seen.js";
 import { TeamChatPreview } from "./team-chat-preview.js";
@@ -656,6 +658,13 @@ interface SurfaceBodyProps {
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenAgentWorkspace(agentId: string): void;
   onOpenBoard(roomId: string): void;
+  /**
+   * The duty board's editor: the 3D pantry's board and the List's lobby card open it. Absent while
+   * the host has sent no duty list.
+   */
+  onOpenDuties: (() => void) | undefined;
+  /** The 3D office acted out a pretend duty with this agent's figure. */
+  onDutyActed(id: string, agentId: string): void;
   machine: Machine | null;
   onOpenMachine(): void;
   /** The 3D wall screen's: absent on an app that cannot show Resources beside the floor. */
@@ -697,6 +706,8 @@ function SurfaceBody({
   onOpenSession,
   onOpenAgentWorkspace,
   onOpenBoard,
+  onOpenDuties,
+  onDutyActed,
   machine,
   onOpenMachine,
   onOpenResources,
@@ -748,6 +759,8 @@ function SurfaceBody({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onSelectBoard={onOpenBoard}
+        onOpenDuties={onOpenDuties}
+        onDutyActed={onDutyActed}
         machine={machine}
         onOpenMachine={onOpenMachine}
         onOpenResources={onOpenResources}
@@ -798,6 +811,7 @@ function SurfaceBody({
       onSelectAgent={onSelectAgent}
       onOpenSession={onOpenSession}
       onOpenBoard={onOpenBoard}
+      onOpenDuties={onOpenDuties}
     />
   );
 }
@@ -1711,6 +1725,16 @@ export function OfficeSurface(
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   const board = useBoardSheet(model, live);
+  const dutyCard = useCardOpening(live);
+  // Until the host sends its duty list (an older host has none) nothing offers the duty board.
+  const openDuties = model.dutyList === null ? undefined : dutyCard.show;
+  const dutyActions = useDutyActions();
+  const { acted } = dutyActions;
+  // A report the host refuses changes nothing: its duty board is what the scene is told next.
+  const dutyActed = useCallback(
+    (id: string, agentId: string) => void acted(id, agentId).catch(() => undefined),
+    [acted],
+  );
   const notesCard = useCardOpening(live);
   const { show: openNotes, close: closeNotes } = notesCard;
   const incidentsCard = useCardOpening(live);
@@ -1872,6 +1896,7 @@ export function OfficeSurface(
     draft,
     newAgent,
     ...chatTasks,
+    onDuties: openDuties,
     onGroupPhoto,
   };
   const sessions = useMemo(
@@ -1953,6 +1978,8 @@ export function OfficeSurface(
             onOpenSession={openSession}
             onOpenAgentWorkspace={showAgentWorkspace}
             onOpenBoard={board.open}
+            onOpenDuties={openDuties}
+            onDutyActed={dutyActed}
             machine={machine}
             onOpenMachine={openMachine}
             onOpenResources={openResources}
@@ -2095,6 +2122,15 @@ export function OfficeSurface(
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
         onClose={board.close}
+      />
+      <DutySheet
+        open={dutyCard.open}
+        list={model.dutyList}
+        rows={model.duties}
+        name={name}
+        actions={dutyActions}
+        styles={styles}
+        onClose={dutyCard.close}
       />
       {full.integrated && (
         <OfficeMessenger

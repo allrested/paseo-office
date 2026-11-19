@@ -17,12 +17,16 @@ import type {
   TestResult,
 } from "../../shared/contracts.js";
 import { machineTitle, memoryPercent, memoryTone } from "../../shared/machine-text.js";
+import { shortHolder } from "../../shared/duties.js";
+import { USER_AUTHOR } from "../../shared/names.js";
+import { dutyRowTitle } from "../duty-text.js";
 import { relativeLuminance } from "../luminance.js";
 import type {
   WorldWeather,
   WorldBoardRow,
   WorldBrand,
   WorldColors,
+  WorldDuty,
   WorldEvent,
   WorldEventType,
   WorldMachine,
@@ -426,4 +430,25 @@ export function worldWeather(scene: WeatherScene | undefined): WorldWeather {
   if (scene === undefined || scene.kind === "none") return { kind: "none" };
   if (scene.kind === "season") return { kind: "season" };
   return { kind: "reading", code: scene.code, temp: scene.temp, cloud: scene.cloud };
+}
+
+/** Who has a duty, as the pantry's board names them: the agent's title cut short. */
+function dutyHolder(model: OfficeModel, claimedBy: string | undefined): WorldDuty["holder"] {
+  if (claimedBy === undefined || claimedBy === USER_AUTHOR) return null;
+  const agent = model.agents.get(claimedBy);
+  const title = agent ? agentTitle(agent) : `Agent ${claimedBy.slice(0, 8)}`;
+  return { id: claimedBy, name: shortHolder(title) };
+}
+
+/** The day's duties for the pantry's board: names, holders and states, never instructions. */
+export function worldDuties(model: OfficeModel): WorldDuty[] {
+  return model.duties.map((row) => ({
+    id: row.post.id,
+    name: dutyRowTitle(row),
+    chore: row.duty?.chore ?? null,
+    pretend: (row.duty?.instructions.trim() ?? "") === "",
+    holder: dutyHolder(model, row.post.claimedBy),
+    state: row.post.state ?? "open",
+    owed: row.owed,
+  }));
 }

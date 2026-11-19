@@ -6,6 +6,7 @@ import {
 } from "@getpaseo/plugin/server";
 import { z } from "zod";
 import {
+  DUTY,
   LOBBY,
   POST_TEXT_MAX,
   PostKindSchema,
@@ -32,9 +33,11 @@ export interface OfficeToolPorts {
 }
 
 const BoardChoiceSchema = z.enum(["room", "lobby"]);
+/** The duty board is read, and its duties claimed and finished; it takes no post. */
+const ReadChoiceSchema = z.enum(["room", "lobby", "duty"]);
 
 export const ReadInputSchema = z.object({
-  board: BoardChoiceSchema.optional(),
+  board: ReadChoiceSchema.optional(),
   since: z.number().int().nonnegative().optional(),
 });
 export type ReadInput = z.output<typeof ReadInputSchema>;
@@ -53,8 +56,9 @@ export type UpdateInput = z.output<typeof UpdateInputSchema>;
 /** "room" is the caller's workspace board; without a workspace it is the lobby. */
 export function boardFor(
   agent: Pick<ToolAgent, "workspaceId">,
-  choice: "room" | "lobby" | undefined,
+  choice: "room" | "lobby" | "duty" | undefined,
 ): string {
+  if (choice === "duty") return DUTY;
   return choice === "lobby" || agent.workspaceId === null ? LOBBY : agent.workspaceId;
 }
 
@@ -133,7 +137,7 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_read",
       description:
-        "Read your workspace's office board (or board: lobby). Up to 30 posts, newest last, and a cursor; pass it as since for newer posts only.",
+        "Read your workspace's office board (or board: lobby, or duty for the day's duties). Up to 30 posts, newest last; pass the cursor as since for newer only.",
       input: ReadInputSchema,
       execute: (input, { agent }) => runRead(ports, agent, input),
     }),
@@ -146,7 +150,8 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     }),
     defineAgentTool({
       name: "office_update",
-      description: "Claim, finish (done) or reopen a task on an office board, by post id.",
+      description:
+        "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id.",
       input: UpdateInputSchema,
       execute: (input, { agent }) => runUpdate(ports, agent, input),
     }),

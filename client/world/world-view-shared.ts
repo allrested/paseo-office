@@ -27,6 +27,10 @@ export interface WorldLatest {
   onOpenLibrary(): void;
   onOpenNotes(): void;
   onOpenIncidents(): void;
+  /** The pantry's duty board: the duty board's editor. */
+  onOpenDuties?(): void;
+  /** A figure acted out a pretend duty: the host records it done by that agent. */
+  onDutyActed?(id: string, agentId: string): void;
   onBell(): void | Promise<void>;
   onLife?: WorldStartOptions["onLife"];
   onTenure?: WorldStartOptions["onTenure"];
@@ -118,6 +122,12 @@ export function worldStartOptions(
       focus();
       latest.current.onOpenIncidents();
     },
+    onDuties: () => {
+      focus();
+      latest.current.onOpenDuties?.();
+    },
+    // (nothing of Paseo's opens: the keyboard stays in the office)
+    onDutyDone: (id, agentId) => latest.current.onDutyActed?.(id, agentId),
     onProblem: (message) => latest.current.onProblem(message),
   };
 }

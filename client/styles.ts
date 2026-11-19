@@ -266,6 +266,8 @@ export interface OfficeStyles {
   lobbyRecipient: ViewStyle;
   lobbyTask: ViewStyle;
   lobbyTaskLine: ViewStyle;
+  /** A duty of the duty board's editor: a to-do's card with room for its fields. */
+  dutyCard: ViewStyle;
   lobbyDelete: ViewStyle;
   lobbyDeleteText: TextStyle;
   lobbyConfirm: ViewStyle;
@@ -1175,6 +1177,14 @@ export function useOfficeStyles(
         paddingHorizontal: 12,
       },
       lobbyTaskLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+      dutyCard: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        padding: 12,
+        gap: 8,
+      },
       lobbyDelete: {
         minWidth: controlHeight,
         minHeight: controlHeight,

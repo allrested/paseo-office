@@ -78,6 +78,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 const ignore = () => undefined;
 

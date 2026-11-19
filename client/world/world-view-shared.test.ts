@@ -12,6 +12,8 @@ const MODEL: OfficeModel = {
   agents: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
+  dutyList: null,
+  duties: [],
 };
 
 function latest(overrides: Partial<WorldLatest> = {}): { current: WorldLatest } {
@@ -181,4 +183,16 @@ test("a tenure write goes to the latest handler, and keeps no focus from the app
   options.onTenure?.({ op: "farewell", name: "api" });
   expect(told).toHaveBeenCalledWith({ op: "farewell", name: "api" });
   expect(focus).not.toHaveBeenCalled();
+});
+
+test("the pantry's board opens the duty board and takes the keyboard; an acted-out duty is reported", () => {
+  const focus = vi.fn();
+  const now = latest({ onOpenDuties: vi.fn(), onDutyActed: vi.fn() });
+  const options = worldStartOptions(now, { focus, ...ENGLISH, brand: BRAND, plan: "pro" });
+  options.onDuties?.();
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(now.current.onOpenDuties).toHaveBeenCalledTimes(1);
+  options.onDutyDone?.("p4", "a1");
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(now.current.onDutyActed).toHaveBeenCalledWith("p4", "a1");
 });
