@@ -520,7 +520,7 @@ export function createOfficePlugin(
     await writer.start();
   });
   // The duty board's day: what is due is posted, and done duties of earlier days leave.
-  const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, () => duties.sync());
+  const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
   );

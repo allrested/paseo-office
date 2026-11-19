@@ -77,8 +77,11 @@ export interface DutyService {
   start(): Promise<void>;
   list(): readonly Duty[];
   save(drafts: readonly DutyDraft[]): Promise<DutySaveResult>;
-  /** The 08:00 run, and the catch-up at start and at each save. Never rejects. */
-  sync(): Promise<void>;
+  /**
+   * The 08:00 run, given the instant it was due, and the catch-up at start and at each save.
+   * Never rejects.
+   */
+  sync(dueAt?: number): Promise<void>;
   /** Follows the notes' zone: the schedule, and the day it makes. Never rejects. */
   settingsChanged(): Promise<void>;
   /** Why the 08:00 schedule could not follow the settings; null once it does. */
@@ -117,9 +120,10 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
     ports.changed({ duties: [...duties], day });
   }
 
-  async function bringUp(): Promise<void> {
+  /** `dueAt`: a timer can fire a little before its 08:00, which is then the board's instant. */
+  async function bringUp(dueAt?: number): Promise<void> {
     try {
-      const clock = dutyClock(ports.now(), await ports.zone());
+      const clock = dutyClock(Math.max(ports.now(), dueAt ?? 0), await ports.zone());
       const due = clock.open ? duties.filter((duty) => duty.days.includes(clock.weekday)) : [];
       await ports.board.syncDuties({ duties, day: clock.day, due });
       day = clock.day;
@@ -156,11 +160,11 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
         await bringUp();
         return { ok: true };
       }),
-    sync: () => exclusive(bringUp),
+    sync: (dueAt) => exclusive(() => bringUp(dueAt)),
     async settingsChanged() {
       const zone = await ports.zone();
       await follower.sync(() => dutyCadence(zone));
-      await exclusive(bringUp);
+      await exclusive(() => bringUp());
     },
     error: follower.error,
   };

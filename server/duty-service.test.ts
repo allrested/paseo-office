@@ -49,8 +49,22 @@ function memoryFile(initial: DutiesFile | null = null) {
   return file;
 }
 
-function setup(options: { start?: number; file?: DutiesFile | null; zone?: string } = {}) {
+function setup(
+  options: {
+    start?: number;
+    file?: DutiesFile | null;
+    zone?: string;
+    /** The schedule engine's timers fire a millisecond before their time, as a real one can. */
+    early?: boolean;
+  } = {},
+) {
   const clock = createFakeClock(options.start ?? WED_7AM);
+  const timers = options.early
+    ? {
+        now: () => clock.now(),
+        setTimeout: (run: () => void, ms: number) => clock.setTimeout(run, Math.max(0, ms - 1)),
+      }
+    : clock;
   let boards: BoardsFile = EMPTY_BOARDS;
   const board = createBoardService({
     store: {
@@ -66,7 +80,7 @@ function setup(options: { start?: number; file?: DutiesFile | null; zone?: strin
     onBoardRemoved: () => undefined,
   });
   const file = memoryFile(options.file ?? null);
-  const schedules = createLocalSchedules({ clock, log: () => undefined });
+  const schedules = createLocalSchedules({ clock: timers, log: () => undefined });
   const told: DutyBoard[] = [];
   const listed: (readonly Duty[])[] = [];
   const logs: string[] = [];
@@ -81,7 +95,7 @@ function setup(options: { start?: number; file?: DutiesFile | null; zone?: strin
     changed: (state) => told.push(state),
     log: (message) => logs.push(message),
   });
-  schedules.handle(DUTY_SCHEDULE, () => service.sync());
+  schedules.handle(DUTY_SCHEDULE, (dueAt) => service.sync(dueAt));
   return {
     clock,
     board,
@@ -129,6 +143,19 @@ test("a host without a list starts on the four pantry chores, posted at 08:00 on
   expect(board.postsOf("duty")).toEqual([]);
   expect(told.at(-1)).toEqual({ duties: STARTING_DUTIES, day: "2026-11-17" });
   clock.advance(HOUR);
+  await settle();
+  expect(board.postsOf("duty").map((post) => post.duty)).toEqual(
+    STARTING_DUTIES.map((duty) => ({ id: duty.id, day: "2026-11-18" })),
+  );
+  expect(told.at(-1)?.day).toBe("2026-11-18");
+});
+
+test("an 08:00 run that fires a millisecond early still posts the day's duties", async () => {
+  const { begin, board, clock, told } = setup({ early: true });
+  await begin();
+  expect(board.postsOf("duty")).toEqual([]);
+  // The run fires at 07:59:59.999, and the clock stays there while it runs.
+  clock.advance(HOUR - 1);
   await settle();
   expect(board.postsOf("duty").map((post) => post.duty)).toEqual(
     STARTING_DUTIES.map((duty) => ({ id: duty.id, day: "2026-11-18" })),

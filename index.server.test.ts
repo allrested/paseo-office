@@ -354,6 +354,8 @@ function setup(
     duties?: DutiesFile | null;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
     server?: (base: PluginServerContext) => PluginServerContext;
+    /** The clock's start; Wednesday 11 November 2026, 12:00 in Riyadh by default. */
+    start?: number;
   } = {},
 ) {
   const recorded: Recorded = {
@@ -374,7 +376,7 @@ function setup(
   const notesStore = memoryNotesStore();
   const incidentsStore = memoryIncidentsStore();
   const chatStore = options.chatStore ?? memoryChatStore();
-  const clock = createFakeClock(Date.parse("2026-11-11T09:00:00.000Z"));
+  const clock = createFakeClock(options.start ?? Date.parse("2026-11-11T09:00:00.000Z"));
   const context = fakeContext(statuses, sent, writers, directory);
   const baseServer = fakeServer(recorded, read);
   const stop = createOfficePlugin(options.server?.(baseServer) ?? baseServer, {
@@ -1536,6 +1538,25 @@ test("a host without a duty list posts the pantry chores at 08:00; a save and th
   };
   expect(board.board).toBe("duty");
   expect(board.posts.map((post) => [post.id, post.state])).toEqual([["p1", "done"]]);
+  await office.leave();
+  await stop();
+});
+
+test("the duty board's 08:00 run takes the instant it was due, so a run a millisecond early posts the day", async () => {
+  const { recorded, context, stop } = setup(async () => ON, {
+    duties: null,
+    // 07:59:59.999 in Riyadh.
+    start: Date.parse("2026-11-11T04:59:59.999Z"),
+  });
+  await settle();
+  await recorded.scheduleRuns.get("duty-board")?.(Date.parse("2026-11-11T05:00:00.000Z"));
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { duties?: { day: string | null }; boards: Record<string, { id: string }[]> }
+    | undefined;
+  expect(snapshot?.duties?.day).toBe("2026-11-11");
+  expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
   await office.leave();
   await stop();
 });
