@@ -22,7 +22,9 @@ export interface Conversation {
   retry(): void;
 }
 
-const PAGE = { limit: 60, wholeTurns: true } as const;
+// No wholeTurns: it has no size limit, and a long turn would be read whole. The rows merge what the
+// server merges, so a page that starts inside a turn reads right; Show earlier reads the rest.
+const PAGE = { limit: 60 } as const;
 
 /** An entry as held: a page entry covers seqStart..seqEnd (merged pieces), a live piece one number. */
 interface Held extends TimelineEntry {

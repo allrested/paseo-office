@@ -85,27 +85,52 @@ function rowFor(entry: TimelineEntry): ConversationRow | null {
   }
 }
 
-/** The rows of a timeline, in order. Streamed pieces of one assistant message are one row. */
+/** A repeat of a call keeps the detail it knew when the repeat says "unknown", as the server's page does. */
+function mergedCall(earlier: ToolCall, later: ToolCall): ToolCall {
+  const detail = later.detail.type === "unknown" ? earlier.detail : later.detail;
+  return { ...earlier, ...later, detail };
+}
+
+/**
+ * The rows of a timeline, in order. A page comes merged from the server and live events do not,
+ * so the same merging is done here: the streamed pieces of one assistant message are one row (a
+ * piece with no messageId continues the message right before it), and a tool call's updates are
+ * one row, rewritten in place from the newest.
+ */
 export function conversationRows(entries: readonly TimelineEntry[]): ConversationRow[] {
   const rows: ConversationRow[] = [];
-  // The messageId of the agent row at the end of `rows`, while the run of pieces goes on.
+  const calls = new Map<string, { index: number; item: ToolCall }>();
+  // Whether the row at the end of `rows` is an assistant message the next piece may continue,
+  // and its messageId.
+  let open = false;
   let openMessageId: string | null = null;
   for (const entry of entries) {
     const { item } = entry;
     const last = rows[rows.length - 1];
     if (
+      open &&
       item.type === "assistant_message" &&
-      item.messageId !== undefined &&
-      item.messageId === openMessageId &&
+      (item.messageId === undefined || item.messageId === openMessageId) &&
       last?.kind === "agent"
     ) {
       last.text += item.text;
       continue;
     }
+    const known = item.type === "tool_call" ? calls.get(item.callId) : undefined;
+    if (known && item.type === "tool_call") {
+      const merged = mergedCall(known.item, item);
+      calls.set(item.callId, { index: known.index, item: merged });
+      rows[known.index] = { kind: "tool", key: rows[known.index].key, text: toolLine(merged) };
+      open = false;
+      continue;
+    }
     const row = rowFor(entry);
-    openMessageId =
-      row?.kind === "agent" && item.type === "assistant_message" ? (item.messageId ?? null) : null;
-    if (row) rows.push(row);
+    open = row?.kind === "agent" && item.type === "assistant_message";
+    openMessageId = open && item.type === "assistant_message" ? (item.messageId ?? null) : null;
+    if (row) {
+      if (item.type === "tool_call") calls.set(item.callId, { index: rows.length, item });
+      rows.push(row);
+    }
   }
   return rows;
 }

@@ -132,14 +132,13 @@ afterEach(() => {
   act(() => root.unmount());
 });
 
-test("it subscribes first, then reads the latest 60 whole-turn entries", async () => {
+test("it subscribes first, then reads the latest 60 entries, without wholeTurns (it has no size limit)", async () => {
   await mount();
   expect(handlers).toHaveLength(1);
   expect(pending).toHaveLength(1);
   expect(pending[0]!.options).toEqual({
     direction: "tail",
     limit: 60,
-    wholeTurns: true,
   });
   expect(conversation.status).toBe("loading");
   await answer(0, page([entry(1, you("Hi")), entry(2, say("Hello", "m1"))]));
@@ -172,6 +171,24 @@ test("a live piece inside a merged page entry's range is not added again", async
   await push(live(3, say("llo", "m1")));
   await push(live(5, say("!", "m1")));
   expect(texts()).toEqual(["Hi", "Hello!"]);
+});
+
+test("a tool call's live updates are one row, as it is after a reopen", async () => {
+  const call = (status: "running" | "completed"): AgentTimelineItem =>
+    ({
+      type: "tool_call",
+      callId: "c1",
+      name: "Bash",
+      status,
+      error: null,
+      detail: { type: "shell", command: "npm test" },
+    }) as AgentTimelineItem;
+  await mount();
+  await answer(0, page([entry(1, you("Hi"))]));
+  await push(live(2, call("running")));
+  await push(live(3, say("Waiting", "m1")));
+  await push(live(4, call("completed")));
+  expect(texts()).toEqual(["Hi", "Bash: npm test", "Waiting"]);
 });
 
 test("a live item arriving out of order is placed by its sequence number", async () => {
@@ -213,7 +230,6 @@ test.each([
   expect(pending[1]!.options).toEqual({
     direction: "tail",
     limit: 60,
-    wholeTurns: true,
   });
   await answer(1, page([entry(1, you("New"))]));
   expect(texts()).toEqual(["New"]);
@@ -235,7 +251,6 @@ test("loadEarlier asks for the page before the held start cursor and puts it in 
     direction: "before",
     cursor: { epoch: "e1", seq: 10 },
     limit: 60,
-    wholeTurns: true,
   });
   await answer(1, page([entry(4, you("Earlier"))], { hasOlder: false }));
   expect(texts()).toEqual(["Earlier", "Later"]);
@@ -313,7 +328,6 @@ test("an earlier page from a stale cursor is not prepended: the tail is read aga
   expect(pending[2]!.options).toEqual({
     direction: "tail",
     limit: 60,
-    wholeTurns: true,
   });
   await answer(2, page([entry(1, you("Fresh"))]));
   expect(texts()).toEqual(["Fresh"]);

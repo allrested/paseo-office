@@ -46,11 +46,33 @@ test("assistant pieces with the same messageId are one row, keyed by the first s
   ]);
 });
 
-test("assistant messages without a messageId do not join", () => {
+test("a piece without a messageId continues the assistant message before it, as the server's page does", () => {
   const rows = conversationRows(
-    entries({ type: "assistant_message", text: "One" }, { type: "assistant_message", text: "Two" }),
+    entries(
+      { type: "assistant_message", text: "One " },
+      { type: "assistant_message", text: "Two" },
+      { type: "assistant_message", text: "!", messageId: "m1" },
+      { type: "assistant_message", text: "?" },
+    ),
   );
-  expect(rows.map((row) => row.text)).toEqual(["One", "Two"]);
+  // An id the run did not have starts a message; a piece with none continues whatever came before.
+  expect(rows).toEqual([
+    { kind: "agent", key: "1", text: "One Two" },
+    { kind: "agent", key: "3", text: "!?" },
+  ]);
+});
+
+test("a piece without a messageId after something else starts its own row", () => {
+  const rows = conversationRows(
+    entries(
+      { type: "assistant_message", text: "A" },
+      tool({ detail: { type: "shell", command: "ls" } }),
+      { type: "assistant_message", text: "B" },
+      { type: "reasoning", text: "hm" },
+      { type: "assistant_message", text: "C" },
+    ),
+  );
+  expect(rows.map((row) => row.text)).toEqual(["A", "Bash: ls", "B", "C"]);
 });
 
 test("a run is broken by an item between its pieces", () => {
@@ -184,4 +206,39 @@ test("rows keep the entries' order and keys are unique", () => {
   );
   expect(rows.map((row) => row.kind)).toEqual(["you", "agent", "tool", "notice"]);
   expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
+});
+
+test("running then completed with one call id is one row, with the completed text", () => {
+  const rows = conversationRows(
+    entries(
+      { type: "user_message", text: "go" },
+      tool({ status: "running", detail: { type: "shell", command: "npm test" } }),
+      { type: "assistant_message", text: "Waiting." },
+      tool({ status: "completed", detail: { type: "shell", command: "npm test" } }),
+    ),
+  );
+  // The repeat rewrites the row where it was, under its first key.
+  expect(rows).toEqual([
+    { kind: "you", key: "1", text: "go" },
+    { kind: "tool", key: "2", text: "Bash: npm test" },
+    { kind: "agent", key: "3", text: "Waiting." },
+  ]);
+  const failed = conversationRows(
+    entries(
+      tool({ status: "running", detail: { type: "shell", command: "make" } }),
+      tool({ status: "failed", error: "boom", detail: { type: "shell", command: "make" } }),
+    ),
+  );
+  expect(failed).toEqual([{ kind: "tool", key: "1", text: "Bash failed: make" }]);
+});
+
+test("calls with different ids are different rows; a repeat with no detail keeps the earlier one", () => {
+  const rows = conversationRows(
+    entries(
+      tool({ callId: "c1", detail: { type: "shell", command: "ls" } }),
+      tool({ callId: "c2", detail: { type: "shell", command: "pwd" } }),
+      tool({ callId: "c1", detail: { type: "unknown", input: null, output: null } }),
+    ),
+  );
+  expect(rows.map((row) => row.text)).toEqual(["Bash: ls", "Bash: pwd"]);
 });
