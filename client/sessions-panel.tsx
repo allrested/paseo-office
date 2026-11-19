@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import type { ChecklistProgress } from "../shared/contracts.js";
 import { useRowClock } from "./structure-view.js";
-import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { agentTitle, buildOfficeModel, dotTone } from "../shared/model.js";
 import { loadProblem } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";
@@ -72,6 +72,8 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
   const time = timeText(row, now);
   const meter = sessionMeter(agent, progress);
   const press = useCallback(() => link.select(agent.id), [link, agent.id]);
+  const { openWorkspace } = link;
+  const showWorkspace = useCallback(() => openWorkspace?.(agent.id), [openWorkspace, agent.id]);
   let accent: typeof ui.error | undefined;
   let detailColor: typeof ui.warningText | undefined;
   if (tone === "warning") {
@@ -91,14 +93,15 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
     () => [ui.clock, detailColor, tone === "running" && ui.workingClock],
     [ui, tone, detailColor],
   );
-  const rowStyle = useMemo(() => [ui.row, accent], [ui, accent]);
+  const rowStyle = useMemo(() => [ui.row, ui.rowMain, accent], [ui, accent]);
   const detailStyle = useMemo(() => [ui.detail, detailColor], [ui, detailColor]);
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
   const hoverOut = useCallback(() => setHovered(false), []);
   const nested = level > 1 ? ui.deep : ui.nested;
+  const wrapStyle = useMemo(() => [ui.rowWrap, level ? nested : undefined], [ui, level, nested]);
   return (
-    <View style={level ? nested : undefined}>
+    <View style={wrapStyle}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${title}: ${state}`}
@@ -145,6 +148,22 @@ function AgentRow({ entry, link, styles, now, progress }: AgentRowProps) {
           </>
         )}
       </Pressable>
+      {/* Beside the row, not in it: a button inside a button is no button to a screen reader. */}
+      {openWorkspace && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${title}'s workspace`}
+          onPress={showWorkspace}
+          style={ui.rowOpen}
+        >
+          {({ pressed }) => (
+            <>
+              {pressed && <View style={styles.pressedFill} />}
+              <Icon name="ArrowUpRight" size={16} color={styles.iconColor} />
+            </>
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }

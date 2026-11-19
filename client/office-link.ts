@@ -12,6 +12,8 @@ export interface OfficeLink {
   select(agentId: string): void;
   /** Shows the agent's session. */
   openSession(agentId: string): void;
+  /** Shows the agent's workspace over the office; absent where the surface has no such view. */
+  openWorkspace?(agentId: string): void;
 }
 
 /** What the surface hands each panel of its column. */

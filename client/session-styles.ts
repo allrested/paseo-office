@@ -325,5 +325,16 @@ export function sessionStyles(colors: PluginTheme["colors"], touch: boolean) {
     },
     detail: { fontSize: 11, lineHeight: 15, color: colors.foregroundMuted },
     rowTitle: { flexDirection: "row", alignItems: "center", gap: 5 },
+    /** A session row and, beside it, the button that opens its workspace. */
+    rowWrap: { flexDirection: "row", alignItems: "center", gap: 2 },
+    rowMain: { flex: 1, minWidth: 0 },
+    rowOpen: {
+      width: hitSize,
+      minHeight: touch ? 48 : 41,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 9,
+      overflow: "hidden",
+    },
   });
 }

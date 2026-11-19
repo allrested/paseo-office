@@ -1509,6 +1509,7 @@ function useFullscreenPanels(
   sheet: ColumnSheetState,
   select: (id: string | null) => void,
   selectFromStrip: (id: string) => void,
+  openWorkspace: (agentId: string) => void,
 ) {
   const docked = active && !compact && surfaceWidth > 0;
   const sessionsAvailable = docked && fullscreen;
@@ -1525,9 +1526,13 @@ function useFullscreenPanels(
       }
     : undefined;
   const { openSession } = sheet;
+  // A Sessions row's own button goes straight to the agent's workspace, past its details.
   const link = useMemo(
-    () => (active ? { select: openSession, openSession } : sheet.link),
-    [active, openSession, sheet.link],
+    (): OfficeLink => ({
+      ...(active ? { select: openSession, openSession } : sheet.link),
+      openWorkspace,
+    }),
+    [active, openSession, sheet.link, openWorkspace],
   );
   const selectAgent = useCallback(
     (id: string | null) => {
@@ -1747,6 +1752,7 @@ export function OfficeSurface(
     sheet,
     setSelectedId,
     selectFromStrip,
+    showAgentWorkspace,
   );
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
