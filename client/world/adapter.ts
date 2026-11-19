@@ -26,7 +26,7 @@ import type {
 } from "./world-api.js";
 
 /** Desks of each floor plan of the vendored scene. */
-export const PLAN_DESKS = { pro: 12, cozy: 9 } as const;
+export const PLAN_DESKS = { pro: 12, cozy: 9, hq: 44 } as const;
 export type WorldPlan = keyof typeof PLAN_DESKS;
 
 export interface WorldPeople {

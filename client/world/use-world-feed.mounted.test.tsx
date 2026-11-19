@@ -189,4 +189,10 @@ test("the plan's desks decide who is seated, and the note says who has none", as
   );
   expect(seated(cozy.calls)).toBe(9);
   expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
+  const headquarters = fakeScene();
+  await act(async () =>
+    root.render(<Probe api={headquarters.api} feed={input({ model: crowd(45), plan: "hq" })} />),
+  );
+  expect(seated(headquarters.calls)).toBe(44);
+  expect(note).toBe("1 agent has no desk on this floor. The list shows everyone.");
 });

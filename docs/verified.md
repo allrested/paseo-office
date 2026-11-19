@@ -480,3 +480,10 @@ by the look's script, seconds late, found the clip already saved.
 | An incident's siren with Sound on and off                                       | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
 | Sound's note with reduced motion, in photo mode, and read by a screen reader    | Not tried                                                                                                                                               |
 | A refused full screen and my-office's game and karaoke lines in the note        | Not tried                                                                                                                                               |
+
+## Headquarters
+
+In Chromium the built scene started in Headquarters at 1280 and 390 px, accepted 44
+synthetic agents, and switched to the department wing's Desks view at both sizes.
+The check covered scene initialization and camera controls. Physical phone performance
+with all 44 desks occupied still needs a device check.

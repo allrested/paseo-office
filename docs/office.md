@@ -198,18 +198,16 @@ real brands. `scripts/street-brands.mjs` lists each real name with the one it be
 the bundle fail on a real name left.
 
 An agent is a person at a desk, and a workspace's agents sit together as a team. The company floor
-has 12 desks and the cozy room 9. With more agents, the ones that need you and the ones at work sit
+has 12 desks, the cozy room 9, and Headquarters 44. Headquarters adds four eight-desk rooms beyond the main floor. Each room’s plaque shows the workspace seated there. With more agents, the ones that need you and the ones at work sit
 first, and a line over the scene says how many are only in the list.
 
-The host setting "Floor plan" chooses between the two. It is stored as `pro` or `cozy`, the company
-floor when nothing is stored, and came without a version bump; a plan this build does not know
-reads as the company floor. The surface reads it (`client/world/use-floor-plan.ts`) and hands it to
+The host setting "Floor plan" stores `pro`, `cozy` or `hq`. The company floor is the default. The surface reads it (`client/world/use-floor-plan.ts`) and hands it to
 the 3D view. A change unmounts the scene and mounts a new one, because a scene page starts once.
 The setting is for the 3D floor only: the 2D floor and the List do not change. The cozy room is
 one open room. It has no lobby and sign, no director (he still talks in the team chat), no screen in
 its meeting corner and so no "Stand-up notes" label, no lounge with its games and sofa, no restroom
 and no dining room. An agent at rest there goes to the fish or the arcade. The camera bar's four
-views look at that plan's places. my-office's third plan, the headquarters, comes later.
+views look at that plan's places. In Headquarters the Desks view looks into the wing.
 
 A step sends its person to that work's place: the library for a read, a search or a skill, the
 desk for an edit, the server room for a command, the test board for a test run. A commit prints a

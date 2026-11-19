@@ -472,11 +472,11 @@ test("on the cozy room the views are upstream's places for it", () => {
   expect(pressed()).toEqual(["server"]);
 });
 
-test("a plan the bar has no places for uses the company floor's", () => {
+test("the headquarters desks view shows the department wing", () => {
   h.plan = "hq";
   open();
   click("[data-view=desks]");
-  expect(h.set).toHaveBeenLastCalledWith(2.3, 0.6, 3.6);
+  expect(h.set).toHaveBeenLastCalledWith(3, 0.6, 18.2);
 });
 
 test("a view closes the chosen person first", () => {

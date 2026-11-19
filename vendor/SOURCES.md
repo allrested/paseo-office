@@ -122,6 +122,8 @@ with `allowJs` off, so two `.d.ts` files beside them type what the office calls:
 `.d.ts`. The engine's `tr` is `shared/chat-words.ts`, the stand-in's lookup over the `chat` area
 and `people.director`, which keeps upstream's emoji.
 
+The Headquarters wing (`src/office/world/pro/wing.js`) is imported from upstream. Its room plaques follow desk assignment. The camera uses the walk bounds for all three plans.
+
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server

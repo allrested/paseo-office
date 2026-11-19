@@ -40,7 +40,7 @@ function isTokenSafe(address: string): boolean {
  * The floor plans the 3D scene is offered, by the scene's own names. Headquarters ("hq") is not
  * among them yet.
  */
-export const FLOOR_PLANS = ["pro", "cozy"] as const;
+export const FLOOR_PLANS = ["pro", "cozy", "hq"] as const;
 export type FloorPlanChoice = (typeof FLOOR_PLANS)[number];
 
 const HostValuesSchema = z.object({
@@ -111,20 +111,19 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * `notesFolder` is the absolute path the stand-up notes are written in, empty for none, and
  * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `notesDays` are the
  * weekdays of that run, 0 for Sunday to 6 for Saturday, in order; none is no run. `floorPlan` is
- * the 3D floor's plan: `pro` the company floor, `cozy` one open room. `jiraProjects`
+ * the 3D floor's plan: `pro` the company floor, `cozy` one open room, or `hq` headquarters. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 4,
+  version: 5,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues).superRefine(refuseBadDays),
   // Version 1 had only `agentTools`, version 2 no incident fields and version 3 no `notesDays`:
   // what a document has stays, and the rest take their defaults, but for the days. Before
   // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.
-  // An additive field with a default such as `floorPlan` takes no version bump: a document
-  // without it draws the company floor, the one its scene was always drawn as.
+  // Version 5 offers Headquarters. Existing plans keep their values.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

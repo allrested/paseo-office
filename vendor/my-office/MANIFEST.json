@@ -33,6 +33,7 @@
     "office/world/props/trinkets.js",
     "office/world/pro/pieces.js",
     "office/world/pro/floor.js",
+    "office/world/pro/wing.js",
     "office/world/props/aquarium.js",
     "office/world/props/arcade.js",
     "office/world/props/printer.js",
@@ -218,9 +219,6 @@
     ],
     "office/world/backdrops/street-folk.js": [
       "seen"
-    ],
-    "office/world/pro/wing.js": [
-      "DEPT_SIGNS"
     ]
   },
   "files": {
@@ -291,6 +289,7 @@
     "office/world/layout.js": "baed9c6610a70997ba36837116cc4af9539f7bdd427fa981c3ea54c005829150",
     "office/world/pro/floor.js": "7c2f4b8af5d2b8ff8b2d704a2be670f5d4007b078fa1cef70dad30fbecdd1bc5",
     "office/world/pro/pieces.js": "48c8ddba5fc7b55fe0d61aec2acdb9bd588855c2ddbbce3600a221d47aafbc88",
+    "office/world/pro/wing.js": "3975f30d2028c385ea085e4bc252a82cebef613c005bea09c8fbf5e26b6de15c",
     "office/world/props/aquarium.js": "3a7263c01a064f760bf048323b3e0ed24f47b38ef92702072930888d11c2b46a",
     "office/world/props/arcade.js": "ee7543998d4cf941cbbeae2abc41c9408bd8f7462c4da6f0e4016173725721d9",
     "office/world/props/billiards.js": "17bdd6b6e67163591d16986e7bdd7a2fe58d579ffee67d32c6a776c94c4bd931",

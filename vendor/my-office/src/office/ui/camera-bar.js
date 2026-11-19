@@ -55,6 +55,7 @@ function endPan() { panBack = null; clearTimeout(panTimer); }
  */
 const VIEWS = {
   pro: { desks: { t: [2.3, 0.6, 3.6], z: 1.9 }, meeting: { t: [-1.2, 0.6, -5.4], z: 2.0 }, server: { t: [-5.6, 1.0, -0.6], z: 2.4 } },
+  hq: { desks: { t: [3, 0.6, 18.2], z: 1.6 }, meeting: { t: [-1.2, 0.6, -5.4], z: 2.8 }, server: { t: [-5.6, 1.0, -0.6], z: 3.3 } },
   cozy: { desks: { t: [0, 0.6, 0.4], z: 1.75 }, meeting: { t: [5.2, 0.6, 2.4], z: 2.3 }, server: { t: [5.4, 1.0, -4.4], z: 2.2 } },
 };
 

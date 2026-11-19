@@ -574,7 +574,7 @@ test("without onOpen the scene has nothing to open a session with", async () => 
   expect(fresh.open).toBeNull();
 });
 
-test("the plan the host names is the scene's floor; headquarters is not offered", async () => {
+test("the plan the host names is the scene's floor", async () => {
   const planOf = async (options: object) => {
     await startPage(options);
     // @ts-expect-error vendored JavaScript has no declarations
@@ -583,7 +583,7 @@ test("the plan the host names is the scene's floor; headquarters is not offered"
   };
   expect(await planOf({ plan: "cozy" })).toBe("cozy");
   expect(await planOf({ plan: "pro" })).toBe("pro");
-  expect(await planOf({ plan: "hq" })).toBe("pro");
+  expect(await planOf({ plan: "hq" })).toBe("hq");
   expect(await planOf({})).toBe("pro");
 });
 

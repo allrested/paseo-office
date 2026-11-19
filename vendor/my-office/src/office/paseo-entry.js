@@ -276,7 +276,7 @@ function glideToRequest(was, now) {
 const api = {
   version: VERSION,
   /**
-   * Builds the office. `options`: plan ('pro' | 'cozy'), dark, colors (the app theme), brand
+   * Builds the office. `options`: plan ('pro' | 'cozy' | 'hq'), dark, colors (the app theme), brand
    * ({ name, logoUrl }, for the lobby's sign), photo (false hides Photo mode), and what
    * the scene tells Paseo: onSelect(id | null), onBoard(project | null) (a team's chip, or the
    * whiteboard), onProblem(message), and, when Paseo has something to show for them, onMachine()
@@ -289,7 +289,7 @@ const api = {
   start(options = {}) {
     if (started) return;
     started = true;
-    host.plan = options.plan === 'cozy' ? 'cozy' : 'pro';
+    host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
     host.select = (id) => options.onSelect?.(id);
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
@@ -351,7 +351,7 @@ const api = {
     // on it also tells Paseo, which has the day's stand-up notes written. meet() rings without it.)
     const bell = PROPS.get('bell');
     if (bell) { const ring = bell.act; bell.act = () => { ringWithEveryone(ring); host.bell?.(); }; }
-    if (host.plan === 'pro' && host.notes) makeNotesLabel();
+    if (host.plan !== 'cozy' && host.notes) makeNotesLabel();
     makeIncidentBanner(() => options.onIncidents?.());
     // (the wall screen opens Paseo's Resources when Paseo has it, and its tooltip says so; the racks and the server
     // room's chip keep the panel)

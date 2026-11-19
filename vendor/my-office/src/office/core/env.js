@@ -50,7 +50,7 @@ export function setup() {
   // or 'hq' (headquarters: the company floor plus a wing of department rooms). Switching reloads the page;
   // ?layout=cozy|pro|hq overrides it for one visit.
   // PASEO: upstream reads the plan from the address and the browser's storage; Paseo names it.
-  LAYOUT = PLANS.includes(host.plan) && host.plan !== 'hq' ? host.plan : 'pro';
+  LAYOUT = PLANS.includes(host.plan) ? host.plan : 'pro';
   // the company floor's rooms, people and habits; headquarters is the company floor plus a wing of departments
   PRO = LAYOUT === 'pro' || LAYOUT === 'hq';
   HQ = LAYOUT === 'hq';

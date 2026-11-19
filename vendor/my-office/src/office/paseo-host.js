@@ -1,7 +1,7 @@
 // PASEO: what the page's host, Paseo's office plugin, gives the scene and hears from it.
 // paseo-entry.js fills it in before any module is set up; the stand-ins read it.
 export const host = {
-  /** 'pro' (the company floor) or 'cozy' (one open room). */
+  /** 'pro' (the company floor), 'cozy' (one open room) or 'hq' (department rooms). */
   plan: 'pro',
   /** Paseo's dark theme draws the office by night. */
   night: false,

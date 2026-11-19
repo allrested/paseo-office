@@ -62,7 +62,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(4);
+  expect(officeHostSettings.version).toBe(5);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -81,8 +81,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  // An additive field with a default: no version bump.
-  expect(officeHostSettings.version).toBe(4);
+  expect(officeHostSettings.version).toBe(5);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -93,7 +92,7 @@ test("a host with no settings draws the company floor", () => {
 test("the cozy room is kept, and only these plans are offered yet", async () => {
   expect(hostIssues({ floorPlan: "cozy" })).toEqual([]);
   expect(await upgraded({ floorPlan: "cozy" }, 4)).toMatchObject({ floorPlan: "cozy" });
-  expect(FLOOR_PLANS).toEqual(["pro", "cozy"]);
+  expect(FLOOR_PLANS).toEqual(["pro", "cozy", "hq"]);
 });
 
 test("a plan this build does not know reads as the company floor and the rest is kept", async () => {
@@ -107,7 +106,7 @@ test("a plan this build does not know reads as the company floor and the rest is
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  for (const floorPlan of ["hq", "", 3, null]) {
+  for (const floorPlan of ["future-plan", "", 3, null]) {
     expect(await upgraded({ ...stored, floorPlan }, 4)).toEqual({ ...stored, ...COMPANY });
   }
 });

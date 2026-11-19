@@ -7,10 +7,11 @@ import { PLAN_DESKS } from "./world/adapter.js";
 
 /** The row's label, and the setting a refused save names. */
 export const FLOOR_PLAN_LABEL = "Floor plan";
-const HINT = `The 3D floor only: the 2D floor and the List are the same on both. Company floor has ${PLAN_DESKS.pro} desks, Cozy room ${PLAN_DESKS.cozy}. Changing it starts the 3D view again.`;
+const HINT = `For the 3D view. Company floor has ${PLAN_DESKS.pro} desks, Cozy room ${PLAN_DESKS.cozy}, and Headquarters ${PLAN_DESKS.hq}. Headquarters may draw more slowly on a phone. Changing it starts the 3D view again.`;
 const NAMES: Readonly<Record<FloorPlanChoice, string>> = {
   pro: "Company floor",
   cozy: "Cozy room",
+  hq: "Headquarters",
 };
 
 export interface FloorPlanRowProps {
