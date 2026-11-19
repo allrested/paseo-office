@@ -183,13 +183,15 @@ frame ends it. Keys pressed inside a frame do not reach the app's shortcuts, so 
 scene, and anything the scene opens in the app (the agent card, a board), gives keyboard focus back
 to the app's window.
 
-The scene is told who is there and what kind of thing each does, and the open incidents' keys and
-titles for the banner; never a file name, a command or a prompt. It makes no network call. It
-writes seven things to the app origin's `localStorage` under keys that start with `office-`:
-which team sits where, the plants, the graphics level, the Sound switch (`office-sound`, which
-the host's setting overwrites at each start), that the tour was seen (`office-tips`), and the
-clip's shape and music choice (`office-clip-shape`, `office-clip-music`). It reads
-`office-autocam`.
+The scene is told who is there and what kind of thing each does, the open incidents' keys and
+titles for the banner, and what the staff scenes read (below); never a folder, a file name, a
+command or a prompt. It makes no network call. It writes to the app origin's `localStorage` under
+keys that start with `office-`: which team sits where, the plants, the graphics level, the Sound
+switch (`office-sound`, which the host's setting overwrites at each start), that the tour was
+seen (`office-tips`), the clip's shape and music choice (`office-clip-shape`,
+`office-clip-music`), and the staff scenes' own (`office-gone` and `office-back:*`, the teams
+that had their farewell or came back; `office-duty`, the duty roster with the names on it;
+`office-drill-day`, the fire drill's day). It reads `office-autocam`.
 
 The shops, apps and products the scene's text and the team chat name (the cafés and stores people
 pop out to, the ride and delivery apps, the bank, the medicines) are made-up ones, not my-office's
@@ -265,6 +267,35 @@ rest the gaps are 10 to 20 minutes. The games are my-office's; the office's plan
 (`vendor/my-office/src/office/paseo-leisure.js`) only starts them, and starts nothing at night,
 during a gathering or with reduced motion. After 21:00 an agent that has rested 30 minutes walks
 home, its rest counted from the host's last change of the agent.
+
+### Staff and daily life
+
+The staff and daily-life scenes that happen on the floor are my-office's: lunch from home at the
+pantry's microwaves, the duty roster, Friday's tea, the accountant, the director's rounds, HR's
+desk and the month's birthdays, a project's farewell and return, the interns, reception, the
+cleaner and the courier, the lobby's altar, the lift's servicing, the post, the fire drill, the
+swapped days off and the midday nap. The six that go out to the street (lunch out, the guard,
+drinks after work, the photo booth, pickleball, the outings) are not there yet. All but the nap
+need the company floor: the cozy room has no lift, no reception and no HR desk.
+
+Most play from the clock and the people alone. Four read the host: the accountant reads what each
+agent has cost (a provider that reports no cost leaves the screen empty); HR reads the day each
+team's repository began (`server/repo-age.ts`, `git log` in the workspace's folder, one folder
+at a time) and brings a cake in its month; the farewells and the interns read the tenure list the
+server keeps (`server/tenure.ts`: a farewell after 30 quiet days, an intern is a team new since
+the list began, made permanent after 20 turns on two days, and every team present when the list
+first starts is permanent); the lift is serviced for three minutes after the plugin's server
+starts, five and a sticker with the build when the scene's build changed
+(`server/lift-service.ts`). The server sends these through `office.life`
+(`server/life-feed.ts`), again only when something the scenes read has changed. A team is a
+workspace, known by its name.
+
+A scene's line for the team chat leaves the scene as a kind and a few words. The server's table
+(`shared/life-lines.ts`, a copy of my-office's `chatLife`) gives each kind its sender (reception,
+HR, a named or a resting person), its words and its answers, and the chat engine says it once per
+period. The staff speak under the names `server/chat-service.ts` gives them, so the engine's own
+morning hello and reminders come too. The lively floor starts nothing from 12:30 to 13:30, while
+my-office's midday nap plays.
 
 ### Sound
 
@@ -546,7 +577,8 @@ the workspace, where it is in the changes to review. The office installs and rem
 ## Data
 
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `chat.json`,
-`notes-writer.json` and `incidents.json`. Its settings are Paseo settings documents
+`notes-writer.json`, `incidents.json`, `tenure.json` (the tenure list) and `lift.json` (the
+scene's build the lift was last serviced for). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.

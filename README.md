@@ -27,6 +27,9 @@ my-office's.
 - Rings an incident alarm for a new Jira bug or Sentry issue in the projects you name.
 - Plays my-office's sounds in the 3D floor: off until you turn on Sound in the settings or with the
   speaker button on the floor's toolbar.
+- Plays my-office's staff and daily life on the 3D floor's company plan: reception, HR, the
+  cleaner and the courier, lunch at the microwaves, the duty roster, the midday nap, the fire
+  drill, a team's farewell and its interns. What they say comes into the team chat.
 - Takes a photo of the 3D floor, in the app's light or held to day or night for the photo, and on
   a desktop or in a browser records a 15-second clip of it; a tour of the floor's things shows
   once on a desktop.
@@ -77,20 +80,34 @@ while the daemon was down is not made up.
 
 ## What it reads and where it sends it
 
-- It reads the host's agents and workspaces, their status, and the kind of thing each agent does
-  (a read, an edit, a command, a test run). The kind is worked out on the host.
-- The 3D scene is told who is there and what kind of thing each does, never a file name, a command
-  or a prompt. The scene makes no network call.
+- It reads the host's agents and workspaces, their status, what each agent has cost so far, and
+  the kind of thing each agent does (a read, an edit, a command, a test run). The kind is worked
+  out on the host.
+- On the host it runs `git log` once in each workspace's folder, to learn the day of the
+  repository's first commit. It runs no other command for the scene.
+- The 3D scene is told who is there, what kind of thing each does, what each agent has cost, the
+  day each team's repository began, and how long each team has been in the office (when it last
+  worked, on how many days and turns, a farewell or a promotion held); a team is a workspace,
+  known by its name. For the lift's servicing it is told two things about the plugin itself: how
+  long ago its server started, as the time the servicing has left, and a short id of the scene's
+  build with the time the lift was first serviced for it. It is never told a folder, a file name,
+  a command or a prompt. The scene makes no network call.
+- The scene tells the plugin two things: a moment for the team chat (a birthday, the fire drill)
+  as a kind and a few words such as a name or a count, which the plugin turns into a staff
+  member's line; and a farewell or a promotion it held.
 - A clip is recorded inside the page and saved as a download on the device; nothing is sent. The
   scene keeps on the device, under keys that start with `office-`, which team sits where, the
-  plants, the graphics level, the Sound switch, that the tour was seen, and the clip's shape and
-  music choice. The column keeps when this device last had the chat open (`office-chat-seen`).
+  plants, the graphics level, the Sound switch, that the tour was seen, the clip's shape and
+  music choice, and the staff scenes' own: which teams had their farewell or came back, the duty
+  roster with the names on it, and the fire drill's day. The column keeps when this device last
+  had the chat open (`office-chat-seen`).
 - It calls Jira and Sentry only when their settings are filled in, with tokens from the host's
   environment (`ATLASSIAN_*`, `SENTRY_AUTH_TOKEN`). The settings never hold a token.
 - The stand-up notes writer, a wake and a chat `@` send the board's text, the chat message and the
   notes' prompt to the host's own agents, and so to whichever provider runs them.
-- It stores boards, the chat, the stand-up notes' state and incidents under the host's Paseo home,
-  in `office/`.
+- It stores boards, the chat, the stand-up notes' state, incidents, the tenure list
+  (`tenure.json`) and the lift's last build (`lift.json`) under the host's Paseo home, in
+  `office/`.
 
 ## Based on
 

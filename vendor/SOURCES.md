@@ -205,14 +205,19 @@ words and answers. A photo is not sent, and the games' own `chatSay` lines still
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
 world-api.ts`), never a file name, a command or a prompt. It also sends the open incidents' keys
-and titles for the banner. The scene runs in upstream's streamer mode, which writes "a file" and
+and titles for the banner. For the staff scenes it sends what each agent has cost, the day each
+team's repository began, the tenure list and the lift's servicing (`client/world/use-life.ts`,
+`office.life`), and it hears back a chat moment as a kind and a few words, and a farewell or a
+promotion held. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
 
-The scene writes seven things to the app origin's `localStorage`, under keys that start with
+The scene writes eleven things to the app origin's `localStorage`, under keys that start with
 `office-`: which team sits where, the plants, the graphics level, the Sound switch
 (`office-sound`, which the host's setting overwrites at each start), that the tour was seen
-(`office-tips`), and the clip's shape and music choice (`office-clip-shape`, `office-clip-music`).
+(`office-tips`), the clip's shape and music choice (`office-clip-shape`, `office-clip-music`),
+and the staff scenes' own: the teams that had their farewell (`office-gone`) or came back
+(`office-back:*`), the duty roster (`office-duty`) and the fire drill's day (`office-drill-day`).
 It reads `office-autocam` (`off` turns the automatic camera off) and a few more `office-` keys
 that nothing here writes. It makes no network call; a clip is recorded in the page and saved as a
 download.
