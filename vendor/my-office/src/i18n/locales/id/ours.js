@@ -1,4 +1,9 @@
 export default {
+  'people.staff.shipper': 'Kurir',
+  'people.staff.shipperHi': ['Permisi, ada paket!', 'Ada paket. Saya titip di meja, ya!'],
+  'people.staff.call': ['{name}, ada paket buat kamu!', '{name}, paketmu sudah sampai!'],
+  'people.staff.callDoor': ['{name}, ada paket!', 'Permisi, paket untuk {name}?'],
+  'life.liftService.stickerWhat': 'Office {version}',
   'people.handOver': 'Ada tugas baru buat kamu',
   'events.generic.grep': 'kode',
   'events.generic.web': 'web',
@@ -36,6 +41,7 @@ export default {
   'tips.person.title': 'Setiap orang mewakili satu agen',
   'tips.person.text': 'Klik seseorang untuk membuka kartunya. Di sana kamu bisa melihat apa yang sedang dia kerjakan dan membuka sesinya.',
   // (the label over the meeting room's screen: it opens Paseo's stand-up notes)
+  'props.season.hint': 'Dekorasi {season}',
   'paseo.notes': 'Catatan stand-up',
   'places.deploy.today': { other: '{n} kali deploy sejak tampilan kantor ini dibuka' },
   'places.live.deployToday': '{n} sejauh ini',
