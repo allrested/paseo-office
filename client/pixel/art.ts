@@ -133,6 +133,7 @@ export const HAIRS = [
   { hair: "#70707C", shade: "#585863" },
 ] as const;
 export interface Look {
+  gender?: Appearance["gender"];
   skin: number;
   hair: number;
   shirt: number;
@@ -150,6 +151,7 @@ export function lookOf(id: string, appearance?: Appearance): Look {
   const seed = lookHash(id);
   const hash = appearance?.avatar ? lookHash(appearance.avatar) : seed;
   return {
+    ...(appearance?.gender && { gender: appearance.gender }),
     skin: hash % SKINS.length,
     hair: (hash >>> 4) % HAIRS.length,
     shirt:
@@ -211,6 +213,23 @@ const POSES: Readonly<Record<Pose, readonly string[]>> = {
   backB: [...HEAD_BACK, ...BODY, ...LEGS_STEP_B],
   seated: [...HEAD_BACK, ...SEATED],
 };
+
+// Each head fits the existing seven-row frame in every walking and sitting pose.
+function personGrid(pose: Pose, gender: Look["gender"]) {
+  const rows = POSES[pose];
+  if (!gender) return rows;
+  const front = pose.startsWith("front");
+  const head = [...(front ? HEAD_FRONT : HEAD_BACK)];
+  if (gender === "Female") {
+    head[5] = front ? "..hssssssh.." : "..HhhhhhhH..";
+    head[6] = front ? "..hSssssSh.." : "..HhhhhhhH..";
+  } else {
+    head[3] = front ? "..hssssssh.." : "..hhhhhhhh..";
+    head[4] = front ? "..ssessess.." : "..HhhhhhhH..";
+    head[5] = "..ssssssss..";
+  }
+  return [...head, ...rows.slice(head.length)];
+}
 
 /** A grid of clear pixels to paint rectangles into. */
 function canvas(width: number, height: number) {
@@ -707,13 +726,13 @@ function buildArt(tones: Tones): Art {
   return {
     tones,
     person(look, pose) {
-      const key = `${look.skin}:${look.hair}:${look.shirt}:${pose}`;
+      const key = `${look.skin}:${look.hair}:${look.shirt}:${look.gender ?? "auto"}:${pose}`;
       const known = people.get(key);
       if (known) return known;
       const skin = SKINS[look.skin] ?? SKINS[0];
       const hair = HAIRS[look.hair] ?? HAIRS[0];
       const shirt = SHIRTS[look.shirt] ?? SHIRTS[0];
-      const sprite = compileSprite(POSES[pose], {
+      const sprite = compileSprite(personGrid(pose, look.gender), {
         h: hair.hair,
         H: hair.shade,
         s: skin.skin,
