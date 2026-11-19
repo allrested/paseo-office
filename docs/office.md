@@ -117,7 +117,9 @@ sheet and Escape close it. Width and collapsed are the `office-column` device se
 from `office-device` because that one is saved whole.
 
 An open session is a tab after the four, with the agent's status dot and title and a button to
-close it (`client/session-panel.tsx`, `client/use-conversation.ts`). A tab shows the
+close it (`client/session-panel.tsx`, `client/use-conversation.ts`). Tabs past the column's edge
+scroll sideways: with a mouse the scroll bar shows, and the tab of the session just shown is
+scrolled into view. A tab shows the
 conversation (your messages and the agent's replies as text, a tool call as one line, never the
 reasoning), the requests waiting on the agent with Approve and Deny, a reply box, and Stop while
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt

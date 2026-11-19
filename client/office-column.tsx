@@ -1,5 +1,12 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { PanResponder, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { DotTone } from "../shared/model.js";
 import {
@@ -9,6 +16,7 @@ import {
   type ColumnTab,
   type ColumnView,
 } from "./column-model.js";
+import { useTabReveal } from "./tab-reveal.js";
 import type { OfficeStyles } from "./styles.js";
 import type { ColumnState } from "./use-column.js";
 
@@ -102,6 +110,8 @@ interface SessionTabProps {
   iconSize: number;
   onSession(agentId: string): void;
   onClose(agentId: string): void;
+  /** Where the tab sits in the strip, once it is drawn and when that changes. */
+  onTabLayout(agentId: string, layout: { x: number; width: number }): void;
   styles: OfficeStyles;
 }
 
@@ -114,9 +124,14 @@ function SessionTab({
   iconSize,
   onSession,
   onClose,
+  onTabLayout,
   styles,
 }: SessionTabProps) {
   const { agentId, title, tone } = session;
+  const measure = useCallback(
+    (event: LayoutChangeEvent) => onTabLayout(agentId, event.nativeEvent.layout),
+    [onTabLayout, agentId],
+  );
   const press = useCallback(() => onSession(agentId), [onSession, agentId]);
   const close = useCallback(() => onClose(agentId), [onClose, agentId]);
   const [hovered, setHovered] = useState(false);
@@ -129,7 +144,7 @@ function SessionTab({
   let closeStyle = styles.sessionTabClose;
   if (!touch && !selected && !hovered && !focused) closeStyle = styles.sessionTabCloseHidden;
   return (
-    <View style={styles.sessionTab}>
+    <View style={styles.sessionTab} onLayout={measure}>
       {selected ? <View style={styles.segmentFill} /> : null}
       <Pressable
         accessibilityRole="tab"
@@ -197,6 +212,7 @@ export function ColumnTabs({
   styles,
 }: ColumnTabsProps) {
   const tab = view?.kind === "tab" ? view.tab : null;
+  const reveal = useTabReveal(view?.kind === "session" ? view.agentId : null);
   const list = (
     <View
       role="tablist"
@@ -241,6 +257,7 @@ export function ColumnTabs({
               iconSize={iconSize}
               onSession={onSession}
               onClose={onClose}
+              onTabLayout={reveal.onTabLayout}
               styles={styles}
             />
           ))
@@ -248,9 +265,18 @@ export function ColumnTabs({
     </View>
   );
   if (!sessionTabs) return list;
-  // Many sessions scroll sideways rather than wrap.
+  // Many sessions scroll sideways rather than wrap. A mouse reaches the ones past the edge by the
+  // bar; a finger just drags.
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.columnTabsScroll}>
+    <ScrollView
+      ref={reveal.scroller}
+      horizontal
+      showsHorizontalScrollIndicator={!touch}
+      onLayout={reveal.onLayout}
+      onScroll={reveal.onScroll}
+      scrollEventThrottle={16}
+      style={styles.columnTabsScroll}
+    >
       {list}
     </ScrollView>
   );
