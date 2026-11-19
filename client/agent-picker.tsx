@@ -21,7 +21,16 @@ interface RowProps {
 }
 
 /** One choice of the page: a radio drawn as a row. */
-function Row({ value, title, detail, tone, selected, takesFocus, onChoose, styles }: RowProps) {
+export function Row({
+  value,
+  title,
+  detail,
+  tone,
+  selected,
+  takesFocus,
+  onChoose,
+  styles,
+}: RowProps) {
   const press = useCallback(() => onChoose(value), [onChoose, value]);
   // Enter presses any Pressable; Space, the key that picks a radio, only a button.
   const id = useId();

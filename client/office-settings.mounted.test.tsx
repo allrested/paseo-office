@@ -17,6 +17,11 @@ let hostSaves: unknown[];
 let deviceSaves: unknown[];
 let deliver: ((event: OfficeEvent) => void) | null;
 
+/** What the device's setting holds; a test sets it before it mounts. */
+const deviceValues = vi.hoisted(() => ({
+  current: { threeD: true, view: "list", rungIncidents: {} } as Record<string, unknown>,
+}));
+
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
   useSettings: (settings: { id: string }) => {
@@ -24,9 +29,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
     return {
       status: "ready",
       revision: "r1",
-      values: device
-        ? { threeD: true, view: "list", rungIncidents: {} }
-        : officeHostSettings.schema.parse({}),
+      values: device ? deviceValues.current : officeHostSettings.schema.parse({}),
       saving: false,
       saveError: null,
       save: async (values: unknown) => {
@@ -124,6 +127,16 @@ test("a view chosen here is saved on the device", async () => {
 
   expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {} }]);
   expect(hostSaves).toEqual([]);
+});
+
+test("a view chosen here keeps the last agent the device holds", async () => {
+  const lastAgent = { provider: "claude", model: "opus" };
+  deviceValues.current = { threeD: true, view: "list", rungIncidents: {}, lastAgent };
+  await mount();
+  await act(async () => labelled("2D view")?.click());
+  deviceValues.current = { threeD: true, view: "list", rungIncidents: {} };
+
+  expect(deviceSaves).toEqual([{ threeD: true, view: "2d", rungIncidents: {}, lastAgent }]);
 });
 
 test("the notes schedule's failure shows under the Time zone field", async () => {

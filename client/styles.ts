@@ -253,6 +253,9 @@ export interface OfficeStyles {
   pickerLead: ViewStyle;
   /** The page's search field: one line, as tall as a control. */
   pickerSearch: TextStyle;
+  /** The New agent form, and its list of workspaces: it scrolls inside the form past this height. */
+  newAgentForm: ViewStyle;
+  newAgentWorkspaces: ViewStyle;
   /** A text setting's field, as the search field. */
   fieldInput: TextStyle;
   iconColor: string;
@@ -1053,6 +1056,8 @@ export function useOfficeStyles(
       // As wide as the dot even without one, so "Nobody" starts on the agents' rail.
       pickerLead: { width: DOT, height: 20, justifyContent: "center" },
       pickerSearch: lineInput,
+      newAgentForm: { padding: pad, gap: 16 },
+      newAgentWorkspaces: { maxHeight: 240 },
       fieldInput: lineInput,
       iconColor: colors.foregroundMuted,
       scene: { flex: 1, minHeight: SCENE_MIN_HEIGHT },

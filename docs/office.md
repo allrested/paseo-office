@@ -129,7 +129,17 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
   something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,
   Janitor, Stand-up, Reviews, QA and Library.
-- **Sessions** lists every agent by room, with sub-agents under their parent.
+- **Sessions** lists every agent by room, with sub-agents under their parent. Its "New agent"
+  button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
+  a workspace chosen from the host's workspaces by project, with a search; a provider and a model,
+  of the providers that are ready and enabled; and the first prompt. Create starts the agent in
+  that workspace's folder, closes the form and opens the agent's session as a tab. The workspaces
+  and providers are read when the form opens, not when the office does. The provider and model
+  start as the last agent's, kept in the `lastAgent` field of the `office-device` setting, or the
+  first provider's default model when that choice is gone. A failure shows its reason with
+  everything typed kept, and Back keeps what was typed for the next time the tab's form opens
+  while the Sessions tab stays chosen. A new project folder, a new worktree, attachments and modes
+  stay in the app's own screen.
 - **Activity** is a feed derived on the client from the office's state, kept in memory for this
   app run. It fills only while an office surface is open.
 - **Chat** is my-office's team chat engine, running on the office's server

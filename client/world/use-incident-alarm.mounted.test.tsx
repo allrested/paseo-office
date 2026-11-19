@@ -199,3 +199,15 @@ test("a save refused because the view was saved first is saved again over the ne
     { values: { threeD: true, view: "2d", rungIncidents: { [older.id]: NOW } }, revision: "r9" },
   ]);
 });
+
+test("the map is saved with the last agent the device holds", async () => {
+  const lastAgent = { provider: "claude", model: "opus" };
+  stored = {
+    status: "ready",
+    values: { threeD: true, view: "3d", rungIncidents: {}, lastAgent },
+    revision: "r1",
+  };
+  await show({ started: true, incidents: state([older]) });
+
+  expect(saved.map(({ values }) => values.lastAgent)).toEqual([lastAgent]);
+});

@@ -4,6 +4,9 @@ import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { agentTitle, buildOfficeModel, dotTone } from "../shared/model.js";
 import { loadProblem, Pill } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";
+import { ActionButton } from "./action-button.js";
+import { NewAgentForm } from "./new-agent-form.js";
+import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
 import { LIST_TABS, NO_MATCH, SEARCH_LABEL, tabCounts, type ListTab } from "./list-text.js";
 import type { ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { NO_AGENTS, sessionRows, type SessionRow } from "./sessions-text.js";
@@ -76,7 +79,47 @@ function AgentRow({ entry, endsGroup, link, styles }: AgentRowProps) {
  * The Sessions tab of the office's column, fed by the surface's subscription: every agent in one
  * list, under the List view's tabs and search.
  */
-export function SessionsPanel({ office, styles, link }: ColumnPanelProps) {
+export function SessionsPanel(props: ColumnPanelProps) {
+  const { link, styles } = props;
+  const [form, setForm] = useState(false);
+  // The form's choice lives here, so Back keeps it for the next time the form opens.
+  const [choice, setChoice] = useState<NewAgentChoice>(EMPTY_CHOICE);
+  const change = useCallback((patch: Partial<NewAgentChoice>) => {
+    const entries = Object.entries(patch) as [keyof NewAgentChoice, string | null][];
+    setChoice((current) =>
+      entries.every(([key, value]) => current[key] === value) ? current : { ...current, ...patch },
+    );
+  }, []);
+  const open = useCallback(() => setForm(true), []);
+  const back = useCallback(() => setForm(false), []);
+  const created = useCallback(
+    (agentId: string) => {
+      setForm(false);
+      setChoice(EMPTY_CHOICE);
+      link.openSession(agentId);
+    },
+    [link],
+  );
+  if (form) {
+    return (
+      <NewAgentForm
+        choice={choice}
+        change={change}
+        onBack={back}
+        onCreated={created}
+        styles={styles}
+      />
+    );
+  }
+  return <SessionList {...props} onNewAgent={open} />;
+}
+
+function SessionList({
+  office,
+  styles,
+  link,
+  onNewAgent,
+}: ColumnPanelProps & { onNewAgent(): void }) {
   const { state, loaded, subscription } = office;
   const [tab, setTab] = useState<ListTab>("all");
   const [query, setQuery] = useState("");
@@ -93,6 +136,14 @@ export function SessionsPanel({ office, styles, link }: ColumnPanelProps) {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
         <View style={styles.panelTop}>
+          <View style={styles.actions}>
+            <ActionButton
+              label="New agent"
+              pendingLabel="Opening..."
+              onPress={onNewAgent}
+              styles={styles}
+            />
+          </View>
           <View role="group" aria-label="Sessions" style={styles.panelChips}>
             {LIST_TABS.map(({ tab: each, label }) => (
               <Pill<ListTab>

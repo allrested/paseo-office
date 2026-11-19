@@ -128,17 +128,21 @@ export type OfficeViewChoice = (typeof OFFICE_VIEWS)[number];
  * from when the office had a 3D switch: off is the list, on leaves the choice to the device. A
  * save writes both. A client from before version 2 reads neither: it refuses the newer version.
  * `rungIncidents` is when this device rang its alarm for each incident, epoch ms by incident id.
+ * `lastAgent` is the provider and model of the last agent started from the office, the next
+ * form's start. Every save of this setting writes the document whole and carries it through.
  */
 export const officeDeviceSettings = defineSettings({
   id: "office-device",
   scope: "device",
-  version: 2,
+  version: 3,
   schema: z.object({
     threeD: z.boolean().default(true),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),
+    lastAgent: z.object({ provider: z.string(), model: z.string() }).optional(),
   }),
-  // Version 1 had no `rungIncidents`: its values stay, and the device has rung for none.
+  // Version 1 had no `rungIncidents`: its values stay, and the device has rung for none. Version 3
+  // added the optional `lastAgent`: older values stay valid.
   migrate: (values) => values,
 });
 

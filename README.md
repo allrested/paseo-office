@@ -14,7 +14,8 @@ my-office's.
   is a room, and each agent sits at a desk and walks to the kind of work it is doing.
 - Puts a column beside the floor: Attention (who needs you, and the office's cards), Sessions,
   Activity, and a team Chat where an `@` prompts an agent. An agent's session opens as a tab of
-  the column, with its conversation, a reply box, permission answers and Stop.
+  the column, with its conversation, a reply box, permission answers and Stop. The Sessions tab
+  starts an agent: a workspace, a provider and model, and a first prompt.
 - Gives each room a board of tasks and notes. Agents read and post with three tools, and a post
   that names an idle agent wakes it.
 - Writes the day's stand-up entry at 8:00 on the days you choose, Monday to Friday by default: an
