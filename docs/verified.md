@@ -40,7 +40,7 @@ and no error.
 ## Seen at 1280 px
 
 - Settings, Plugins lists "Office 3D" with its description. Its icon is a letter, in the Plugins
-list
+  list
   and on the plugin's own page: Paseo's app takes a tile's icon from the plugin's listing in
   Paseo's plugin registry, never from an installed plugin's manifest, so a plugin installed by Git
   shows a letter.
