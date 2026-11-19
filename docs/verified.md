@@ -487,3 +487,11 @@ In Chromium the built scene started in Headquarters at 1280 and 390 px, accepted
 synthetic agents, and switched to the department wing's Desks view at both sizes.
 The check covered scene initialization and camera controls. Physical phone performance
 with all 44 desks occupied still needs a device check.
+
+## The street
+
+The office scene started with the shipped car kit in Chromium with software WebGL, in a 1280 px frame and in a touch-like 390 px frame. The narrow frame also started with the street off. The street-on narrow frame showed the evening eatery chip with four people at the tables. The scene issued no network requests during either narrow-frame run.
+
+On this host the narrow frame reported 137 MiB of JavaScript heap with the street off and 179 MiB with it on. Each ten-second sampling window produced only one animation callback (25.9 seconds off, 17.4 seconds on) under competing CPU load and software rendering. These timings include the first frame and do not measure steady-state performance.
+
+The measurements used standalone plugin frames. Physical phone memory, the car payload through a real native bridge, timed staff outings, audio, shop interiors and the version-triggered shopping trip still need observation. The evening chip alone does not establish that an office worker joined the tables.

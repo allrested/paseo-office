@@ -267,3 +267,9 @@ test("the language choice is a separate device document with Automatic as its de
     expect(setting.schema.parse({ choice })).toEqual({ choice });
   for (const choice of ["fr", 1]) expect(setting.schema.safeParse({ choice }).success).toBe(false);
 });
+
+test("the street is optional and preserves either explicit device choice", () => {
+  expect(officeDeviceSettings.schema.parse({})).not.toHaveProperty("street");
+  for (const street of [false, true])
+    expect(officeDeviceSettings.schema.parse({ street }).street).toBe(street);
+});

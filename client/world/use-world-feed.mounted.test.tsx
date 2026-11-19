@@ -223,3 +223,9 @@ test("life reaches each started scene once across equivalent lift readings", asy
   expect(calls.filter((call) => call.startsWith("setTenure:"))).toHaveLength(1);
   expect(calls.filter((call) => call.startsWith("setLiftService:"))).toHaveLength(1);
 });
+
+test("the active floor explains a failed street kit", async () => {
+  const { api } = fakeScene();
+  await act(async () => root.render(<Probe api={api} feed={input({ streetNote: true })} />));
+  expect(note).toContain("The street's cars could not be loaded.");
+});

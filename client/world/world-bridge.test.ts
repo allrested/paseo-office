@@ -137,3 +137,10 @@ test("start sends the requested language and its JSON to the WebView", () => {
   api.start(options(language));
   expect(posted).toMatchObject([{ call: "start", args: [language] }]);
 });
+
+test("posts a full-sized street kit intact as start data", () => {
+  const kit = "x".repeat(430_000);
+  const { api, posted } = bridge();
+  api.start(options({ street: { kit } }));
+  expect(posted[0].args[0]).toMatchObject({ street: { kit } });
+});

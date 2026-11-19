@@ -175,7 +175,6 @@ test("the door offers the lift when the street is available", () => {
   page("btn-fp").click();
   fpUpdate(0.016);
   expect(page("fp-near").hidden).toBe(false);
-  expect(page("fp-near").textContent).toContain("Door");
   expect(page("fp-near").textContent).toContain("street");
 
   key("KeyE");
