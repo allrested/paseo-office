@@ -30,14 +30,13 @@ if (!FROM || !THREE) {
 }
 
 /**
- * Not taken: upstream's panels, chat window, replay, demo, every sound but the siren, the street, and the daily-life scenes.
- * The lounge's four games are taken (people/billiards.js, gaming.js, foosball.js, karaoke.js). The siren's
- * audio/sfx.js and life/incidents.js are taken trimmed by hand, so they stay denied here and only their exports are
- * checked.
+ * Not taken: upstream's panels, chat window, replay, demo, the street, and the daily-life scenes.
+ * The lounge's four games are taken (people/billiards.js, gaming.js, foosball.js, karaoke.js). life/incidents.js is
+ * taken trimmed by hand, so it stays denied here and only its exports are checked.
  */
 const DENY = [
   /^office\/ui\/(?!event-text\.js$|icons\.js$|photo\.js$)/,
-  /^office\/(demo|replay|audio)\//,
+  /^office\/(demo|replay)\//,
   /^office\/world\/backdrops\//,
   /^office\/world\/pro\/wing\.js$/,
   /^office\/people\/(outings|comnha|comtrua|duty|teatime|accountant|rounds|guard|hr|farewell|interns|nhau|photobooth|pickle|staff)\.js$/,
@@ -56,6 +55,7 @@ const OWN = new Set([
   "office/paseo-focus.js",
   "office/paseo-leisure-plan.js",
   "office/paseo-leisure.js",
+  "office/paseo-sound.js",
 ]);
 const denied = (rel) => DENY.some((re) => re.test(rel));
 const srcOf = (rel) => path.join(FROM, "src", rel);

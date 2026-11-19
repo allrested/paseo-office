@@ -64,6 +64,7 @@ import * as uiPhoto from './ui/photo.js';
 import * as interactFirstPerson from './interact/first-person.js';
 import * as netLive from './net/live.js';
 import * as lifeYourTurn from './life/your-turn.js';
+import * as audioSfx from './audio/sfx.js';
 import * as coreLoop from './core/loop.js';
 import * as coreOptimize from './core/optimize.js';
 
@@ -133,6 +134,7 @@ export const MODULES = [
   ['interactFirstPerson', interactFirstPerson],
   ['netLive', netLive],
   ['lifeYourTurn', lifeYourTurn],
+  ['audioSfx', audioSfx],
   ['coreLoop', coreLoop],
   ['coreOptimize', coreOptimize],
 ];

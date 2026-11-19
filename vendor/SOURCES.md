@@ -28,11 +28,13 @@ bundle needs no resolver, and that real brand names are swapped for made-up ones
 
 The first-person walk is taken too: Walk in, at the camera bar's end, walks the floor as your own
 character, and a game can be played from there. The games call the group chat and the sounds. The
-chat's window is not taken: its stand-in exports what the games import and does nothing. The sounds are the
-siren alone (below). So a game is seen and not heard, and a karaoke song has no sound.
+chat's window is not taken: its stand-in exports what the games import and does nothing. The sounds are upstream's,
+off until the Sound switch is on, so a game and a karaoke song are heard then.
 
-Five copied files are changed by hand, and each change starts with `// PASEO:`:
+Six copied files are changed by hand, and each change starts with `// PASEO:`:
 
+- `src/office/audio/sfx.js`: the one tune that stands for a real brand's is cut (its sound and its
+  gap); the engine and every other sound are upstream's.
 - `src/office/core/env.js`: the build flag upstream reads from `process.env` is a constant, and
   the floor plan comes from Paseo, not from the page's address and storage.
 - `src/office/interact/first-person.js`: the street is cut (`street()` returns null, so the door
@@ -66,15 +68,16 @@ the swap would change nothing in it. It changed these, and nothing else in them:
 - `src/office/people/chibi-rig.js`, `src/office/people/look.js`
 - `src/office/world/props/tv-games.js`
 - `src/office/interact/first-person.js`, which is also changed by hand (above)
+- `src/office/audio/sfx.js`, which is also changed by hand (above)
 
 The import tool runs the same swap on what it copies: a file whose only note is the names one is
 written as upstream's with the names swapped, so it is compared and updated like an unchanged
 copy, and `MANIFEST.json` keeps upstream's sha256. `npm run test:scripts` runs the script's
 `--check` over the tree, and `server/world-script.test.ts` checks the bundle.
 
-Two files are taken trimmed. Their paths stay in the import tool's `DENY`, so it never writes them
-and only checks that they export what the kept modules import (which is why `MANIFEST.json` lists
-them under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry.js` runs their
+One file is taken trimmed. Its path stays in the import tool's `DENY`, so it never writes it
+and only checks that it exports what the kept modules import (which is why `MANIFEST.json` lists
+it under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry.js` runs its
 `setup` where upstream's start-up order has them, just before the loop.
 
 - `src/office/life/incidents.js`: upstream's alarm, `startIncident`, `updateIncident` and `setup`:
@@ -84,10 +87,6 @@ them under `standIns`). Each cut or change starts with `// PASEO:`. `paseo-entry
   and the entry's `setIncidents` rings it); `headache()` (the errand for headache pills); `onEvent`
   (its part that moves people stands in `paseo-entry.js`); and the banner, which is the entry's
   and shows while an incident is open, not only for the 25 s.
-- `src/office/audio/sfx.js`: upstream's engine (the audio context and its unlock on a click or a
-  key, `tone`, a gap per sound, the `office-sound` switch) with the siren alone. Cut: `noise` and
-  every other sound, so every other name the kept modules play makes no sound. `sfx.on` reads off,
-  because `people/karaoke.js` sings through its own audio while it is on.
 
 The team chat's engine (`src/shared/chat-engine.js`) and the English `chat` area
 (`src/i18n/locales/en/chat.js`, with its names made up) are taken into the plugin's
@@ -105,7 +104,7 @@ and `people.director`, which keeps upstream's emoji.
 ### What is not taken
 
 Upstream's own interface (panels, the session drawer, the chat, settings, the top bar), its server
-connection, the replay, the demo, every sound but the siren, other languages, the street outside
+connection, the replay, the demo, other languages, the street outside
 with its shops, and the daily-life scenes (lunch runs, the midday nap, the seasons, the weather and
 the like). The plugin takes the office floor only. Of the camera toolbar and photo mode, these
 are left out on purpose: the list button, the automatic camera, clip recording, and photo mode's
@@ -155,8 +154,9 @@ and titles for the banner. The scene runs in upstream's streamer mode, which wri
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.
 
-The scene writes three things to the app origin's `localStorage`, under keys that start with
-`office-`: which team sits where, the plants, and the graphics level. It reads a few more
+The scene writes four things to the app origin's `localStorage`, under keys that start with
+`office-`: which team sits where, the plants, the graphics level, and the Sound switch
+(`office-sound`, which the host's setting overwrites at each start). It reads a few more
 `office-` keys that nothing here writes. It makes no network call.
 
 ### Taking a newer upstream

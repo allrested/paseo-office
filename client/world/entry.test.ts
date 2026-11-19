@@ -123,7 +123,7 @@ vi.mock("../../vendor/my-office/src/office/life/tests.js", () => ({ clearRun() {
 vi.mock("../../vendor/my-office/src/office/life/your-turn.js", () => ({ onTurnDone() {} }));
 // The sounds need a page's audio: the test hears which one played.
 vi.mock("../../vendor/my-office/src/office/audio/sfx.js", () => ({
-  sfx: { play: (name: string) => h.played.push(name) },
+  sfx: { play: (name: string) => h.played.push(name), set() {} },
   setup() {},
 }));
 

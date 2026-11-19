@@ -122,9 +122,9 @@ describe("the embedded scene", () => {
     expect(script).toContain("is-incident");
     // Upstream's red light over the floor.
     expect(script).toContain("#FF2A2A");
-    // Upstream's sound engine, muted by its switch, with the siren alone: a shop's jingle (its
-    // sound named by the shop's made-up key) was one of the sounds left out.
+    // Upstream's sound engine, all its sounds but one shop's tune (a real brand's, kept out by its key).
     expect(script).toContain("office-sound");
+    expect(script).toContain("webkitAudioContext");
     expect(script).not.toMatch(/\bfrosty:\(?\w*\)?=>/);
   });
 

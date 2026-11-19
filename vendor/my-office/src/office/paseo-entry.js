@@ -38,7 +38,7 @@ import { shredAction } from './world/props/shredder.js';
 import { clearRun, onTest } from './life/tests.js';
 import { onTurnDone } from './life/your-turn.js';
 import * as lifeIncidents from './life/incidents.js';
-import * as audioSfx from './audio/sfx.js';
+import { sfx } from './audio/sfx.js';
 import { t as tr } from '../i18n/index.js';
 
 const VERSION = 1;
@@ -284,8 +284,8 @@ const api = {
     // what upstream's first message from its server sets
     state.stats = {}; state.todos = []; state.feed = []; state.limits = null; state.world = true;
     for (const [name, module] of MODULES) {
-      // (upstream starts its incidents and its sounds after the live connection; Paseo's trimmed copies are not in MODULES)
-      if (name === 'coreLoop') { lifeIncidents.setup(); audioSfx.setup(); }
+      // (upstream starts its incidents after the live connection; Paseo's trimmed copy of it is not in MODULES. Its sounds are, in upstream's place)
+      if (name === 'coreLoop') lifeIncidents.setup();
       if (name === 'coreLoop') backdrops.setup();   // (upstream sets the backdrop up just before the loop)
       if (typeof module.setup === 'function') module.setup();
       if (name === 'interactPlaceCards') whiteboard.setup();
@@ -296,6 +296,8 @@ const api = {
     state.streamer = true;
     // (upstream gives a compaction its sparkle; what the person carries to the shredder is paper)
     TYPE_ICON.compact = 'file';
+    // PASEO: upstream's engine starts on unless its own page stored "off"; Paseo's scene starts off until the host says on.
+    sfx.set(false);
     cameraBar.setup();
     // Escape closes the place card and gives the keyboard back to the chip that opened it.
     document.addEventListener('keydown', (event) => {
