@@ -26,6 +26,21 @@ interface Loaded {
 
 const LOADING: Loaded = { status: "loading", error: null, workspaces: [], providers: [] };
 
+/** The form waits this long for the providers to finish loading; the SDK's own wait is a minute. */
+const PROVIDERS_WAIT_MS = 5000;
+
+/**
+ * The providers once they have loaded; when one is slow, the snapshot as it stands, whose ready
+ * providers the form offers and whose loading ones it leaves out.
+ */
+async function readProviders(paseo: PluginPaseoApi) {
+  try {
+    return await paseo.providers.waitForReady({ timeoutMs: PROVIDERS_WAIT_MS });
+  } catch {
+    return paseo.providers.snapshot();
+  }
+}
+
 async function readWorkspaces(paseo: PluginPaseoApi): Promise<WorkspaceOption[]> {
   const all: WorkspaceOption[] = [];
   let cursor: string | undefined;
@@ -65,7 +80,7 @@ export function useNewAgent({ choice, change }: NewAgentInput): NewAgent {
   useEffect(() => {
     let current = true;
     setLoaded(LOADING);
-    Promise.all([readWorkspaces(paseo), paseo.providers.waitForReady()]).then(
+    Promise.all([readWorkspaces(paseo), readProviders(paseo)]).then(
       ([workspaces, snapshot]) => {
         if (!current) return undefined;
         const providers = providerOptions(snapshot.entries);

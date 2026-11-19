@@ -45,12 +45,18 @@ interface Stored {
 const host = vi.hoisted(() => ({
   workspaceCalls: [] as Record<string, unknown>[],
   providerCalls: 0,
+  /** The options each waitForReady got; when set, the wait times out as a slow provider's would. */
+  waits: [] as unknown[],
+  waitTimesOut: false,
+  snapshots: 0,
   created: [] as Record<string, unknown>[],
   saves: [] as { values: unknown; revision: string }[],
   pages: [] as unknown[],
   providers: null as unknown,
   create: null as unknown,
   device: null as unknown,
+  /** What the device's save answers; the SDK's save never throws, it answers false when refused. */
+  saved: true,
 }));
 
 // One object for every render, as the host's SDK object is: a new one would read again each time.
@@ -63,8 +69,15 @@ const sdk = vi.hoisted(() => ({
     },
   },
   providers: {
-    waitForReady: () => {
+    waitForReady: (options: unknown) => {
       host.providerCalls += 1;
+      host.waits.push(options);
+      return host.waitTimesOut
+        ? Promise.reject(new Error("Timed out waiting for providers: gemini"))
+        : Promise.resolve(host.providers);
+    },
+    snapshot: () => {
+      host.snapshots += 1;
       return Promise.resolve(host.providers);
     },
   },
@@ -95,7 +108,7 @@ vi.mock("@getpaseo/plugin/client", () => ({
     saveError: null,
     save: async (values: unknown, revision: string) => {
       host.saves.push({ values, revision });
-      return true;
+      return host.saved;
     },
     reset: async () => true,
     reload: async () => undefined,
@@ -229,8 +242,12 @@ beforeEach(() => {
   opened = [];
   host.workspaceCalls = [];
   host.providerCalls = 0;
+  host.waits = [];
+  host.waitTimesOut = false;
+  host.snapshots = 0;
   host.created = [];
   host.saves = [];
+  host.saved = true;
   host.pages = [WORKSPACE_PAGE];
   host.providers = PROVIDERS;
   host.create = async () => ({ id: "agent-new" });
@@ -358,6 +375,42 @@ test("Create starts the agent in the chosen workspace, closes the form, keeps th
   ]);
   expect(maybe("First prompt")).toBeNull();
   expect(maybe("New agent")).not.toBeNull();
+});
+
+test("the wait for providers is short, and a slow provider falls back to the snapshot's ready ones", async () => {
+  host.waitTimesOut = true;
+  host.providers = {
+    entries: [
+      ...PROVIDERS.entries,
+      { provider: "slow", status: "loading", enabled: true, label: "Slow", models: [] },
+    ],
+  };
+  await openForm();
+  expect(host.waits).toEqual([{ timeoutMs: 5000 }]);
+  expect(host.snapshots).toBe(1);
+  expect(container.textContent).not.toContain("Unable to read");
+  expect(maybe("Codex")).not.toBeNull();
+  expect(maybe("Slow")).toBeNull();
+  await press("Codex");
+  await fillForm();
+  await press("Create");
+  await settle();
+  expect(opened).toEqual(["agent-new"]);
+});
+
+test("a choice the device refuses to keep is no failure: the agent exists, opens, and is created once", async () => {
+  host.saved = false;
+  await openForm();
+  await press("Codex");
+  await fillForm();
+  await press("Create");
+  await settle();
+
+  expect(container.textContent).not.toContain("Unable to create");
+  expect(opened).toEqual(["agent-new"]);
+  expect(host.saves).toHaveLength(1);
+  expect(maybe("Create")).toBeNull();
+  expect(host.created).toHaveLength(1);
 });
 
 test("a failed create shows the reason and keeps everything typed", async () => {
