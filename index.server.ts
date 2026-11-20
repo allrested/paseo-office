@@ -56,6 +56,8 @@ import { createSshMonitor } from "./server/ssh/monitor.js";
 import { sshReadingRpc, sshServersRpc } from "./shared/ssh.js";
 import { cleanUpAgent } from "./server/machine/cleanup.js";
 import { liveCleanupPorts, liveMachinePorts } from "./server/machine/live-ports.js";
+import { hostDetailsRpc, type HostSample } from "./shared/host-details.js";
+import { readHostDetails, recordSample } from "./server/machine/details.js";
 import { createMachineReader } from "./server/machine/machine.js";
 import { createMachineWatch } from "./server/machine/watch.js";
 import { nodeNotesFs, readMonthNotes } from "./server/notes-files.js";
@@ -195,13 +197,19 @@ export function createOfficePlugin(
     log,
   });
 
+  const samples: HostSample[] = [];
+  const reader = createMachineReader({
+    procRoot: deps.machine.procRoot,
+    cgroupRoot: deps.machine.cgroupRoot,
+    platform: deps.machine.platform,
+    ...liveMachinePorts(holder, () => deps.clock.now()),
+  });
   const machine = createMachineWatch({
-    read: createMachineReader({
-      procRoot: deps.machine.procRoot,
-      cgroupRoot: deps.machine.cgroupRoot,
-      platform: deps.machine.platform,
-      ...liveMachinePorts(holder, () => deps.clock.now()),
-    }).read,
+    async read() {
+      const reading = await reader.read();
+      if (reading) recordSample(samples, reading);
+      return reading;
+    },
     timers: deps.clock,
     log,
   });
@@ -450,6 +458,7 @@ export function createOfficePlugin(
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
   server.handle(sshServersRpc, (_input, context) => ssh.list(context.paseo));
   server.handle(sshReadingRpc, ({ id }, context) => ssh.read(context.paseo, id));
+  server.handle(hostDetailsRpc, () => readHostDetails(deps.machine.procRoot, homedir(), samples));
   server.handle(machineSubscription, (_input, context) => {
     holder.remember(context.paseo);
     return machine.attach(context);

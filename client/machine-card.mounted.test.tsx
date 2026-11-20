@@ -15,11 +15,15 @@ import { MachineCard } from "./machine-card.js";
 import { useOfficeStyles } from "./styles.js";
 
 const rpc = vi.hoisted(() => ({
+  details: vi.fn(),
   discover: vi.fn<() => Promise<SshDiscovery>>(),
   read: vi.fn<(input: { id: string }) => Promise<SshReading>>(),
 }));
 vi.mock("@getpaseo/plugin/client", () => ({
-  useRpc: ({ name }: { name: string }) => (name === "office.ssh.servers" ? rpc.discover : rpc.read),
+  useRpc: ({ name }: { name: string }) => {
+    if (name === "office.machine.details") return rpc.details;
+    return name === "office.ssh.servers" ? rpc.discover : rpc.read;
+  },
 }));
 
 vi.mock("@getpaseo/plugin/client/ui", () => {
@@ -95,9 +99,9 @@ function Card({ machine }: { machine: Machine }) {
 
 async function labels(machine: Machine): Promise<string[]> {
   await act(async () => root.render(<Card machine={machine} />));
-  return [...container.querySelectorAll<HTMLElement>("button[aria-label]")].map(
-    (button) => button.getAttribute("aria-label")!,
-  );
+  return [
+    ...container.querySelectorAll<HTMLElement>('button[aria-label]:not([aria-label="Details"])'),
+  ].map((button) => button.getAttribute("aria-label")!);
 }
 
 test("a host that can close offers Close runtime on an idle agent and Clean up on a forgotten one", async () => {
@@ -309,4 +313,32 @@ test("partial metrics stay unavailable and expanded hosts disclose their known r
     container.querySelector('[aria-label="Details for partial"]')?.getAttribute("aria-expanded"),
   ).toBe("true");
   expect(container.textContent).toContain("CPU cores · 2");
+});
+
+test("Details reads local diagnostics on demand, refreshes and returns to the summary", async () => {
+  rpc.details.mockResolvedValue({
+    hostname: "test-machine",
+    readAt: Date.now(),
+    cores: 2,
+    load: [1, 2, 3],
+    swap: { used: 0, total: 0 },
+    disk: null,
+    apps: [{ name: "node", count: 2, bytes: 1024 }],
+    caches: [],
+    history: [],
+  });
+  await labels(reading([IDLE]));
+  expect(rpc.details).not.toHaveBeenCalled();
+  const click = async (name: string) => {
+    const b = container.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`);
+    expect(b).not.toBeNull();
+    await act(async () => b!.click());
+  };
+  await click("Details");
+  expect(container.textContent).toContain("test-machine");
+  expect(container.textContent).toContain("node");
+  await click("Refresh");
+  expect(rpc.details).toHaveBeenCalledTimes(2);
+  await click("Hide details");
+  expect(container.textContent).not.toContain("test-machine");
 });
