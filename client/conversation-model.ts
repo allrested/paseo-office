@@ -6,7 +6,7 @@ import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
  * line per tool call, and anything that went wrong.
  */
 export type ConversationRow =
-  | { kind: "you"; key: string; text: string }
+  | { kind: "you"; key: string; text: string; imageUrls?: string[] }
   | { kind: "agent"; key: string; text: string }
   | { kind: "tool"; key: string; text: string; outcome?: "failed" | "canceled" }
   | { kind: "notice"; key: string; text: string; tone: "muted" | "danger" };
@@ -70,8 +70,15 @@ function rowFor(entry: TimelineEntry): ConversationRow | null {
   const { item } = entry;
   const key = String(entry.seq);
   switch (item.type) {
-    case "user_message":
+    case "user_message": {
+      // Newer hosts include replayable file URLs. Older SDKs expose only the text.
+      const urls = "imageUrls" in item && Array.isArray(item.imageUrls) ? item.imageUrls : [];
+      const imageUrls = urls.filter(
+        (url): url is string => typeof url === "string" && /^file:\/\/[^<>\s]+$/i.test(url),
+      );
+      if (imageUrls.length) return { kind: "you", key, text: item.text, imageUrls };
       return item.text.trim() ? { kind: "you", key, text: item.text } : null;
+    }
     case "assistant_message":
       return item.text.trim() ? { kind: "agent", key, text: item.text } : null;
     case "tool_call":

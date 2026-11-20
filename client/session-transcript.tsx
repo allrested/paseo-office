@@ -61,6 +61,10 @@ function Assignment({
   );
 }
 
+function imageList(row: ConversationRow) {
+  return row.kind === "you" ? row.imageUrls?.join("\n") : undefined;
+}
+
 function sameRow(before: RowProps, after: RowProps): boolean {
   const [a, b] = [before.row, after.row];
   return (
@@ -71,6 +75,7 @@ function sameRow(before: RowProps, after: RowProps): boolean {
     a.kind === b.kind &&
     a.key === b.key &&
     a.text === b.text &&
+    imageList(a) === imageList(b) &&
     (a.kind !== "notice" || (b.kind === "notice" && a.tone === b.tone)) &&
     (a.kind !== "tool" || (b.kind === "tool" && a.outcome === b.outcome))
   );
@@ -116,10 +121,14 @@ const Row = memo(function Row({ row, name, appearance, styles }: RowProps) {
     }
     case "you": {
       const task = readLobbyAssignment(row.text);
-      if (task) return <Assignment task={task} original={row.text} styles={styles} />;
+      if (task && !row.imageUrls?.length)
+        return <Assignment task={task} original={row.text} styles={styles} />;
       return (
         <View accessibilityLabel={label} style={s.outgoing}>
           <Text style={s.name}>You</Text>
+          {row.imageUrls && (
+            <Markdown>{row.imageUrls.map((url) => `![Image](<${url}>)`).join("\n\n")}</Markdown>
+          )}
           <Text selectable style={s.text}>
             {row.text}
           </Text>

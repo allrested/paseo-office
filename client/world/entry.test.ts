@@ -34,6 +34,7 @@ const h = vi.hoisted(() => ({
   soundAsked: [] as boolean[],
   /** How many times the wall clock's own act ran (upstream's cycleTime). */
   clockCycled: 0,
+  logDoor: vi.fn(),
   /** How many times the duty board's own act ran (upstream's toast of the day's names). */
   dutyToasts: 0,
   /** What the camera bar's autoCam() answers: whether the camera may glide now. */
@@ -116,6 +117,7 @@ vi.mock("../../vendor/my-office/src/office/interact/place-chips.js", () => ({ PL
 vi.mock("../../vendor/my-office/src/office/interact/props.js", () => ({ PROPS: new Map() }));
 vi.mock("../../vendor/my-office/src/office/interact/place-cards.js", () => ({
   closePlace: h.closePlace,
+  logDoor: h.logDoor,
 }));
 vi.mock("../../vendor/my-office/src/office/world/pro/pieces.js", () => ({
   OFFICE_MARK: "",
@@ -861,4 +863,17 @@ test("the host's duties replace the scene's rota, and a pretend duty acted out i
   expect(done).toHaveBeenCalledWith("p1", "a1");
   pageHost.dutyDone("p1", "x".repeat(300));
   expect(done).toHaveBeenLastCalledWith("p1", "x".repeat(80));
+});
+
+test("the elevator logs a crossing once even if the departing session is then removed", () => {
+  world.setSessions([session("Arief")]);
+  h.logDoor.mockClear();
+  host.crossDoor("Arief", false);
+  host.crossDoor("Arief", false);
+  world.setSessions([]);
+  world.setSessions([session("Arief")]);
+  expect(h.logDoor.mock.calls.map(([s, entering]) => [s.title, entering])).toEqual([
+    ["Arief", false],
+    ["Arief", true],
+  ]);
 });

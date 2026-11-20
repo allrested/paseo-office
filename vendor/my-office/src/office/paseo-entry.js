@@ -24,7 +24,7 @@ import { closeSession, openSession } from './ui/session-drawer.js';
 import { setMacSnap } from './ui/mac-drawer.js';
 import { PLACES } from './interact/place-chips.js';
 import { PROPS } from './interact/props.js';
-import { closePlace } from './interact/place-cards.js';
+import { closePlace, logDoor } from './interact/place-cards.js';
 import { OFFICE_MARK, PRO_FX } from './world/pro/pieces.js';
 import { SIGN, drawSign } from './paseo-sign.js';
 import { followHostFocus } from './paseo-focus.js';
@@ -53,6 +53,13 @@ import { lang, setLanguage, t as tr } from '../i18n/index.js';
 const VERSION = 1;
 let started = false;
 let seated = false;
+const outsideOffice = new Set();
+function crossDoor(id, entering) {
+  const person = sessions.get(id);
+  if (!person || entering !== outsideOffice.has(id)) return;
+  if (entering) outsideOffice.delete(id); else outsideOffice.add(id);
+  logDoor(person, entering);
+}
 let limits = [];
 let boardRows = [];
 let problem = () => {};
@@ -307,6 +314,7 @@ const api = {
     setLanguage(options.language, options.words);
     host.plan = ['cozy', 'hq'].includes(options.plan) ? options.plan : 'pro';
     host.night = options.dark === true;
+    host.crossDoor = crossDoor;
     host.wentHome = (id, idleSince) => { if (!stopped) options.onWentHome?.(id, idleSince); };
     host.select = (id) => options.onSelect?.(id);
     host.board = (project) => options.onBoard?.(typeof project === 'string' ? project : null);
@@ -439,11 +447,16 @@ const api = {
   setSessions(list) {
     if (!started) return;
     const ids = new Set(list.map((s) => s.id));
-    for (const id of [...sessions.keys()]) if (!ids.has(id)) live.removeSession(id);
+    for (const id of [...sessions.keys()]) if (!ids.has(id)) {
+      crossDoor(id, false);
+      live.removeSession(id);
+      outsideOffice.delete(id);
+    }
     for (const s of list) {
       const was = sessions.get(s.id);   // (record() keeps the last event on the session object this one replaces)
       if (was) { s.last ??= was.last; if (!s.stuck) s.lastAt ??= was.lastAt; }   // (stopped on an error: no time, so no walk home at night)
       live.upsertSession(s, seated);
+      if (seated && !was) logDoor(s, true);
       glideToRequest(was, s);
     }
     seated = true;

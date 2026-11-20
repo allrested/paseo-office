@@ -19,7 +19,7 @@ import { availableInLounge, requestLoungeAction } from '../paseo-leisure.js';
 import { cap, toast } from '../ui/activity.js';
 import { openSession } from '../ui/session-drawer.js';
 import { setView } from '../ui/camera-bar.js';
-import { brewCoffee, catToSofa, feedFish } from './props.js';
+import { makeCoffee, catToSofa, feedFish } from './props.js';
 import { EDIT_T, PLACES, READ_T, WEB_T, _a } from './place-chips.js';
 import { boardContent } from '../ui/whiteboard.js';
 import { fp } from './first-person.js';
@@ -27,6 +27,12 @@ import { sfx } from '../audio/sfx.js';
 import { focusTarget } from '../core/loop.js';
 import { t as tr, num, locale } from '../../i18n/index.js';
 
+const doorHistory = [];
+export function logDoor(person, entering) {
+  doorHistory.unshift({ sess: person.id, name: dn(person), ts: nowMs(), entering });
+  if (doorHistory.length > 10) doorHistory.pop();
+  if (plcState.id === 'door') queuePlace();
+}
 let plc;
 export const plcState = { id: null, prop: null };
 export const agoText = (ts) => (ts ? tr('time.ago', { time: fmtAgo((nowMs() - ts) / 1000) }) : '');
@@ -102,14 +108,14 @@ function placeContent(id) {
       return { icon: 'rocket', title: tr('places.deploy.title'), sub: tr('places.deploy.sub'), body, foot };
     }
     case 'door': {
-      const ev = recentEvents(['start', 'end'], 10), box = el('div', 'pl-rows');
-      for (const e of ev) box.append(plRow({ ic: 'door', color: sessColor(e.sess), title: tr(e.type === 'start' ? 'places.door.came' : 'places.door.went', { name: dnOf(e) }), meta: agoText(e.ts), onClick: sessions.has(e.sess) ? () => openSession(e.sess) : null }));
+      const ev = doorHistory, box = el('div', 'pl-rows');
+      for (const e of ev) box.append(plRow({ ic: 'door', color: sessColor(e.sess), title: tr(e.entering ? 'places.door.came' : 'places.door.went', { name: e.name }), meta: agoText(e.ts), onClick: sessions.has(e.sess) ? () => openSession(e.sess) : null }));
       return { icon: 'door', title: tr(lift ? 'places.door.titleLift' : 'places.door.title'), sub: tr(!lift ? 'places.door.sub' : lift.service ? 'places.door.subService' : 'places.door.subLift'), body: ev.length ? box : plEmpty(tr('places.door.empty')), foot: el('span', null, tr('places.door.open', { n: list.length })) };
     }
     case 'coffee': {
       const rest = list.filter((s) => s.status === 'rest').sort((a, b) => (b.doneAt || b.lastAt) - (a.doneAt || a.lastAt)), box = el('div', 'pl-rows');
       for (const s of rest) box.append(plRow({ ic: 'coffee', color: colorOf(s), title: dn(s), meta: s.lastPrompt ? tr('places.coffee.done', { prompt: short(s.lastPrompt, 48), ago: agoText(s.doneAt || s.lastAt) }) : tr('places.coffee.noPrompt'), onClick: () => openSession(s.id) }));
-      const foot = el('div', 'pl-foot-row'); foot.append(el('span', null, tr(rest.length ? 'places.coffee.hint' : 'places.coffee.busy')), plButton(tr('places.coffee.brew'), brewCoffee));
+      const foot = el('div', 'pl-foot-row'); foot.append(el('span', null, tr(rest.length ? 'places.coffee.hint' : 'places.coffee.busy')), plButton(tr('places.coffee.brew'), makeCoffee));
       return { icon: 'coffee', title: tr('places.coffee.title'), sub: tr('places.coffee.sub'), body: rest.length ? box : plEmpty(tr('places.coffee.empty')), foot };
     }
     case 'meeting': {

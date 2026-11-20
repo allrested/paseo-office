@@ -17,6 +17,7 @@ export const host = {
   /** A person was chosen; null when nobody is. */
   select() {},
   wentHome() {},
+  crossDoor() {},
   /** A team's chip was chosen (its project), or the whiteboard (nothing). */
   board() {},
   /** The server racks, or the wall screen while `resources` is null, were chosen; null while Paseo has nothing to open for them. */

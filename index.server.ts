@@ -1,3 +1,4 @@
+import { createLogoReader } from "./server/brand-logo.js";
 import { hostBrand } from "./shared/branding.js";
 import { createHash } from "node:crypto";
 import { execCommand } from "@getpaseo/plugin/server";
@@ -104,6 +105,7 @@ import {
   setWakesPausedRpc,
   skillsRpc,
   updateRpc,
+  worldLogoRpc,
   worldRpc,
   streetRpc,
   worldWordsRpc,
@@ -437,6 +439,12 @@ export function createOfficePlugin(
     return hub.attach(context);
   });
   server.handle(streetRpc, () => guarded("street", () => deps.world.readStreet()));
+  const readLogo = createLogoReader();
+  server.handle(worldLogoRpc, async () => {
+    const current = await settings.read();
+    const url = hostBrand(current.status === "ready" ? current.values : {}, deps.env)?.logoUrl;
+    return url ? { url, data: await readLogo(url) } : null;
+  });
   server.handle(worldRpc, () => guarded("world", () => deps.world.read()));
   server.handle(worldWordsRpc, (input) => guarded("words", () => deps.words.read(input.language)));
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.

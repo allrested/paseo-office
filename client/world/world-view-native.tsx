@@ -1,4 +1,4 @@
-import { useOfficeBrand } from "../office-brand-context.js";
+import { useSceneBrand } from "../office-brand-context.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { worldBrand, type WorldPlan } from "./adapter.js";
@@ -72,7 +72,7 @@ function WorldViewNativeScene({
   const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
-  const brand = useOfficeBrand();
+  const brand = useSceneBrand();
   const latest = useRef<WorldLatest>({
     model,
     theme,
@@ -136,7 +136,7 @@ function WorldViewNativeScene({
   // order: start goes first, then whatever the feed sends once `api` is set.
   useEffect(() => {
     const handle = frame.current;
-    if (words.status !== "ready" || page === null || handle === null) return undefined;
+    if (!brand || words.status !== "ready" || page === null || handle === null) return undefined;
     const made = createWorldBridge((text) => handle.post(text), onPhotoReady);
     bridge.current = made;
     try {

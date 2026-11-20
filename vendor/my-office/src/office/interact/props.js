@@ -114,6 +114,11 @@ export function brewCoffee() {
   coffeeBrew = state.sim + 2.6;
   for (let i = 0; i < 9; i++) setTimeout(() => steam(STEAM_AT.x + rand(-0.03, 0.03), STEAM_AT.y, STEAM_AT.z), i * 220);
 }
+export function makeCoffee() {
+  brewCoffee();
+  coffeeMade();
+  toast(tr('people.brewing'));
+}
 let coffeeBrew = 0;
 export let vacSpin = 0;
 let neonFlicker = 0;
@@ -152,7 +157,7 @@ export function buildProps() {
   prop('board', { name: tr('props.board.name'), hint: tr('props.board.hint'), place: 'board', meshes: meshesOf(board), bounce: board });
   if (lift) prop('door', { name: tr('props.lift.name'), hint: tr('props.lift.hint'), place: 'door', meshes: meshesOf(lift.g), act: () => { liftCall(3); sfx.play('click'); } });
   else prop('door', { name: tr('props.door.name'), hint: tr('props.door.hint'), place: 'door', meshes: [...meshesOf(doorPivot), ...meshesIn([-8.1, 0, DZ - 1.0, -7.8, 2.75, DZ + 1.0])], act: () => { doorKick = state.sim + 2.2; } });
-  prop('coffee', { name: tr(PRO ? 'props.coffee.namePro' : 'props.coffee.name'), hint: tr('props.coffee.hint'), place: 'coffee', meshes: PRO ? [...meshesOf(coffeeG), ...meshesIn([11.9, 0, -8.1, 14.1, 2.2, -7.1])] : meshesOf(coffeeG), act: () => { brewCoffee(); coffeeMade(); } });
+  prop('coffee', { name: tr(PRO ? 'props.coffee.namePro' : 'props.coffee.name'), hint: tr('props.coffee.hint'), place: 'coffee', meshes: PRO ? [...meshesOf(coffeeG), ...meshesIn([11.9, 0, -8.1, 14.1, 2.2, -7.1])] : meshesOf(coffeeG), act: makeCoffee });
   if (host.notes && PRO_FX.notesScreen) prop('notes', { name: tr('paseo.notes'), hint: '', meshes: PRO_FX.notesScreen, act: () => host.notes() });
   prop('meeting', { name: tr('props.meeting.name'), hint: tr('props.meeting.hint'), place: 'meeting', meshes: meshesIn(REG.meeting) });
   prop('printer', { name: tr('props.printer.name'), hint: tr('props.printer.hint'), place: 'printer', meshes: [...meshesIn([PRN.x - 0.4, 0, PRN.z - 0.35, PRN.x + 0.4, 1.05, PRN.z + 0.35]), paper], act: () => { printPage(); pagePrinted(); } });

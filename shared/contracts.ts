@@ -746,6 +746,12 @@ export const chatRpc = defineRpc({
   output: ChatResultSchema,
 });
 
+export const worldLogoRpc = defineRpc({
+  name: "office.world.logo",
+  input: z.object({}),
+  output: z.object({ url: z.string(), data: z.string().nullable() }).nullable(),
+});
+
 /**
  * The script of the page that draws the 3D office: the vendored my-office scene with three.js,
  * one self-contained file. A browser evaluates it in a frame of its own.

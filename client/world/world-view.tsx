@@ -1,4 +1,4 @@
-import { useOfficeBrand } from "../office-brand-context.js";
+import { useSceneBrand } from "../office-brand-context.js";
 import { RegisterWorkspaceDock } from "./workspace-dock.js";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -141,7 +141,7 @@ function WorldScene({
   const onWentHome = useHomeDeparture();
   const { life, say: onLife, tell: onTenure } = useLife();
   const words = useSceneWords();
-  const brand = useOfficeBrand();
+  const brand = useSceneBrand();
   const [sized, setSized] = useState(false);
   const [api, setApi] = useState<WorldApi | null>(null);
   // What the frame's callbacks and its start read: always the last render's.
@@ -237,7 +237,7 @@ function WorldScene({
 
   const script = useWorldScript(sized, onProblem);
   useEffect(() => {
-    if (words.status !== "ready" || script === null || !sized) return undefined;
+    if (!brand || words.status !== "ready" || script === null || !sized) return undefined;
     const container = document.getElementById(containerId);
     if (container === null) return undefined;
     let live = true;
