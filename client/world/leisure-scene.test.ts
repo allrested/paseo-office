@@ -13,7 +13,12 @@ const { leisureNow, requestLoungeAction, updateLeisure } = leisure;
 const h = vi.hoisted(() => ({
   sessions: new Map<string, { id: string; status: string }>(),
   workers: new Map<string, Record<string, unknown>>(),
-  stations: { coffee: [], dining: [], wc: [] } as Record<string, { by: unknown }[]>,
+  brew: vi.fn(),
+  toast: vi.fn(),
+  stations: { coffee: [], dining: [], wc: [] } as Record<
+    string,
+    { by: unknown; x?: number; z?: number }[]
+  >,
   /** The floor plan as core/env.js reads it: the company floor, or not. */
   env: { PRO: true },
   /** What the lively floor last told its plan is open now (paseo-leisure-plan.js step's `open`). */
@@ -41,9 +46,10 @@ vi.mock("../../vendor/my-office/src/office/world/furniture/coffee.js", () => ({
   STEAM_AT: { x: 0, z: 0 },
 }));
 vi.mock("../../vendor/my-office/src/office/interact/props.js", () => ({
-  brewCoffee() {},
+  brewCoffee: h.brew,
   feedFish() {},
 }));
+vi.mock("../../vendor/my-office/src/office/ui/activity.js", () => ({ toast: h.toast }));
 vi.mock("../../vendor/my-office/src/office/people/navigation.js", () => ({
   STATIONS: h.stations,
   standBy() {},
@@ -58,6 +64,8 @@ vi.mock("../../vendor/my-office/src/office/people/workers.js", () => ({
 vi.mock("../../vendor/my-office/src/office/people/errands.js", () => ({
   asleep: (w: Person) => w.root.visible && w.station === "desk",
   free: () => false,
+  dist: (w: { pos: { x: number; y: number } }, x: number, z: number) =>
+    Math.hypot(w.pos.x - x, w.pos.y - z),
   quip() {},
 }));
 vi.mock("../../vendor/my-office/src/office/people/gatherings.js", () => ({
@@ -298,4 +306,38 @@ test("work arriving during the walk takes priority over the requested Lounge eff
   prompt(agent);
   errand.mock.calls[0]![0].arrived();
   expect(effect).not.toHaveBeenCalled();
+});
+
+test("a brewed cup waits for a resting session, including someone asleep across the floor", () => {
+  h.env.PRO = false;
+  h.stations.coffee = [{ by: null }, { by: null }, { x: 42, z: 3, by: null }];
+  const working = person("working");
+  prompt(working);
+
+  leisure.requestCoffee();
+  leisure.requestCoffee();
+  expect(h.brew).toHaveBeenCalledTimes(1);
+  expect(h.toast).toHaveBeenLastCalledWith("paseo.coffee.waiting");
+
+  const sleeper = person("sleeping");
+  interface Job {
+    spot: { x: number; z: number };
+    at(): string;
+    done(): void;
+  }
+  const errand = vi.fn((job: Job) => Object.assign(sleeper, { chore: job }));
+  Object.assign(sleeper, { errand });
+  openNow();
+  const job = errand.mock.calls[0]![0];
+  expect(job.spot).toMatchObject({ x: 42, z: 3 });
+  expect(h.toast).toHaveBeenLastCalledWith("paseo.coffee.coming");
+  leisure.requestCoffee();
+  expect(errand).toHaveBeenCalledTimes(1);
+  expect(sleeper).not.toHaveProperty("carry");
+
+  expect(job.at()).toBe("people.coffee.thanks");
+  expect(sleeper).toHaveProperty("carry", "cup");
+  expect(h.toast).toHaveBeenLastCalledWith("paseo.coffee.collected");
+  job.done();
+  expect(sleeper).toHaveProperty("anim", "coffee");
 });

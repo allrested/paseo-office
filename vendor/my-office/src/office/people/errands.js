@@ -1,5 +1,5 @@
 // People reacting to what you do in the office: switch off the lamp someone is working by and they get up and switch it
-// back on; print a page and someone fetches it; make a coffee and someone comes for it; the cat on a keyboard gets lifted
+// back on; print a page and someone fetches it; the cat on a keyboard gets lifted
 // down; a thirsty plant gets watered; click someone at work and they look up. (Gatherings, the meeting bell and parties,
 // are in gatherings.js and use the helpers exported here.)
 import * as THREE from '../../../three/three.module.min.js';
@@ -10,13 +10,11 @@ import { ROOM_LAMPS } from '../scene/lights.js';
 import { mat } from '../scene/blocks.js';
 import { night } from '../world/room-update.js';
 import { PRN, paper, printQueue, prnLed } from '../world/props/printer.js';
-import { STEAM_AT } from '../world/furniture/coffee.js';
 import { cat, catGo } from '../world/props/cat.js';
 import { roomPlants } from '../world/furniture/plants-lamps.js';
 import { PROPS } from '../interact/props.js';
 import { DEMO } from '../demo/demo.js';
-import { DESK_SPOTS, STATIONS, standBy, wayTo } from './navigation.js';
-import { COFFEE_Q } from './breaks.js';
+import { DESK_SPOTS, standBy, wayTo } from './navigation.js';
 import { npcs, sessions, subs, workers } from './workers.js';
 import { director } from './director.js';
 import { sfx } from '../audio/sfx.js';
@@ -90,8 +88,8 @@ export function lightsSwitched(sw, flip) {
 const timers = [];
 export function later(sec, fn) { timers.push({ at: state.sim + sec, fn }); }
 
-/* ---------- held things: a page, a cup, a watering can ---------- */
-let paperGeo, paperM, cupGeo, cupM, canM, canDarkM, canGeos;
+/* ---------- held things: a page or a watering can ---------- */
+let paperGeo, paperM, canM, canDarkM, canGeos;
 function hold(w, kind) {
   let m;
   if (kind === 'can') {
@@ -101,8 +99,9 @@ function hold(w, kind) {
     const spout = new THREE.Mesh(canGeos[1], canM); spout.position.set(0, 0.03, 0.09); spout.rotation.x = 1.05; m.add(spout);
     const handle = new THREE.Mesh(canGeos[2], canDarkM); handle.position.set(0, 0.07, -0.01); m.add(handle);
     m.position.set(0, -0.09, 0.05);
-  } else m = kind === 'paper' ? new THREE.Mesh(paperGeo, paperM) : new THREE.Mesh(cupGeo, cupM);
-  if (kind === 'paper') { m.position.set(0, -0.06, 0.07); m.rotation.x = 0.3; } else if (kind === 'cup') m.position.set(0, -0.05, 0.03);
+  } else {
+    m = new THREE.Mesh(paperGeo, paperM); m.position.set(0, -0.06, 0.07); m.rotation.x = 0.3;
+  }
   m.userData.dynamic = true; w.P.armR.hand.add(m); return m;
 }
 
@@ -124,27 +123,6 @@ export function pagePrinted() {
       return line('people.print.got');
     },
     done: () => { held?.removeFromParent(); } });
-}
-
-/* ---------- the coffee machine ----------
-   Make a coffee and the nearest person free to come (anywhere on the floor) says so, takes the cup, and drinks it back
-   at their seat. Not while the afternoon queue is at the machine. */
-export function coffeeMade() {
-  if (replay.on || people().some((w) => w.chore?.coffee)) return;
-  const head = PRO ? COFFEE_Q[0] : STATIONS.coffee[2];
-  if (head?.by) return;
-  const w = nearest(STEAM_AT.x, STEAM_AT.z, PRO ? 14 : 10, (p) => free(p) && p !== director, false);
-  const spot = w && (head ? { x: head.x, z: head.z, face: head.face, node: head.node } : standBy(STEAM_AT.x, STEAM_AT.z));   // (a copy: nobody holds it)
-  if (!spot) return;
-  let cup = null;
-  w.errand({ coffee: true, spot, look: [STEAM_AT.x, STEAM_AT.z], type: 'coffee', anim: 'tidy', hold: 2.2, wait: 0.7, line: line('people.coffee.who'),
-    at: () => { cup = hold(w, 'cup'); return line('people.coffee.thanks'); },
-    done: () => {
-      cup?.removeFromParent();
-      if (w.chore || w.want || w.anim === 'hand') return;
-      const was = w.anim; w.anim = 'coffee';   // sips at the desk for a while (real work still comes first), then back to it
-      setTimeout(() => { if (w.anim === 'coffee' && !w.chore && w.station === 'desk') w.anim = was; }, rand(6000, 9000));
-    } });
 }
 
 /* ---------- the cat ----------
@@ -286,8 +264,6 @@ export function lookUp(w) {
 export function setup() {
   paperGeo = new THREE.BoxGeometry(0.17, 0.012, 0.23);
   paperM = mat('#FBFBF7', { roughness: 0.9 });
-  cupGeo = new THREE.CylinderGeometry(0.035, 0.028, 0.08, 12).translate(0, 0.04, 0);
-  cupM = mat('#FFFFFF', { roughness: 0.4 });
   canM = mat('#4FA36B', { roughness: 0.5, metalness: 0.2 }); canDarkM = mat('#2F6B45', { roughness: 0.6 });
   dropGeo = new THREE.SphereGeometry(0.014, 6, 4); dropM = new THREE.MeshBasicMaterial({ color: '#8FD3FF', transparent: true, opacity: 0.85 });
   printQueue.keep = false;
