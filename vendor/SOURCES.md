@@ -86,7 +86,7 @@ The following copied files include changes marked with `// PASEO:`.
 - `src/office/people/farewell.js` and `interns.js` read the host’s tenure list and report ceremonies through its callback.
 - `src/office/people/duty.js`: while the host gives its duty board (`host.duties`, from `setDuties`), the day's duties and
   who has each are the host's. The scene keeps no rota, assigns nobody and posts no grumble, so an owed duty gets no apology either. HR posts the host's list in
-  the morning. A free person acts out a pretend duty, chosen by `paseo-duty-plan.js`, and `host.dutyDone` tells Paseo.
+  the morning. A free person acts out a pretend duty as soon as it is idle, at any hour, chosen by `paseo-duty-plan.js`, and `host.dutyDone` tells Paseo.
   An agent's duty is acted out once by its holder. A duty with no chore of its own has its person walk to the board and
   back. The tooltip is the host's list with short names. The cups in the sink are still counted here. Without host
   duties it is upstream's rota.
