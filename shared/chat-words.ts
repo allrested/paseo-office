@@ -4,7 +4,6 @@ import type { Translate } from "./upstream/chat-engine.js";
 // Upstream's English name for the director (vendor/my-office/src/i18n/locales/en/people.js).
 const DIRECTOR = "Director";
 const CHAT_PREFIX = "chat.";
-const plural = new Intl.PluralRules("en-US");
 
 // Array.isArray does not narrow a readonly array.
 function isList(words: ChatWords): words is readonly ChatWords[] {
@@ -53,7 +52,8 @@ function line(
 ): string | undefined {
   if (words === undefined || typeof words === "string") return words;
   if (isList(words)) return line(words[Math.floor(Math.random() * words.length)], values);
-  const chosen = words[plural.select(Number(values.n ?? 0))] ?? words.other;
+  // This English dictionary only pluralizes counts. Mobile clients can lack Intl.PluralRules.
+  const chosen = Math.abs(Number(values.n)) === 1 ? (words.one ?? words.other) : words.other;
   return typeof chosen === "string" ? chosen : undefined;
 }
 
