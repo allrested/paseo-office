@@ -1,6 +1,5 @@
 import { expect, test } from "vitest";
 import {
-  BOARD_WINDOW,
   boardRows,
   dutyLine,
   tipRows,
@@ -24,8 +23,6 @@ function duty(id: string, patch: Partial<WorldDuty> = {}): WorldDuty {
 
 const HOLDER = { id: "a1", name: "Planner" };
 const free = (...ids: string[]) => ids.map((id) => ({ id, ready: true }));
-/** 15:00, the cups' hour and the board's. */
-const AFTERNOON = 900;
 
 test("the board's rows: each duty's name, its chore, who has it, ticked when done, owed in red", () => {
   expect(
@@ -75,20 +72,44 @@ test("the tooltip's rows: one duty a row, who has it, done, and owed on its own 
   ]);
 });
 
-test("a pretend duty in its hours goes to the free figure that has done fewest today", () => {
+test("an open pretend duty goes to the free figure that has done fewest today", () => {
   const job = nextJob({
     duties: [duty("p1", { chore: "cups" })],
     acted: new Set(),
     counts: new Map([["a", 1]]),
     figures: [{ id: "x", ready: false }, ...free("a", "b")],
-    minutes: AFTERNOON,
     force: false,
     pile: 4,
   });
   expect(job).toEqual({ id: "p1", who: "b" });
 });
 
-test("nothing is acted out outside its hours, twice, once done elsewhere, or with an empty sink", () => {
+test("a free figure takes an open duty at once, whatever the hour its chore used to wait for", () => {
+  const base = {
+    acted: new Set<string>(),
+    counts: new Map(),
+    figures: free("a"),
+    force: false,
+    pile: 4,
+  };
+  for (const chore of ["plants", "cups", "trash", "table", null] as const) {
+    expect(nextJob({ ...base, duties: [duty("p1", { chore })] })).toEqual({ id: "p1", who: "a" });
+  }
+});
+
+test("a duty waits while nobody is free", () => {
+  const job = nextJob({
+    duties: [duty("p1", { chore: "trash" })],
+    acted: new Set(),
+    counts: new Map(),
+    figures: [{ id: "a", ready: false }],
+    force: false,
+    pile: 4,
+  });
+  expect(job).toBeNull();
+});
+
+test("nothing is acted out twice, once done elsewhere, or with an empty sink", () => {
   const base = {
     acted: new Set<string>(),
     counts: new Map(),
@@ -97,27 +118,22 @@ test("nothing is acted out outside its hours, twice, once done elsewhere, or wit
     pile: 4,
   };
   const plants = [duty("p1", { chore: "plants" })];
-  expect(nextJob({ ...base, duties: plants, minutes: 480 })).toBeNull();
-  expect(nextJob({ ...base, duties: plants, minutes: 480, force: true })).toEqual({
-    id: "p1",
-    who: "a",
-  });
-  expect(nextJob({ ...base, duties: plants, minutes: 600, acted: new Set(["p1"]) })).toBeNull();
-  expect(nextJob({ ...base, duties: [duty("p1", { state: "done" })], minutes: 600 })).toBeNull();
+  expect(nextJob({ ...base, duties: plants, acted: new Set(["p1"]) })).toBeNull();
+  expect(nextJob({ ...base, duties: [duty("p1", { state: "done" })] })).toBeNull();
+  const cups = [duty("p1", { chore: "cups" })];
+  expect(nextJob({ ...base, duties: cups, pile: 0 })).toBeNull();
+  expect(nextJob({ ...base, duties: cups, pile: 0, force: true })).toEqual({ id: "p1", who: "a" });
   expect(
-    nextJob({ ...base, duties: [duty("p1", { chore: "cups" })], minutes: AFTERNOON, pile: 0 }),
-  ).toBeNull();
-  expect(BOARD_WINDOW).toEqual([480, 1080]);
-  expect(nextJob({ ...base, duties: [duty("p1")], minutes: 1100 })).toBeNull();
+    nextJob({ ...base, duties: [duty("p1", { chore: "cups", owed: true })], pile: 0 }),
+  ).toEqual({ id: "p1", who: "a" });
 });
 
-test("an owed duty comes first, from 8:00 and outside its hours", () => {
+test("an owed duty comes first", () => {
   const job = nextJob({
     duties: [duty("p1", { chore: "plants" }), duty("p2", { chore: "trash", owed: true })],
     acted: new Set(),
     counts: new Map(),
     figures: free("a"),
-    minutes: 540,
     force: false,
     pile: 0,
   });
@@ -129,7 +145,6 @@ test("an agent's duty is acted out once by its holder's figure, and by nobody el
   const base = {
     acted: new Set<string>(),
     counts: new Map(),
-    minutes: 600,
     force: false,
     pile: 0,
   };

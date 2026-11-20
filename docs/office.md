@@ -429,9 +429,13 @@ you mark any. Nobody posts to the duty board, not even from the office. A duty i
 to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
 
 A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor
-finish it. On the 3D floor a free person acts it out during that chore's hours, and the view tells
+finish it. On the 3D floor a person acts it out as soon as it is idle (resting at its desk with
+nothing else on), at any hour: no duty waits for a time of day. Owed duties go first, then the
+board's order, each to the idle person that has done fewest today, one duty at a time. Work coming
+in calls the person back and the duty waits for the next idle one. Only the cups wait for something
+else, a cup in the sink, unless they are owed. The view tells
 the host, which records it as done by that agent. When two devices both act it out, the first to
-report wins. With no 3D office open during those hours, it stays open and is owed.
+report wins. With no 3D office open, or nobody idle, before its day ends, it stays open and is owed.
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.

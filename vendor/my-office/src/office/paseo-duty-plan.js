@@ -4,12 +4,7 @@
 //
 // The host keeps the list and each day's state. A duty with instructions is an agent's: its holder's figure acts it
 // out once. A pretend one (no instructions) is acted out by a free figure, and the scene tells the host it is done.
-import { OWE_FROM, due } from '../shared/duty.js';
-
-/** A duty with no chore of its own: its figure walks to the board and back, from 8:00 to 18:00. */
-export const BOARD_WINDOW = [480, 1080];
-
-const inHours = (d, minutes) => (d.chore ? due(d.chore, minutes) : minutes >= BOARD_WINDOW[0] && minutes < BOARD_WINDOW[1]);
+// A duty waits for a free figure, never for an hour of the day: whoever is idle takes the next one open.
 
 /** The board's rows: { chore, label, name (the holder's, '' while open), at ('✓' once done), busy, owed }. */
 export function boardRows(duties, busyId) {
@@ -41,14 +36,11 @@ export function dutyLine(duties, open) {
   }).join(' · ');
 }
 
-/** Whether this duty is one to act out now (not who: see nextJob). */
-function wanted(d, { acted, minutes, force, pile }) {
+/** Whether this duty is one to act out now (not who: see nextJob). The cups wait for a cup in the sink, unless owed. */
+function wanted(d, { acted, force, pile }) {
   if (acted.has(d.id)) return false;
   if (d.pretend ? d.state !== 'open' : !d.holder) return false;
-  if (force) return true;
-  if (d.owed) return minutes >= OWE_FROM;
-  if (d.chore === 'cups' && pile === 0) return false;
-  return inHours(d, minutes);
+  return force || d.owed || d.chore !== 'cups' || pile > 0;
 }
 
 /** Who acts it out: its holder's figure; a pretend one, the free figure that has done fewest today. */
@@ -62,13 +54,13 @@ function whoFor(d, figures, counts) {
 
 /**
  * The next duty to act out, owed ones first: { id, who }, or null. `acted`: the duties this page has acted out;
- * `counts`: how many each figure has done today; `figures`: [{ id, ready }] in the floor's order; `minutes` of the
- * day; `force` (?duty): any hour; `pile`: the cups in the sink.
+ * `counts`: how many each figure has done today; `figures`: [{ id, ready }] in the floor's order (ready: idle, with
+ * nothing else on); `force` (?duty): the cups with an empty sink too; `pile`: the cups in the sink.
  */
-export function nextJob({ duties, acted, counts, figures, minutes, force, pile }) {
+export function nextJob({ duties, acted, counts, figures, force, pile }) {
   const order = [...duties.filter((d) => d.owed), ...duties.filter((d) => !d.owed)];
   for (const d of order) {
-    if (!wanted(d, { acted, minutes, force, pile })) continue;
+    if (!wanted(d, { acted, force, pile })) continue;
     const who = whoFor(d, figures, counts);
     if (who !== null) return { id: d.id, who };
   }
