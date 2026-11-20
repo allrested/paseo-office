@@ -31,8 +31,8 @@ import { CHORES, OWE_FROM, assign, done, due, fresh, pile, roll, saw, washed } f
 import { dayKey, dayKind, isWorkday, prevWorkday } from '../../shared/workdays.js';
 import { t as tr } from '../../i18n/index.js';
 // PASEO: the host's duty board (paseo-host.js `duties`, set by setDuties): while the host gives one, the day's duties
-// and who has each are the host's, not this rota's. A free figure acts out a pretend duty and the host is told it is
-// done; an agent's duty is acted out once by its holder's figure. The cups in the sink are still counted here.
+// and who has each are the host's, not this rota's. A free figure acts out a pretend duty as soon as it is idle (no
+// hour of the day is waited for) and the host is told it is done; an agent's duty is acted out once by its holder's figure. The cups in the sink are still counted here.
 import { host } from '../paseo-host.js';
 import { boardRows, dutyLine, nextJob, tipRows } from '../paseo-duty-plan.js';
 
@@ -185,7 +185,7 @@ function hostLook(list, m, today) {
   }
   if (job || !list.length || napOn) return;
   const figures = list.map((p) => ({ id: p.w.id, ready: ready(p.w) }));
-  const next = nextJob({ duties: host.duties, acted, counts, figures, minutes: m, force: FORCE, pile: pile(st, m) });
+  const next = nextJob({ duties: host.duties, acted, counts, figures, force: FORCE, pile: pile(st, m) });
   const given = next && host.duties.find((d) => d.id === next.id);
   if (given) start(given.chore || 'board', workers.get(next.who), given.owed, given);
 }
