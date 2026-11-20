@@ -1,0 +1,46 @@
+name: Publish the verified v0.2.0 tarball
+on:
+  push:
+    branches: [release/recover-v020-0oRiKX]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Reproduce the tarball from the tested release tag
+        run: |
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" --json > "$RUNNER_TEMP/pack.json"
+          node <<'JS'
+          const { readFileSync } = require('node:fs');
+          const [pack] = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/pack.json', 'utf8'));
+          const assert = require('node:assert/strict');
+          assert.equal(pack.id, 'paseo-office@0.2.0');
+          assert.equal(pack.integrity, 'sha512-9uJDnTwiepJzA5ohX/hzkRLbPX5GMN+n/24hDpJKpy3SKHCkGHdHtfTL3ruWWHjmNxqJjYl3l9YovcNbZ7F+qA==');
+          JS
+      - name: Install the staging-capable npm CLI
+        run: npm install --prefix "$RUNNER_TEMP/release-cli" --registry=https://registry.npmjs.org --ignore-scripts --no-audit --no-fund npm@11.21.3
+      - name: Publish, or stage if npm requests maintainer approval
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm_cli="$RUNNER_TEMP/release-cli/node_modules/.bin/npm"
+          tarball="$RUNNER_TEMP/paseo-office-0.2.0.tgz"
+          log="$RUNNER_TEMP/publish.log"
+          if "$npm_cli" publish "$tarball" --tag latest --access public --provenance --ignore-scripts > "$log" 2>&1; then
+            tail -5 "$log"
+            exit 0
+          fi
+          tail -12 "$log"
+          grep -qF 'Two-factor authentication or granular access token with bypass 2fa enabled' "$log" || exit 1
+          "$npm_cli" stage publish "$tarball" --tag latest --access public --provenance --ignore-scripts
