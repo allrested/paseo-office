@@ -32,7 +32,18 @@ export function messengerStyles({ colors }: PluginTheme, compact: boolean, touch
     borderRadius: 16,
     zIndex: 1,
   };
+  const floorAnchor: ViewStyle = {
+    position: "absolute",
+    top: 8,
+    bottom: 12,
+    right: 12,
+    left: 12,
+    alignItems: "flex-end",
+    zIndex: 6,
+  };
   return {
+    floorAnchor,
+    compactAnchor: { ...floorAnchor, top: 6, bottom: 6, right: 6, left: 6 },
     tools,
     photo: { width: 210, maxWidth: "100%", aspectRatio: 4 / 3, borderRadius: 8 },
     morePanel: {
@@ -80,14 +91,9 @@ export function messengerStyles({ colors }: PluginTheme, compact: boolean, touch
     toolsHidden: { ...tools, opacity: 0, pointerEvents: "none" },
     chosenName: { flexShrink: 1, color: colors.foreground, fontSize: 12, fontWeight: "600" },
     floating: {
-      position: "absolute",
-      top: compact ? 6 : 60,
-      bottom: compact ? 6 : 12,
-      right: compact ? 6 : 12,
-      left: compact ? 6 : undefined,
-      width: compact ? undefined : 460,
-      maxWidth: "100%",
-      zIndex: 6,
+      flex: 1,
+      width: "100%",
+      maxWidth: compact ? undefined : 460,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.border,

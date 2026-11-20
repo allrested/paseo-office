@@ -1614,10 +1614,18 @@ function OfficeMessenger({
     }),
     [link, onClose],
   );
-  return open ? (
-    <FloatingTeamChat {...panel} link={sessionLink} onClose={onClose} />
-  ) : (
-    <TeamChatPreview chat={panel.office.chat} onOpen={onOpen} />
+  const { messenger } = panel.styles;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={panel.layout.compact ? messenger.compactAnchor : messenger.floorAnchor}
+    >
+      {open ? (
+        <FloatingTeamChat {...panel} link={sessionLink} onClose={onClose} />
+      ) : (
+        <TeamChatPreview chat={panel.office.chat} onOpen={onOpen} compact={panel.layout.compact} />
+      )}
+    </View>
   );
 }
 
@@ -1970,7 +1978,7 @@ export function OfficeSurface(
             size={panels.railSize}
           />
         ) : null}
-        <View style={floorStyle}>
+        <View testID="office-floor-pane" style={floorStyle}>
           {!panels.docked && controls}
           <SurfaceBody
             onPhotoReady={onPhotoReady}
@@ -2018,6 +2026,15 @@ export function OfficeSurface(
             color={color}
             {...panel}
           />
+          {full.integrated && (
+            <OfficeMessenger
+              open={teamOpen}
+              {...panel}
+              link={panels.link}
+              onOpen={openTeam}
+              onClose={closeTeam}
+            />
+          )}
         </View>
         <WideColumn
           sessions={sessions}
@@ -2146,15 +2163,6 @@ export function OfficeSurface(
         styles={styles}
         onClose={dutyCard.close}
       />
-      {full.integrated && (
-        <OfficeMessenger
-          open={teamOpen}
-          {...panel}
-          link={panels.link}
-          onOpen={openTeam}
-          onClose={closeTeam}
-        />
-      )}
       <OfficeWorkspace
         selection={workspace}
         hostId={props.host.id}

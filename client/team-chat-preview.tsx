@@ -6,11 +6,7 @@ import type { ChatMessage, ChatSnapshot } from "../shared/contracts.js";
 import { isYours, shows, STICKERS } from "./chat-text.js";
 
 const card: ViewStyle = {
-  position: "absolute",
-  zIndex: 4,
-  top: 58,
-  right: 12,
-  maxWidth: "92%",
+  maxWidth: "100%",
   width: 318,
   minHeight: 56,
   flexDirection: "row",
@@ -23,6 +19,7 @@ const card: ViewStyle = {
   borderWidth: 1,
   borderColor: "#cbd4df",
 };
+const compactCard: ViewStyle = { ...card, marginTop: 52, marginRight: 6, maxWidth: "92%" };
 const badge: ViewStyle = {
   width: 34,
   height: 34,
@@ -44,7 +41,15 @@ function previewText(message: ChatMessage): string {
 }
 
 /** A newly arrived group message can open the messenger without changing the camera or rail. */
-export function TeamChatPreview({ chat, onOpen }: { chat: ChatSnapshot | null; onOpen(): void }) {
+export function TeamChatPreview({
+  chat,
+  compact,
+  onOpen,
+}: {
+  chat: ChatSnapshot | null;
+  compact: boolean;
+  onOpen(): void;
+}) {
   const brand = useOfficeBrand();
   const newest = chat?.messages.at(-1);
   const id = newest?.id ?? "";
@@ -75,7 +80,7 @@ export function TeamChatPreview({ chat, onOpen }: { chat: ChatSnapshot | null; o
       accessibilityRole="button"
       accessibilityLabel={`Open team chat: ${caption}`}
       onPress={onOpen}
-      style={card}
+      style={compact ? compactCard : card}
     >
       <View style={badge}>
         <Icon name="MessagesSquare" size={18} color="#20599a" />
