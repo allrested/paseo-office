@@ -4,6 +4,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 /** The Host card uses the same type and surface colors as the Office rails. */
 export function hostStyles(colors: PluginTheme["colors"], compact: boolean, touch: boolean) {
   const actionWidth = touch ? 156 : 138;
+  const detailRow = { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 } as const;
   return StyleSheet.create({
     body: { gap: 20 },
     tabs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4 },
@@ -118,6 +119,10 @@ export function hostStyles(colors: PluginTheme["colors"], compact: boolean, touc
       ? { alignSelf: "flex-start", marginLeft: 17, maxWidth: "95%" }
       : { width: actionWidth },
     emptyAction: compact ? { display: "none" } : { width: actionWidth },
+    detailRow,
+    detailRowDivided: { ...detailRow, borderTopColor: colors.border, borderTopWidth: 1 },
+    historyPlot: { height: 32, flexDirection: "row", alignItems: "flex-end", gap: 2 },
+    historyBar: { flex: 1, borderRadius: 2, backgroundColor: colors.accent },
     footer: { flexDirection: "row", alignItems: "center", gap: 6 },
     empty: { padding: 14, fontSize: 13, color: colors.foregroundMuted },
   });

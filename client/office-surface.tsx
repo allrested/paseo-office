@@ -2069,6 +2069,7 @@ export function OfficeSurface(
         onClose={closeCard}
       />
       <MachineCard
+        workspaces={office.state.workspaces}
         ssh={ssh}
         machine={machine}
         open={machineOpen}

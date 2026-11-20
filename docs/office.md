@@ -482,6 +482,8 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
+In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
+
 Local process readings require Linux. On other platforms the Host card is available when Office
 finds a configured SSH-MCP installation.
 

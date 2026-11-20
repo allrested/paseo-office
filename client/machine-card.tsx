@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import type { Machine, MachineAgent } from "../shared/contracts.js";
+import type { Machine, MachineAgent, OfficeWorkspace } from "../shared/contracts.js";
 import { HostViews, NO_SSH, type SshDiscovery } from "./ssh-hosts.js";
+import { LocalHostDetails } from "./host-details.js";
 import { ActionButton } from "./action-button.js";
 import {
   agentLine,
@@ -193,6 +194,7 @@ function AgentGroup({ title, agents, now, actionFor, cleanUp, styles, empty }: A
 }
 
 interface MachineBodyProps {
+  workspaces?: readonly OfficeWorkspace[];
   machine: Machine;
   cleanUp(agentIds: readonly string[]): Promise<void>;
   styles: OfficeStyles;
@@ -204,7 +206,11 @@ const CLEAN_ONLY = { label: "Clean up", pendingLabel: "Cleaning up...", primary:
 const CLEAN_ONE = { label: "Clean up", pendingLabel: "Cleaning up...", primary: false };
 const CLOSE = { label: "Close runtime", pendingLabel: "Closing...", primary: false };
 
-function MachineBody({ machine, cleanUp, styles }: MachineBodyProps) {
+const NO_WORKSPACES: readonly OfficeWorkspace[] = [];
+
+function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: MachineBodyProps) {
+  const [expanded, setExpanded] = useState(false);
+  const toggle = useCallback(() => setExpanded((value) => !value), []);
   const now = Date.parse(machine.readAt);
   const left = useMemo(() => machine.agents.filter((agent) => agent.forgotten), [machine.agents]);
   const others = useMemo(
@@ -244,6 +250,16 @@ function MachineBody({ machine, cleanUp, styles }: MachineBodyProps) {
         />
         <Meter icon="Cpu" label="CPU" percent={machine.cpuPercent} tone="muted" styles={styles} />
       </View>
+      <View style={styles.host.groupHead}>
+        <Text style={styles.host.note}>Read at {readAtText(machine.readAt)}</Text>
+        <ActionButton
+          label={expanded ? "Hide details" : "Details"}
+          pendingLabel="Details"
+          onPress={toggle}
+          styles={styles}
+        />
+      </View>
+      {expanded && <LocalHostDetails machine={machine} workspaces={workspaces} styles={styles} />}
       {left.length > 0 ? (
         <View style={styles.host.group}>
           <AgentGroup
@@ -283,15 +299,12 @@ function MachineBody({ machine, cleanUp, styles }: MachineBodyProps) {
             : "No other agent holds a process on this host."
         }
       />
-      <View style={styles.host.footer}>
-        <Icon name="Clock" size={13} color={styles.host.note.color} />
-        <Text style={styles.host.note}>Read at {readAtText(machine.readAt)}</Text>
-      </View>
     </View>
   );
 }
 
 export interface MachineCardProps {
+  workspaces?: readonly OfficeWorkspace[];
   /** Empty on hosts without local readings. */
   machine: Machine | null;
   ssh?: SshDiscovery;
@@ -305,6 +318,7 @@ export interface MachineCardProps {
 export function MachineCard({
   machine,
   ssh = NO_SSH,
+  workspaces,
   open,
   cleanUp,
   styles,
@@ -327,7 +341,12 @@ export function MachineCard({
         {visible && (
           <HostViews discovery={ssh} hasLocal={machine !== null} styles={styles}>
             {machine ? (
-              <MachineBody machine={machine} cleanUp={cleanUp} styles={styles} />
+              <MachineBody
+                workspaces={workspaces}
+                machine={machine}
+                cleanUp={cleanUp}
+                styles={styles}
+              />
             ) : (
               <Text style={styles.host.note}>
                 Local resource readings are unavailable on this host.
