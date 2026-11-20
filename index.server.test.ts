@@ -752,6 +752,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
   expect([...recorded.handlers.keys()]).toEqual([
     "office.state",
     "office.world.street",
+    "office.world.logo",
     "office.world.request",
     "office.world.words",
     "office.ssh.servers",

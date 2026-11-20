@@ -36,7 +36,7 @@ function parseReply(text: string): BridgeReply | null {
 function brandForPage(brand: WorldStartOptions["brand"]): WorldStartOptions["brand"] {
   if (brand === undefined) return undefined;
   return {
-    name: brand.name,
+    ...brand,
     logoUrl: brand.logoUrl?.startsWith("data:") ? brand.logoUrl : null,
   };
 }

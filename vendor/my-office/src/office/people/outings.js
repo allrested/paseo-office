@@ -62,7 +62,7 @@ export const here = (w) => ({ x: w.pos.x, z: w.pos.y });
 // down to the street: the lift (wait for it, step in, the doors shut, down; the stairs while it is serviced) or out of
 // the door, then unseen a moment
 export function goDown(w, R, cb) {
-  const stage = R.stage, gone = () => { if (!live(R, stage)) return; w.offstage = true; later(lift ? 3 : 1, () => live(R, stage) && cb()); };
+  const stage = R.stage, gone = () => { if (!live(R, stage)) return; host.crossDoor(w.id, false); w.offstage = true; later(lift ? 3 : 1, () => live(R, stage) && cb()); };
   w.goTo(DOOR_IN, () => {
     if (!live(R, stage)) return;
     if (!lift) { w.goTo(DOOR_OUT, gone); return; }
@@ -76,6 +76,7 @@ export function goUp(w, R, to, cb) {
   later(lift ? 2.5 : 1, () => {
     if (!live(R, 'up')) return;
     w.offstage = false; w.pos.set(DOOR_OUT.x, DOOR_OUT.z); w.face = w.faceTarget = Math.PI / 2; w.spot = DOOR_OUT;
+    host.crossDoor(w.id, true);
     liftArrive(w);
     const go = () => !R.dead && w.goTo(to(), () => !R.dead && cb());
     if (R.kind === 'come' && clockHooks.in) clockHooks.in(w, go); else go();   // (the morning: clocked in on the way, people/hr.js)

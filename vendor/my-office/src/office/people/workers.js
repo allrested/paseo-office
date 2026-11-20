@@ -467,7 +467,7 @@ export function setup() {
     // packing up at the desk (coat on, bag on the back), then out: the lift (press the button, wait, step in, ride
     // down; the stairs while it is serviced) or the door
     walkOut(gone) {
-      const down = () => streetHooks.home?.(this, gone) || gone();   // (and with the city outside, out into the street)
+      const down = () => { host.crossDoor(this.id, false); if (!streetHooks.home?.(this, gone)) gone(); };   // (and with the city outside, out into the street)
       const out = () => viaClock('out', this, () => this.goTo(DOOR_IN, () => {
         if (!lift) { this.goTo(DOOR_OUT, down); return; }
         liftDown(this, down);
@@ -515,6 +515,7 @@ export function setup() {
     comeBack() {
       this.away = false; this.station = 'arriving';
       if (streetHooks.arrive?.(this)) return;   // (by the street, with the city outside)
+      host.crossDoor(this.id, true);
       this.pos.set(DOOR_OUT.x, DOOR_OUT.z); this.face = this.faceTarget = Math.PI / 2; this.spot = DOOR_OUT;
       this.dress(true); liftArrive(this);
       const home = this.homeSpot(), d = sessions.get(this.id)?.desk ?? -1;

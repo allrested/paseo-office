@@ -294,3 +294,11 @@ test("entries that carry no turn merge as before", () => {
     { kind: "agent", key: "1", text: "ab" },
   ]);
 });
+
+test("an image-only message reopened from Paseo keeps its attachments in order", () => {
+  const imageUrls = ["file:///tmp/a.png", "file:///tmp/b.png"];
+  const message = { type: "user_message" as const, text: "", imageUrls };
+  expect(conversationRows(entries(message))).toEqual([
+    { kind: "you", key: "1", text: "", imageUrls },
+  ]);
+});
