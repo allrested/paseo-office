@@ -952,6 +952,24 @@ test("a dismissed sheet keeps the session: reopened from Sessions it is the same
   expect(container.textContent).not.toContain("Sessions, 2 open");
 });
 
+test("the phone conversation has one header and keeps the draft while its details are open", async () => {
+  compact = true;
+  await mount();
+  await seeAda();
+  await pressFirst("Ada");
+  await press("Open session");
+  expect(sheet()?.querySelector('[aria-label="Close"]')).toBeNull();
+  expect(labelled("Close Ada")).not.toBeNull();
+  expect(labelled("Customize agent")).toBeNull();
+  await typeReply("Draft for Ada");
+  await press("Session details");
+  expect(labelled("Session details")?.getAttribute("aria-expanded")).toBe("true");
+  expect(labelled("Customize agent")).not.toBeNull();
+  await press("Session details");
+  expect(labelled("Customize agent")).toBeNull();
+  expect(reply()).toBe("Draft for Ada");
+});
+
 test("Back in the sheet shows Sessions and keeps the session open", async () => {
   compact = true;
   await mount();

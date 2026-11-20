@@ -84,6 +84,7 @@ export interface OfficeStyles {
   sheetScrim: ViewStyle;
   /** The phone's column: a sheet over the lower part of the floor. */
   columnSheet: ViewStyle;
+  sessionSheet: ViewStyle;
   columnSheetHead: ViewStyle;
   columnSheetTitle: TextStyle;
   dialogBody: ViewStyle;
@@ -577,6 +578,20 @@ export function useOfficeStyles(
       borderColor: colors.border,
       borderWidth: 1,
     };
+    const columnSheet: ViewStyle = {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: "75%",
+      zIndex: 3,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+      borderTopWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface0,
+      overflow: "hidden",
+    };
     return {
       fullscreenHeader: {
         ...headerTools,
@@ -768,20 +783,8 @@ export function useOfficeStyles(
       sheetScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 },
       dialogBody: { padding: compact ? 16 : 22, gap: 16 },
       // The floor's top quarter stays in view over the sheet, so the office is still there.
-      columnSheet: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: "75%",
-        zIndex: 3,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        borderTopWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface0,
-        overflow: "hidden",
-      },
+      columnSheet,
+      sessionSheet: { ...columnSheet, height: "92%" },
       columnSheetHead: {
         flexDirection: "row",
         alignItems: "center",

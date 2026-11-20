@@ -1076,6 +1076,7 @@ function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
     return (
       <SessionPane
         agentId={view.agentId}
+        inSheet={panel.layout.compact}
         subagents={sessionChildren(model, view.agentId)}
         onOpenSubagent={panel.link.openSession}
         agent={agent}
@@ -1280,10 +1281,13 @@ function PhoneSheet({
   }, [shown, closeSession]);
   if (!compact) return null;
   const title = sessions.find((each) => each.agentId === shown)?.title ?? null;
+  const identity = shown ? sessionOf(session.model, shown) : null;
   return (
     <ColumnSheet
       open={view}
       sessionTitle={title}
+      sessionAgent={identity?.agent}
+      sessionRoom={identity?.room}
       color={color}
       iconSize={20}
       platform={panel.layout.platform}

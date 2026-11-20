@@ -19,7 +19,8 @@ import { PermissionActions } from "./permission-actions.js";
 import {
   SessionButton,
   SessionDetailTabs,
-  SessionIdentity,
+  SessionHeading,
+  SessionMetadata,
   SubagentRow,
   type SessionDetailTab,
 } from "./session-panel-detail.js";
@@ -60,6 +61,7 @@ export interface SessionPanelProps {
   onClose(): void;
   /** The workspace dialog already provides a close control. */
   hideClose?: boolean;
+  inSheet?: boolean;
   subagents?: readonly OfficeAgent[];
   onOpenSubagent?(id: string): void;
 }
@@ -74,14 +76,60 @@ function Header({
   onOpenWorkspace,
   onClose,
   hideClose,
+  inSheet,
   styles,
 }: Pick<
   SessionPanelProps,
-  "agent" | "room" | "onOpenWorkspace" | "onClose" | "hideClose" | "styles"
+  "agent" | "room" | "onOpenWorkspace" | "onClose" | "hideClose" | "inSheet" | "styles"
 >) {
+  const [expanded, setExpanded] = useState(false);
+  const toggle = useCallback(() => setExpanded((value) => !value), []);
   const [editing, setEditing] = useState(false);
   const edit = useCallback(() => setEditing(true), []);
   const closeEditor = useCallback(() => setEditing(false), []);
+  if (inSheet) {
+    return (
+      <View style={styles.sessions.sheetTools}>
+        {!agent && <Text style={styles.muted}>{UNLISTED_LINE}</Text>}
+        <View style={styles.sessions.sheetActionRow}>
+          {onOpenWorkspace && (
+            <SessionButton
+              label="Open in workspace"
+              icon="PanelsTopLeft"
+              caption="button"
+              onPress={onOpenWorkspace}
+              styles={styles}
+            />
+          )}
+          {agent && (
+            <SessionButton
+              label="Session details"
+              icon={expanded ? "ChevronUp" : "ChevronDown"}
+              expanded={expanded}
+              caption="plain"
+              onPress={toggle}
+              styles={styles}
+            />
+          )}
+        </View>
+        {expanded && agent && (
+          <View style={styles.sessions.sheetDetails}>
+            <SessionMetadata agent={agent} styles={styles} />
+            <SessionButton
+              label="Customize agent"
+              icon="Pencil"
+              caption="plain"
+              onPress={edit}
+              styles={styles}
+            />
+          </View>
+        )}
+        {agent && editing && (
+          <AppearanceEditor key={agent.id} agent={agent} styles={styles} close={closeEditor} />
+        )}
+      </View>
+    );
+  }
   return (
     <View style={styles.sessions.deskHead}>
       <View style={styles.sessions.identityRow}>
@@ -90,7 +138,10 @@ function Header({
             <Text style={styles.muted}>{UNLISTED_LINE}</Text>
           </View>
         ) : (
-          <SessionIdentity agent={agent} room={room} styles={styles} />
+          <View style={styles.sessions.identity}>
+            <SessionHeading agent={agent} room={room} styles={styles} />
+            <SessionMetadata agent={agent} styles={styles} />
+          </View>
         )}
         {agent && (
           <SessionButton label="Customize agent" icon="Pencil" onPress={edit} styles={styles} />
@@ -104,7 +155,7 @@ function Header({
         <SessionButton
           label="Open in workspace"
           icon="ArrowUpRight"
-          caption
+          caption="plain"
           onPress={onOpenWorkspace}
           styles={styles}
         />
@@ -307,6 +358,7 @@ export function SessionPanel({
   onOpenWorkspace,
   onClose,
   hideClose,
+  inSheet,
   subagents,
   onOpenSubagent,
 }: SessionPanelProps) {
@@ -326,6 +378,7 @@ export function SessionPanel({
         onOpenWorkspace={onOpenWorkspace}
         onClose={onClose}
         hideClose={hideClose}
+        inSheet={inSheet}
         styles={styles}
       />
       <SessionDetailTabs

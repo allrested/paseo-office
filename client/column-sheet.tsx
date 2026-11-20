@@ -1,6 +1,8 @@
 import { useCallback, useEffect, type ReactNode } from "react";
 import { KeyboardAvoidingView, Pressable, Text, View } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
+import type { OfficeAgent } from "../shared/contracts.js";
+import { SessionHeading } from "./session-panel-detail.js";
 import { COLUMN_TABS, type ColumnTab, type ColumnView } from "./column-model.js";
 import { ColumnTabs, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import type { OfficeStyles } from "./styles.js";
@@ -10,6 +12,8 @@ export interface ColumnSheetProps {
   open: ColumnView | null;
   /** The open session's title, while the sheet shows a session. */
   sessionTitle: string | null;
+  sessionAgent?: OfficeAgent | null;
+  sessionRoom?: string | null;
   /** The theme's foreground, which an icon-only control's glyph rests at. */
   color: string;
   iconSize: number;
@@ -34,6 +38,8 @@ export interface ColumnSheetProps {
 export function ColumnSheet({
   open,
   sessionTitle,
+  sessionAgent,
+  sessionRoom,
   color,
   iconSize,
   platform,
@@ -64,7 +70,7 @@ export function ColumnSheet({
         onPress={onClose}
         style={styles.sheetScrim}
       />
-      <View testID="office-column-sheet" style={styles.columnSheet}>
+      <View testID="office-column-sheet" style={session ? styles.sessionSheet : styles.columnSheet}>
         <View style={styles.columnSheetHead}>
           {session ? (
             <Pressable
@@ -76,9 +82,13 @@ export function ColumnSheet({
               <Icon name="ArrowLeft" size={iconSize} color={color} />
             </Pressable>
           ) : null}
-          <Text accessibilityRole="header" numberOfLines={1} style={styles.columnSheetTitle}>
-            {title}
-          </Text>
+          {sessionAgent ? (
+            <SessionHeading agent={sessionAgent} room={sessionRoom ?? null} styles={styles} />
+          ) : (
+            <Text accessibilityRole="header" numberOfLines={1} style={styles.columnSheetTitle}>
+              {title}
+            </Text>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={session ? `Close ${title}` : "Close"}
