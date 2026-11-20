@@ -31,7 +31,7 @@ async function upgraded(stored: Record<string, unknown>, fromVersion: number): P
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 
 /** A document from before the floor plan was a setting draws the company floor, as its scene always did. */
-const COMPANY = { floorPlan: "pro", ...WEATHER_DEFAULTS };
+const COMPANY = { archiveOnDeparture: false, floorPlan: "pro", ...WEATHER_DEFAULTS };
 
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
   expect(await upgraded({ agentTools: false }, 1)).toEqual({
@@ -85,6 +85,14 @@ test("a version 4 document without a floor plan keeps its values and draws the c
   };
   expect(officeHostSettings.version).toBe(6);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
+});
+
+test("automatic archiving requires opt-in on new and existing hosts", async () => {
+  expect(officeHostSettings.schema.parse({}).archiveOnDeparture).toBe(false);
+  expect(await upgraded({ agentTools: true }, 6)).toMatchObject({ archiveOnDeparture: false });
+  expect(officeHostSettings.schema.parse({ archiveOnDeparture: true }).archiveOnDeparture).toBe(
+    true,
+  );
 });
 
 test("a host with no settings draws the company floor", () => {

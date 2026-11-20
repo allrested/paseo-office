@@ -23,6 +23,7 @@ type HostSetting =
   | "Office name"
   | "Logo URL"
   | "Brand color"
+  | "Archive idle sessions"
   | "Agent tools"
   | "Notes folder"
   | "Time zone"
@@ -227,6 +228,12 @@ export function HostSwitches({
               />
             </View>
           </View>
+          <ArchiveSetting
+            values={stored}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
           <Text style={styles.sheetLabel}>Stand-up schedule</Text>
           <View style={styles.headerFields}>
             <SettingField
@@ -386,6 +393,41 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         </View>
       )}
     </>
+  );
+}
+
+function ArchiveSetting({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const toggle = useCallback(
+    (next: boolean) => void change("Archive idle sessions", { archiveOnDeparture: next }),
+    [change],
+  );
+  const problem = saveProblem("Archive idle sessions");
+  return (
+    <View style={settingsLayout.block}>
+      {stored && (
+        <LabeledSwitch
+          label="Archive idle sessions"
+          value={stored.archiveOnDeparture}
+          onChange={toggle}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default. When a worker goes home for the night or after evening drinks, an open 3D
+        floor can archive its idle session on this host. Sessions awaiting approval or a working
+        subagent stay active. Archived sessions leave the active list and keep their history.
+      </Text>
+      {problem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {problem}
+        </Text>
+      )}
+    </View>
   );
 }
 

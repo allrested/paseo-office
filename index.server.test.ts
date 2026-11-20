@@ -69,12 +69,24 @@ const NO_TRACKERS = {
 const ON: SettingsState = {
   status: "ready",
   revision: "1",
-  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro" },
+  values: {
+    archiveOnDeparture: false,
+    agentTools: true,
+    ...NO_NOTES,
+    ...NO_TRACKERS,
+    floorPlan: "pro",
+  },
 };
 const OFF: SettingsState = {
   status: "ready",
   revision: "2",
-  values: { agentTools: false, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro" },
+  values: {
+    archiveOnDeparture: false,
+    agentTools: false,
+    ...NO_NOTES,
+    ...NO_TRACKERS,
+    floorPlan: "pro",
+  },
 };
 const OWN_TOOL = defineAgentTool({
   name: "other_tool",
@@ -536,6 +548,7 @@ function notesSettings(
     status: "ready",
     revision: notesFolder + notesTimeZone + notesDays.join(""),
     values: {
+      archiveOnDeparture: false,
       agentTools: true,
       notesFolder,
       notesTimeZone,
@@ -1337,7 +1350,14 @@ function jiraVariables(base: string): NodeJS.ProcessEnv {
 const JIRA_ON: SettingsState = {
   status: "ready",
   revision: "jira",
-  values: { agentTools: true, ...NO_NOTES, ...NO_TRACKERS, floorPlan: "pro", jiraProjects: "OPS" },
+  values: {
+    archiveOnDeparture: false,
+    agentTools: true,
+    ...NO_NOTES,
+    ...NO_TRACKERS,
+    floorPlan: "pro",
+    jiraProjects: "OPS",
+  },
 };
 
 test("a due incidents run calls the check; dismiss answers its count", async () => {

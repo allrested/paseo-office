@@ -577,7 +577,13 @@ export function createOfficePlugin(
     });
   });
   server.handle(streetSubscription, (_input, context) => streets.attach(context));
-  const archiveDeparture = createDepartureArchiver(() => hub.read());
+  const archiveDeparture = createDepartureArchiver(
+    () => hub.read(),
+    async () => {
+      const state = await settings.read();
+      return state.status === "ready" && state.values.archiveOnDeparture === true;
+    },
+  );
   server.handle(homeDepartureRpc, (input, context) =>
     guarded("home departure", async () => {
       holder.remember(context.paseo);

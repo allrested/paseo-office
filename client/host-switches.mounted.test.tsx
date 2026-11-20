@@ -112,6 +112,7 @@ beforeEach(() => {
   saveError = null;
   answer = null;
   stored = {
+    archiveOnDeparture: false,
     agentTools: false,
     notesFolder: "",
     notesTimeZone: "Asia/Riyadh",
@@ -167,6 +168,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
   expect(saved).toEqual([
     {
       values: {
+        archiveOnDeparture: false,
         agentTools: false,
         notesFolder: "/workspace/notes",
         notesTimeZone: "Asia/Riyadh",
@@ -201,6 +203,19 @@ test("a field left as it was saves nothing", async () => {
   expect(saved).toEqual([]);
 });
 
+test("the archive switch is off until enabled and saves the host preference", async () => {
+  await mount();
+  const control = container.querySelector<HTMLElement>('[aria-label="Archive idle sessions"]')!;
+  expect(control.getAttribute("aria-checked")).toBe("false");
+  await act(async () => control.click());
+  expect(saved.map((save) => save.values.archiveOnDeparture)).toEqual([true]);
+  stored = saved[0]!.values;
+  await mount();
+  expect(control.getAttribute("aria-checked")).toBe("true");
+  await act(async () => control.click());
+  expect(saved.at(-1)?.values.archiveOnDeparture).toBe(false);
+});
+
 test("the switch keeps the notes settings when it saves", async () => {
   await mount();
   await act(async () =>
@@ -208,6 +223,7 @@ test("the switch keeps the notes settings when it saves", async () => {
   );
   expect(saved.map((save) => save.values)).toEqual([
     {
+      archiveOnDeparture: false,
       agentTools: true,
       notesFolder: "",
       notesTimeZone: "Asia/Riyadh",
