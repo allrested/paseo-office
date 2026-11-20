@@ -12,7 +12,21 @@ export function sessionStyles(colors: PluginTheme["colors"], touch: boolean) {
     alignItems: "center",
     justifyContent: "center",
   } as const;
+  const workspaceButton = {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surface1,
+    borderWidth: 1,
+    borderColor: colors.border,
+  } as const;
   return StyleSheet.create({
+    workspaceButton,
+    workspacePressed: { ...workspaceButton, backgroundColor: colors.surface2 },
     // The session drawer shares this header with the workspace dialog, from 264 px to desktop.
     deskHead: {
       ...rail,
@@ -21,6 +35,15 @@ export function sessionStyles(colors: PluginTheme["colors"], touch: boolean) {
       paddingTop: 14,
       paddingBottom: 6,
     },
+    sheetTools: { paddingHorizontal: 12, paddingTop: 6, backgroundColor: colors.surface0 },
+    sheetActionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      columnGap: 8,
+    },
+    sheetDetails: { paddingTop: 6, gap: 4 },
     identityRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
     identity: {
       flex: 1,

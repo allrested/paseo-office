@@ -11,7 +11,7 @@ import { avatarInitials } from "./sessions-text.js";
 import { statusLine } from "./session-text.js";
 import type { OfficeStyles } from "./styles.js";
 
-export function SessionIdentity({
+export function SessionHeading({
   agent,
   room,
   styles,
@@ -21,64 +21,67 @@ export function SessionIdentity({
   styles: OfficeStyles;
 }) {
   const name = agentTitle(agent);
-  const context = contextPercent(agent);
-  const cost = agent.costUsd === 0 ? "$0.00" : costText(agent.costUsd);
   const borderColor = shirtColor(agent.appearance);
   const avatarStyle = useMemo(
     () => [styles.sessions.identityAvatar, borderColor && { borderColor, borderWidth: 2 }],
     [styles.sessions.identityAvatar, borderColor],
   );
+  return (
+    <View style={styles.sessions.identityLead}>
+      <View style={avatarStyle} aria-hidden>
+        <Text style={styles.sessions.initials}>
+          {agent.appearance?.avatar ? AVATARS[agent.appearance.avatar] : avatarInitials(name)}
+        </Text>
+        <View style={styles.sessions.badge}>
+          <View style={styles.dot[dotTone(agent)]} />
+        </View>
+      </View>
+      <View style={styles.sessions.identityText}>
+        <Text accessibilityRole="header" style={styles.sessions.identityName} numberOfLines={2}>
+          {name}
+        </Text>
+        <Text numberOfLines={2} style={styles.chatMeta}>
+          {statusLine(agent, room)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export function SessionMetadata({ agent, styles }: { agent: OfficeAgent; styles: OfficeStyles }) {
+  const context = contextPercent(agent);
+  const cost = agent.costUsd === 0 ? "$0.00" : costText(agent.costUsd);
   const fill = useMemo(
     () => [styles.sessions.contextGauge, { width: `${context ?? 0}%` as const }],
     [context, styles],
   );
   return (
-    <View style={styles.sessions.identity}>
-      <View style={styles.sessions.identityLead}>
-        <View style={avatarStyle} aria-hidden>
-          <Text style={styles.sessions.initials}>
-            {agent.appearance?.avatar ? AVATARS[agent.appearance.avatar] : avatarInitials(name)}
-          </Text>
-          <View style={styles.sessions.badge}>
-            <View style={styles.dot[dotTone(agent)]} />
-          </View>
-        </View>
-        <View style={styles.sessions.identityText}>
-          <Text accessibilityRole="header" style={styles.sessions.identityName} numberOfLines={2}>
-            {name}
-          </Text>
-          <Text numberOfLines={2} style={styles.chatMeta}>
-            {statusLine(agent, room)}
-          </Text>
-        </View>
+    <View style={styles.sessions.metadata}>
+      <View style={styles.sessions.metaChip}>
+        <Text style={styles.sessions.caption}>{agent.model ? "Model" : "Provider"}</Text>
+        <Text style={styles.sessions.metaValue} numberOfLines={2} selectable>
+          {agent.model || agent.provider}
+        </Text>
       </View>
-      <View style={styles.sessions.metadata}>
+      {context !== null && (
+        <View
+          style={styles.sessions.metaChip}
+          accessible
+          accessibilityLabel={contextLine(agent) ?? undefined}
+        >
+          <Text style={styles.sessions.caption}>Context</Text>
+          <View style={styles.sessions.contextTrack} aria-hidden>
+            <View style={fill} />
+          </View>
+          <Text style={styles.sessions.metaValue}>{context}%</Text>
+        </View>
+      )}
+      {cost !== null && (
         <View style={styles.sessions.metaChip}>
-          <Text style={styles.sessions.caption}>{agent.model ? "Model" : "Provider"}</Text>
-          <Text style={styles.sessions.metaValue} numberOfLines={2} selectable>
-            {agent.model || agent.provider}
-          </Text>
+          <Text style={styles.sessions.caption}>Cost</Text>
+          <Text style={styles.sessions.metaValue}>{cost}</Text>
         </View>
-        {context !== null && (
-          <View
-            style={styles.sessions.metaChip}
-            accessible
-            accessibilityLabel={contextLine(agent) ?? undefined}
-          >
-            <Text style={styles.sessions.caption}>Context</Text>
-            <View style={styles.sessions.contextTrack} aria-hidden>
-              <View style={fill} />
-            </View>
-            <Text style={styles.sessions.metaValue}>{context}%</Text>
-          </View>
-        )}
-        {cost !== null && (
-          <View style={styles.sessions.metaChip}>
-            <Text style={styles.sessions.caption}>Cost</Text>
-            <Text style={styles.sessions.metaValue}>{cost}</Text>
-          </View>
-        )}
-      </View>
+      )}
     </View>
   );
 }
@@ -89,7 +92,8 @@ export function SessionButton({
   onPress,
   styles,
   primary = false,
-  caption = false,
+  caption,
+  expanded,
   disabled = false,
 }: {
   icon: string;
@@ -97,12 +101,14 @@ export function SessionButton({
   onPress(): void;
   styles: OfficeStyles;
   primary?: boolean;
-  caption?: boolean;
+  caption?: "plain" | "button";
+  expanded?: boolean;
   disabled?: boolean;
 }) {
   const buttonStyle = useCallback(
     ({ pressed }: PressableStateCallbackType) => {
       const palette = styles.sessions;
+      if (caption === "button") return pressed ? palette.workspacePressed : palette.workspaceButton;
       if (caption) return palette.deskLink;
       if (!primary) return pressed ? palette.deskActionPressed : palette.deskAction;
       if (disabled) return palette.sendDisabled;
@@ -115,6 +121,7 @@ export function SessionButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      aria-expanded={expanded}
       disabled={disabled}
       onPress={onPress}
       style={buttonStyle}
