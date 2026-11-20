@@ -1013,6 +1013,7 @@ const NOTES: SettingsState = {
   status: "ready",
   revision: "notes",
   values: {
+    archiveOnDeparture: false,
     agentTools: true,
     ...NO_NOTES,
     notesFolder: NOTES_FOLDER,
