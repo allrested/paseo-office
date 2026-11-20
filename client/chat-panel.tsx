@@ -759,7 +759,8 @@ function Pinned({
 }
 
 const memberStatuses = { attention: "Needs you", working: "Working", resting: "Resting" } as const;
-type ChatPanelProps = ColumnPanelProps & ChatShortcuts & { draft: ChatDraft; onClose?(): void };
+type ChatPanelProps = ColumnPanelProps &
+  ChatShortcuts & { draft: ChatDraft; onClose?: (() => void) | undefined };
 
 export function FloatingTeamChat(props: ChatPanelProps & { onClose(): void }) {
   const theme = useMemo(() => messengerTheme(props.theme), [props.theme]);
@@ -986,91 +987,100 @@ export function ChatPanel({
           />
         </View>
       )}
-      <ScrollView
-        ref={scroller}
-        contentContainerStyle={styles.chatList}
-        onScroll={onScroll}
-        onContentSizeChange={followEnd}
-        onLayout={followEnd}
-        scrollEventThrottle={16}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Messages
-          messages={shownMessages}
-          emptyLabel={needle ? "No matching messages" : CHAT_EMPTY}
-          firstUnread={needle ? undefined : firstUnread}
-          agents={model.agents}
-          problem={problem}
-          always={touchScreen}
-          link={link}
-          run={run}
-          onReply={setReplyTo}
-          styles={styles}
-        />
-      </ScrollView>
-      {typing && <Text style={styles.chatTyping}>{typing}</Text>}
-      <View style={styles.messenger.composer}>
-        {replyTo === null ? null : (
-          <ReplyBar
-            message={replyTo}
-            onClose={closeReply}
-            iconSize={iconSize}
-            color={theme.colors.foreground}
+      <View style={styles.messenger.conversationBody}>
+        <ScrollView
+          ref={scroller}
+          contentContainerStyle={styles.chatList}
+          onScroll={onScroll}
+          onContentSizeChange={followEnd}
+          onLayout={followEnd}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Messages
+            messages={shownMessages}
+            emptyLabel={needle ? "No matching messages" : CHAT_EMPTY}
+            firstUnread={needle ? undefined : firstUnread}
+            agents={model.agents}
+            problem={problem}
+            always={touchScreen}
+            link={link}
+            run={run}
+            onReply={setReplyTo}
             styles={styles}
           />
-        )}
-        <ComposeTools
-          draft={draft}
-          members={members}
-          web={layout.platform === "web"}
-          run={run}
-          styles={styles}
-          onBoard={onBoard}
-          onDuties={onDuties}
-          onNewAgent={onNewAgent}
-          onGroupPhoto={onGroupPhoto}
-          openSession={link.openSession}
-          onUse={useQuick}
-          insertMention={insertMention}
-          setReading={setReading}
-          stickersOpen={stickersOpen}
-          toggleStickers={toggleStickers}
-        />
-        {options.length > 0 ? (
-          <MentionList options={options} onPick={pick} styles={styles} />
-        ) : null}
-        {counter === null ? null : <Text style={styles.chatMeta}>{counter}</Text>}
-        <PromptCoach draft={draft} styles={styles} />
-        <View style={styles.messenger.composerRow}>
-          <TextInput
-            ref={input}
-            accessibilityLabel="Message"
-            placeholder="Write a message"
-            placeholderTextColor={styles.placeholderColor}
-            value={text}
-            onChangeText={setText}
-            onKeyPress={onKeyPress}
-            multiline
-            maxLength={CHAT_TEXT_MAX}
-            style={styles.messenger.field}
-          />
-          <SendButton
-            like={canLike(draft, reading)}
-            canSend={canSend}
-            send={send}
-            sendLike={sendLike}
-            styles={styles}
-            color={theme.colors.accentForeground}
-            muted={theme.colors.foregroundMuted}
-            size={iconSize}
-          />
+        </ScrollView>
+        {typing && <Text style={styles.chatTyping}>{typing}</Text>}
+        <View style={styles.messenger.composer}>
+          <ScrollView
+            style={styles.messenger.composeOptions}
+            contentContainerStyle={styles.messenger.composeOptionsBody}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {replyTo === null ? null : (
+              <ReplyBar
+                message={replyTo}
+                onClose={closeReply}
+                iconSize={iconSize}
+                color={theme.colors.foreground}
+                styles={styles}
+              />
+            )}
+            <ComposeTools
+              draft={draft}
+              members={members}
+              web={layout.platform === "web"}
+              run={run}
+              styles={styles}
+              onBoard={onBoard}
+              onDuties={onDuties}
+              onNewAgent={onNewAgent}
+              onGroupPhoto={onGroupPhoto}
+              openSession={link.openSession}
+              onUse={useQuick}
+              insertMention={insertMention}
+              setReading={setReading}
+              stickersOpen={stickersOpen}
+              toggleStickers={toggleStickers}
+            />
+            {options.length > 0 ? (
+              <MentionList options={options} onPick={pick} styles={styles} />
+            ) : null}
+            {counter === null ? null : <Text style={styles.chatMeta}>{counter}</Text>}
+            <PromptCoach draft={draft} styles={styles} />
+            {stickersOpen ? <StickerTray onPick={sendSticker} styles={styles} /> : null}
+          </ScrollView>
+          <View style={styles.messenger.composerRow}>
+            <TextInput
+              ref={input}
+              accessibilityLabel="Message"
+              placeholder="Write a message"
+              placeholderTextColor={styles.placeholderColor}
+              value={text}
+              onChangeText={setText}
+              onKeyPress={onKeyPress}
+              multiline
+              maxLength={CHAT_TEXT_MAX}
+              style={styles.messenger.field}
+            />
+            <SendButton
+              like={canLike(draft, reading)}
+              canSend={canSend}
+              send={send}
+              sendLike={sendLike}
+              styles={styles}
+              color={theme.colors.accentForeground}
+              muted={theme.colors.foregroundMuted}
+              size={iconSize}
+            />
+          </View>
+          {error === null ? null : (
+            <Text accessibilityRole="alert" style={styles.actionError}>
+              {error}
+            </Text>
+          )}
         </View>
-        {error === null ? null : (
-          <Text accessibilityRole="alert" style={styles.actionError}>
-            {error}
-          </Text>
-        )}
-        {stickersOpen ? <StickerTray onPick={sendSticker} styles={styles} /> : null}
       </View>
     </View>
   );

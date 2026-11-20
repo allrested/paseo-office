@@ -59,6 +59,7 @@ export function ColumnSheet({
   }, [platform, open, onClose]);
   if (open === null) return null;
   const session = open.kind === "session";
+  const chat = open.kind === "tab" && open.tab === "chat";
   const title = session
     ? (sessionTitle ?? "Session")
     : (COLUMN_TABS.find((each) => each.tab === open.tab)?.label ?? "");
@@ -70,37 +71,42 @@ export function ColumnSheet({
         onPress={onClose}
         style={styles.sheetScrim}
       />
-      <View testID="office-column-sheet" style={session ? styles.sessionSheet : styles.columnSheet}>
-        <View style={styles.columnSheetHead}>
-          {session ? (
+      <View
+        testID="office-column-sheet"
+        style={session || chat ? styles.sessionSheet : styles.columnSheet}
+      >
+        {!chat && (
+          <View style={styles.columnSheetHead}>
+            {session ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back to Sessions"
+                onPress={onBack}
+                style={styles.segment}
+              >
+                <Icon name="ArrowLeft" size={iconSize} color={color} />
+              </Pressable>
+            ) : null}
+            {sessionAgent ? (
+              <SessionHeading agent={sessionAgent} room={sessionRoom ?? null} styles={styles} />
+            ) : (
+              <Text accessibilityRole="header" numberOfLines={1} style={styles.columnSheetTitle}>
+                {title}
+              </Text>
+            )}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back to Sessions"
-              onPress={onBack}
+              accessibilityLabel={session ? `Close ${title}` : "Close"}
+              onPress={session ? onCloseSession : onClose}
               style={styles.segment}
             >
-              <Icon name="ArrowLeft" size={iconSize} color={color} />
+              <Icon name="X" size={iconSize} color={color} />
             </Pressable>
-          ) : null}
-          {sessionAgent ? (
-            <SessionHeading agent={sessionAgent} room={sessionRoom ?? null} styles={styles} />
-          ) : (
-            <Text accessibilityRole="header" numberOfLines={1} style={styles.columnSheetTitle}>
-              {title}
-            </Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={session ? `Close ${title}` : "Close"}
-            onPress={session ? onCloseSession : onClose}
-            style={styles.segment}
-          >
-            <Icon name="X" size={iconSize} color={color} />
-          </Pressable>
-        </View>
-        {/* The Chat box sits at the sheet's bottom: on iOS the keyboard would cover it. */}
+          </View>
+        )}
+        {/* Team chat adjusts the whole office so the sheet and its composer move together. */}
         <KeyboardAvoidingView
-          behavior={platform === "ios" ? "padding" : undefined}
+          behavior={!chat && platform === "ios" ? "padding" : undefined}
           style={styles.columnBody}
         >
           {children}

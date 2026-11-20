@@ -147,7 +147,12 @@ export function messengerStyles({ colors }: PluginTheme, compact: boolean, touch
     unread: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
     unreadRule: { flex: 1, height: 1, backgroundColor: colors.statusDanger, opacity: 0.4 },
     unreadText: { color: colors.statusDanger, fontSize: 12, fontWeight: "600" },
+    conversationBody: { flex: 1, minHeight: 0 },
+    composeOptions: { flexGrow: 0, flexShrink: 1 },
+    composeOptionsBody: { gap: 6 },
     composer: {
+      flexShrink: 0,
+      maxHeight: compact ? "85%" : undefined,
       paddingVertical: 8,
       paddingHorizontal: 12,
       gap: 6,
