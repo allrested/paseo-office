@@ -27,9 +27,11 @@ function setup(child?: DirectoryAgentInput) {
     ({
       agents: [record, ...(child ? [child] : [])].map((a) => projectAgent(a)!),
     }) as OfficeSnapshot;
-  const report = createDepartureArchiver(read);
+  const enabled = vi.fn(async () => true);
+  const report = createDepartureArchiver(read, enabled);
   return {
     archive,
+    enabled,
     ref,
     depart: () => report(paseo, record.id, idleSince),
     change: (patch: Partial<DirectoryAgentInput>) => {
@@ -38,6 +40,15 @@ function setup(child?: DirectoryAgentInput) {
     reopen: () => projectAgent(current),
   };
 }
+
+test("the host must still opt in when the departure is processed", async () => {
+  const f = setup();
+  f.enabled.mockResolvedValue(false);
+  await expect(f.depart()).resolves.toBe(false);
+  expect(f.archive).not.toHaveBeenCalled();
+  f.enabled.mockResolvedValue(true);
+  await expect(f.depart()).resolves.toBe(true);
+});
 
 test("two floors archive only the departed session and it stays out of a newly opened directory", async () => {
   const f = setup();

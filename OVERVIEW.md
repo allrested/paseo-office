@@ -16,6 +16,8 @@ Office 3D requires Paseo 0.16.0 or newer and plugins enabled on the host. Deskto
 
 The settings gear controls the floor plan, backdrop, lighting and sound. Under **Appearance → Branding**, the host can set a shared office name, logo and mark color. The 3D scene supports English, Vietnamese, Thai and Indonesian. The surrounding Office controls use English.
 
+**Archive idle sessions** is off by default. Enable it under **Office settings → Automation** if you want an open 3D floor to archive a session when its worker goes home. Workers can go home after resting for at least 30 minutes at night or after evening drinks. The session must still be idle, with no pending approval or working subagent. Archiving removes it from the active list and keeps its conversation history.
+
 Stand-up notes need a host folder. Jira and Sentry alerts need project settings and host credentials. Weather from a service needs a configured URL. Linux hosts can also show CPU, memory and processes.
 
 ## Data access

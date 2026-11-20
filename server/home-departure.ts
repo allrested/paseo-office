@@ -3,7 +3,10 @@ import type { OfficeSnapshot } from "../shared/contracts.js";
 import type { Paseo } from "./paseo-holder.js";
 
 // Several open floors can see the same person leave. Archive once per session and idle period.
-export function createDepartureArchiver(read: () => Promise<OfficeSnapshot>) {
+export function createDepartureArchiver(
+  read: () => Promise<OfficeSnapshot>,
+  archiveEnabled: () => Promise<boolean>,
+) {
   const pending = new Map<string, Promise<boolean>>();
 
   async function archive(paseo: Paseo, agentId: string, idleSince: string) {
@@ -28,6 +31,7 @@ export function createDepartureArchiver(read: () => Promise<OfficeSnapshot>) {
       agent.updatedAt !== idleSince
     )
       return false;
+    if (!(await archiveEnabled())) return false;
     await ref.archive();
     return true;
   }

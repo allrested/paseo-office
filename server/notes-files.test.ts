@@ -39,6 +39,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
     status: "ready",
     revision: "1",
     values: {
+      archiveOnDeparture: false,
       agentTools: true,
       notesFolder,
       notesTimeZone,

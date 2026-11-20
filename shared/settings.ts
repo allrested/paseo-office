@@ -48,6 +48,7 @@ export type FloorPlanChoice = (typeof FLOOR_PLANS)[number];
 
 const HostValuesSchema = z.object({
   ...brandFields,
+  archiveOnDeparture: z.boolean().default(false),
   agentTools: z.boolean().default(true),
   notesFolder: z.string().default(""),
   notesTimeZone: z.string().default(""),
