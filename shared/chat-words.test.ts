@@ -71,3 +71,15 @@ test("an unknown key gives the key, and an empty list", () => {
   expect(chatT("people.reception")).toBe("people.reception");
   expect(chatT("chat.nothing.here", null, "list")).toEqual([]);
 });
+
+test("mobile clients can load English chat without Intl.PluralRules", async () => {
+  vi.stubGlobal("Intl", { ...Intl, PluralRules: undefined });
+  try {
+    vi.resetModules();
+    const { chatT: mobileChat } = await import("./chat-words.js");
+    expect(mobileChat("chat.pins.said", { n: 1 })).toContain("1 note you pinned was");
+    expect(mobileChat("chat.pins.said", { n: 0 })).toContain("0 notes you pinned were");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

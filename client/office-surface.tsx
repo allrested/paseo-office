@@ -997,10 +997,11 @@ function ViewControls({
       </>
     );
   }
+  const floating = floorDrawn && !compact;
   return (
     <View
-      testID={floorDrawn ? "office-view-corner" : "office-view-row"}
-      style={floorDrawn ? styles.viewCorner : styles.viewRow}
+      testID={floating ? "office-view-corner" : "office-view-row"}
+      style={floating ? styles.viewCorner : styles.viewRow}
     >
       <View style={styles.viewControls}>
         {modes}
@@ -1566,6 +1567,7 @@ function useFullscreenPanels(
   );
   return {
     docked,
+    controlsAboveFloor: docked || compact,
     sessionsAvailable,
     sidebars,
     sessionsOpen,
@@ -1656,17 +1658,30 @@ function useMessengerTasks(
   }, [sidebars, compact, openTab, show, setOpen, closeChat]);
   return { onBoard, onNewAgent };
 }
-function useWorkspaceOverlay(model: OfficeModel, openBoard: (id: string) => void) {
+function workspaceNavigation({ layout, navigation }: OfficeSurfaceProps) {
+  return layout.compact || layout.platform !== "web" ? navigation : undefined;
+}
+
+function useWorkspaceOverlay(
+  model: OfficeModel,
+  openBoard: (id: string) => void,
+  mobileNavigation: PluginScreenProps["navigation"],
+) {
   const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(null);
   const closeWorkspace = useCallback(() => setWorkspace(null), []);
   const showWorkspace = useCallback(
-    (workspaceId: string) => setWorkspace({ workspaceId, agentId: null }),
-    [],
+    (workspaceId: string) => {
+      if (mobileNavigation) mobileNavigation.openWorkspace({ workspaceId });
+      else setWorkspace({ workspaceId, agentId: null });
+    },
+    [mobileNavigation],
   );
   const showAgentWorkspace = useCallback(
-    (agentId: string) =>
-      setWorkspace({ workspaceId: model.agents.get(agentId)?.workspaceId ?? null, agentId }),
-    [model.agents],
+    (agentId: string) => {
+      if (mobileNavigation) mobileNavigation.openAgent({ agentId });
+      else setWorkspace({ workspaceId: model.agents.get(agentId)?.workspaceId ?? null, agentId });
+    },
+    [model.agents, mobileNavigation],
   );
   const openWorkspaceBoard = useCallback(
     (id: string) => {
@@ -1777,7 +1792,7 @@ export function OfficeSurface(
     openNotes();
   }, [closeStandup, openNotes]);
   const { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard } =
-    useWorkspaceOverlay(model, board.open);
+    useWorkspaceOverlay(model, board.open, workspaceNavigation(props));
   const qa = useQa(model, live);
   const readLog = useScriptLog();
   const reviews = useReviews({
@@ -1954,7 +1969,7 @@ export function OfficeSurface(
       machine={machine}
       onMachine={hostEntry?.onOpen}
       onChange={changeView}
-      compact={layout.compact}
+      compact={compact}
       touchScreen={touchScreen}
       color={color}
       onOpenSettings={settings.show}
@@ -1972,7 +1987,7 @@ export function OfficeSurface(
         retryScene={retryScene}
         styles={styles}
       />
-      {panels.docked && controls}
+      {panels.controlsAboveFloor && controls}
       <View style={styles.officeRow}>
         {panels.sessionsAvailable ? (
           <SessionsSidebar
@@ -1983,7 +1998,7 @@ export function OfficeSurface(
           />
         ) : null}
         <View testID="office-floor-pane" style={floorStyle}>
-          {!panels.docked && controls}
+          {!panels.controlsAboveFloor && controls}
           <SurfaceBody
             onPhotoReady={onPhotoReady}
             fullscreen={full.available ? full : undefined}

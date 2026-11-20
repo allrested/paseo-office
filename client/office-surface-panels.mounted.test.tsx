@@ -239,10 +239,13 @@ beforeAll(async () => {
   ({ OfficeSurface } = await import("./office-surface.js"));
 });
 
-async function mount(params: Record<string, string> = {}): Promise<void> {
+async function mount(
+  params: Record<string, string> = {},
+  platform: PluginScreenProps["layout"]["platform"] = "web",
+): Promise<void> {
   const props = {
     theme: THEME,
-    layout: { compact, platform: "web" },
+    layout: { compact, platform },
     host: { id: "host", label: "Host" },
     params,
     ...(settingsWay ? { onOpenSettings: () => void (settingsOpened += 1) } : {}),
@@ -412,6 +415,7 @@ test("the corner has an Office settings button that opens the settings", async (
 
 test("a Sound save the device refuses after a press on the floor's button is shown in the view corner", async () => {
   floor.webgl = true;
+  compact = false;
   floor.refuse = true;
   view = "3d";
   await mount();
@@ -527,6 +531,7 @@ test("Chat's tab shows the messages since the chat was last open, and none at ze
 });
 
 test("the controls take a row while the body shows Loading, and the corner once a floor is drawn", async () => {
+  compact = false;
   view = "2d";
   await mount();
   expect(container.textContent).toContain("Loading");
@@ -1438,3 +1443,31 @@ test("the native Office 3D row opens its regular screen", async () => {
   expect(props.openScreen).toHaveBeenCalledWith({ screenId: "office" });
   cleanup();
 });
+
+test("phone view controls occupy a row outside the scene, leaving its cards readable", async () => {
+  compact = true;
+  floor.webgl = true;
+  view = "3d";
+  await mount();
+  await seeAda();
+  const row = container.querySelector('[data-testid="office-view-row"]');
+  const floorPane = container.querySelector('[data-testid="office-floor-pane"]');
+  expect(row).not.toBeNull();
+  expect(floorPane).not.toBeNull();
+  expect(floorPane?.contains(row)).toBe(false);
+  expect(container.querySelector('[data-testid="office-view-corner"]')).toBeNull();
+});
+
+test.each(["ios", "android", "web"] as const)(
+  "Open in workspace from phone Details opens the agent in Paseo on %s",
+  async (platform) => {
+    compact = true;
+    await mount({}, platform);
+    await seeAda();
+    await pressFirst("Ada");
+    await press("Open session");
+    await press("Open in workspace");
+    expect(opened).toEqual(["ada"]);
+    expect(container.querySelector('[role="dialog"], dialog, iframe')).toBeNull();
+  },
+);
