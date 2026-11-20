@@ -1295,10 +1295,13 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     );
     const floorPane = container.querySelector('[data-testid="office-floor-pane"]');
     await press("Show details sidebar");
+    const sessionComposer = labelled("Message");
+    expect(sessionComposer).not.toBeNull();
     expect(floorPane?.contains(labelled("Open team chat: Ada · Hi"))).toBe(true);
     await press("Open team chat: Ada · Hi");
     expect(floorPane?.contains(labelled("Close team chat"))).toBe(true);
-    expect(floorPane?.contains(labelled("Message"))).toBe(false);
+    expect(sessionComposer?.isConnected).toBe(true);
+    expect(floorPane?.contains(sessionComposer)).toBe(false);
     expect(labelled("To: Whole group")).not.toBeNull();
     await press("Close team chat");
     expect(labelled("Open team chat: Ada · Hi")).toBeNull();
