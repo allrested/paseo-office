@@ -13,7 +13,8 @@ import { brewCoffee, feedFish } from './interact/props.js';
 import { STATIONS, standBy, wayTo } from './people/navigation.js';
 import { COFFEE_Q } from './people/breaks.js';
 import { dn, sessions, workers } from './people/workers.js';
-import { asleep, free, quip } from './people/errands.js';
+import { toast } from './ui/activity.js';
+import { asleep, dist, free, quip } from './people/errands.js';
 import { gatheringNow } from './people/gatherings.js';
 import { bilState, billiards } from './people/billiards.js';
 import { foosState, foosball } from './people/foosball.js';
@@ -69,6 +70,59 @@ export function availableInLounge(s) {
   const w = workers.get(s.id);
   return w && resting(w, s) && !w.chore && !w.after && !w.onBreak && !w.outing && !w.street && !w.offstage &&
     !w.wcBusy && !w.liftHold && !w.liftWait && !w.doze && !w.queued && !solo.has(s.id) && (free(w) || asleep(w));
+}
+
+// One manual brew waits at the machine until a resting session actually collects it.
+let coffeeWaiting = false;
+let collector = null;
+function assignCoffee() {
+  const head = PRO ? COFFEE_Q[0] : STATIONS.coffee[2];
+  if (!head || head.by) return;
+  const [s] = [...sessions.values()].filter(availableInLounge).sort((a, b) =>
+    dist(workers.get(a.id), head.x, head.z) - dist(workers.get(b.id), head.x, head.z));
+  if (!s) return;
+  const w = workers.get(s.id);
+  collector = w;
+  w.errand({ coffee: true, spot: { x: head.x, z: head.z, face: head.face, node: head.node },
+    look: [STEAM_AT.x, STEAM_AT.z], type: 'coffee', anim: 'tidy', hold: 2.2,
+    line: tr('people.coffee.who'),
+    at: () => {
+      if (!resting(w, sessions.get(w.id))) return;
+      w.carry = 'cup';
+      coffeeWaiting = false;
+      toast(tr('paseo.coffee.collected', { name: dn(s) }));
+      return tr('people.coffee.thanks');
+    },
+    done: () => {
+      if (w.carry !== 'cup' || !resting(w, sessions.get(w.id))) return;
+      w.anim = 'coffee';
+      w.restAt = state.sim + rand(6, 9);
+    } });
+  toast(tr('paseo.coffee.coming', { name: dn(s) }));
+}
+
+function updateCoffee() {
+  if (collector) {
+    const w = collector;
+    if (workers.get(w.id) === w && w.chore?.coffee && !w.leaving) {
+      if (!resting(w, sessions.get(w.id)) && w.chore.stage !== 'back') {
+        w.after = null;
+        w.errandBack();
+      }
+      return;
+    }
+    collector = null;
+  }
+  if (coffeeWaiting) assignCoffee();
+}
+
+export function requestCoffee() {
+  if (replay.on) return;
+  if (collector?.chore?.coffee && !collector.leaving) { toast(tr('paseo.lounge.inProgress')); return; }
+  if (!coffeeWaiting) brewCoffee();
+  coffeeWaiting = true;
+  updateCoffee();
+  if (!collector) toast(tr('paseo.coffee.waiting'));
 }
 
 export function requestLoungeAction(kind, target, label, effect) {
@@ -161,6 +215,7 @@ export function updateLeisure() {
   }
   if (state.sim < lookAt) return;
   lookAt = state.sim + 1;
+  updateCoffee();
   const agents = [];
   for (const [id, w] of workers) { const s = sessions.get(id); agents.push({ id, resting: resting(w, s), idle: idle(w, s) }); }
   const next = plan.step({ now: state.sim, wall: nowMs(), hour: officeNow().getHours(), quiet: reduceMotion || !!gatheringNow() || napOn, agents, open: openNow() });

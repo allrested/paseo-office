@@ -15,11 +15,11 @@ import { AQ } from '../world/props/aquarium.js';
 import { ARC } from '../world/props/arcade.js';
 import { SOFA } from '../world/props/cat.js';
 import { ROCKET_HOME } from '../world/furniture/rocket.js';
-import { availableInLounge, requestLoungeAction } from '../paseo-leisure.js';
+import { availableInLounge, requestCoffee, requestLoungeAction } from '../paseo-leisure.js';
 import { cap, toast } from '../ui/activity.js';
 import { openSession } from '../ui/session-drawer.js';
 import { setView } from '../ui/camera-bar.js';
-import { makeCoffee, catToSofa, feedFish } from './props.js';
+import { catToSofa, feedFish } from './props.js';
 import { EDIT_T, PLACES, READ_T, WEB_T, _a } from './place-chips.js';
 import { boardContent } from '../ui/whiteboard.js';
 import { fp } from './first-person.js';
@@ -115,7 +115,7 @@ function placeContent(id) {
     case 'coffee': {
       const rest = list.filter((s) => s.status === 'rest').sort((a, b) => (b.doneAt || b.lastAt) - (a.doneAt || a.lastAt)), box = el('div', 'pl-rows');
       for (const s of rest) box.append(plRow({ ic: 'coffee', color: colorOf(s), title: dn(s), meta: s.lastPrompt ? tr('places.coffee.done', { prompt: short(s.lastPrompt, 48), ago: agoText(s.doneAt || s.lastAt) }) : tr('places.coffee.noPrompt'), onClick: () => openSession(s.id) }));
-      const foot = el('div', 'pl-foot-row'); foot.append(el('span', null, tr(rest.length ? 'places.coffee.hint' : 'places.coffee.busy')), plButton(tr('places.coffee.brew'), makeCoffee));
+      const foot = el('div', 'pl-foot-row'); foot.append(el('span', null, tr(rest.length ? 'places.coffee.hint' : 'places.coffee.busy')), plButton(tr('places.coffee.brew'), requestCoffee));
       return { icon: 'coffee', title: tr('places.coffee.title'), sub: tr('places.coffee.sub'), body: rest.length ? box : plEmpty(tr('places.coffee.empty')), foot };
     }
     case 'meeting': {
