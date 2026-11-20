@@ -91,9 +91,6 @@ export function FullscreenHeader({
             {brand.name ?? "Office 3D"}
           </Text>
         </Pressable>
-        <View style={styles.headerModes}>{modes}</View>
-      </View>
-      <View style={styles.headerTools}>
         {sidebars.sessionsAvailable && (
           <SidebarButton
             name="Sessions"
@@ -104,6 +101,9 @@ export function FullscreenHeader({
             styles={styles}
           />
         )}
+      </View>
+      <View style={styles.headerTools}>
+        <View style={styles.headerModes}>{modes}</View>
         {collapsed && (
           <ColumnTabs
             hideSessions
