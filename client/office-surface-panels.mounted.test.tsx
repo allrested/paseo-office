@@ -662,6 +662,35 @@ async function pressTab(label: string): Promise<void> {
   );
 }
 
+test("phone chat clears only the keyboard overlap and keeps its composer mounted", async () => {
+  const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: 800 });
+  vi.stubGlobal("visualViewport", viewport);
+  try {
+    await mount();
+    const surface = container.firstElementChild!;
+    const bounds = surface.getBoundingClientRect();
+    const measure = vi
+      .spyOn(surface, "getBoundingClientRect")
+      .mockReturnValue({ ...bounds, bottom: 760 });
+    await pressTab("Chat");
+    const field = labelled("Message");
+    expect(field).not.toBeNull();
+    const space = container.querySelector<HTMLElement>('[data-testid="office-keyboard-space"]')!;
+    expect(space.style.height).toBe("0px");
+    viewport.height = 470;
+    viewport.offsetTop = 10;
+    await act(async () => viewport.dispatchEvent(new Event("resize")));
+    expect(space.style.height).toBe("280px");
+    expect(labelled("Message")).toBe(field);
+    // Some hosts have already resized the layout to fit above the keyboard.
+    measure.mockReturnValue({ ...bounds, bottom: 480 });
+    await act(async () => viewport.dispatchEvent(new Event("scroll")));
+    expect(space.style.height).toBe("0px");
+  } finally {
+    Reflect.deleteProperty(window, "visualViewport");
+  }
+});
+
 test("a half-typed chat message is still there after a look at another tab", async () => {
   compact = false;
   await mount();

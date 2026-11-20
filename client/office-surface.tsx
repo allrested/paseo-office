@@ -1,3 +1,4 @@
+import { useChatKeyboard } from "./office-keyboard.js";
 import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
@@ -856,6 +857,7 @@ function useCardOpening(live: boolean): CardOpening {
 }
 
 interface ViewControlsProps {
+  keyboardVisible: boolean;
   badges: ColumnBadges;
   sidebars?: SidebarControls;
   full: ReturnType<typeof useFullscreen>;
@@ -901,6 +903,7 @@ function HostResourceButton({
 
 /** The view switch and the settings button. */
 function ViewControls({
+  keyboardVisible,
   badges,
   sidebars,
   full,
@@ -934,6 +937,7 @@ function ViewControls({
     onChange(viewChoice.options.includes("3d") ? "3d" : "2d");
     sidebars?.column.show("activity");
   }, [onChange, viewChoice.options, sidebars]);
+  if (compact && keyboardVisible) return null;
   const actions = (
     <>
       {sidebars && onMachine && (
@@ -1045,6 +1049,7 @@ function SessionsSidebar({
 }
 
 interface ColumnPanelSwitchProps extends ColumnPanelProps {
+  onCloseChat?(): void;
   tab: ColumnTab;
   /** The Attention tab's content. */
   attention: ReactNode;
@@ -1053,7 +1058,7 @@ interface ColumnPanelSwitchProps extends ColumnPanelProps {
 }
 
 /** The chosen tab's panel. Only that one is mounted: Chat counts as seen while it is. */
-function ColumnPanel({ tab, attention, draft, ...panel }: ColumnPanelSwitchProps) {
+function ColumnPanel({ tab, attention, draft, onCloseChat, ...panel }: ColumnPanelSwitchProps) {
   if (tab === "attention") {
     return (
       <ScrollView contentContainerStyle={panel.styles.columnAttention}>{attention}</ScrollView>
@@ -1061,7 +1066,7 @@ function ColumnPanel({ tab, attention, draft, ...panel }: ColumnPanelSwitchProps
   }
   if (tab === "sessions") return <SessionsPanel {...panel} />;
   if (tab === "activity") return <ActivityPanel {...panel} />;
-  return <ChatPanel {...panel} draft={draft} />;
+  return <ChatPanel {...panel} draft={draft} onClose={onCloseChat} />;
 }
 
 interface ColumnViewPanelProps extends Omit<ColumnPanelSwitchProps, "tab"> {
@@ -1249,6 +1254,16 @@ function useColumnSheet(
   return { sheetView, openTab, closeSheet, openSession, link, sheetLink };
 }
 
+function chatIsVisible(
+  floating: boolean,
+  compact: boolean,
+  sheet: ColumnView | null,
+  column: ColumnView,
+) {
+  const visible = compact ? sheet : column;
+  return floating || (visible?.kind === "tab" && visible.tab === "chat");
+}
+
 type ColumnSheetState = ReturnType<typeof useColumnSheet>;
 
 interface PhoneSheetProps extends Omit<ColumnPanelProps, "link"> {
@@ -1300,6 +1315,7 @@ function PhoneSheet({
       {view === null ? null : (
         <ColumnViewPanel
           view={view}
+          onCloseChat={sheet.closeSheet}
           session={session}
           attention={attention}
           {...panel}
@@ -1311,6 +1327,7 @@ function PhoneSheet({
 }
 
 interface PhoneBarProps {
+  keyboardVisible: boolean;
   compact: boolean;
   sheet: ColumnSheetState;
   sessions: readonly ColumnSession[];
@@ -1320,8 +1337,16 @@ interface PhoneBarProps {
 }
 
 /** On a compact surface, the column's tabs as a bar under the floor; nothing on a wide one. */
-function PhoneBar({ compact, sheet, sessions, badges, color, styles }: PhoneBarProps) {
-  if (!compact) return null;
+function PhoneBar({
+  keyboardVisible,
+  compact,
+  sheet,
+  sessions,
+  badges,
+  color,
+  styles,
+}: PhoneBarProps) {
+  if (!compact || keyboardVisible) return null;
   return (
     <ColumnBar
       open={sheet.sheetView}
@@ -1814,6 +1839,22 @@ export function OfficeSurface(
   }, []);
   // Every way in to a session ends in the column: its tab, or the phone's sheet.
   const sheet = useColumnSheet(column, compact, full.integrated, setSelectedId);
+  const {
+    spaceStyle,
+    measureKeyboard,
+    visible: chatKeyboardVisible,
+  } = useChatKeyboard(
+    full.root,
+    layout.platform,
+    chatIsVisible(teamOpen, compact, sheet.sheetView, column.view),
+  );
+  const onSurfaceLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      measure(event);
+      measureKeyboard();
+    },
+    [measure, measureKeyboard],
+  );
   const { openSession } = sheet;
   const panels = useFullscreenPanels(
     full.integrated,
@@ -1958,6 +1999,7 @@ export function OfficeSurface(
   const color = theme.colors.foreground;
   const controls = (
     <ViewControls
+      keyboardVisible={chatKeyboardVisible}
       badges={badges}
       full={full}
       sidebars={panels.sidebars}
@@ -1979,7 +2021,7 @@ export function OfficeSurface(
   // One tree in both layouts, so a flip between them does not draw the floor again: compact adds
   // the sheet in the floor's box and the bar under the row, wide adds the column beside the floor.
   const surface = (
-    <View ref={full.root} style={styles.screen} onLayout={measure}>
+    <View ref={full.root} style={styles.screen} onLayout={onSurfaceLayout}>
       <SurfaceNotices
         fullscreenError={full.error}
         choice={viewChoice.choice}
@@ -2073,12 +2115,14 @@ export function OfficeSurface(
       </View>
       <PhoneBar
         compact={compact}
+        keyboardVisible={chatKeyboardVisible}
         sheet={sheet}
         sessions={sessions}
         badges={badges}
         color={color}
         styles={styles}
       />
+      <View aria-hidden testID="office-keyboard-space" style={spaceStyle} />
       <AgentCard
         agent={selected.agent}
         activity={selected.activity}
