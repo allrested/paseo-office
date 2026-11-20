@@ -1293,11 +1293,15 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
     await act(async () =>
       deliver?.({ type: "chat", change: { op: "add", message: chatMessage(Date.now(), "Ada") } }),
     );
+    const floorPane = container.querySelector('[data-testid="office-floor-pane"]');
+    await press("Show details sidebar");
+    expect(floorPane?.contains(labelled("Open team chat: Ada · Hi"))).toBe(true);
     await press("Open team chat: Ada · Hi");
+    expect(floorPane?.contains(labelled("Close team chat"))).toBe(true);
+    expect(floorPane?.contains(labelled("Message"))).toBe(false);
     expect(labelled("To: Whole group")).not.toBeNull();
     await press("Close team chat");
     expect(labelled("Open team chat: Ada · Hi")).toBeNull();
-    await press("Show details sidebar");
     expect(reply()).toBe("Keep this draft");
     expect(sessionTab()?.getAttribute("aria-selected")).toBe("true");
     await press("Show sessions sidebar");
