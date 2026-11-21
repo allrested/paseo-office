@@ -69,7 +69,7 @@ import {
   type OfficeRoom,
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
-import { ColumnBar, ColumnSheet, ConversationDialog } from "./column-sheet.js";
+import { ColumnBar, ColumnDialog, ColumnSheet } from "./column-sheet.js";
 import {
   SessionPane,
   sessionChildren,
@@ -1307,13 +1307,11 @@ function PhoneSheet({
   const closeShown = useCallback(() => {
     if (shown !== null) closeSession(shown);
   }, [shown, closeSession]);
-  if (!compact) return null;
+  if (!compact || !view) return null;
   const title = sessions.find((each) => each.agentId === shown)?.title ?? null;
   const identity = shown ? sessionOf(session.model, shown) : null;
-  const nativeDialog =
-    panel.layout.platform !== "web" &&
-    (view?.kind === "session" || (view?.kind === "tab" && view.tab === "chat"));
-  const content = view && (
+  const nativeDialog = panel.layout.platform !== "web";
+  const content = (
     <ColumnViewPanel
       view={view}
       onCloseChat={nativeDialog ? undefined : sheet.closeSheet}
@@ -1325,7 +1323,8 @@ function PhoneSheet({
   );
   if (nativeDialog) {
     return (
-      <ConversationDialog
+      <ColumnDialog
+        view={view}
         sessionTitle={title}
         identity={identity}
         color={color}
@@ -1336,7 +1335,7 @@ function PhoneSheet({
         <OfficeBrandContext.Provider value={panel.office.state.brand}>
           {content}
         </OfficeBrandContext.Provider>
-      </ConversationDialog>
+      </ColumnDialog>
     );
   }
   return (

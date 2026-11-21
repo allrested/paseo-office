@@ -11,7 +11,8 @@ import type { OfficeStyles } from "./styles.js";
 const dialogContent = { padding: 0, gap: 0 };
 
 /** Paseo sizes the dialog body to its visible snap point and registers its text inputs with the keyboard. */
-export function ConversationDialog({
+export function ColumnDialog({
+  view,
   sessionTitle,
   identity,
   color,
@@ -20,6 +21,7 @@ export function ConversationDialog({
   styles,
   children,
 }: {
+  view: ColumnView;
   sessionTitle: string | null;
   identity: { agent: OfficeAgent | null; room: string | null } | null;
   color: string;
@@ -28,10 +30,14 @@ export function ConversationDialog({
   styles: OfficeStyles;
   children: ReactNode;
 }) {
-  const title = identity?.agent
-    ? `${sessionTitle} · ${statusLine(identity.agent, identity.room)}`
-    : (sessionTitle ?? "Team chat");
-  const session = identity !== null;
+  const session = view.kind === "session";
+  let title = sessionTitle ?? "Session";
+  if (view.kind === "tab") {
+    title =
+      view.tab === "chat" ? "Team chat" : COLUMN_TABS.find((item) => item.tab === view.tab)!.label;
+  } else if (identity?.agent) {
+    title = `${title} · ${statusLine(identity.agent, identity.room)}`;
+  }
   const back = useMemo(
     () =>
       session ? (
