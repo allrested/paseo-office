@@ -333,7 +333,7 @@ function SessionList({
   else if (GROUPS.every((group) => shown[group].length === 0)) status = NO_MATCH;
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.panelFeed}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.panelFeed}>
         <View style={ui.top}>
           <View style={ui.actions}>
             <Pressable

@@ -959,6 +959,42 @@ test.each(["ios", "android"] as const)(
   },
 );
 
+test.each(["android", "ios"] as const)(
+  "the phone column tabs share the host dialog on %s",
+  async (platform) => {
+    ssh.discover.mockResolvedValueOnce({
+      servers: [{ id: "cafecafecafecafe", name: "ssh" }],
+      discoveryIncomplete: false,
+    });
+    await mount({}, platform);
+    await seeAda();
+    const dialog = (title: string) => container.querySelector(`section[aria-label="${title}"]`);
+    await pressTab("Activity");
+    expect(dialog("Activity")?.contains(labelled("Commands"))).toBe(true);
+    await press("Commands");
+    expect(labelled("Commands")?.getAttribute("aria-pressed")).toBe("true");
+    await press("Dismiss dialog");
+    await pressTab("Attention");
+    expect(dialog("Attention")).not.toBeNull();
+    await pressFirst("Host:");
+    expect(dialog("Attention")).toBeNull();
+    await press("Dismiss dialog");
+    await pressTab("Sessions");
+    const sessions = dialog("Sessions");
+    expect(sessions?.querySelector('[aria-label="Search agents"]')).toBeTruthy();
+    const row = sessions?.querySelector<HTMLElement>('[aria-label^="Ada:"]');
+    expect(row).toBeTruthy();
+    await act(async () => row?.click());
+    expect(dialog("Sessions")).toBeNull();
+    expect(labelled("Message")).not.toBeNull();
+    await press("Back to Sessions");
+    expect(dialog("Sessions")).not.toBeNull();
+    await press("Dismiss dialog");
+    expect(sheet()).toBeNull();
+    expect(dialog("Sessions")).toBeNull();
+  },
+);
+
 test("opening the same session twice leaves one tab in the wide column", async () => {
   compact = false;
   await mount();

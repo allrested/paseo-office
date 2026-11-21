@@ -204,7 +204,7 @@ export function loadProblem(subscription: OfficeState["subscription"]): string |
  * The Activity tab of the office's column, fed by the surface's subscription: the feed of what
  * the agents did, filtered by its tabs and chips.
  */
-export function ActivityPanel({ office, styles, link }: ColumnPanelProps) {
+export function ActivityPanel({ office, styles, link, layout }: ColumnPanelProps) {
   const { state, subscription } = office;
   const events = useSyncExternalStore(feedStore.subscribe, feedStore.getSnapshot);
   const [tab, setTab] = useState<FeedTab>("all");
@@ -228,9 +228,11 @@ export function ActivityPanel({ office, styles, link }: ColumnPanelProps) {
       <ScrollView contentContainerStyle={styles.panelFeed}>
         <View style={styles.activityTop}>
           <View style={styles.activityHeading}>
-            <Text accessibilityRole="header" style={styles.activityTitle}>
-              Activity
-            </Text>
+            {(!layout.compact || layout.platform === "web") && (
+              <Text accessibilityRole="header" style={styles.activityTitle}>
+                Activity
+              </Text>
+            )}
             {subscription.status === "live" ? (
               <View style={styles.panelLive}>
                 <View style={styles.dot.running} />
