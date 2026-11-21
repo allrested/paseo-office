@@ -1254,6 +1254,16 @@ function useColumnSheet(
   return { sheetView, openTab, closeSheet, openSession, link, sheetLink };
 }
 
+function sceneSelection(
+  compact: boolean,
+  platform: Platform,
+  view: ColumnView | null,
+  card: string | null,
+) {
+  if (compact && platform !== "web" && view?.kind === "session") return view.agentId;
+  return card;
+}
+
 function usesOfficeKeyboard(
   platform: Platform,
   floating: boolean,
@@ -2079,7 +2089,7 @@ export function OfficeSurface(
             theme={theme}
             focusRoomId={focusRoomId}
             focusRequest={focusRequest}
-            selectedAgentId={kept}
+            selectedAgentId={sceneSelection(compact, layout.platform, sheet.sheetView, kept)}
             styles={styles}
             compact={layout.compact}
             actions={actions}

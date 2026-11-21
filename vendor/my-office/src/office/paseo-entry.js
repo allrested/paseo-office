@@ -133,6 +133,15 @@ function asButton(chip, open) {
     if (!event.repeat) open();
   });
 }
+function makeSessionChipButton(id) {
+  const chip = workers.get(id)?.tagEl;
+  if (!chip || chip.getAttribute('role') === 'button') return;
+  const open = () => openSession(id);
+  chip.style.pointerEvents = 'auto';
+  chip.style.cursor = 'pointer';
+  chip.addEventListener('click', open);
+  asButton(chip, open);
+}
 function makeTeamChipsButtons() {
   for (const tag of live.teamTags || []) {
     const open = () => { const team = teamOf(tag); if (team) host.board(team); };
@@ -456,6 +465,7 @@ const api = {
       const was = sessions.get(s.id);   // (record() keeps the last event on the session object this one replaces)
       if (was) { s.last ??= was.last; if (!s.stuck) s.lastAt ??= was.lastAt; }   // (stopped on an error: no time, so no walk home at night)
       live.upsertSession(s, seated);
+      makeSessionChipButton(s.id);
       if (seated && !was) logDoor(s, true);
       glideToRequest(was, s);
     }
