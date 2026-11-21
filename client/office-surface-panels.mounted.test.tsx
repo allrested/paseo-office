@@ -160,8 +160,26 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
 
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { ScrollView, TextInput, View } = await import("react-native");
-  const Modal = (props: { title: string; open: boolean; children: ReactNode }) =>
-    props.open ? createElement("section", { "aria-label": props.title }, props.children) : null;
+  const Modal = (props: {
+    title: string;
+    open: boolean;
+    icon?: ReactNode;
+    onOpenChange(open: boolean): void;
+    children: ReactNode;
+  }) =>
+    props.open
+      ? createElement(
+          "section",
+          { "aria-label": props.title },
+          props.icon,
+          createElement("button", {
+            type: "button",
+            "aria-label": "Dismiss dialog",
+            onClick: () => props.onOpenChange(false),
+          }),
+          props.children,
+        )
+      : null;
   Modal.Content = (props: { children: ReactNode }) => createElement("div", null, props.children);
   const Markdown = (props: { children: string }) =>
     createElement("div", { "data-markdown": "" }, props.children);
@@ -914,6 +932,33 @@ test("a phone's Open session shows the session in the sheet", async () => {
   expect(opened).toEqual([]);
 });
 
+test.each(["ios", "android"] as const)(
+  "phone conversations use the host dialog on %s and keep drafts on dismissal",
+  async (platform) => {
+    await mount({}, platform);
+    await seeAda();
+    await pressFirst("Ada");
+    expect(adaCard()).toBeNull();
+    const sessionDialog = () => container.querySelector('section[aria-label^="Ada ·"]');
+    expect(sessionDialog()?.contains(labelled("Message"))).toBe(true);
+    expect(sheet()).toBeNull();
+    await typeReply("Draft for Ada");
+    await press("Back to Sessions");
+    expect(sessionDialog()).toBeNull();
+    await pressFirst("Ada");
+    expect(reply()).toBe("Draft for Ada");
+    await press("Dismiss dialog");
+    expect(sessionDialog()).toBeNull();
+    await pressTab("Chat");
+    expect(
+      container.querySelector('section[aria-label="Team chat"]')?.contains(labelled("Message")),
+    ).toBe(true);
+    expect(sheet()).toBeNull();
+    await press("Dismiss dialog");
+    expect(labelled("Message")).toBeNull();
+  },
+);
+
 test("opening the same session twice leaves one tab in the wide column", async () => {
   compact = false;
   await mount();
@@ -1494,7 +1539,7 @@ test.each(["ios", "android", "web"] as const)(
     await mount({}, platform);
     await seeAda();
     await pressFirst("Ada");
-    await press("Open session");
+    if (platform === "web") await press("Open session");
     await press("Open in workspace");
     expect(opened).toEqual(["ada"]);
     expect(container.querySelector('[role="dialog"], dialog, iframe')).toBeNull();

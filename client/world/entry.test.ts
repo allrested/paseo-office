@@ -11,6 +11,7 @@ import { openWorldFrame } from "./world-frame.web.js";
 
 const h = vi.hoisted(() => ({
   weather: vi.fn(),
+  openSession: vi.fn(),
   photoRelease: vi.fn(),
   lookForUpgrade: vi.fn(),
   setTenure: vi.fn(),
@@ -110,7 +111,7 @@ vi.mock("../../vendor/my-office/src/office/ui/icons.js", () => ({
   icon: () => null,
 }));
 vi.mock("../../vendor/my-office/src/office/ui/session-drawer.js", () => ({
-  openSession() {},
+  openSession: h.openSession,
   closeSession() {},
 }));
 vi.mock("../../vendor/my-office/src/office/interact/place-chips.js", () => ({ PLACES: {} }));
@@ -274,6 +275,19 @@ beforeEach(() => {
   state.incidentUntil = 0;
   world.setIncidents([]);
   page("stage-wrap").classList.remove("is-incident");
+});
+
+test("a worker's name opens the conversation once per tap or key press after a feed update", () => {
+  const tagEl = document.createElement("div");
+  h.workers.set("a", { id: "a", tagEl });
+  world.setSessions([session("a")]);
+  world.setSessions([session("a")]);
+  h.openSession.mockClear();
+
+  expect(tagEl.getAttribute("role")).toBe("button");
+  tagEl.click();
+  tagEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+  expect(h.openSession.mock.calls).toEqual([["a"], ["a"]]);
 });
 
 test("a deploy that succeeded is applauded, also right after a push or another deploy", () => {

@@ -69,7 +69,7 @@ import {
   type OfficeRoom,
 } from "../shared/model.js";
 import type { FocusRequest } from "./focus-request.js";
-import { ColumnBar, ColumnSheet } from "./column-sheet.js";
+import { ColumnBar, ColumnSheet, ConversationDialog } from "./column-sheet.js";
 import {
   SessionPane,
   sessionChildren,
@@ -1049,7 +1049,7 @@ function SessionsSidebar({
 }
 
 interface ColumnPanelSwitchProps extends ColumnPanelProps {
-  onCloseChat?(): void;
+  onCloseChat?: (() => void) | undefined;
   tab: ColumnTab;
   /** The Attention tab's content. */
   attention: ReactNode;
@@ -1254,12 +1254,24 @@ function useColumnSheet(
   return { sheetView, openTab, closeSheet, openSession, link, sheetLink };
 }
 
-function chatIsVisible(
+function sceneSelection(
+  compact: boolean,
+  platform: Platform,
+  view: ColumnView | null,
+  card: string | null,
+) {
+  if (compact && platform !== "web" && view?.kind === "session") return view.agentId;
+  return card;
+}
+
+function usesOfficeKeyboard(
+  platform: Platform,
   floating: boolean,
   compact: boolean,
   sheet: ColumnView | null,
   column: ColumnView,
 ) {
+  if (compact && platform !== "web") return false; // The native conversation dialog owns its keyboard.
   const visible = compact ? sheet : column;
   return floating || (visible?.kind === "tab" && visible.tab === "chat");
 }
@@ -1298,6 +1310,35 @@ function PhoneSheet({
   if (!compact) return null;
   const title = sessions.find((each) => each.agentId === shown)?.title ?? null;
   const identity = shown ? sessionOf(session.model, shown) : null;
+  const nativeDialog =
+    panel.layout.platform !== "web" &&
+    (view?.kind === "session" || (view?.kind === "tab" && view.tab === "chat"));
+  const content = view && (
+    <ColumnViewPanel
+      view={view}
+      onCloseChat={nativeDialog ? undefined : sheet.closeSheet}
+      session={session}
+      attention={attention}
+      {...panel}
+      link={sheet.sheetLink}
+    />
+  );
+  if (nativeDialog) {
+    return (
+      <ConversationDialog
+        sessionTitle={title}
+        identity={identity}
+        color={color}
+        styles={panel.styles}
+        onBack={back}
+        onDismiss={sheet.closeSheet}
+      >
+        <OfficeBrandContext.Provider value={panel.office.state.brand}>
+          {content}
+        </OfficeBrandContext.Provider>
+      </ConversationDialog>
+    );
+  }
   return (
     <ColumnSheet
       open={view}
@@ -1312,16 +1353,7 @@ function PhoneSheet({
       onCloseSession={closeShown}
       styles={panel.styles}
     >
-      {view === null ? null : (
-        <ColumnViewPanel
-          view={view}
-          onCloseChat={sheet.closeSheet}
-          session={session}
-          attention={attention}
-          {...panel}
-          link={sheet.sheetLink}
-        />
-      )}
+      {content}
     </ColumnSheet>
   );
 }
@@ -1552,6 +1584,7 @@ function useFullscreen(props: OfficeSurfaceProps, launcher: SidebarLauncher | un
 function useFullscreenPanels(
   active: boolean,
   fullscreen: boolean,
+  platform: Platform,
   compact: boolean,
   surfaceWidth: number,
   column: ColumnState,
@@ -1560,6 +1593,7 @@ function useFullscreenPanels(
   selectFromStrip: (id: string) => void,
   openWorkspace: (agentId: string) => void,
 ) {
+  const directSessions = active || (compact && platform !== "web");
   const docked = active && !compact && surfaceWidth > 0;
   const sessionsAvailable = docked && fullscreen;
   const { on: sessionsHidden, set: hideSessions } = useDeviceSwitch("sessionsHidden", false);
@@ -1578,17 +1612,17 @@ function useFullscreenPanels(
   // A Sessions row's own button goes straight to the agent's workspace, past its details.
   const link = useMemo(
     (): OfficeLink => ({
-      ...(active ? { select: openSession, openSession } : sheet.link),
+      ...(directSessions ? { select: openSession, openSession } : sheet.link),
       openWorkspace,
     }),
-    [active, openSession, sheet.link, openWorkspace],
+    [directSessions, openSession, sheet.link, openWorkspace],
   );
   const selectAgent = useCallback(
     (id: string | null) => {
-      if (active && id !== null) openSession(id);
+      if (directSessions && id !== null) openSession(id);
       else select(id);
     },
-    [active, openSession, select],
+    [directSessions, openSession, select],
   );
   return {
     docked,
@@ -1599,7 +1633,7 @@ function useFullscreenPanels(
     railSize,
     link,
     selectAgent,
-    selectFromStrip: active ? openSession : selectFromStrip,
+    selectFromStrip: directSessions ? openSession : selectFromStrip,
     width: sessionsAvailable && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
     column: useMemo(
       () =>
@@ -1608,7 +1642,10 @@ function useFullscreenPanels(
           : column,
       [column, docked],
     ),
-    sheet: useMemo(() => (active ? { ...sheet, sheetLink: link } : sheet), [sheet, link, active]),
+    sheet: useMemo(
+      () => (directSessions ? { ...sheet, sheetLink: link } : sheet),
+      [sheet, link, directSessions],
+    ),
   };
 }
 
@@ -1846,7 +1883,7 @@ export function OfficeSurface(
   } = useChatKeyboard(
     full.root,
     layout.platform,
-    chatIsVisible(teamOpen, compact, sheet.sheetView, column.view),
+    usesOfficeKeyboard(layout.platform, teamOpen, compact, sheet.sheetView, column.view),
   );
   const onSurfaceLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -1859,6 +1896,7 @@ export function OfficeSurface(
   const panels = useFullscreenPanels(
     full.integrated,
     full.active,
+    layout.platform,
     compact,
     surfaceWidth,
     column,
@@ -2051,7 +2089,7 @@ export function OfficeSurface(
             theme={theme}
             focusRoomId={focusRoomId}
             focusRequest={focusRequest}
-            selectedAgentId={kept}
+            selectedAgentId={sceneSelection(compact, layout.platform, sheet.sheetView, kept)}
             styles={styles}
             compact={layout.compact}
             actions={actions}
