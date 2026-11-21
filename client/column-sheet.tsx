@@ -1,11 +1,59 @@
-import { useCallback, useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { KeyboardAvoidingView, Pressable, Text, View } from "react-native";
-import { Icon } from "@getpaseo/plugin/client/ui";
+import { Icon, Modal } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
+import { statusLine } from "./session-text.js";
 import { SessionHeading } from "./session-panel-detail.js";
 import { COLUMN_TABS, type ColumnTab, type ColumnView } from "./column-model.js";
 import { ColumnTabs, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import type { OfficeStyles } from "./styles.js";
+
+const dialogContent = { padding: 0, gap: 0 };
+
+/** Paseo sizes the dialog body to its visible snap point and registers its text inputs with the keyboard. */
+export function ConversationDialog({
+  sessionTitle,
+  identity,
+  color,
+  onBack,
+  onDismiss,
+  styles,
+  children,
+}: {
+  sessionTitle: string | null;
+  identity: { agent: OfficeAgent | null; room: string | null } | null;
+  color: string;
+  onBack(): void;
+  onDismiss(): void;
+  styles: OfficeStyles;
+  children: ReactNode;
+}) {
+  const title = identity?.agent
+    ? `${sessionTitle} · ${statusLine(identity.agent, identity.room)}`
+    : (sessionTitle ?? "Team chat");
+  const session = identity !== null;
+  const back = useMemo(
+    () =>
+      session ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to Sessions"
+          onPress={onBack}
+          style={styles.segment}
+        >
+          <Icon name="ArrowLeft" size={20} color={color} />
+        </Pressable>
+      ) : undefined,
+    [session, onBack, styles.segment, color],
+  );
+  return (
+    <Modal open title={title} icon={back} onOpenChange={onDismiss}>
+      <Modal.Content scrollable={false} contentContainerStyle={dialogContent}>
+        {children}
+      </Modal.Content>
+    </Modal>
+  );
+}
 
 export interface ColumnSheetProps {
   /** What the sheet shows; null while it is closed. */
