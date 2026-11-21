@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode, type SetStateAc
 import {
   Text,
   View,
+  type LayoutChangeEvent,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from "react-native";
@@ -265,17 +266,26 @@ interface ComposerProps {
   actions: AgentActions;
   touchScreen: boolean;
   styles: OfficeStyles;
+  focused: boolean;
+  setFocused(value: boolean): void;
 }
 
-function Composer({ agent, draft, actions, touchScreen, styles }: ComposerProps) {
+function Composer({
+  agent,
+  draft,
+  actions,
+  touchScreen,
+  styles,
+  focused,
+  setFocused,
+}: ComposerProps) {
   const { text, setText } = draft;
   const [error, setError] = useState<string | null>(null);
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
   const [pending, setPending] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const focus = useCallback(() => setFocused(true), []);
-  const blur = useCallback(() => setFocused(false), []);
+  const focus = useCallback(() => setFocused(true), [setFocused]);
+  const blur = useCallback(() => setFocused(false), [setFocused]);
   const shell = useMemo(
     () => [styles.sessions.replyShell, focused && styles.sessions.replyFocused],
     [styles, focused],
@@ -369,24 +379,41 @@ export function SessionPanel({
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
     [layout.platform],
   );
+  const nativeDialog = inSheet && layout.platform !== "web";
+  const [focused, setFocused] = useState(false);
+  const [short, setShort] = useState(false);
+  const measureBody = useCallback((event: LayoutChangeEvent) => {
+    // Keep room for the transcript and a four-line draft on a short keyboard-open sheet.
+    setShort(event.nativeEvent.layout.height < 280);
+  }, []);
   const name = agent === null ? `Agent ${agentId.slice(0, 8)}` : agentTitle(agent);
+  const requests = agent && (
+    <Asks
+      agent={agent}
+      actions={actions}
+      canOpenWorkspace={onOpenWorkspace !== undefined}
+      styles={styles}
+    />
+  );
   return (
-    <View style={styles.screen}>
-      <Header
-        agent={agent}
-        room={room}
-        onOpenWorkspace={onOpenWorkspace}
-        onClose={onClose}
-        hideClose={hideClose}
-        inSheet={inSheet}
-        styles={styles}
-      />
-      <SessionDetailTabs
-        tab={tab}
-        setTab={setTab}
-        childCount={onOpenSubagent ? subagents?.length : undefined}
-        styles={styles}
-      />
+    <View style={styles.screen} onLayout={nativeDialog ? measureBody : undefined}>
+      <View style={short && focused ? styles.hidden : undefined}>
+        <Header
+          agent={agent}
+          room={room}
+          onOpenWorkspace={onOpenWorkspace}
+          onClose={onClose}
+          hideClose={hideClose}
+          inSheet={inSheet}
+          styles={styles}
+        />
+        <SessionDetailTabs
+          tab={tab}
+          setTab={setTab}
+          childCount={onOpenSubagent ? subagents?.length : undefined}
+          styles={styles}
+        />
+      </View>
       <ScrollView
         ref={scroller}
         contentContainerStyle={styles.sessionList}
@@ -414,16 +441,14 @@ export function SessionPanel({
             styles={styles}
           />
         )}
+        {nativeDialog && requests}
       </ScrollView>
       {agent === null ? null : (
         <>
-          <Asks
-            agent={agent}
-            actions={actions}
-            canOpenWorkspace={onOpenWorkspace !== undefined}
-            styles={styles}
-          />
+          {!nativeDialog && requests}
           <Composer
+            focused={focused}
+            setFocused={setFocused}
             agent={agent}
             draft={draft}
             actions={actions}
