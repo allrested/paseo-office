@@ -25,6 +25,8 @@ interface Saved {
 }
 
 let saved: Saved[];
+let calls: { name: string; input: unknown }[];
+let rpcAnswer: { ok: true } | { ok: false; problem: string };
 let saveError: string | null;
 /** Set to keep each save waiting for the host's answer. */
 let answer: Promise<boolean> | null;
@@ -48,6 +50,11 @@ vi.mock("./world/adapter.js", async (importOriginal) => ({
 }));
 
 vi.mock("@getpaseo/plugin/client", () => ({
+  // The two tracker calls: what was sent is recorded, and `rpcAnswer` is the host's reply.
+  useRpc: (contract: { name: string }) => async (input: unknown) => {
+    calls.push({ name: contract.name, input });
+    return rpcAnswer;
+  },
   useSettings: (): HostSettings => ({
     status: "ready",
     revision: "r1",
@@ -83,7 +90,7 @@ const ACTIONS = {
 } as unknown as BoardActions;
 const WAKE = { paused: false, queued: {} };
 
-type Trackers = Pick<IncidentsState, "jiraReady" | "sentryReady" | "scheduleError">;
+type Trackers = Pick<IncidentsState, "jiraReady" | "sentryReady" | "scheduleError" | "connections">;
 
 interface HarnessProps {
   scheduleError: string | null;
@@ -109,6 +116,8 @@ let root: Root;
 
 beforeEach(() => {
   saved = [];
+  calls = [];
+  rpcAnswer = { ok: true };
   saveError = null;
   answer = null;
   stored = {
@@ -453,13 +462,98 @@ test("a refused plan goes back and shows the reason under the row", async () => 
   );
 });
 
-const JIRA_HINT =
-  "Project keys, comma separated. Needs ATLASSIAN_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN on the host.";
-const JIRA_UNSET =
-  "ATLASSIAN_BASE_URL, ATLASSIAN_EMAIL or ATLASSIAN_API_TOKEN is not set on this host";
-const SENTRY_UNSET = "SENTRY_AUTH_TOKEN is not set on this host";
+const JIRA_HINT = "Project keys, comma separated. New bugs in them ring the incident alarm.";
+const JIRA_UNSET = "No Jira connection on this host: save one above";
+const SENTRY_UNSET = "No Sentry token on this host: save one above";
 
-test("a tracker's field set while its variables are not names them under it", async () => {
+async function press(name: string): Promise<void> {
+  const button = container.querySelector<HTMLElement>(`[role="button"][aria-label="${name}"]`);
+  if (!button) throw new Error(`No button is named "${name}"`);
+  await act(async () => button.click());
+}
+
+const SAVED_JIRA: Trackers = {
+  jiraReady: true,
+  sentryReady: false,
+  scheduleError: null,
+  connections: {
+    jira: { source: "saved", baseUrl: "https://acme.atlassian.net", email: "a@acme.test" },
+    sentry: { source: "none" },
+  },
+};
+
+test("the Jira connection shows the host's address and email, never a token", async () => {
+  await mount(null, SAVED_JIRA);
+  expect(field("Jira address").value).toBe("https://acme.atlassian.net");
+  expect(field("Jira email").value).toBe("a@acme.test");
+  expect(field("Jira API token").value).toBe("");
+  expect(field("Jira API token").type).toBe("password");
+  expect(field("Sentry auth token").type).toBe("password");
+  expect(container.textContent).toContain("Jira connection saved on this host");
+  expect(container.textContent).toContain("No Sentry connection on this host");
+});
+
+test("Save connection sends what is typed, and the token field empties", async () => {
+  await mount(null, { ...SAVED_JIRA, connections: undefined });
+  await type("Jira address", "https://acme.atlassian.net");
+  await type("Jira email", "a@acme.test");
+  await type("Jira API token", "typed-token");
+  await press("Save Jira connection");
+  expect(calls).toEqual([
+    {
+      name: "office.trackers.save.request",
+      input: {
+        action: "save-jira",
+        baseUrl: "https://acme.atlassian.net",
+        email: "a@acme.test",
+        token: "typed-token",
+      },
+    },
+  ]);
+  expect(field("Jira API token").value).toBe("");
+
+  await type("Sentry auth token", "sentry-token");
+  await press("Save Sentry connection");
+  expect(calls.at(-1)).toEqual({
+    name: "office.trackers.save.request",
+    input: { action: "save-sentry", token: "sentry-token" },
+  });
+});
+
+test("Test connection says what the tracker answered, and saves nothing", async () => {
+  await mount(null, SAVED_JIRA);
+  await press("Test Jira connection");
+  expect(calls).toEqual([
+    {
+      name: "office.trackers.test.request",
+      input: {
+        tracker: "jira",
+        baseUrl: "https://acme.atlassian.net",
+        email: "a@acme.test",
+        token: "",
+      },
+    },
+  ]);
+  expect(container.textContent).toContain("Jira accepted the sign-in");
+
+  rpcAnswer = { ok: false, problem: "Jira refused the token: check the Jira API token" };
+  await press("Test Jira connection");
+  expect(alerts()).toEqual([
+    "Unable to test connection: Jira refused the token: check the Jira API token",
+  ]);
+  expect(container.textContent).not.toContain("Jira accepted the sign-in");
+});
+
+test("only a saved connection can be removed", async () => {
+  await mount(null, SAVED_JIRA);
+  expect(container.querySelector('[aria-label="Remove saved Sentry connection"]')).toBeNull();
+  await press("Remove saved Jira connection");
+  expect(calls).toEqual([
+    { name: "office.trackers.save.request", input: { action: "clear", tracker: "jira" } },
+  ]);
+});
+
+test("a tracker's field set while the host has no sign-in for it says so under it", async () => {
   stored = { ...stored, jiraProjects: "SHOP", sentryOrg: "acme" };
   await mount(null, { jiraReady: false, sentryReady: false, scheduleError: null });
   expect(fieldBlock("Jira projects")).toBe("Jira projects" + JIRA_HINT + JIRA_UNSET);
@@ -480,7 +574,7 @@ test("an address other than sentry.io counts as set: it names the Sentry token t
   await mount(null, { jiraReady: true, sentryReady: false, scheduleError: null });
   expect(fieldBlock("Sentry address")).toBe(
     "Sentry address" +
-      "Where SENTRY_AUTH_TOKEN is sent. https, or http on the host itself." +
+      "Where the Sentry token is sent. https, or http on the host itself." +
       SENTRY_UNSET,
   );
 

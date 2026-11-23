@@ -472,7 +472,7 @@ The gear in fullscreen opens **Office settings** over the floor. You can also op
 | ---------- | -------------------------------------------------------------------------------------------- |
 | Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
 | Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
-| Services   | Jira projects, Sentry organization and projects, and the optional weather service.           |
+| Services   | Jira and Sentry connections and projects, and the optional weather service.                  |
 
 View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
@@ -589,12 +589,23 @@ office sets them from its settings each time it starts and at each save, and sto
 ## Incidents
 
 The office rings my-office's incident alarm for a new Jira bug or Sentry issue. "Jira projects"
-takes project keys, and a new issue of type Bug in one of them rings; it needs
-`ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` in the daemon's environment.
-"Sentry organisation", "Sentry projects" and "Sentry address" (`https://sentry.io` by default) do
-the same for a new unresolved Sentry issue with `SENTRY_AUTH_TOKEN`. A changed token takes a daemon
-restart, and the settings name the variables to set, never a value. Jira does not refuse a project
-key it does not know, so a mistyped key rings nothing and shows no problem.
+takes project keys, and a new issue of type Bug in one of them rings. "Sentry organisation",
+"Sentry projects" and "Sentry address" (`https://sentry.io` by default) do the same for a new
+unresolved Sentry issue. Jira does not refuse a project key it does not know, so a mistyped key
+rings nothing and shows no problem.
+
+Each tracker needs a sign-in, set under Services in the office's settings. Jira takes its
+address, the account's email and an API token; Sentry takes an auth token. "Save connection"
+writes them to `office/trackers.json` in Paseo's home on the host, a file only the daemon's user
+can read (mode 600). The tokens are stored there as typed, not encrypted. A saved token is never
+sent back to the app: its field stays empty, and the settings say only where the sign-in comes
+from. "Test connection" sends one signed-in request with what is typed and saves nothing; a
+Sentry test asks the organisation and address already set. "Remove" deletes a saved connection.
+A save holds from the next check, with no daemon restart.
+
+A host with no saved connection reads `ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL` and
+`ATLASSIAN_API_TOKEN`, and `SENTRY_AUTH_TOKEN`, from the daemon's environment, as before. A saved
+connection comes first, and a changed variable takes a daemon restart.
 
 The first check records what exists and rings nothing. Each check reads from the last successful
 one less 10 minutes, because Jira compares `created` to the minute; the office writes the time in

@@ -18,6 +18,11 @@ import { emptyChat, type ChatData, type ChatStore } from "./server/chat-store.js
 import { createFakeClock, settle } from "./server/fake-clock.js";
 import type { LocalSchedules, OfficeCadence } from "./server/local-schedules.js";
 import {
+  NO_SAVED_TRACKERS,
+  type SavedTrackers,
+  type TrackerCredentialsStore,
+} from "./server/tracker-credentials.js";
+import {
   EMPTY_INCIDENTS,
   type IncidentsData,
   type IncidentsStore,
@@ -298,6 +303,19 @@ function memoryIncidentsStore(): IncidentsStore & { kept: IncidentsData } {
   return store;
 }
 
+function memoryTrackerStore(
+  kept: SavedTrackers = NO_SAVED_TRACKERS,
+): TrackerCredentialsStore & { kept: SavedTrackers } {
+  const store = {
+    kept,
+    load: async () => structuredClone(store.kept),
+    save: async (saved: SavedTrackers) => {
+      store.kept = structuredClone(saved);
+    },
+  };
+  return store;
+}
+
 function memoryChatStore(): ChatStore & { kept: ChatData } {
   // Copied on each load and save, as the file is.
   const store = {
@@ -362,6 +380,8 @@ function setup(
     env?: NodeJS.ProcessEnv;
     fetchFn?: typeof fetch;
     chatStore?: ChatStore;
+    /** The tracker connections saved from the settings; none by default. */
+    savedTrackers?: SavedTrackers;
     /** The kept duty list; an empty one by default, so no duty takes a post id. Null: none kept. */
     duties?: DutiesFile | null;
     /** Gives the fake server extras, as a host that kept plugin schedules has. */
@@ -387,6 +407,7 @@ function setup(
   const directory: FakeDirectory = { agents: [], timelines: new Map() };
   const notesStore = memoryNotesStore();
   const incidentsStore = memoryIncidentsStore();
+  const trackerStore = memoryTrackerStore(options.savedTrackers);
   const chatStore = options.chatStore ?? memoryChatStore();
   const clock = createFakeClock(options.start ?? Date.parse("2026-11-11T09:00:00.000Z"));
   const context = fakeContext(statuses, sent, writers, directory);
@@ -395,6 +416,7 @@ function setup(
     store: memoryStore(),
     notesStore,
     incidentsStore,
+    trackerStore,
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
     tenureFile: { load: async () => null, save: async () => {} },
@@ -439,6 +461,7 @@ function setup(
     directory,
     notesStore,
     incidentsStore,
+    trackerStore,
     clock,
     context,
     stop,
@@ -786,6 +809,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.trackers.save.request",
+    "office.trackers.test.request",
     "office.chat.request",
     "office.life",
     "office.street.events",
@@ -1400,6 +1425,84 @@ test("a due incidents run calls the check; dismiss answers its count", async () 
   await stop();
 });
 
+test("a saved Jira connection turns the check on, and its token never reaches a client", async () => {
+  const jira = await jiraStandIn();
+  const { recorded, trackerStore, context, logs, stop } = setup(async () => JIRA_ON);
+  const incidentsCalls = () => recorded.schedules.filter((call) => call.includes(" incidents"));
+  await settle();
+  // No variable and nothing saved: the project alone does not start the check.
+  expect(incidentsCalls()).toEqual(["remove incidents"]);
+  const events: { type: string; state?: { incidents?: unknown } }[] = [];
+  const leaving = new AbortController();
+  const done = recorded.handlers.get("office.state")?.({}, {
+    ...context,
+    signal: leaving.signal,
+    push: async (event: { type: string }) => void events.push(event),
+  } as never);
+  await settle();
+
+  const save = recorded.handlers.get("office.trackers.save.request");
+  const typed = { baseUrl: `${jira.base}/`, email: "office@example.test", token: "typed-token" };
+  expect(await save?.({ action: "save-jira", ...typed, token: "" }, context)).toEqual({
+    ok: false,
+    problem: "Enter the Jira API token",
+  });
+  expect(await save?.({ action: "save-jira", ...typed }, context)).toEqual({ ok: true });
+  await settle();
+  expect(trackerStore.kept).toEqual({
+    version: 1,
+    jira: { baseUrl: jira.base, email: "office@example.test", token: "typed-token" },
+  });
+  expect(incidentsCalls().at(-1)).toBe("upsert incidents every 300000");
+  expect(events.at(-1)?.state?.incidents).toMatchObject({
+    jiraReady: true,
+    connections: {
+      jira: { source: "saved", baseUrl: jira.base, email: "office@example.test" },
+      sentry: { source: "none" },
+    },
+  });
+  expect(JSON.stringify(events)).not.toContain("typed-token");
+  expect(logs.join("\n")).not.toContain("typed-token");
+
+  // Cleared: no sign-in is left, so the check stops.
+  expect(await save?.({ action: "clear", tracker: "jira" }, context)).toEqual({ ok: true });
+  await settle();
+  expect(trackerStore.kept).toEqual({ version: 1 });
+  expect(incidentsCalls().at(-1)).toBe("remove incidents");
+  expect(events.at(-1)?.state?.incidents).toMatchObject({ jiraReady: false });
+  leaving.abort();
+  await done;
+  await stop();
+});
+
+test("a connection test asks the tracker once and saves nothing", async () => {
+  const jira = await jiraStandIn();
+  const { recorded, trackerStore, context, stop } = setup(async () => JIRA_ON, {
+    savedTrackers: {
+      version: 1,
+      jira: { baseUrl: jira.base, email: "office@example.test", token: "kept-token" },
+    },
+  });
+  await settle();
+  const probe = recorded.handlers.get("office.trackers.test.request");
+  const typed = { tracker: "jira", baseUrl: jira.base, email: "office@example.test" };
+  // No token typed: the saved one is tried.
+  expect(await probe?.({ ...typed, token: "" }, context)).toEqual({ ok: true });
+  expect(
+    await probe?.({ ...typed, baseUrl: "http://jira.example.test", token: "t" }, context),
+  ).toEqual({
+    ok: false,
+    problem: "The Jira address must be an https address (plain http only on this machine)",
+  });
+  // The settings name no Sentry organisation to ask about.
+  expect(await probe?.({ tracker: "sentry", token: "t" }, context)).toEqual({
+    ok: false,
+    problem: "Set the Sentry organisation first",
+  });
+  expect(trackerStore.kept.jira?.token).toBe("kept-token");
+  await stop();
+});
+
 test("an open office gets the incidents state with which trackers' variables are set, and a schedule that fails after a save", async () => {
   const { recorded, context, stop } = setup(async () => JIRA_ON, {
     env: jiraVariables("https://jira.example.test"),
@@ -1421,6 +1524,10 @@ test("an open office gets the incidents state with which trackers' variables are
     problems: {},
     jiraReady: true,
     sentryReady: false,
+    connections: {
+      jira: { source: "env", baseUrl: "https://jira.example.test", email: "office@example.test" },
+      sentry: { source: "none" },
+    },
     scheduleError: null,
   });
   expect(incidentsCalls()).toEqual(["upsert incidents every 300000"]);
@@ -1476,7 +1583,7 @@ test("a tracker's problem goes once no tracker is on", async () => {
   saved = ON;
   await Promise.all([...recorded.listeners].map((listener) => listener(saved)));
   await settle();
-  expect(events.at(-1)?.state?.incidents).toEqual({
+  expect(events.at(-1)?.state?.incidents).toMatchObject({
     open: [],
     problems: {},
     jiraReady: true,

@@ -34,14 +34,23 @@ import { createHub } from "./server/hub.js";
 import { createWeatherService } from "./server/weather-service.js";
 import { createWeatherReader } from "./server/weather-read.js";
 import { createIncidentsCheck, type IncidentsCheckState } from "./server/incidents-check.js";
-import { jiraEnv } from "./server/incidents-jira.js";
+import { TrackerProblem } from "./server/incidents-http.js";
+import { probeJira } from "./server/incidents-jira.js";
 import {
   createIncidentsSchedule,
   INCIDENTS_SCHEDULE,
   incidentsReaders,
+  type IncidentsSettings,
 } from "./server/incidents-schedule.js";
-import { sentryToken } from "./server/incidents-sentry.js";
+import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
+import {
+  changeSavedTrackers,
+  createTrackerCredentialsStore,
+  NO_SAVED_TRACKERS,
+  trackerCredentials,
+  type TrackerCredentialsStore,
+} from "./server/tracker-credentials.js";
 import { tidyAgent } from "./server/janitor.js";
 import {
   liveAgentPorts,
@@ -83,6 +92,7 @@ import {
   dutiesFile,
   hostSkillFolders,
   incidentsFile,
+  trackersFile,
   notesWriterFile,
   type SkillFolder,
 } from "./server/paths.js";
@@ -97,6 +107,11 @@ import {
   dutiesSaveRpc,
   dutyActedRpc,
   incidentsDismissRpc,
+  trackersSaveRpc,
+  trackersTestRpc,
+  type TrackersChange,
+  type TrackersProbe,
+  type TrackersResult,
   janitorRpc,
   machineSubscription,
   notesReadRpc,
@@ -123,13 +138,15 @@ export interface OfficePluginDeps {
   notesStore: NotesStore;
   /** Where the incidents check keeps the open incidents and what each tracker has shown. */
   incidentsStore: IncidentsStore;
+  /** Where the tracker connections saved from the settings are kept. */
+  trackerStore: TrackerCredentialsStore;
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
   liftFile: LifeFile<LiftKept>;
   /** The owner's duty list. */
   dutiesFile: LifeFile<DutiesFile>;
-  /** The daemon's environment: the trackers' tokens are read from it. */
+  /** The daemon's environment: a tracker with no saved connection takes its token from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
   log(message: string): void;
@@ -291,18 +308,40 @@ export function createOfficePlugin(
   // The check's last state, kept so a save that changes the schedule's error pushes it again.
   // Null until the store was read: the snapshot has no incidents before then.
   let checked: IncidentsCheckState | null = null;
+  // The connections saved from the settings, read once and kept: a save replaces them here too.
+  let savedTrackers = NO_SAVED_TRACKERS;
+  const trackersLoaded = deps.trackerStore.load().then(
+    (saved) => {
+      savedTrackers = saved;
+      return undefined;
+    },
+    (error: unknown) => log(`[office] tracker connections failed to load: ${errorMessage(error)}`),
+  );
+  const credentials = () => trackerCredentials(savedTrackers, deps.env);
   function pushIncidents(): void {
     if (checked === null) return;
+    const { jira, sentry } = credentials();
     hub.setIncidents({
       ...checked,
-      jiraReady: jiraEnv(deps.env) !== null,
-      sentryReady: sentryToken(deps.env) !== null,
+      jiraReady: jira !== null,
+      sentryReady: sentry !== null,
+      connections: {
+        jira: {
+          source: jira?.source ?? "none",
+          baseUrl: jira?.baseUrl ?? "",
+          email: jira?.email ?? "",
+        },
+        sentry: { source: sentry?.source ?? "none" },
+      },
       scheduleError: incidentsSchedule.error(),
     });
   }
   // The settings are read at each run, so a save holds from the next check.
   const incidents = createIncidentsCheck({
-    readers: async () => incidentsReaders(await readHostSettings(), deps.env),
+    readers: async () => {
+      await trackersLoaded;
+      return incidentsReaders(await readHostSettings(), credentials());
+    },
     store: deps.incidentsStore,
     now: () => deps.clock.now(),
     log,
@@ -416,7 +455,11 @@ export function createOfficePlugin(
     await writer
       .settingsChanged()
       .catch((error: unknown) => log(`[office] notes state failed: ${errorMessage(error)}`));
-    const trackersOn = Object.keys(incidentsReaders(state.values, deps.env)).length > 0;
+    await followTrackers(state.values);
+  }
+  async function followTrackers(values: IncidentsSettings): Promise<void> {
+    await trackersLoaded;
+    const trackersOn = Object.keys(incidentsReaders(values, credentials())).length > 0;
     await incidentsSchedule.sync(trackersOn);
     // With every tracker off no run comes again. One run with no reader drops the problems and
     // closes what is a day old.
@@ -564,6 +607,59 @@ export function createOfficePlugin(
   const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
+  );
+  async function saveTrackers(input: TrackersChange): Promise<TrackersResult> {
+    await trackersLoaded;
+    const changed = changeSavedTrackers(savedTrackers, input);
+    if ("problem" in changed) return { ok: false, problem: changed.problem };
+    await deps.trackerStore.save(changed.saved);
+    savedTrackers = changed.saved;
+    // The check's schedule follows the new connection; the settings may be unreadable.
+    await readHostSettings().then(followTrackers, pushIncidents);
+    return { ok: true };
+  }
+  async function probeTracker(input: TrackersProbe): Promise<void | string> {
+    const kept = credentials();
+    if (input.tracker === "jira") {
+      // The typed connection as a save would keep it, with the token in use when none is typed.
+      const token = input.token.trim() || (kept.jira?.token ?? "");
+      const typed = changeSavedTrackers(NO_SAVED_TRACKERS, {
+        action: "save-jira",
+        ...input,
+        token,
+      });
+      if ("problem" in typed) return typed.problem;
+      if (typed.saved.jira === undefined) return "Enter the Jira connection";
+      return probeJira({ ...typed.saved.jira, tokenVariable: "the Jira API token" });
+    }
+    const token = input.token.trim() || (kept.sentry?.token ?? "");
+    if (token === "") return "Enter the Sentry auth token";
+    const { sentryUrl: url, sentryOrg: org } = await readHostSettings();
+    if (org.trim() === "") return "Set the Sentry organisation first";
+    return probeSentry({ url, org, token, tokenVariable: "the Sentry auth token" });
+  }
+  async function testTracker(input: TrackersProbe): Promise<TrackersResult> {
+    await trackersLoaded;
+    try {
+      const problem = await probeTracker(input);
+      return typeof problem === "string" ? { ok: false, problem } : { ok: true };
+    } catch (error) {
+      // A tracker's problem is written to be shown; anything else may quote what was typed.
+      if (error instanceof TrackerProblem) return { ok: false, problem: error.message };
+      throw error;
+    }
+  }
+  // One save at a time: each starts from what the one before it kept.
+  let trackerSaves: Promise<unknown> = Promise.resolve();
+  server.handle(trackersSaveRpc, (input) => {
+    const run = trackerSaves.then(() =>
+      guarded("tracker connection save", () => saveTrackers(input)),
+    );
+    trackerSaves = run.catch(() => undefined);
+    return run;
+  });
+  server.handle(trackersTestRpc, (input) =>
+    guarded("tracker connection test", () => testTracker(input)),
   );
   server.handle(chatRpc, (input, context) => {
     holder.remember(context.paseo);
@@ -755,6 +851,10 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     }),
     notesStore: createNotesStore({ file: notesWriterFile(process.env, homedir()), log }),
     incidentsStore: createIncidentsStore({ file: incidentsFile(process.env, homedir()), log }),
+    trackerStore: createTrackerCredentialsStore({
+      file: trackersFile(process.env, homedir()),
+      log,
+    }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),

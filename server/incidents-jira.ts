@@ -14,6 +14,8 @@ export interface JiraEnv {
   baseUrl: string;
   email: string;
   token: string;
+  /** What a refused token's message names; the environment's variable when absent. */
+  tokenVariable?: string;
 }
 
 /** Jira's site and sign-in from the daemon's environment; null unless all three are set. */
@@ -70,19 +72,29 @@ function jqlTime(since: number, timeZone: string): string {
   return `${day} ${parts.get("hour")}:${parts.get("minute")}`;
 }
 
+function jiraTracker(env: JiraEnv, fetchFn: typeof fetch): Tracker {
+  const basic = Buffer.from(`${env.email}:${env.token}`).toString("base64");
+  return {
+    name: "Jira",
+    tokenVariable: env.tokenVariable ?? "ATLASSIAN_API_TOKEN",
+    headers: { Authorization: `Basic ${basic}` },
+    fetchFn,
+  };
+}
+
+/** One signed-in request, to tell whether Jira takes the sign-in. Rejects with a `TrackerProblem`. */
+export async function probeJira(env: JiraEnv, fetchFn: typeof fetch = fetch): Promise<void> {
+  const tracker = jiraTracker(env, fetchFn);
+  await getJson({ tracker, url: `${env.baseUrl}/rest/api/3/myself`, schema: MyselfSchema });
+}
+
 /** New bugs in `projects`, keys already checked against the settings' pattern. */
 export function createJiraReader(
   env: JiraEnv,
   projects: string[],
   fetchFn: typeof fetch = fetch,
 ): TrackerReader {
-  const basic = Buffer.from(`${env.email}:${env.token}`).toString("base64");
-  const tracker: Tracker = {
-    name: "Jira",
-    tokenVariable: "ATLASSIAN_API_TOKEN",
-    headers: { Authorization: `Basic ${basic}` },
-    fetchFn,
-  };
+  const tracker = jiraTracker(env, fetchFn);
   const api = `${env.baseUrl}/rest/api/3`;
 
   async function read(since: number): Promise<FoundIssue[]> {

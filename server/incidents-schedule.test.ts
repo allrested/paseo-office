@@ -7,6 +7,7 @@ import {
   type IncidentsSettings,
   incidentsReaders,
 } from "./incidents-schedule.js";
+import { NO_SAVED_TRACKERS, trackerCredentials } from "./tracker-credentials.js";
 
 const EVERY_5_MINUTES = { type: "every", everyMs: 300_000 } as const;
 const SAVED = {
@@ -87,7 +88,9 @@ const JIRA_ENV = {
 const SENTRY_ENV = { SENTRY_AUTH_TOKEN: "placeholder-sentry-token" };
 
 function trackersOn(values: Partial<IncidentsSettings>, env: NodeJS.ProcessEnv): string[] {
-  return Object.keys(incidentsReaders({ ...NONE, ...values }, env));
+  return Object.keys(
+    incidentsReaders({ ...NONE, ...values }, trackerCredentials(NO_SAVED_TRACKERS, env)),
+  );
 }
 
 test("Jira is on only with all three ATLASSIAN_* and a project", () => {
@@ -156,7 +159,11 @@ test("the readers read the settings' projects from the environment's Jira and th
       sentryProjects: "pos",
       sentryUrl: server.base,
     },
-    { ...JIRA_ENV, ATLASSIAN_BASE_URL: server.base, ...SENTRY_ENV },
+    trackerCredentials(NO_SAVED_TRACKERS, {
+      ...JIRA_ENV,
+      ATLASSIAN_BASE_URL: server.base,
+      ...SENTRY_ENV,
+    }),
   );
   await readers.jira?.read(Date.UTC(2026, 10, 17, 5, 0));
   await readers.sentry?.read(Date.UTC(2026, 10, 17, 5, 0));

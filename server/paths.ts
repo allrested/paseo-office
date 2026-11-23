@@ -35,6 +35,11 @@ export function incidentsFile(env: NodeJS.ProcessEnv, home: string): string {
   return join(officeDir(env, home), "incidents.json");
 }
 
+/** The tracker connections saved from the settings. It holds tokens: owner-only. */
+export function trackersFile(env: NodeJS.ProcessEnv, home: string): string {
+  return join(officeDir(env, home), "trackers.json");
+}
+
 /** The team chat's conversation, kept as upstream's engine writes it. */
 export function chatFile(env: NodeJS.ProcessEnv, home: string): string {
   return join(officeDir(env, home), "chat.json");
