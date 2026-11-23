@@ -1,4 +1,7 @@
 import chat, { type ChatWords } from "./upstream/chat.js";
+import { chatId } from "./chat-id.js";
+import { chatInternational } from "./chat-international.js";
+import type { ChatCulture } from "./settings.js";
 import type { Translate } from "./upstream/chat-engine.js";
 
 // Upstream's English name for the director (vendor/my-office/src/i18n/locales/en/people.js).
@@ -27,16 +30,36 @@ const OURS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-function find(key: string): ChatWords | undefined {
-  if (key === "people.director") return DIRECTOR;
-  if (Object.hasOwn(OURS, key)) return OURS[key];
-  if (!key.startsWith(CHAT_PREFIX)) return undefined;
-  let found: ChatWords | undefined = chat;
-  for (const part of key.slice(CHAT_PREFIX.length).split(".")) {
+/** What the chat's people write for a culture; a key a culture lacks reads the next one's. */
+const LINES: Readonly<Record<ChatCulture, readonly Readonly<Record<string, ChatWords>>[]>> = {
+  international: [chatInternational, OURS],
+  indonesian: [],
+  vietnamese: [OURS],
+};
+const DIRECTORS: Readonly<Record<ChatCulture, string>> = {
+  international: DIRECTOR,
+  indonesian: "Direktur",
+  vietnamese: DIRECTOR,
+};
+
+function within(words: ChatWords | undefined, path: string): ChatWords | undefined {
+  let found = words;
+  for (const part of path.split(".")) {
     if (found === undefined || typeof found === "string" || isList(found)) return undefined;
     found = found[part];
   }
   return found;
+}
+
+function find(key: string, culture: ChatCulture): ChatWords | undefined {
+  if (key === "people.director") return DIRECTORS[culture];
+  for (const lines of LINES[culture]) if (Object.hasOwn(lines, key)) return lines[key];
+  if (!key.startsWith(CHAT_PREFIX)) return undefined;
+  const path = key.slice(CHAT_PREFIX.length);
+  // Indonesian has what people write; the rest of the area stays upstream's English.
+  const local = culture === "indonesian" ? within(chatId, path) : undefined;
+  if (local !== undefined) return local;
+  return Object.hasOwn(OURS, key) ? OURS[key] : within(chat, path);
 }
 
 function fill(text: string, values: Readonly<Record<string, unknown>>): string {
@@ -57,24 +80,28 @@ function line(
   return typeof chosen === "string" ? chosen : undefined;
 }
 
-function translate(key: string, vars?: object | null): string;
-function translate(key: string, vars: object | null, as: "list"): string[];
-function translate(key: string, vars?: object | null, as?: "list"): string | string[] {
-  const words = find(key);
-  if (as === "list") {
-    if (typeof words === "string") return [words];
-    if (words === undefined || !isList(words)) return [];
-    return words.filter((item): item is string => typeof item === "string");
+/**
+ * The engine's `tr` for a culture, with the stand-in's rules: an array is one of its lines at
+ * random, a one/other pair is chosen by `n`, `{name}` is filled from `vars`, and an unknown key
+ * gives the key. Upstream's emoji stay: the scene strips them for its speech bubbles, which the
+ * chat does not have.
+ */
+export function chatWords(culture: ChatCulture): Translate {
+  function translate(key: string, vars?: object | null): string;
+  function translate(key: string, vars: object | null, as: "list"): string[];
+  function translate(key: string, vars?: object | null, as?: "list"): string | string[] {
+    const words = find(key, culture);
+    if (as === "list") {
+      if (typeof words === "string") return [words];
+      if (words === undefined || !isList(words)) return [];
+      return words.filter((item): item is string => typeof item === "string");
+    }
+    const values = Object.fromEntries(Object.entries(vars ?? {}));
+    const text = line(words, values);
+    return text === undefined ? key : fill(text, values);
   }
-  const values = Object.fromEntries(Object.entries(vars ?? {}));
-  const text = line(words, values);
-  return text === undefined ? key : fill(text, values);
+  return translate;
 }
 
-/**
- * The engine's `tr` over upstream's English `chat` area, with the stand-in's rules: an array is
- * one of its lines at random, a one/other pair is chosen by `n`, `{name}` is filled from `vars`,
- * and an unknown key gives the key. Upstream's emoji stay: the scene strips them for its speech
- * bubbles, which the chat does not have.
- */
-export const chatT: Translate = translate;
+/** The chat's words where no host setting is at hand: the default culture's. */
+export const chatT: Translate = chatWords("international");

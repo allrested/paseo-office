@@ -1,5 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { chatT } from "./chat-words.js";
+import { chatId } from "./chat-id.js";
+import { chatInternational } from "./chat-international.js";
+import { chatT, chatWords } from "./chat-words.js";
 import chat from "./upstream/chat.js";
 import { createChatEngine, REACTIONS, type EngineMessage } from "./upstream/chat-engine.js";
 
@@ -82,4 +84,66 @@ test("mobile clients can load English chat without Intl.PluralRules", async () =
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+const slots = (text: string) => (text.match(/\{\w+\}/g) ?? []).toSorted();
+const VIETNAMESE = /[ăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]|Tết|\d+k\b/i;
+
+test("the Indonesian chat has upstream's keys, list lengths and slots, and nothing Vietnamese", () => {
+  // (upstream's English with the office's own lines, which the Indonesian words follow)
+  const english = chatWords("vietnamese");
+  const ours = chatWords("indonesian");
+  const keys: string[] = [];
+  for (const [area, words] of Object.entries(chatId)) {
+    if (typeof words === "string" || Array.isArray(words)) keys.push(`chat.${area}`);
+    else {
+      // (every key of upstream's, and the office's own lines besides)
+      expect(Object.keys(words), area).toEqual(
+        expect.arrayContaining(Object.keys(chat[area] as object)),
+      );
+      keys.push(...Object.keys(words).map((key) => `chat.${area}.${key}`));
+    }
+  }
+  expect(keys.length).toBeGreaterThan(140);
+  for (const key of keys) {
+    const theirs = english(key, null, "list");
+    const lines = ours(key, null, "list");
+    expect(lines.length, key).toBe(theirs.length);
+    lines.forEach((text, i) => {
+      expect(slots(text), key).toEqual(slots(theirs[i] ?? ""));
+      expect(text, key).not.toMatch(VIETNAMESE);
+    });
+  }
+  expect(chatWords("indonesian")("chat.life.lunchOpts", null, "list")).toEqual([
+    "Nasi padang",
+    "Bakso",
+    "Soto ayam",
+    "Gado-gado",
+  ]);
+  expect(chatWords("indonesian")("people.director")).toBe("Direktur");
+  // (the window's own words are not what people write: they stay upstream's English)
+  expect(chatWords("indonesian")("chat.send")).toBe(chat.send);
+});
+
+test("the international chat keeps upstream's lists and slots, with nothing Vietnamese", () => {
+  const tr = chatWords("international");
+  for (const [key, lines] of Object.entries(chatInternational)) {
+    const theirs = chatWords("vietnamese")(key, null, "list");
+    expect(lines.length, key).toBe(theirs.length);
+    lines.forEach((text, i) => expect(slots(text), key).toEqual(slots(theirs[i] ?? "")));
+  }
+  for (const area of ["reply", "work", "life", "sys"]) {
+    for (const key of Object.keys(chat[area] as object)) {
+      for (const text of tr(`chat.${area}.${key}`, null, "list")) {
+        expect(text, `${area}.${key}`).not.toMatch(VIETNAMESE);
+      }
+    }
+  }
+  expect(tr("chat.life.lunchOpts", null, "list")).toEqual([
+    "Rice bowl",
+    "Noodle soup",
+    "Sandwich",
+    "Salad",
+  ]);
+  expect(chatWords("vietnamese")("chat.life.lunchOpts", null, "list")).toContain("Phở");
 });
