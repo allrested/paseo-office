@@ -55,42 +55,50 @@ card and fullscreen header in `client/`, `client/world/adapter.ts`, `docs/office
 **Tests.** The name is read, saved and cleared; every place that showed the workspace name shows
 the team name; a ledger kept by name is carried over to ids with tenure intact.
 
-## 3. Characters for a provider's own sub-agents
+## 3. Sub-agents walking in
 
 **Problem.** The office draws a character for a sub-agent only when it is a Paseo agent, started
 with Paseo's create-agent tool and carrying the parent label. A sub-agent the provider runs inside
 its own session, such as Claude's Agent tool, is not a Paseo agent. Paseo's plugin SDK does not
 list them, so the office shows the parent "Waiting on" nothing and no new character appears.
 
-**Change.** A stand-in character for each sub-agent call that is running.
+**Change.** The scene already has upstream's own sub-agents: on a `substart` event a person
+comes in through the door, takes a brief from the boss, works where the task belongs, reports back
+and leaves on `substop` (`spawnSub` and `dropSub` in `vendor/my-office/src/office/people/
+workers.js`, wired in `paseo-entry.js`). The plugin sends the scene none today (`subs: []` in
+`client/world/adapter.ts`). It will send them.
 
 - The office already reads the tail of each running agent's timeline every 5 s and knows a
-  `Task` or `Agent` tool call as the kind `subagent`. Each such call with status `running`
-  becomes a stand-in: named `<parent's name>-<n>`, seated in the parent's room, at work until the
-  call ends, then walking out.
-- A stand-in is display only. It has no session to open, no chat, no janitor and no wake, and the
-  cards say so. A tap on it opens the parent.
-- The parent counts as waiting on its stand-ins, so it stays at its desk, at work.
+  `Task` or `Agent` tool call as the kind `subagent`. A call first seen `running` is a
+  `substart` for its parent, with the call's description as the label; one that ends is a
+  `substop`.
+- The 2D floor and the session lists show the same sub-agents as rows under the parent, named
+  `<parent's name>-<n>`. They are display only: no session to open, no chat, no janitor and no
+  wake. A tap opens the parent.
+- The parent counts as waiting on them, so it stays at its desk, at work.
 - Limits to accept: a call that starts and ends between two reads is never seen; the read is of
   the timeline's tail, so with many calls at once the oldest may be missed; and what a sub-agent
   is doing is not known beyond the call's description.
 
 **Open point.** If Paseo's SDK gains a list of provider sub-agents (the app has one for its
-Subagents track), the stand-ins should come from it instead. This plan does not wait for that.
+Subagents track), the events should come from it instead. This plan does not wait for that.
 
 **Files.** `server/activity.ts` (the running sub-agent calls of an agent), `server/hub.ts` and
-`shared/contracts.ts` (stand-ins in the office state), `shared/model.ts` (rows and waiting-on),
-`client/world/adapter.ts` (people on the floor), the session cards in `client/`, `docs/office.md`.
+`shared/contracts.ts` (them in the office state), `shared/model.ts` (rows and waiting-on),
+`client/world/adapter.ts` and `client/world/world-api.ts` (the events), the session cards in
+`client/`, `docs/office.md`.
 
-**Tests.** Calls become stand-ins and leave when they end; names are stable while a call runs;
-the parent waits on them; no action that needs a session is offered on one.
+**Tests.** A call becomes a `substart` once and a `substop` once; names are stable while a call
+runs; the parent waits on them; no action that needs a session is offered on one.
 
 ## Order and release
 
 1. Stand-up writer mode: smallest, and it unblocks the daily notes.
 2. Team name.
-3. Sub-agent stand-ins: largest, and the one most likely to need a second look on a phone.
+3. Sub-agents walking in: largest, and the one most likely to need a second look on a phone.
 4. Bump to 0.2.3, add the version to `CHANGELOG.md`, tag, publish to npm, registry update.
+
+0.2.3 is the first step of `docs/roadmap-0.3.0.md`.
 
 Each pull request passes typecheck, lint, the format check, the world check and the tests before
 it is opened, and is tried on a phone before the release.
