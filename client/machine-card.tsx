@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import type { Machine, MachineAgent, OfficeWorkspace } from "../shared/contracts.js";
+import type { Machine, MachineAgent, OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
+import { ForgottenWork, SubagentModels } from "./host-work.js";
 import { HostViews, NO_SSH, type SshDiscovery } from "./ssh-hosts.js";
 import { LocalHostDetails } from "./host-details.js";
 import { ActionButton } from "./action-button.js";
@@ -102,6 +103,10 @@ function PlanLimits({
           ))}
         </View>
       ))}
+      <Text style={styles.host.note}>
+        To switch accounts, use the account-switcher plugin. The office reads the limits and handles
+        no sign-in.
+      </Text>
     </View>
   );
 }
@@ -234,6 +239,8 @@ function AgentGroup({ title, agents, now, actionFor, cleanUp, styles, empty }: A
 
 interface MachineBodyProps {
   workspaces?: readonly OfficeWorkspace[];
+  /** The office's agents, for the models of those that have sub-agents. */
+  agents?: readonly OfficeAgent[];
   machine: Machine;
   cleanUp(agentIds: readonly string[]): Promise<void>;
   styles: OfficeStyles;
@@ -247,7 +254,15 @@ const CLOSE = { label: "Close runtime", pendingLabel: "Closing...", primary: fal
 
 const NO_WORKSPACES: readonly OfficeWorkspace[] = [];
 
-function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: MachineBodyProps) {
+const NO_AGENTS: readonly OfficeAgent[] = [];
+
+function MachineBody({
+  machine,
+  cleanUp,
+  styles,
+  workspaces = NO_WORKSPACES,
+  agents = NO_AGENTS,
+}: MachineBodyProps) {
   const usage = usePlanUsageValue();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((value) => !value), []);
@@ -301,6 +316,8 @@ function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: M
       </View>
       {expanded && <LocalHostDetails machine={machine} workspaces={workspaces} styles={styles} />}
       <PlanLimits usage={usage} now={now} styles={styles} />
+      <SubagentModels agents={agents} styles={styles} />
+      <ForgottenWork styles={styles} />
       {left.length > 0 ? (
         <View style={styles.host.group}>
           <AgentGroup
@@ -346,6 +363,7 @@ function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: M
 
 export interface MachineCardProps {
   workspaces?: readonly OfficeWorkspace[];
+  agents?: readonly OfficeAgent[];
   /** Empty on hosts without local readings. */
   machine: Machine | null;
   ssh?: SshDiscovery;
@@ -360,6 +378,7 @@ export function MachineCard({
   machine,
   ssh = NO_SSH,
   workspaces,
+  agents,
   open,
   cleanUp,
   styles,
@@ -384,6 +403,7 @@ export function MachineCard({
             {machine ? (
               <MachineBody
                 workspaces={workspaces}
+                agents={agents}
                 machine={machine}
                 cleanUp={cleanUp}
                 styles={styles}

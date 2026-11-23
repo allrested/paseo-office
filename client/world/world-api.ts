@@ -30,6 +30,8 @@ export interface WorldSession {
   git: { repo: string; ci?: "red" | "green"; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
+  /** The prompt cache's clock, guessed from the turn's end: the cup on a resting desk steams until `until` (epoch ms). */
+  cache?: { until: number; ttl: "5m" | "1h"; tokens: number; guessed: true };
   /** The plan the person runs on, only while that plan is used up: named on their tag, and they take a break. */
   acct?: string;
   /** Which mark the scene puts on the person's screen. */

@@ -103,9 +103,13 @@ export function useWorldFeed(
   // Whose plan is used up is named on their session, so the scene knows who takes the break.
   const usage = usePlanUsageValue();
   const out = useMemo(() => providersOut(usage, Date.now()), [usage]);
+  // The host's settings: the cache clock here, streamer mode and the sticky notes below.
+  const host = useSettings(officeHostSettings);
+  const hostValues = host.status === "ready" ? host.values : null;
+  const cacheClock = hostValues?.cacheClock ?? "off";
   const people = useMemo(
-    () => worldPeople(model, PLAN_DESKS[plan], life?.born, out),
-    [model, plan, life?.born, out],
+    () => worldPeople(model, PLAN_DESKS[plan], life?.born, out, cacheClock),
+    [model, plan, life?.born, out, cacheClock],
   );
   useEffect(() => {
     const scene = world.current;
@@ -128,8 +132,6 @@ export function useWorldFeed(
   }, [worldReadings, api]);
 
   // The host's: whether bubbles name what a person is at, and the owner's notes on the whiteboard.
-  const host = useSettings(officeHostSettings);
-  const hostValues = host.status === "ready" ? host.values : null;
   const streamer = hostValues?.streamerMode ?? null;
   const notesText = hostValues?.stickyNotes ?? null;
   useEffect(() => {

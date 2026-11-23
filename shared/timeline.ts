@@ -124,6 +124,33 @@ export interface WeekRecap {
   days: { from: number; workMs: number }[];
 }
 
+export interface PlanEater {
+  id: string;
+  name: string;
+  team: string;
+  workMs: number;
+  /** Null when its provider says no cost. */
+  costUsd: number | null;
+}
+
+/** The lanes that used the most: by cost where a provider says one, else by time at work. */
+export function planEaters(timeline: Timeline, most = 5): PlanEater[] {
+  return timeline.lanes
+    .map((lane) => ({
+      id: lane.id,
+      name: lane.name,
+      team: lane.team,
+      costUsd: lane.costUsd,
+      workMs: lane.spans.reduce(
+        (total, span) => total + (span.state === "work" ? span.to - span.from : 0),
+        0,
+      ),
+    }))
+    .filter((eater) => eater.workMs > 0 || (eater.costUsd ?? 0) > 0)
+    .sort((a, b) => (b.costUsd ?? 0) - (a.costUsd ?? 0) || b.workMs - a.workMs)
+    .slice(0, most);
+}
+
 function overlap(span: TimelineSpan, from: number, to: number): number {
   return Math.max(0, Math.min(span.to, to) - Math.max(span.from, from));
 }
