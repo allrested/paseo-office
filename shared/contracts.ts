@@ -5,6 +5,7 @@ import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { PlanUsageSchema } from "./plan-usage.js";
 import { TimelineSchema } from "./timeline.js";
 import { AlertSchema } from "./alerts.js";
+import { ForgottenSchema } from "./forgotten.js";
 import { PromptReportSchema, VaultHitSchema, VaultTalkSchema } from "./vault.js";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
@@ -835,6 +836,16 @@ export const vaultReportRpc = defineRpc({
   name: "office.vault.report.request",
   input: z.object({}),
   output: z.object({ on: z.boolean(), report: PromptReportSchema }),
+});
+
+/**
+ * The checkouts with unfinished work, by their counts. It runs git in each workspace's folder, so
+ * it is read when the owner asks.
+ */
+export const forgottenRpc = defineRpc({
+  name: "office.forgotten.request",
+  input: z.object({}),
+  output: z.object({ items: z.array(ForgottenSchema) }),
 });
 
 /** What the office noticed and nobody dismissed, newest first. */

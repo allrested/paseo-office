@@ -64,6 +64,10 @@ export function stickyNotesOf(text: string): string[] {
     );
 }
 
+/** How long a prompt cache is taken to stay warm after a turn, for the cup on a resting desk. */
+export const CACHE_CLOCKS = ["off", "5m", "1h"] as const;
+export type CacheClock = (typeof CACHE_CLOCKS)[number];
+
 const HostValuesSchema = z.object({
   ...brandFields,
   archiveOnDeparture: z.boolean().default(false),
@@ -80,6 +84,7 @@ const HostValuesSchema = z.object({
   streamerMode: z.boolean().default(true),
   historyVault: z.boolean().default(false),
   pinnedNotes: z.string().max(PINNED_NOTES_MAX).default(""),
+  cacheClock: z.enum(CACHE_CLOCKS).default("1h").catch("1h"),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
@@ -149,7 +154,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * owner's notes on the 3D whiteboard, with `;` between them. `historyVault` on has the office
  * keep what is said in each conversation in a file on the host; it is off until the owner turns
  * it on. `pinnedNotes` is said again to an agent whose conversation is compacted during a turn;
- * empty says nothing. `jiraProjects`
+ * empty says nothing. `cacheClock` is how long a prompt cache is taken to last after a turn, for
+ * the steaming cup on a resting desk of the 3D floor; `off` draws none. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */

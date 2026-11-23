@@ -2293,6 +2293,7 @@ export function OfficeSurface(
       />
       <MachineCard
         workspaces={office.state.workspaces}
+        agents={office.state.agents}
         ssh={ssh}
         machine={machine}
         open={machineOpen}

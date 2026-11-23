@@ -1,4 +1,5 @@
 import type { PlanUsage } from "../../shared/plan-usage.js";
+import type { CacheClock } from "../../shared/settings.js";
 import { shirtColor } from "../../shared/appearance.js";
 import type { OfficeBrand } from "../brand.js";
 import {
@@ -73,6 +74,7 @@ function subId(parentId: string, callId: string): string {
 }
 
 const NOBODY_OUT: ReadonlyMap<string, string> = new Map();
+const CACHE_MS = { "5m": 5 * 60_000, "1h": 60 * 60_000 } as const;
 
 /** The plans as the scene reads them: a name and how much of each limit is used. */
 export function worldLimits(usage: readonly PlanUsage[]): WorldLimit[] {
@@ -85,12 +87,35 @@ export function worldLimits(usage: readonly PlanUsage[]): WorldLimit[] {
   }));
 }
 
+/**
+ * A resting person's prompt cache, guessed: warm for the setting's time after the turn's end.
+ * Nothing for whoever is not resting, when the setting is off, or when the host did not say when
+ * the turn ended.
+ */
+function cacheOf(
+  agent: OfficeAgent,
+  resting: boolean,
+  idle: number,
+  cacheClock: CacheClock,
+): Pick<WorldSession, "cache"> {
+  if (!resting || cacheClock === "off" || !Number.isFinite(idle)) return {};
+  return {
+    cache: {
+      until: idle + CACHE_MS[cacheClock],
+      ttl: cacheClock,
+      tokens: agent.context?.usedTokens ?? 0,
+      guessed: true,
+    },
+  };
+}
+
 function toSession(
   row: OfficeRow,
   team: string,
   checks: WorkspacePullRequest["checks"] | undefined,
   born: Readonly<Record<string, string>>,
   out: ReadonlyMap<string, string>,
+  cacheClock: CacheClock,
 ): WorldSession {
   const { agent } = row;
   const title = agentTitle(agent);
@@ -119,6 +144,7 @@ function toSession(
       ? { doneAt: idle, idleSince: agent.idleSince }
       : {}),
     stuck,
+    ...cacheOf(agent, status === "rest" && !stuck, idle, cacheClock),
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
     subs: (row.subagents ?? []).map((sub) => ({ id: subId(agent.id, sub.id), type: sub.type })),
     ...(agent.context === undefined && agent.costUsd === undefined
@@ -142,11 +168,14 @@ export function worldPeople(
   desks: number,
   born: Readonly<Record<string, string>> = {},
   out: ReadonlyMap<string, string> = NOBODY_OUT,
+  cacheClock: CacheClock = "off",
 ): WorldPeople {
   const rows = model.rooms.flatMap((room) =>
     room.rows.map((row) => ({ row, team: room.name, checks: room.workspace?.pullRequest?.checks })),
   );
-  const all = rows.map(({ row, team, checks }) => toSession(row, team, checks, born, out));
+  const all = rows.map(({ row, team, checks }) =>
+    toSession(row, team, checks, born, out, cacheClock),
+  );
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks

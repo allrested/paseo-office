@@ -809,3 +809,28 @@ describe("the day's duties as the scene's duty board", () => {
     expect(JSON.stringify(duties)).not.toContain("secret");
   });
 });
+
+describe("the cache clock on a resting person", () => {
+  const idleSince = "2026-11-23T10:00:00.000Z";
+  const model = buildOfficeModel(
+    office([
+      agent("1", { status: "idle", idleSince, context: { usedTokens: 4000, maxTokens: 200_000 } }),
+      agent("2", { status: "running" }),
+    ]),
+  );
+  const cacheOf = (clock: "off" | "5m" | "1h") =>
+    worldPeople(model, PLAN_DESKS.pro, {}, new Map(), clock).sessions.map((s) => s.cache);
+
+  it("is warm for the setting's time after the turn's end, and absent for whoever works", () => {
+    const until = Date.parse(idleSince);
+    expect(cacheOf("1h")).toEqual([
+      { until: until + 3_600_000, ttl: "1h", tokens: 4000, guessed: true },
+      undefined,
+    ]);
+    expect(cacheOf("5m")[0]?.until).toBe(until + 300_000);
+  });
+
+  it("is not drawn when the setting is off", () => {
+    expect(cacheOf("off")).toEqual([undefined, undefined]);
+  });
+});

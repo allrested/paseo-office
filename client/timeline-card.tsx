@@ -9,7 +9,9 @@ import {
   TIMELINE_RANGES,
   doingAt,
   durationText,
+  planEaters,
   weekRecap,
+  type PlanEater,
   type ReplaySpeed,
   type Timeline,
   type TimelineLane,
@@ -146,8 +148,14 @@ function Figure({ label, value, styles }: { label: string; value: string; styles
   );
 }
 
+function eaterText(eater: PlanEater): string {
+  const worked = `${durationText(eater.workMs)} at work`;
+  return eater.costUsd === null ? worked : `$${eater.costUsd.toFixed(2)}, ${worked}`;
+}
+
 function Week({ timeline, styles }: { timeline: Timeline; styles: OfficeStyles }) {
   const recap = useMemo(() => weekRecap(timeline), [timeline]);
+  const eaters = useMemo(() => planEaters(timeline), [timeline]);
   const most = Math.max(1, ...recap.days.map((day) => day.workMs));
   const bars = useMemo(
     () =>
@@ -204,6 +212,27 @@ function Week({ timeline, styles }: { timeline: Timeline; styles: OfficeStyles }
       <Text style={styles.host.note}>
         Counted from what the office saw while it was open, in the 24 hours each bar ends.
       </Text>
+      <View style={styles.host.group}>
+        <Text accessibilityRole="header" style={styles.host.title}>
+          What eats your plan
+        </Text>
+        {eaters.map((eater) => (
+          <View
+            key={eater.id}
+            accessible
+            accessibilityRole="text"
+            accessibilityLabel={`${eater.name}: ${eaterText(eater)}`}
+            style={layout.laneHead}
+          >
+            <Text style={styles.host.name} numberOfLines={1}>
+              {eater.name}
+            </Text>
+            <Text style={styles.host.note}>
+              {eater.team} · {eaterText(eater)}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

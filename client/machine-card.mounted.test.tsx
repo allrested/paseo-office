@@ -100,7 +100,9 @@ function Card({ machine }: { machine: Machine }) {
 async function labels(machine: Machine): Promise<string[]> {
   await act(async () => root.render(<Card machine={machine} />));
   return [
-    ...container.querySelectorAll<HTMLElement>('button[aria-label]:not([aria-label="Details"])'),
+    ...container.querySelectorAll<HTMLElement>(
+      'button[aria-label]:not([aria-label="Details"]):not([aria-label="Check for forgotten work"])',
+    ),
   ].map((button) => button.getAttribute("aria-label")!);
 }
 

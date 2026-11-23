@@ -38,6 +38,7 @@ const COMPANY = {
   streamerMode: true,
   historyVault: false,
   pinnedNotes: "",
+  cacheClock: "1h",
   stickyNotes: "",
   ...WEATHER_DEFAULTS,
 };

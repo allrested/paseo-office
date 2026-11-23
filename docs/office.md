@@ -546,6 +546,25 @@ start a turn.
 Not done here: blocking a call before it runs and undoing a turn's edits. Both need real Claude
 Code hooks written into the host's `~/.claude/settings.json`.
 
+## Plan and machine tools
+
+- **What eats your plan.** Under This week in the Timeline card: the five agents that used the
+  most in the last seven days, by cost where their provider reports one and by time at work
+  otherwise. It is as detailed as what Paseo reports per agent, and counts what the office saw.
+- **Forgotten work.** In the Host card, **Check** looks in each workspace's folder, and in the
+  other worktrees of its repository, for files not committed, commits no remote has, and stashes
+  (`office.forgotten.request`, `server/forgotten-work.ts`). It answers with counts only. It runs
+  git, so it reads when asked, not on a timer.
+- **Models.** The Host card lists each agent that has sub-agents with its model and the models
+  they run on. A provider's own sub-agents (Claude's Agent tool) are not Paseo agents and have no
+  model the office can read.
+- **The cache clock.** On the 3D floor a resting desk has a cup that steams while the session's
+  prompt cache is taken to be warm, and stands cold after. Paseo does not report the cache, so
+  it is an estimate from the end of the last turn: an hour by default, five minutes or no cup in
+  Settings.
+- **Accounts.** The Host card's plan limits are per provider. Switching accounts is the
+  `account-switcher` plugin's; the office handles no sign-in.
+
 ## History vault and the prompt report
 
 **History vault** (Settings, host-wide, off by default) has the office keep what is said in each

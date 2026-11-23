@@ -48,6 +48,7 @@ import { projectPlanUsage } from "./server/plan-usage.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
 import { createWatchers } from "./server/watchers.js";
+import { readForgotten, type Checkout } from "./server/forgotten-work.js";
 import {
   VAULT_TAIL_LIMIT,
   VaultFileSchema,
@@ -132,6 +133,7 @@ import {
   timelineRpc,
   alertDismissRpc,
   alertsRpc,
+  forgottenRpc,
   vaultReportRpc,
   vaultSearchRpc,
   vaultTalkRpc,
@@ -301,6 +303,14 @@ export function createOfficePlugin(
     stopVault = hub.watch(vault.view);
   })().catch((error: unknown) => log(`[office] history vault unavailable: ${errorMessage(error)}`));
   const stopWatchers = hub.watch(watchers.view);
+  // The workspaces' folders as the directory last reported them, for the forgotten-work read.
+  let checkouts: Checkout[] = [];
+  const stopCheckouts = hub.watch((view) => {
+    checkouts = (view?.workspaces ?? []).flatMap((workspace) => {
+      const folder = view?.folders?.[workspace.id];
+      return folder ? [{ workspaceId: workspace.id, name: workspace.name, folder }] : [];
+    });
+  });
   let stopTimeline: (() => void) | undefined;
   const timelineReady = (async () => {
     const kept = (await deps.timelineFile?.load()) ?? null;
@@ -767,6 +777,9 @@ export function createOfficePlugin(
     const start = Math.max(from, end - TIMELINE_KEEP_MS);
     return { ok: true as const, timeline: timeline.read(start, end) };
   });
+  server.handle(forgottenRpc, async () => ({
+    items: await readForgotten(checkouts, execCommand),
+  }));
   server.handle(alertsRpc, async () => ({ alerts: watchers.alerts() }));
   server.handle(alertDismissRpc, async ({ id }) => {
     watchers.dismiss(id);
@@ -1004,6 +1017,7 @@ export function createOfficePlugin(
     stopLife?.();
     stopTimeline?.();
     stopWatchers();
+    stopCheckouts();
     stopVault?.();
     await vaultSaves?.flush();
     await timelineSaves?.flush();

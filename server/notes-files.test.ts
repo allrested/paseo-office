@@ -49,6 +49,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       streamerMode: true,
       historyVault: false,
       pinnedNotes: "",
+      cacheClock: "1h",
       stickyNotes: "",
       jiraProjects: "",
       sentryOrg: "",

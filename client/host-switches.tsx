@@ -8,14 +8,17 @@ import { SettingField } from "./setting-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
 import {
+  CACHE_CLOCKS,
   officeHostSettings,
   STICKY_NOTES_MAX,
+  type CacheClock,
   STICKY_NOTE_MAX,
   type FloorPlanChoice,
 } from "../shared/settings.js";
 import { failureText } from "./action-button.js";
 import { wakeSummary } from "./board-text.js";
 import { FLOOR_PLAN_LABEL, FloorPlanRow } from "./floor-plan-row.js";
+import { SegmentPill } from "./segment-pill.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
 import { NOTES_MODE_LABEL, NotesModeRow } from "./notes-mode-row.js";
@@ -35,6 +38,7 @@ type HostSetting =
   | "Streamer mode"
   | "History vault"
   | "Pinned notes"
+  | "Cache clock"
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
@@ -434,6 +438,12 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
   );
 }
 
+const CACHE_CLOCK_NAMES: Readonly<Record<CacheClock, string>> = {
+  off: "No cup",
+  "5m": "5 minutes",
+  "1h": "1 hour",
+};
+
 /** The floor's own: what bubbles may name, and the owner's notes on the whiteboard. */
 function FloorSettings({
   values: stored,
@@ -455,6 +465,11 @@ function FloorSettings({
     [change],
   );
   const vaultProblem = saveProblem("History vault");
+  const saveCache = useCallback(
+    (next: CacheClock) => void change("Cache clock", { cacheClock: next }),
+    [change],
+  );
+  const cacheProblem = saveProblem("Cache clock");
   return (
     <View style={settingsLayout.block}>
       {stored && (
@@ -492,6 +507,36 @@ function FloorSettings({
           {vaultProblem}
         </Text>
       )}
+      <View style={styles.headerField}>
+        <Text style={styles.sheetLabel}>Cache clock</Text>
+        <View
+          role="group"
+          aria-label="Cache clock"
+          style={stored ? styles.segments : styles.segmentsDisabled}
+        >
+          {CACHE_CLOCKS.map((value) => (
+            <SegmentPill
+              key={value}
+              value={value}
+              name={CACHE_CLOCK_NAMES[value]}
+              on={stored?.cacheClock === value}
+              disabled={stored === null}
+              onPress={saveCache}
+              styles={styles}
+            />
+          ))}
+        </View>
+        <Text style={styles.fieldHint}>
+          The cup on a resting desk of the 3D floor steams while the session&apos;s prompt cache is
+          taken to be warm: this long after its last turn. An estimate; a subscription keeps the
+          cache about an hour, an API key five minutes.
+        </Text>
+        {cacheProblem && (
+          <Text accessibilityRole="alert" style={styles.actionError}>
+            {cacheProblem}
+          </Text>
+        )}
+      </View>
       <SettingField
         label="Sticky notes"
         hint={`Your notes on the 3D whiteboard, with ; between them. Up to ${STICKY_NOTES_MAX}, ${STICKY_NOTE_MAX} characters each.`}
