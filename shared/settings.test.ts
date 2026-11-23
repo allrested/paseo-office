@@ -7,6 +7,7 @@ import {
   officeLanguageSettings,
   parseKeys,
   SENTRY_SLUG,
+  stickyNotesOf,
 } from "./settings.js";
 
 const WEATHER_DEFAULTS = { weatherMode: "off", weatherManual: "season", weatherUrl: "" };
@@ -31,7 +32,13 @@ async function upgraded(stored: Record<string, unknown>, fromVersion: number): P
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 
 /** A document from before the floor plan was a setting draws the company floor, as its scene always did. */
-const COMPANY = { archiveOnDeparture: false, floorPlan: "pro", ...WEATHER_DEFAULTS };
+const COMPANY = {
+  archiveOnDeparture: false,
+  floorPlan: "pro",
+  streamerMode: true,
+  stickyNotes: "",
+  ...WEATHER_DEFAULTS,
+};
 
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
   expect(await upgraded({ agentTools: false }, 1)).toEqual({
@@ -286,4 +293,19 @@ test("the street is optional and preserves either explicit device choice", () =>
   expect(officeDeviceSettings.schema.parse({})).not.toHaveProperty("street");
   for (const street of [false, true])
     expect(officeDeviceSettings.schema.parse({ street }).street).toBe(street);
+});
+
+test("sticky notes are the setting's text split at ; and cut to what the board holds", () => {
+  expect(stickyNotesOf("")).toEqual([]);
+  expect(stickyNotesOf(" Ship 0.3.0 ; ;Call the bank\nthree;four;five")).toEqual([
+    "Ship 0.3.0",
+    "Call the bank",
+    "three",
+    "four",
+  ]);
+  expect(stickyNotesOf("x".repeat(90))[0]).toHaveLength(60);
+  expect(officeHostSettings.schema.parse({})).toMatchObject({
+    streamerMode: true,
+    stickyNotes: "",
+  });
 });

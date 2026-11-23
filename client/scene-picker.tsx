@@ -8,13 +8,14 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import { OFFICE_LIGHTING, OFFICE_SCENES } from "../shared/settings.js";
+import { OFFICE_GRAPHICS, OFFICE_LIGHTING, OFFICE_SCENES } from "../shared/settings.js";
 import type { OfficeStyles } from "./styles.js";
 import type { useOfficeScene } from "./use-street.js";
 import { scenePreviews } from "./scene-previews.js";
 
 const scenes = { plain: "Plain", city: "City", countryside: "Countryside", beach: "Beach" };
 const lighting = { auto: "App theme", day: "Day", night: "Night" };
+const graphics = { auto: "Auto", low: "Low", medium: "Medium", high: "High" };
 const lightIcons = { auto: "Monitor", day: "Sun", night: "Moon" };
 const layout = StyleSheet.create({
   body: { gap: 20 },
@@ -152,6 +153,24 @@ export function SceneChoices({
             />
           ))}
         </View>
+      </View>
+      <View style={layout.section}>
+        <Text style={styles.sheetLabel}>Graphics</Text>
+        <View role="group" aria-label="Graphics" style={layout.row}>
+          {OFFICE_GRAPHICS.map((value) => (
+            <Choice
+              key={value}
+              value={value}
+              label={graphics[value]}
+              setting={choice.graphics}
+              styles={styles}
+            />
+          ))}
+        </View>
+        <Text style={styles.fieldHint}>
+          Auto picks for this device and steps down when frames come late. Low draws no shadows, at
+          30 frames a second.
+        </Text>
       </View>
     </View>
   );

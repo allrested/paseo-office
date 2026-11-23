@@ -210,7 +210,9 @@ export function createOfficePlugin(
 ): () => Promise<void> {
   const { log } = deps;
   const holder = createPaseoHolder();
-  const hub = createHub(liveHubPorts(holder, deps.clock, log));
+  // Off until the settings are read: nothing is named before the host has said it may be.
+  let stepsNamed = false;
+  const hub = createHub(liveHubPorts(holder, deps.clock, log, () => stepsNamed));
   hub.setBrand(hostBrand({}, deps.env));
   const office = createOffice({
     store: deps.store,
@@ -434,6 +436,7 @@ export function createOfficePlugin(
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {
     agentToolsOn = false;
+    stepsNamed = false;
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
@@ -453,6 +456,7 @@ export function createOfficePlugin(
     }
     hub.setBrand(hostBrand(state.values, deps.env));
     agentToolsOn = state.values.agentTools;
+    stepsNamed = !state.values.streamerMode;
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);

@@ -7,7 +7,12 @@ import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
-import { officeHostSettings, type FloorPlanChoice } from "../shared/settings.js";
+import {
+  officeHostSettings,
+  STICKY_NOTES_MAX,
+  STICKY_NOTE_MAX,
+  type FloorPlanChoice,
+} from "../shared/settings.js";
 import { failureText } from "./action-button.js";
 import { wakeSummary } from "./board-text.js";
 import { FLOOR_PLAN_LABEL, FloorPlanRow } from "./floor-plan-row.js";
@@ -27,6 +32,8 @@ type HostSetting =
   | "Brand color"
   | "Archive idle sessions"
   | "Agent tools"
+  | "Streamer mode"
+  | "Sticky notes"
   | "Notes folder"
   | "Time zone"
   | typeof NOTES_DAYS_LABEL
@@ -210,6 +217,12 @@ export function HostSwitches({
             />
           </View>
           <View style={styles.headerFields}>{language}</View>
+          <FloorSettings
+            values={stored}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
           {deviceProblem && (
             <Text accessibilityRole="alert" style={styles.actionError}>
               {deviceProblem}
@@ -415,6 +428,53 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         </View>
       )}
     </>
+  );
+}
+
+/** The floor's own: what bubbles may name, and the owner's notes on the whiteboard. */
+function FloorSettings({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const toggle = useCallback(
+    (next: boolean) => void change("Streamer mode", { streamerMode: next }),
+    [change],
+  );
+  const saveNotes = useCallback(
+    (next: string) => change("Sticky notes", { stickyNotes: next }),
+    [change],
+  );
+  const problem = saveProblem("Streamer mode");
+  return (
+    <View style={settingsLayout.block}>
+      {stored && (
+        <LabeledSwitch
+          label="Streamer mode"
+          value={stored.streamerMode}
+          onChange={toggle}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        On by default: the 3D floor names no file, command or site. Off, the bubble over a person
+        names the one they are at, to everyone who opens this office.
+      </Text>
+      {problem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {problem}
+        </Text>
+      )}
+      <SettingField
+        label="Sticky notes"
+        hint={`Your notes on the 3D whiteboard, with ; between them. Up to ${STICKY_NOTES_MAX}, ${STICKY_NOTE_MAX} characters each.`}
+        value={stored?.stickyNotes ?? null}
+        onSave={saveNotes}
+        problem={saveProblem("Sticky notes")}
+        styles={styles}
+      />
+    </View>
   );
 }
 

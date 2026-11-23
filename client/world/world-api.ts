@@ -268,6 +268,12 @@ export interface WorldApi {
   setMachine(machine: WorldMachine | null): void;
   /** The plans' limits; one at 100% puts the board up and its resting people on a break. */
   setLimits?(limits: WorldLimit[]): void;
+  /** Streamer mode: on, bubbles name no file, command or site; off, they show an event's label. */
+  setStreamer?(on: boolean): void;
+  /** The graphics level this device chose. */
+  setGraphics?(choice: "auto" | "low" | "medium" | "high"): void;
+  /** The owner's sticky notes on the whiteboard. */
+  setNotes?(notes: string[]): void;
   /**
    * Rings the bell on the meeting table for a stand-up: everyone free walks there and says what
    * they are on. Nothing happens while another gathering is on, or when nobody is free.

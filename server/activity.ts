@@ -1,6 +1,7 @@
 import {
   CHECKLIST_STEP_MAX,
   CHECKLIST_TEXT_MAX,
+  STEP_LABEL_MAX,
   type ChecklistStep,
   type ChecklistCounts,
   type ChecklistProgress,
@@ -180,11 +181,40 @@ function resultOf(item: ActivityItem): TestResult | null {
   return item.status === "completed" ? "passed" : null;
 }
 
-function stepOf(item: ActivityItem): ActivityStep {
+function cut(text: string): string {
+  const line = text.split(/[\r\n]/, 1)[0].trim();
+  return line.length > STEP_LABEL_MAX ? `${line.slice(0, STEP_LABEL_MAX - 1)}…` : line;
+}
+
+/** What a call is at, for a host whose streamer mode is off: a file's name, a command, a site. */
+function labelOf(item: ActivityItem): string {
+  const { detail } = item;
+  const command = field(detail, "command");
+  if (typeof command === "string") return cut(command);
+  const filePath = field(detail, "filePath");
+  if (typeof filePath === "string") return cut(filePath.split(/[\\/]/).at(-1) ?? "");
+  const query = field(detail, "query");
+  if (typeof query === "string") return cut(query);
+  const url = field(detail, "url");
+  if (typeof url !== "string") return "";
+  try {
+    return cut(new URL(url).hostname);
+  } catch {
+    return "";
+  }
+}
+
+function stepOf(item: ActivityItem, named: boolean): ActivityStep {
   const kind = toolKind(item);
   const key = typeof item.callId === "string" && item.callId !== "" ? item.callId : kind;
   const result = ENDS.has(kind) ? resultOf(item) : null;
-  return result === null ? { kind, key } : { kind, key, result };
+  const label = named ? labelOf(item) : "";
+  return {
+    kind,
+    key,
+    ...(result === null ? {} : { result }),
+    ...(label === "" ? {} : { label }),
+  };
 }
 
 /** The ids of the tool calls in a tail: what a read has seen, for the read after it. */
@@ -211,14 +241,15 @@ export function callsIn(items: readonly ActivityItem[]): Set<string> {
 export function describeStep(
   items: readonly ActivityItem[],
   seen?: ReadonlySet<string>,
+  named = false,
 ): ActivityStep | null {
   let movedOn = false;
   for (const item of items.toReversed()) {
     if (item.type === "tool_call") {
-      if (!movedOn) return stepOf(item);
+      if (!movedOn) return stepOf(item, named);
       const id = item.callId;
       const fresh = seen !== undefined && typeof id === "string" && id !== "" && !seen.has(id);
-      return fresh ? stepOf(item) : null;
+      return fresh ? stepOf(item, named) : null;
     }
     if (item.type === "user_message") return null;
     if (item.type === "assistant_message" || item.type === "reasoning") movedOn = true;
@@ -236,8 +267,9 @@ export function nextStep(
   before: ActivityStep | undefined,
   items: readonly ActivityItem[],
   seen?: ReadonlySet<string>,
+  named = false,
 ): ActivityStep | null {
-  const step = describeStep(items, seen);
+  const step = describeStep(items, seen, named);
   if (
     before === undefined ||
     !ENDS.has(before.kind) ||
@@ -322,6 +354,8 @@ export interface ActivityPorts {
   tail(agentId: string): Promise<readonly ActivityItem[]>;
   timers: Timers;
   log(message: string): void;
+  /** Whether a step says what it is at (the host's streamer mode is off); absent, it never does. */
+  named?(): boolean;
   /**
    * `checklists` holds each agent read this round whose tail has a todo item, `[]` when all its
    * steps are finished; an agent whose read failed, or whose tail has none, is absent. An agent
@@ -386,7 +420,7 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
       const line = describeActivity(items);
       if (line !== null) next[agentId] = line;
       const seen = seenCalls.get(agentId);
-      const step = nextStep(previousSteps[agentId], items, seen);
+      const step = nextStep(previousSteps[agentId], items, seen, ports.named?.() ?? false);
       if (step !== null) steps[agentId] = step;
       const checklist = readChecklist(items);
       if (checklist !== null) {

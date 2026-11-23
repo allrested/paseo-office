@@ -27,9 +27,9 @@ function fit(g, text, max) {
   return text.slice(0, lo).trimEnd() + '…';
 }
 function drawBoard(t) {
-  const rows = host.boardRows();
+  const rows = host.boardRows(), notes = host.stickies?.() ?? [];
   const pulsing = state.boardPulse.until > t;
-  const sig = JSON.stringify(rows);
+  const sig = JSON.stringify([rows, notes]);
   if (sig === boardSig && !pulsing) return;
   boardSig = pulsing ? '' : sig;
   const g = boardCanvas.getContext('2d');
@@ -40,7 +40,7 @@ function drawBoard(t) {
   g.font = `600 22px ${FONT}`; g.fillStyle = MUTED;
   const sum = [count('doing') && `${count('doing')} at work`, count('wait') && `${count('wait')} waiting for you`, count('done') && `${count('done')} resting`].filter(Boolean).join(' · ');
   g.fillText(sum || 'Nobody is at work', 40, 104);
-  const shown = rows.slice(0, 10);
+  const shown = rows.slice(0, notes.length ? 5 : 10);   // (the owner's notes take the right half)
   shown.forEach((x, i) => {
     const left = i < 5 ? 0 : 590, y = 132 + (i % 5) * 72;
     if (state.boardPulse.id === x.id && pulsing) { g.fillStyle = `rgba(255,214,102,${0.25 + 0.25 * Math.sin(t * 9)})`; g.fillRect(left + 28, y - 6, 552, 66); }
@@ -55,7 +55,26 @@ function drawBoard(t) {
   });
   if (!shown.length) { g.fillStyle = '#8A93A3'; g.font = `500 24px ${FONT}`; g.fillText('What each agent is doing shows here.', 40, 170); }
   if (rows.length > shown.length) { g.fillStyle = MUTED; g.font = `600 20px ${FONT}`; g.fillText(`and ${rows.length - shown.length} more`, 40, BH - 22); }
+  notes.forEach((text, i) => drawNote(g, text, i));
   boardTexture.needsUpdate = true;
+}
+// PASEO: the owner's sticky notes (the host's setting), two by two on the right half, each a little askew.
+const NOTE_PAPER = ['#FFE680', '#FFC2D1', '#BDE6FF', '#C9F2B8'], NOTE_W = 262, NOTE_H = 170;
+function drawNote(g, text, i) {
+  const x = 618 + (i % 2) * (NOTE_W + 22), y = 130 + Math.floor(i / 2) * (NOTE_H + 20);
+  g.save();
+  g.translate(x + NOTE_W / 2, y + NOTE_H / 2); g.rotate([-0.025, 0.02, 0.03, -0.015][i % 4]);
+  g.fillStyle = 'rgba(34,48,74,.14)'; g.fillRect(-NOTE_W / 2 + 4, -NOTE_H / 2 + 6, NOTE_W, NOTE_H);
+  g.fillStyle = NOTE_PAPER[i % 4]; g.fillRect(-NOTE_W / 2, -NOTE_H / 2, NOTE_W, NOTE_H);
+  g.fillStyle = INK; g.font = `600 25px ${FONT}`; g.textAlign = 'left';
+  const lines = []; let line = '';
+  for (const word of String(text).split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && g.measureText(next).width > NOTE_W - 36) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  lines.slice(0, 4).forEach((l, n) => g.fillText(fit(g, l, NOTE_W - 36), -NOTE_W / 2 + 18, -NOTE_H / 2 + 44 + n * 32));
+  g.restore();
 }
 /** The whiteboard has no place card: its chip opens Paseo's board (paseo-entry.js gives the place its `open`). */
 export function boardContent() { return null; }

@@ -46,6 +46,23 @@ export function isTokenSafe(address: string): boolean {
 export const FLOOR_PLANS = ["pro", "cozy", "hq"] as const;
 export type FloorPlanChoice = (typeof FLOOR_PLANS)[number];
 
+/** The owner's notes on the 3D floor's whiteboard: this many, each this long, typed with `;` between. */
+export const STICKY_NOTES_MAX = 4;
+export const STICKY_NOTE_MAX = 60;
+const STICKY_NOTES_TEXT_MAX = 400;
+
+/** The notes of the setting's text: trimmed, none empty, cut to what the board has room for. */
+export function stickyNotesOf(text: string): string[] {
+  return text
+    .split(/[;\n]/)
+    .map((note) => note.trim())
+    .filter((note) => note !== "")
+    .slice(0, STICKY_NOTES_MAX)
+    .map((note) =>
+      note.length > STICKY_NOTE_MAX ? `${note.slice(0, STICKY_NOTE_MAX - 1)}…` : note,
+    );
+}
+
 const HostValuesSchema = z.object({
   ...brandFields,
   archiveOnDeparture: z.boolean().default(false),
@@ -59,6 +76,8 @@ const HostValuesSchema = z.object({
     .transform((days) => [...days].sort((a, b) => a - b)),
   // A plan this build does not know (a later build's, or a hand edit) reads as the company floor.
   floorPlan: z.enum(FLOOR_PLANS).default("pro").catch("pro"),
+  streamerMode: z.boolean().default(true),
+  stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
@@ -121,7 +140,10 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `notesMode` is the
  * mode the notes writer starts in, by its provider's id, empty for the office's own choice. `notesDays` are the
  * weekdays of that run, 0 for Sunday to 6 for Saturday, in order; none is no run. `floorPlan` is
- * the 3D floor's plan: `pro` the company floor, `cozy` one open room, or `hq` headquarters. `jiraProjects`
+ * the 3D floor's plan: `pro` the company floor, `cozy` one open room, or `hq` headquarters.
+ * `streamerMode` on (the default) keeps file names, commands and sites out of what the office
+ * sends to the floor; off, a person's bubble names what they are at. `stickyNotes` are the
+ * owner's notes on the 3D whiteboard, with `;` between them. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */
@@ -152,6 +174,8 @@ export const officeHostSettings = defineSettings({
 /** Outdoor environments for the 3D floor. */
 export const OFFICE_SCENES = ["plain", "city", "countryside", "beach"] as const;
 export type OfficeScene = (typeof OFFICE_SCENES)[number];
+export const OFFICE_GRAPHICS = ["auto", "low", "medium", "high"] as const;
+export type OfficeGraphics = (typeof OFFICE_GRAPHICS)[number];
 export const OFFICE_LIGHTING = ["auto", "day", "night"] as const;
 export type OfficeLighting = (typeof OFFICE_LIGHTING)[number];
 
@@ -177,6 +201,7 @@ export const officeDeviceSettings = defineSettings({
     street: z.boolean().optional(),
     scene: z.enum(OFFICE_SCENES).optional(),
     lighting: z.enum(OFFICE_LIGHTING).optional(),
+    graphics: z.enum(OFFICE_GRAPHICS).optional(),
     sessionsHidden: z.boolean().optional(),
     view: z.enum(OFFICE_VIEWS).optional(),
     rungIncidents: z.record(z.string(), z.number()).default({}),

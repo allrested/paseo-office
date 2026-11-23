@@ -497,6 +497,22 @@ The gear in fullscreen opens **Office settings** over the floor. You can also op
 
 View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
+## Streamer mode, graphics and sticky notes
+
+**Streamer mode** (Settings, host-wide, on by default) keeps file names, commands, search queries
+and sites out of what the office sends to the floor: a bubble says "a file" or "a command". Turned
+off, a step carries one cut line of what it is at (a file's name without its folder, a command's
+first line, a query, a site's host name, 80 characters at most) and the 3D floor shows it over the
+person, to everyone who opens this office. Prompts and replies are never sent either way.
+
+**Graphics** (Settings → the scene picker, per device) is Auto, Low, Medium or High. Auto picks for
+the device and steps down when frames keep coming late; Low draws no shadows and no post effects at
+30 frames a second.
+
+**Sticky notes** (Settings, host-wide) are the owner's notes on the 3D whiteboard: up to four,
+60 characters each, typed with `;` between them. While there are any, the whiteboard lists five
+agents instead of ten and the notes take its right half.
+
 ## The host
 
 While an office surface is open, the `office.machine` subscription sends a reading every 10 s:

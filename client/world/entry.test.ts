@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   lookForUpgrade: vi.fn(),
   setTenure: vi.fn(),
   setLiftService: vi.fn(),
+  setQuality: vi.fn(),
   onCommit: vi.fn(),
   onPush: vi.fn(),
   postAction: vi.fn(),
@@ -81,6 +82,9 @@ vi.mock("../../vendor/my-office/src/office/paseo-modules.js", () => ({
 }));
 vi.mock("../../vendor/my-office/src/office/scene/renderer.js", () => ({
   renderer: { domElement: document.createElement("canvas"), dispose() {}, forceContextLoss() {} },
+}));
+vi.mock("../../vendor/my-office/src/office/scene/quality.js", () => ({
+  setQuality: h.setQuality,
 }));
 vi.mock("../../vendor/my-office/src/office/scene/blocks.js", () => ({ canvasTex: () => null }));
 vi.mock("../../vendor/my-office/src/office/core/loop.js", () => ({ focusTarget: null }));
@@ -187,6 +191,9 @@ const { sound } = await import("../../vendor/my-office/src/office/paseo-sound.js
 interface World {
   start(options?: object): void;
   setSessions(list: object[]): void;
+  setNotes(list: string[]): void;
+  setGraphics(choice: string): void;
+  setStreamer(on: boolean): void;
   event(e: { sess: string; type: string; agent?: string; label?: string }): void;
   setIncidents(list: object[]): void;
   photoRelease(tag: string): void;
@@ -906,4 +913,17 @@ test("the elevator logs a crossing once even if the departing session is then re
     ["Arief", false],
     ["Arief", true],
   ]);
+});
+
+test("the owner's sticky notes, the graphics level and streamer mode reach the scene", () => {
+  world.setNotes(["Ship 0.3.0", "Call the bank", "three", "four", "five"]);
+  expect(state.boardDirty).toBe(true);
+  world.setGraphics("low");
+  expect(h.setQuality).toHaveBeenLastCalledWith("low");
+  // On from the start: nothing is named until the host says it may be.
+  expect(state.streamer).toBe(true);
+  world.setStreamer(false);
+  expect(state.streamer).toBe(false);
+  world.setStreamer(true);
+  expect(state.streamer).toBe(true);
 });
