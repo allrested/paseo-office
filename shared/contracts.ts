@@ -268,14 +268,32 @@ export const IncidentSchema = z.object({
 });
 export type Incident = z.output<typeof IncidentSchema>;
 
+/** Where a tracker's sign-in is: saved from the settings, in the daemon's environment, or nowhere. */
+export const TRACKER_SOURCES = ["saved", "env", "none"] as const;
+export type TrackerSource = (typeof TRACKER_SOURCES)[number];
+
 /** The open incidents, and what keeps a tracker from being checked. */
 export const IncidentsStateSchema = z.object({
   open: z.array(IncidentSchema),
   /** Why a tracker's last check failed; absent once one succeeds. */
   problems: z.object({ jira: z.string().optional(), sentry: z.string().optional() }),
-  /** The tracker's token variables are set on the host. Never the values. */
+  /** The tracker has a sign-in on the host, saved or in its environment. Never the values. */
   jiraReady: z.boolean(),
   sentryReady: z.boolean(),
+  /**
+   * Where each tracker's sign-in comes from, and Jira's address and email. Never a token. Absent
+   * from a server older than the settings' connections.
+   */
+  connections: z
+    .object({
+      jira: z.object({
+        source: z.enum(TRACKER_SOURCES),
+        baseUrl: z.string(),
+        email: z.string(),
+      }),
+      sentry: z.object({ source: z.enum(TRACKER_SOURCES) }),
+    })
+    .optional(),
   /** Why the check's schedule could not follow the settings; null once it does. */
   scheduleError: z.string().nullable(),
 });
@@ -730,6 +748,51 @@ export const notesWriteRpc = defineRpc({
   name: "office.notes.write.request",
   input: z.object({}),
   output: z.object({ started: z.boolean() }),
+});
+
+const JiraConnectionSchema = z.object({
+  baseUrl: z.string().max(500),
+  email: z.string().max(320),
+  /** Empty for the token already saved. */
+  token: z.string().max(4000),
+});
+const SentryConnectionSchema = z.object({ token: z.string().max(4000) });
+
+export const TrackersChangeSchema = z.discriminatedUnion("action", [
+  JiraConnectionSchema.extend({ action: z.literal("save-jira") }),
+  SentryConnectionSchema.extend({ action: z.literal("save-sentry") }),
+  z.object({ action: z.literal("clear"), tracker: z.enum(INCIDENT_SOURCES) }),
+]);
+export type TrackersChange = z.output<typeof TrackersChangeSchema>;
+
+/** `problem` is why it failed, in words safe to show: never a token. */
+export const TrackersResultSchema = z.union([
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), problem: z.string() }),
+]);
+export type TrackersResult = z.output<typeof TrackersResultSchema>;
+
+/**
+ * Saves or clears a tracker's connection on the host, in a file only the daemon's user can read.
+ * The token is never sent back; the office's state names where each sign-in comes from.
+ */
+export const trackersSaveRpc = defineRpc({
+  name: "office.trackers.save.request",
+  input: TrackersChangeSchema,
+  output: TrackersResultSchema,
+});
+
+/** One signed-in request to the tracker with the connection as typed; nothing is saved. */
+const TrackersProbeSchema = z.discriminatedUnion("tracker", [
+  JiraConnectionSchema.extend({ tracker: z.literal("jira") }),
+  SentryConnectionSchema.extend({ tracker: z.literal("sentry") }),
+]);
+export type TrackersProbe = z.output<typeof TrackersProbeSchema>;
+
+export const trackersTestRpc = defineRpc({
+  name: "office.trackers.test.request",
+  input: TrackersProbeSchema,
+  output: TrackersResultSchema,
 });
 
 /** Closes the named open incidents, or all of them when none are named. Their keys stay seen. */

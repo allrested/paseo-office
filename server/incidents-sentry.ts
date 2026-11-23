@@ -23,6 +23,8 @@ export interface SentryReaderInput {
   /** Project slugs, already checked against the settings' pattern. */
   projects: string[];
   token: string;
+  /** What a refused token's message names; the environment's variable when absent. */
+  tokenVariable?: string;
 }
 
 const ProjectsSchema = z.array(z.object({ id: z.string(), slug: z.string() }));
@@ -36,6 +38,36 @@ const IssuesSchema = z.array(
   }),
 );
 
+type SentrySignIn = Omit<SentryReaderInput, "projects">;
+
+function sentryApi(input: SentrySignIn): string {
+  const site = new URL(input.url.trim());
+  const org = encodeURIComponent(input.org.trim());
+  return `${site.origin}${site.pathname.replace(/\/+$/, "")}/api/0/organizations/${org}`;
+}
+
+function sentryTracker(input: SentrySignIn, fetchFn: typeof fetch): Tracker {
+  return {
+    name: "Sentry",
+    tokenVariable: input.tokenVariable ?? "SENTRY_AUTH_TOKEN",
+    headers: { Authorization: `Bearer ${input.token}` },
+    fetchFn,
+  };
+}
+
+/**
+ * One signed-in request, to tell whether Sentry takes the token for the organisation. Rejects
+ * with a `TrackerProblem`.
+ */
+export async function probeSentry(
+  input: SentrySignIn,
+  fetchFn: typeof fetch = fetch,
+): Promise<void> {
+  const tracker = sentryTracker(input, fetchFn);
+  const url = `${sentryApi(input)}/projects/?per_page=1`;
+  await getJson({ tracker, url, schema: ProjectsSchema });
+}
+
 /** New unresolved issues in the listed projects. */
 export function createSentryReader(
   input: SentryReaderInput,
@@ -43,14 +75,8 @@ export function createSentryReader(
 ): TrackerReader {
   const { projects } = input;
   const org = input.org.trim();
-  const site = new URL(input.url.trim());
-  const api = `${site.origin}${site.pathname.replace(/\/+$/, "")}/api/0/organizations/${encodeURIComponent(org)}`;
-  const tracker: Tracker = {
-    name: "Sentry",
-    tokenVariable: "SENTRY_AUTH_TOKEN",
-    headers: { Authorization: `Bearer ${input.token}` },
-    fetchFn,
-  };
+  const api = sentryApi(input);
+  const tracker = sentryTracker(input, fetchFn);
 
   /**
    * The listed projects' ids, in the order listed. The issue search takes slugs too, but only on

@@ -1,10 +1,11 @@
 import type { IncidentSource } from "../shared/contracts.js";
 import { JIRA_KEY, parseKeys, SENTRY_SLUG } from "../shared/settings.js";
 import type { TrackerReader } from "./incidents-http.js";
-import { createJiraReader, jiraEnv } from "./incidents-jira.js";
-import { createSentryReader, sentryToken } from "./incidents-sentry.js";
+import { createJiraReader } from "./incidents-jira.js";
+import { createSentryReader } from "./incidents-sentry.js";
 import type { OfficeCadence, OfficeSchedules } from "./local-schedules.js";
 import { createScheduleFollower, type OfficeSchedule } from "./schedule-follower.js";
+import type { TrackerCredentials } from "./tracker-credentials.js";
 
 /** The check's schedule's name among the office's schedules, and the handler that answers it. */
 export const INCIDENTS_SCHEDULE = "incidents";
@@ -23,29 +24,28 @@ export interface IncidentsSettings {
 }
 
 /**
- * The trackers that are on: each needs its token variables in `env` and a project in the
- * settings, and Sentry an organisation too.
+ * The trackers that are on: each needs a sign-in in `credentials` and a project in the settings,
+ * and Sentry an organisation too.
  */
 export function incidentsReaders(
   values: IncidentsSettings,
-  env: NodeJS.ProcessEnv,
+  credentials: TrackerCredentials,
 ): Partial<Record<IncidentSource, TrackerReader>> {
   const readers: Partial<Record<IncidentSource, TrackerReader>> = {};
-  const jira = jiraEnv(env);
+  const { jira, sentry } = credentials;
   const jiraProjects = parseKeys(values.jiraProjects, JIRA_KEY);
   if (jira !== null && jiraProjects.length > 0) {
     readers.jira = createJiraReader(jira, jiraProjects);
   }
-  const token = sentryToken(env);
   const org = values.sentryOrg.trim();
   const sentryProjects = parseKeys(values.sentryProjects, SENTRY_SLUG);
-  const sentryOn = token !== null && org !== "" && sentryProjects.length > 0;
-  if (sentryOn) {
+  if (sentry !== null && org !== "" && sentryProjects.length > 0) {
     readers.sentry = createSentryReader({
       url: values.sentryUrl,
       org,
       projects: sentryProjects,
-      token,
+      token: sentry.token,
+      tokenVariable: sentry.tokenVariable,
     });
   }
   return readers;

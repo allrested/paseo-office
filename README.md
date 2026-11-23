@@ -55,7 +55,7 @@ Boards, duties, team chat and stand-up state are stored under `$PASEO_HOME/offic
 
 Agent prompts, tool results and scheduled assignments go through the agent’s configured provider. A **Whole group** chat message can go to one available session with up to six recent group or scene messages for context. **To**, mentions and replies address a particular session.
 
-Jira and Sentry use project settings and credentials from the host environment. A configured weather service receives requests while Office is open, at most once every 15 minutes. Its URL is visible in host settings. On stock hosts using fallback timers, scheduled work resumes after daemon restart when Office or an agent activates the plugin. Missed runs are skipped. [Plugin overview](https://github.com/allrested/paseo-office/blob/main/OVERVIEW.md) · [Implementation and storage](https://github.com/allrested/paseo-office/blob/main/docs/office.md)
+Jira and Sentry use project settings and a connection saved from the settings or read from the host environment. Saved tokens stay on the host, unencrypted, in a file only its user can read. A configured weather service receives requests while Office is open, at most once every 15 minutes. Its URL is visible in host settings. On stock hosts using fallback timers, scheduled work resumes after daemon restart when Office or an agent activates the plugin. Missed runs are skipped. [Plugin overview](https://github.com/allrested/paseo-office/blob/main/OVERVIEW.md) · [Implementation and storage](https://github.com/allrested/paseo-office/blob/main/docs/office.md)
 
 ## Development
 

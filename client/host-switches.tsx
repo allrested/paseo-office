@@ -13,6 +13,7 @@ import { wakeSummary } from "./board-text.js";
 import { FLOOR_PLAN_LABEL, FloorPlanRow } from "./floor-plan-row.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
+import { JiraConnection, SentryConnection } from "./tracker-connections.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
@@ -36,11 +37,13 @@ type HostSetting =
   | WeatherSetting;
 
 /** What the incidents fields need to know from the host: never a token's value. */
-type TrackerState = Pick<IncidentsState, "jiraReady" | "sentryReady" | "scheduleError">;
+type TrackerState = Pick<
+  IncidentsState,
+  "jiraReady" | "sentryReady" | "scheduleError" | "connections"
+>;
 
-const JIRA_UNSET =
-  "ATLASSIAN_BASE_URL, ATLASSIAN_EMAIL or ATLASSIAN_API_TOKEN is not set on this host";
-const SENTRY_UNSET = "SENTRY_AUTH_TOKEN is not set on this host";
+const JIRA_UNSET = "No Jira connection on this host: save one above";
+const SENTRY_UNSET = "No Sentry token on this host: save one above";
 
 /** The line under a tracker's field: `missing` while the field is set, nothing while it is empty. */
 function unsetLine(value: string | null, missing: string | null): string | null {
@@ -313,7 +316,7 @@ interface TrackerFieldsProps {
 
 /**
  * The trackers the incidents check reads, and its schedule's failure under them. A field set
- * while the host lacks the tracker's variables names them; the token itself never reaches here.
+ * while the host has no sign-in for the tracker says so; the token itself never comes back here.
  */
 function TrackerFields({ values, incidents, change, saveProblem, styles }: TrackerFieldsProps) {
   const saveJiraProjects = useCallback(
@@ -341,7 +344,7 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
   // Not known until the host has said: no line before then.
   const jiraMissing = incidents?.jiraReady === false ? JIRA_UNSET : null;
   const sentryMissing = incidents?.sentryReady === false ? SENTRY_UNSET : null;
-  // A refused save comes first; while the host refuses nothing, the variables it lacks.
+  // A refused save comes first; while the host refuses nothing, the sign-in it lacks.
   const jiraProblem = saveProblem("Jira projects") ?? unsetLine(jiraProjects, jiraMissing);
   const sentryOrgProblem =
     saveProblem("Sentry organisation") ?? unsetLine(sentryOrg, sentryMissing);
@@ -352,17 +355,19 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
   return (
     <>
       <View style={styles.headerFields}>
+        <JiraConnection connection={incidents?.connections?.jira} styles={styles} />
         <SettingField
           label="Jira projects"
-          hint="Project keys, comma separated. Needs ATLASSIAN_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN on the host."
+          hint="Project keys, comma separated. New bugs in them ring the incident alarm."
           value={jiraProjects}
           onSave={saveJiraProjects}
           problem={jiraProblem}
           styles={styles}
         />
+        <SentryConnection connection={incidents?.connections?.sentry} styles={styles} />
         <SettingField
           label="Sentry organisation"
-          hint="The organisation's slug. Needs SENTRY_AUTH_TOKEN on the host."
+          hint="The organisation's slug."
           value={sentryOrg}
           onSave={saveSentryOrg}
           problem={sentryOrgProblem}
@@ -370,7 +375,7 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         />
         <SettingField
           label="Sentry projects"
-          hint="Project slugs, comma separated. Needs SENTRY_AUTH_TOKEN on the host."
+          hint="Project slugs, comma separated."
           value={sentryProjects}
           onSave={saveSentryProjects}
           problem={sentryProjectsProblem}
@@ -378,7 +383,7 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         />
         <SettingField
           label="Sentry address"
-          hint="Where SENTRY_AUTH_TOKEN is sent. https, or http on the host itself."
+          hint="Where the Sentry token is sent. https, or http on the host itself."
           value={sentryUrl}
           onSave={saveSentryUrl}
           problem={sentryUrlProblem}
