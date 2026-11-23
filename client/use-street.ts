@@ -17,5 +17,11 @@ export function useOfficeScene(layout: StreetLayout) {
   const legacy = useStreetSwitch(layout);
   const scene = useDeviceSwitch("scene", legacy.on ? "city" : "plain");
   const lighting = useDeviceSwitch("lighting", "auto");
-  return { scene, lighting, unsaved: scene.unsaved || lighting.unsaved };
+  const graphics = useDeviceSwitch("graphics", "auto");
+  return {
+    scene,
+    lighting,
+    graphics,
+    unsaved: scene.unsaved || lighting.unsaved || graphics.unsaved,
+  };
 }

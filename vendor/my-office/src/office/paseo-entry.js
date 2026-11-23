@@ -12,6 +12,7 @@ import { setWeather as drawWeather } from './life/weather.js';
 import { weatherToDraw } from './paseo-weather-plan.js';
 import { SEASON, el, reduceMotion, short } from './core/env.js';
 import { renderer, scene } from './scene/renderer.js';
+import { setQuality } from './scene/quality.js';
 import { canvasTex } from './scene/blocks.js';
 import { focusTarget } from './core/loop.js';
 import * as live from './net/live.js';
@@ -61,6 +62,7 @@ function crossDoor(id, entering) {
   logDoor(person, entering);
 }
 let limits = [];
+let stickies = [];
 let boardRows = [];
 let problem = () => {};
 let onMachine = null;
@@ -348,6 +350,7 @@ const api = {
     host.streetKit = host.street ? options.street?.kit ?? null : null;
     host.photo = options.photo !== false;
     host.limits = () => limits;
+    host.stickies = () => stickies;
     host.boardRows = () => boardRows;
     problem = (message) => options.onProblem?.(message);
     buildPage();
@@ -365,8 +368,9 @@ const api = {
       if (name === 'interactPlaceCards') whiteboard.setup();
       if (name === 'netLive') { live.setupTeams(); makeTeamChipsButtons(); }
     }
-    // Upstream's streamer mode says "a file" and "a command" where it would show a name. Paseo sends no names, so it is
-    // always on (set here, after ui/event-text.js read upstream's own setting).
+    // Upstream's streamer mode says "a file" and "a command" where it would show a name. It is on (set here, after
+    // ui/event-text.js read upstream's own setting) until the host's setting turns it off (setStreamer): Paseo sends
+    // names only then.
     state.streamer = true;
     // (upstream gives a compaction its sparkle; what the person carries to the shredder is paper)
     TYPE_ICON.compact = 'file';
@@ -485,7 +489,8 @@ const api = {
     if (e.type === 'substart' || e.type === 'substop') { if (e.agent) onEvent({ ts: Date.now(), sess: e.sess, type: e.type, agent: e.agent, label: e.label || '' }); return; }
     // the test board writes a run's label beside its result: Paseo gives the time it ended
     const ended = e.type === 'testok' || e.type === 'testfail';
-    onEvent({ ts: Date.now(), sess: e.sess, type: e.type, label: ended ? clockTime() : '', of: e.of });
+    const named = state.streamer ? '' : short(String(e.label || ''), 80);
+    onEvent({ ts: Date.now(), sess: e.sess, type: e.type, label: ended ? clockTime() : named, of: e.of });
   },
   /** Paseo chose someone (its card opened) or nobody (it closed): mark them, tell nobody back. */
   select(id) { if (!started) return; if (id && sessions.has(id)) openSession(id, { tell: false }); else closeSession({ tell: false }); },
@@ -568,6 +573,12 @@ const api = {
   /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
   setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
   /** The plans in use: [{ name, windows: [{ pct, resetsAt }] }]. One at its limit sends its resting people (sessions with that `acct`) on a break. */
+  /** Streamer mode: on, a bubble says "a file" and "a command"; off, it shows the label an event carries. */
+  setStreamer(on) { if (started && !stopped) state.streamer = on !== false; },
+  /** Graphics: 'auto', 'low', 'medium' or 'high' (scene/quality.js); kept for this device by the scene too. */
+  setGraphics(choice) { if (started && !stopped) setQuality(choice); },
+  /** The owner's sticky notes for the whiteboard: up to four short strings. */
+  setNotes(list) { stickies = Array.isArray(list) ? list.slice(0, 4).map((n) => String(n)) : []; state.boardDirty = true; },
   setLimits(list) { if (!started || stopped) return; state.limits = { others: Array.isArray(list) ? list : [] }; },
 };
 

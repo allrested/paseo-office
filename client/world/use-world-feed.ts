@@ -21,6 +21,9 @@ import {
   type WorldMemory,
   type WorldPlan,
 } from "./adapter.js";
+import { useSettings } from "@getpaseo/plugin/client";
+import { officeHostSettings, stickyNotesOf } from "../../shared/settings.js";
+import { useDeviceSwitch } from "../use-device-switch.js";
 import { providersOut } from "../../shared/plan-usage.js";
 import { usePlanUsageValue } from "../use-plan-usage.js";
 import { useIncidentAlarm } from "./use-incident-alarm.js";
@@ -123,6 +126,22 @@ export function useWorldFeed(
   useEffect(() => {
     world.current?.setMachine(worldReadings);
   }, [worldReadings, api]);
+
+  // The host's: whether bubbles name what a person is at, and the owner's notes on the whiteboard.
+  const host = useSettings(officeHostSettings);
+  const hostValues = host.status === "ready" ? host.values : null;
+  const streamer = hostValues?.streamerMode ?? null;
+  const notesText = hostValues?.stickyNotes ?? null;
+  useEffect(() => {
+    if (streamer !== null) world.current?.setStreamer?.(streamer);
+  }, [streamer, api]);
+  useEffect(() => {
+    if (notesText !== null) world.current?.setNotes?.(stickyNotesOf(notesText));
+  }, [notesText, api]);
+  const graphics = useDeviceSwitch("graphics", "auto").on;
+  useEffect(() => {
+    if (graphics !== null) world.current?.setGraphics?.(graphics);
+  }, [graphics, api]);
 
   // After the people: the break is for the sessions already named with their plan.
   useEffect(() => {

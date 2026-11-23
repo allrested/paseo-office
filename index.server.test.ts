@@ -85,6 +85,8 @@ const ON: SettingsState = {
     ...NO_NOTES,
     ...NO_TRACKERS,
     floorPlan: "pro",
+    streamerMode: true,
+    stickyNotes: "",
   },
 };
 const OFF: SettingsState = {
@@ -96,6 +98,8 @@ const OFF: SettingsState = {
     ...NO_NOTES,
     ...NO_TRACKERS,
     floorPlan: "pro",
+    streamerMode: true,
+    stickyNotes: "",
   },
 };
 const OWN_TOOL = defineAgentTool({
@@ -605,6 +609,8 @@ function notesSettings(
       notesDays,
       ...NO_TRACKERS,
       floorPlan: "pro",
+      streamerMode: true,
+      stickyNotes: "",
     },
   };
 }
@@ -1076,6 +1082,8 @@ const NOTES: SettingsState = {
     notesFolder: NOTES_FOLDER,
     ...NO_TRACKERS,
     floorPlan: "pro",
+    streamerMode: true,
+    stickyNotes: "",
   },
 };
 
@@ -1124,6 +1132,8 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       archiveOnDeparture: false,
       agentTools: true,
       floorPlan: "pro",
+      streamerMode: true,
+      stickyNotes: "",
     },
   });
   let saved: SettingsState = NOTES;
@@ -1480,6 +1490,8 @@ const JIRA_ON: SettingsState = {
     ...NO_NOTES,
     ...NO_TRACKERS,
     floorPlan: "pro",
+    streamerMode: true,
+    stickyNotes: "",
     jiraProjects: "OPS",
   },
 };

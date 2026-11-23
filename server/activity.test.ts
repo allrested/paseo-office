@@ -828,3 +828,22 @@ test("the poller reports sub-agents as they start and end, and nothing while the
   expect(harness.subagents.at(-1)).toEqual({});
   harness.poller.stop();
 });
+
+test("a step says what it is at only when asked to, in one cut line", () => {
+  const named = (detail: unknown) => describeStep([call(detail)], undefined, true)?.label;
+  // Never without the host's say-so.
+  expect(describeStep([call({ type: "read", filePath: "/repo/src/app.ts" })])).toEqual({
+    kind: "read",
+    key: "c1",
+  });
+  expect(named({ type: "read", filePath: "/repo/src/app.ts" })).toBe("app.ts");
+  expect(named({ type: "edit", filePath: "C:\\repo\\main.py" })).toBe("main.py");
+  expect(named({ type: "shell", command: "npm test\nnpm run lint" })).toBe("npm test");
+  expect(named({ type: "search", query: "where is the hub" })).toBe("where is the hub");
+  expect(named({ type: "fetch", url: "https://docs.example.com/a/b?token=1" })).toBe(
+    "docs.example.com",
+  );
+  expect(named({ type: "fetch", url: "not an address" })).toBeUndefined();
+  expect(named({ type: "plan" })).toBeUndefined();
+  expect(named({ type: "shell", command: "x".repeat(200) })).toHaveLength(80);
+});

@@ -217,10 +217,14 @@ export const WakeStateSchema = z.object({
 export type WakeState = z.output<typeof WakeStateSchema>;
 
 /** A running agent's newest tool call: what it is for, and a key that changes with each call. */
+/** The most characters of what a step is at. */
+export const STEP_LABEL_MAX = 80;
+
 export const ActivityStepSchema = z.object({
   kind: z.enum(ACTIVITY_KINDS),
   key: z.string(),
   result: z.enum(TEST_RESULTS).optional(),
+  label: z.string().max(STEP_LABEL_MAX).optional(),
 });
 
 /** The most steps of one agent's checklist the office sends. */

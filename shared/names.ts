@@ -40,4 +40,6 @@ export interface ActivityStep {
   key: string;
   /** Set on a test run or a deploy once it has ended. */
   result?: TestResult;
+  /** What the call is at: a file's name, a command, a site. Only from a host whose streamer mode is off. */
+  label?: string;
 }

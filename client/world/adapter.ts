@@ -237,7 +237,7 @@ function runOf(kind: ActivityKind): Run | null {
   return kind === "test" || kind === "deploy" ? kind : null;
 }
 
-type StepEvent = Pick<WorldEvent, "type" | "of">;
+type StepEvent = Pick<WorldEvent, "type" | "of" | "label">;
 
 /**
  * How a run that ended is told. A test run's result goes on the test board. A deploy that
@@ -347,7 +347,10 @@ function stepEvents(
       events.push(endOf(run, step.result));
     } else {
       running = run;
-      events.push({ type: STEP_EVENT[step.kind] });
+      events.push({
+        type: STEP_EVENT[step.kind],
+        ...(step.label === undefined ? {} : { label: step.label }),
+      });
     }
   }
   return { events, step: told, running };

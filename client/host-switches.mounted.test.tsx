@@ -143,6 +143,8 @@ beforeEach(() => {
     notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
     floorPlan: "pro",
+    streamerMode: true,
+    stickyNotes: "",
     ...NO_TRACKERS,
   };
   container = document.createElement("div");
@@ -200,6 +202,8 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         notesMode: "",
         notesDays: SUNDAY_TO_THURSDAY,
         floorPlan: "pro",
+        streamerMode: true,
+        stickyNotes: "",
         ...NO_TRACKERS,
       },
       revision: "r1",
@@ -256,6 +260,8 @@ test("the switch keeps the notes settings when it saves", async () => {
       notesMode: "",
       notesDays: SUNDAY_TO_THURSDAY,
       floorPlan: "pro",
+      streamerMode: true,
+      stickyNotes: "",
       ...NO_TRACKERS,
     },
   ]);

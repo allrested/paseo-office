@@ -27,6 +27,8 @@ export function liveHubPorts(
   holder: PaseoHolder,
   timers: Timers,
   log: (message: string) => void,
+  /** Whether steps name what they are at: the host's streamer mode is off. */
+  named: () => boolean = () => false,
 ): HubPorts {
   return {
     openDirectory: (onChange, onEnd) => openPaseoDirectory(holder.require(), onChange, log, onEnd),
@@ -42,6 +44,7 @@ export function liveHubPorts(
         },
         timers,
         log,
+        named,
         onChange,
       });
       return () => poller.stop();

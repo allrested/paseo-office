@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettings } from "@getpaseo/plugin/client";
-import { officeDeviceSettings, type OfficeScene, type OfficeLighting } from "../shared/settings.js";
+import {
+  officeDeviceSettings,
+  type OfficeGraphics,
+  type OfficeLighting,
+  type OfficeScene,
+} from "../shared/settings.js";
 
 export interface DeviceSwitch {
   /** The switch as the person left it (a tap shows at once); null while the device's setting is read or unreadable. */
@@ -29,6 +34,7 @@ interface Preferences {
   sessionsHidden: boolean;
   scene: OfficeScene;
   lighting: OfficeLighting;
+  graphics: OfficeGraphics;
 }
 
 export function useDeviceSwitch<Field extends keyof Preferences>(
