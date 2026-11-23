@@ -2,6 +2,19 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.4 (2026-11-23)
+
+- Plan limits: the Host card lists each provider's limits with how much is used and when each
+  resets. From 80% used the toolbar's Host button names the closest limit, from 95% in the
+  danger colour, and at 100% it reads "Out of" the provider (#31).
+- Out of Claude: on the 3D floor a plan at 100% puts up the countdown board and sends that
+  plan's resting people on a break until it resets (#31).
+- Streamer mode is a setting, on by default as before. Off, the bubble over a person names the
+  file, command or site they are at (#32).
+- Graphics is a per-device choice of Auto, Low, Medium or High (#32).
+- Sticky notes: up to four notes of the owner's on the 3D whiteboard, typed in the settings
+  (#32).
+
 ## 0.2.3 (2026-11-23)
 
 - The stand-up writer's mode is a setting: the modes its provider offers, Codex's Full Access
