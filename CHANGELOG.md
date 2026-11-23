@@ -2,6 +2,17 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.7 (2026-11-23)
+
+- The office notices, as cards in the Attention strip: the same call failing three times running
+  (Stop, Send a hint), a call auto mode refused, two agents changing one file (Tell both), a
+  command whose port is taken (Tell the agent), and failing checks (Fix it) (#35).
+- Pinned notes, a setting, are said again to an agent whose conversation is compacted during a
+  turn (#35).
+- These are noticed a few seconds after the fact and only while an office is open. Blocking a
+  call before it runs and undoing a turn's edits are not in this version: both need real Claude
+  Code hooks on the host.
+
 ## 0.2.6 (2026-11-23)
 
 - History vault, off by default: turned on, the office keeps the prompts and the replies of each
