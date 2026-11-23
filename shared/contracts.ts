@@ -273,10 +273,10 @@ export const NotesStateSchema = z.object({
 });
 export type NotesState = z.output<typeof NotesStateSchema>;
 
-export const INCIDENT_SOURCES = ["jira", "sentry"] as const;
+export const INCIDENT_SOURCES = ["jira", "sentry", "cloudwatch"] as const;
 export type IncidentSource = (typeof INCIDENT_SOURCES)[number];
 
-/** A new bug in Jira or a new issue in Sentry, open until dismissed or a day after it was found. */
+/** A new bug in Jira, a new issue in Sentry or an alarm in CloudWatch, open until dismissed or a day after it was found. */
 export const IncidentSchema = z.object({
   id: z.string(),
   source: z.enum(INCIDENT_SOURCES),
@@ -298,7 +298,11 @@ export type TrackerSource = (typeof TRACKER_SOURCES)[number];
 export const IncidentsStateSchema = z.object({
   open: z.array(IncidentSchema),
   /** Why a tracker's last check failed; absent once one succeeds. */
-  problems: z.object({ jira: z.string().optional(), sentry: z.string().optional() }),
+  problems: z.object({
+    jira: z.string().optional(),
+    sentry: z.string().optional(),
+    cloudwatch: z.string().optional(),
+  }),
   /** The tracker has a sign-in on the host, saved or in its environment. Never the values. */
   jiraReady: z.boolean(),
   sentryReady: z.boolean(),
@@ -898,7 +902,7 @@ const SentryConnectionSchema = z.object({ token: z.string().max(4000) });
 export const TrackersChangeSchema = z.discriminatedUnion("action", [
   JiraConnectionSchema.extend({ action: z.literal("save-jira") }),
   SentryConnectionSchema.extend({ action: z.literal("save-sentry") }),
-  z.object({ action: z.literal("clear"), tracker: z.enum(INCIDENT_SOURCES) }),
+  z.object({ action: z.literal("clear"), tracker: z.enum(["jira", "sentry"]) }),
 ]);
 export type TrackersChange = z.output<typeof TrackersChangeSchema>;
 

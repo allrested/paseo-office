@@ -1,3 +1,4 @@
+import { TeamName } from "./team-name.js";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
@@ -431,6 +432,10 @@ export function BoardSheet({
             onPicking={setPicking}
             styles={styles}
           />
+        ) : null}
+        {/* The team's own name is set here too: this sheet opens from every view, the list from one. */}
+        {room !== null && !room.lobby && !picking && room.workspace ? (
+          <TeamName room={room} styles={styles} />
         ) : null}
         {room !== null && !room.lobby ? (
           <SheetBody

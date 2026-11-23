@@ -117,8 +117,13 @@ import { useReviews } from "./use-reviews.js";
 import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
-import { PlanUsageContext, usePlanUsage } from "./use-plan-usage.js";
-import { planNote, type PlanUsage } from "../shared/plan-usage.js";
+import {
+  PlanPickerContext,
+  PlanUsageContext,
+  usePlanUsage,
+  type PlanState,
+} from "./use-plan-usage.js";
+import { planNote } from "../shared/plan-usage.js";
 import { useOffice, type OfficeState } from "./use-office.js";
 import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
@@ -880,6 +885,7 @@ interface ViewControlsProps {
   onMachine?: () => void;
   onTimeline?: () => void;
   onHistory?: () => void;
+  shortcuts?: readonly Shortcut[];
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -930,14 +936,46 @@ function HostResourceButton({
   );
 }
 
+/** A card of the office as a toolbar icon. */
+interface Shortcut extends StripCard {
+  icon: string;
+}
+
+function shortcutsOf(entries: readonly (readonly [StripCard | null, string])[]): Shortcut[] {
+  return entries.flatMap(([entry, icon]) => (entry === null ? [] : [{ ...entry, icon }]));
+}
+
+/** A card that asks for a look: its note is a warning or worse. One that only informs does not. */
+function needsLook(card: StripCard): boolean {
+  return card.note.tone !== "muted";
+}
+
+/**
+ * The Attention strip's cards. A docked office has the informing ones as toolbar icons, so its
+ * strip holds only what needs a look; elsewhere (a phone) the strip is the only way to them.
+ */
+function stripCards(
+  first: readonly (StripCard | null)[],
+  shortcuts: readonly Shortcut[],
+  docked: boolean,
+): StripCard[] {
+  const all = [...first, ...shortcuts].filter((card) => card !== null);
+  return docked ? all.filter(needsLook) : all;
+}
+
 /** The toolbar's buttons for what was: the timeline and the history, each while it is offered. */
+const NO_SHORTCUTS: readonly Shortcut[] = [];
+
 function PastButtons({
+  shortcuts = NO_SHORTCUTS,
   onTimeline,
   onHistory,
   size,
   color,
   styles,
 }: {
+  /** The office's own cards, each an icon named by its card and what it says. */
+  shortcuts?: readonly Shortcut[] | undefined;
   onTimeline: (() => void) | undefined;
   onHistory: (() => void) | undefined;
   size: number;
@@ -946,6 +984,18 @@ function PastButtons({
 }) {
   return (
     <>
+      {shortcuts.map((shortcut) => (
+        <PanelButton
+          key={shortcut.title}
+          label={`${shortcut.title}: ${shortcut.note.text}`}
+          icon={shortcut.icon}
+          screenId={shortcut.title}
+          size={size}
+          color={color}
+          onOpen={shortcut.onOpen}
+          styles={styles}
+        />
+      ))}
       {onTimeline ? (
         <PanelButton
           label="Timeline"
@@ -987,6 +1037,7 @@ function ViewControls({
   onMachine,
   onTimeline,
   onHistory,
+  shortcuts,
   onChange,
   compact,
   touchScreen,
@@ -1031,6 +1082,7 @@ function ViewControls({
       )}
       {sidebars ? (
         <PastButtons
+          shortcuts={shortcuts}
           onTimeline={onTimeline}
           onHistory={onHistory}
           size={touchScreen ? 20 : 16}
@@ -1233,10 +1285,11 @@ function useColumnContent({
   const waiting = model.attention.length;
   const badges = useMemo(
     (): ColumnBadges => ({
-      attention: live ? countLabel(waiting + cards.length) : null,
+      // Only what needs a look is counted: a card that says all is well is no notification.
+      attention: live ? countLabel(waiting + cards.filter(needsLook).length) : null,
       chat: unread,
     }),
-    [live, waiting, cards.length, unread],
+    [live, waiting, cards, unread],
   );
   const select = useCallback(
     (agentId: string) => {
@@ -1681,11 +1734,19 @@ function useFullscreenPanels(
   const sessionsOpen = sessionsHidden !== true;
   const sidebarWidth = Math.max(SESSION_RAIL_MIN, Math.min(312, Math.round(surfaceWidth * 0.24)));
   const railSize = useMemo(() => ({ width: sidebarWidth }), [sidebarWidth]);
+  // Docked, Sessions has its own rail: the column's Sessions tab shows as Activity, in the header too.
+  const shownColumn = useMemo(
+    () =>
+      docked && column.view.kind === "tab" && column.view.tab === "sessions"
+        ? { ...column, view: { kind: "tab", tab: "activity" } as const }
+        : column,
+    [column, docked],
+  );
   const sidebars: SidebarControls | undefined = docked
     ? {
         sessionsOpen,
         sessionsAvailable,
-        column,
+        column: shownColumn,
         hideSessions,
       }
     : undefined;
@@ -1716,13 +1777,7 @@ function useFullscreenPanels(
     selectAgent,
     selectFromStrip: directSessions ? openSession : selectFromStrip,
     width: sessionsAvailable && sessionsOpen ? surfaceWidth - sidebarWidth : surfaceWidth,
-    column: useMemo(
-      () =>
-        docked && column.view.kind === "tab" && column.view.tab === "sessions"
-          ? { ...column, view: { kind: "tab", tab: "activity" } as const }
-          : column,
-      [column, docked],
-    ),
+    column: shownColumn,
     sheet: useMemo(
       () => (directSessions ? { ...sheet, sheetLink: link } : sheet),
       [sheet, link, directSessions],
@@ -1845,17 +1900,19 @@ function OfficeContexts({
   children,
 }: {
   brand: OfficeState["state"]["brand"];
-  planUsage: readonly PlanUsage[];
+  planUsage: PlanState;
   onTimeline: (() => void) | undefined;
   onHistory: (() => void) | undefined;
   children: ReactNode;
 }) {
   return (
     <OfficeBrandContext.Provider value={brand}>
-      <PlanUsageContext.Provider value={planUsage}>
-        <OpenTimelineContext.Provider value={onTimeline}>
-          <OpenHistoryContext.Provider value={onHistory}>{children}</OpenHistoryContext.Provider>
-        </OpenTimelineContext.Provider>
+      <PlanUsageContext.Provider value={planUsage.counted}>
+        <PlanPickerContext.Provider value={planUsage.picker}>
+          <OpenTimelineContext.Provider value={onTimeline}>
+            <OpenHistoryContext.Provider value={onHistory}>{children}</OpenHistoryContext.Provider>
+          </OpenTimelineContext.Provider>
+        </PlanPickerContext.Provider>
       </PlanUsageContext.Provider>
     </OfficeBrandContext.Provider>
   );
@@ -2073,32 +2130,35 @@ export function OfficeSurface(
     () => weatherEntry(office.state.weather, settings.show),
     [office.state.weather, settings.show],
   );
-  // The strip's cards, each only while it has something to say. An incident comes first.
+  // The strip's cards, each only while it has something to say. An incident comes first. The
+  // office's own cards with nothing to report (the janitor, the stand-up, QA, the library) are
+  // icons in the toolbar of a docked office, so the strip there holds only what needs a look.
+  const shortcuts = useMemo(
+    () =>
+      shortcutsOf([
+        [janitorEntry, "Brush"],
+        [standup.entry, "NotebookPen"],
+        [reviews.entry, "GitPullRequest"],
+        [qa.entry, "FlaskConical"],
+        [library.entry, "BookOpen"],
+      ]),
+    [janitorEntry, standup.entry, reviews.entry, qa.entry, library.entry],
+  );
   const cards = useMemo(
     () =>
-      [
-        incidentsStripEntry,
-        ...alerts.cards,
-        settingsStripEntry,
-        weatherStripEntry,
-        hostEntry,
-        janitorEntry,
-        standup.entry,
-        reviews.entry,
-        qa.entry,
-        library.entry,
-      ].filter((card) => card !== null),
+      stripCards(
+        [incidentsStripEntry, ...alerts.cards, settingsStripEntry, weatherStripEntry, hostEntry],
+        shortcuts,
+        panels.docked,
+      ),
     [
       incidentsStripEntry,
       alerts.cards,
       settingsStripEntry,
       weatherStripEntry,
       hostEntry,
-      janitorEntry,
-      standup.entry,
-      reviews.entry,
-      qa.entry,
-      library.entry,
+      shortcuts,
+      panels.docked,
     ],
   );
   const draft = useChatDraft();
@@ -2170,6 +2230,7 @@ export function OfficeSurface(
       onMachine={hostEntry?.onOpen}
       onTimeline={timeline.onOpen}
       onHistory={history.onOpen}
+      shortcuts={shortcuts}
       onChange={changeView}
       compact={compact}
       touchScreen={touchScreen}

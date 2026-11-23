@@ -17,6 +17,8 @@ import type { BoardActions } from "./use-board-actions.js";
 /** What the host's sheet does when it is closed: Escape, its close button, a swipe. */
 let dismiss: () => void = () => undefined;
 
+const rename = vi.hoisted(() => vi.fn(async (_input: object) => ({ ok: true as const })));
+vi.mock("@getpaseo/plugin/client", () => ({ useRpc: () => rename }));
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { ScrollView, TextInput } = await import("react-native");
   const Modal = (props: {
