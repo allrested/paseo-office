@@ -98,6 +98,25 @@ export function moved<Entry>(list: readonly Entry[], index: number, by: -1 | 1):
   return next;
 }
 
+/** The team with `teamId` one place up (-1) or down (1); unchanged at an end or when absent. */
+export function moveTeam(teams: readonly RosterTeam[], teamId: string, by: -1 | 1): RosterTeam[] {
+  const index = teams.findIndex((team) => team.id === teamId);
+  return index < 0 ? [...teams] : moved(teams, index, by);
+}
+
+/** The same for a teammate of the team `teamId`. */
+export function moveMember(
+  teams: readonly RosterTeam[],
+  teamId: string,
+  memberId: string,
+  by: -1 | 1,
+): RosterTeam[] {
+  return inTeam(teams, teamId, (team) => {
+    const index = team.members.findIndex((member) => member.id === memberId);
+    return index < 0 ? team : { ...team, members: moved(team.members, index, by) };
+  });
+}
+
 /** Who holds what: each held team's workspace, by its own name in Paseo, and the held teammates. */
 export interface RosterHolders {
   teams: ReadonlyMap<string, string>;

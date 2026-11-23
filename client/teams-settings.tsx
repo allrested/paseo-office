@@ -17,7 +17,8 @@ import {
   TEAMS_LABEL,
   addMember,
   addTeam,
-  moved,
+  moveMember,
+  moveTeam,
   newId,
   removeMember,
   removeTeam,
@@ -42,6 +43,21 @@ const layout = StyleSheet.create({
 
 const NO_TEAMS: RosterTeam[] = [];
 
+interface Draft {
+  on: boolean;
+  teams: RosterTeam[];
+}
+
+/** One change to the roster, read off the list as it stands when the change is saved. */
+type Edit = (draft: Draft) => Draft;
+
+type EditRoster = (edit: Edit) => Promise<boolean>;
+
+interface Queued {
+  edit: Edit;
+  answer(saved: boolean): void;
+}
+
 interface TeamsSettingsProps {
   /** Null while the settings are read or cannot be read: nothing can then be changed. */
   values: HostValues | null;
@@ -55,22 +71,70 @@ interface TeamsSettingsProps {
 /**
  * The roster: a switch, then each team with its teammates in the order they are handed out.
  * Every change is one save of the whole list, with the edition a longer list or the switch
- * going on calls for.
+ * going on calls for. The saves go one at a time, each from the values the host last kept, so an
+ * edit made before the last one is answered is saved after it, on top of it.
  */
 export function TeamsSettings({ values, change, problem, holders, styles }: TeamsSettingsProps) {
-  const save = useCallback(
-    (on: boolean, teams: RosterTeam[]) => {
-      if (values === null) return Promise.resolve(false);
-      const rosterEdition = nextEdition(rosterOf(values), { on, teams });
-      return change(TEAMS_LABEL, { rosterOn: on, rosterEdition, teams });
-    },
-    [change, values],
+  const latest = useRef({ values, change });
+  latest.current = { values, change };
+  const queue = useRef<Queued[]>([]);
+  // A save that kept its values is followed only once the host has drawn the new ones.
+  const last = useRef<{ busy: boolean; kept: boolean; from: HostValues | null }>({
+    busy: false,
+    kept: false,
+    from: null,
+  });
+  const mounted = useRef(true);
+  const [answered, setAnswered] = useState(0);
+  const drain = useCallback(() => {
+    const { values: current, change: save } = latest.current;
+    if (last.current.busy || queue.current.length === 0) return;
+    if (current === null) {
+      for (const { answer } of queue.current.splice(0)) answer(false);
+      return;
+    }
+    if (last.current.kept && last.current.from === current) return;
+    const taken = queue.current.splice(0);
+    const draft = taken.reduce<Draft>((now, { edit }) => edit(now), {
+      on: current.rosterOn,
+      teams: current.teams,
+    });
+    const rosterEdition = nextEdition(rosterOf(current), draft);
+    last.current = { busy: true, kept: false, from: current };
+    void save(TEAMS_LABEL, { rosterOn: draft.on, rosterEdition, teams: draft.teams }).then(
+      (kept) => {
+        last.current = { busy: false, kept, from: current };
+        for (const { answer } of taken) answer(kept);
+        if (mounted.current) setAnswered((count) => count + 1);
+        return kept;
+      },
+    );
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(drain, [drain, values, answered]);
+  const edit = useCallback<EditRoster>(
+    (next) =>
+      new Promise<boolean>((answer) => {
+        queue.current.push({ edit: next, answer });
+        drain();
+      }),
+    [drain],
   );
   const on = values?.rosterOn ?? false;
   const teams = values?.teams ?? NO_TEAMS;
-  const toggle = useCallback((next: boolean) => void save(next, teams), [save, teams]);
-  const edit = useCallback((next: RosterTeam[]) => save(on, next), [save, on]);
-  const appendTeam = useCallback(() => void edit(addTeam(teams, newId("t"))), [edit, teams]);
+  const toggle = useCallback(
+    (next: boolean) => void edit((draft) => ({ ...draft, on: next })),
+    [edit],
+  );
+  const appendTeam = useCallback(() => {
+    const id = newId("t");
+    void edit((draft) => ({ ...draft, teams: addTeam(draft.teams, id) }));
+  }, [edit]);
   return (
     <View style={styles.headerFields}>
       <LabeledSwitch
@@ -80,16 +144,8 @@ export function TeamsSettings({ values, change, problem, holders, styles }: Team
         styles={styles}
       />
       <Text style={styles.fieldHint}>{INTRO}</Text>
-      {teams.map((team, index) => (
-        <TeamBlock
-          key={team.id}
-          team={team}
-          index={index}
-          teams={teams}
-          edit={edit}
-          holders={holders}
-          styles={styles}
-        />
+      {teams.map((team) => (
+        <TeamBlock key={team.id} team={team} edit={edit} holders={holders} styles={styles} />
       ))}
       {values !== null && teams.length < ROSTER_TEAMS_MAX && (
         <TextButton label="Add team" text="Add team" onPress={appendTeam} styles={styles} />
@@ -105,25 +161,33 @@ export function TeamsSettings({ values, change, problem, holders, styles }: Team
 
 interface TeamBlockProps {
   team: RosterTeam;
-  index: number;
-  teams: RosterTeam[];
-  edit(next: RosterTeam[]): Promise<boolean>;
+  edit: EditRoster;
   holders: RosterHolders;
   styles: OfficeStyles;
 }
 
-function TeamBlock({ team, index, teams, edit, holders, styles }: TeamBlockProps) {
+function TeamBlock({ team, edit, holders, styles }: TeamBlockProps) {
   const rename = useCallback(
-    (name: string) => edit(renameTeam(teams, team.id, name)),
-    [edit, teams, team.id],
+    (name: string) =>
+      edit((draft) => ({ ...draft, teams: renameTeam(draft.teams, team.id, name) })),
+    [edit, team.id],
   );
-  const up = useCallback(() => void edit(moved(teams, index, -1)), [edit, teams, index]);
-  const down = useCallback(() => void edit(moved(teams, index, 1)), [edit, teams, index]);
-  const remove = useCallback(() => void edit(removeTeam(teams, team.id)), [edit, teams, team.id]);
-  const append = useCallback(
-    () => void edit(addMember(teams, team.id, newId("m"))),
-    [edit, teams, team.id],
+  const up = useCallback(
+    () => void edit((draft) => ({ ...draft, teams: moveTeam(draft.teams, team.id, -1) })),
+    [edit, team.id],
   );
+  const down = useCallback(
+    () => void edit((draft) => ({ ...draft, teams: moveTeam(draft.teams, team.id, 1) })),
+    [edit, team.id],
+  );
+  const remove = useCallback(
+    () => void edit((draft) => ({ ...draft, teams: removeTeam(draft.teams, team.id) })),
+    [edit, team.id],
+  );
+  const append = useCallback(() => {
+    const id = newId("m");
+    void edit((draft) => ({ ...draft, teams: addMember(draft.teams, team.id, id) }));
+  }, [edit, team.id]);
   const workspace = holders.teams.get(team.id);
   return (
     <View
@@ -156,7 +220,6 @@ function TeamBlock({ team, index, teams, edit, holders, styles }: TeamBlockProps
           key={member.id}
           team={team}
           at={at}
-          teams={teams}
           edit={edit}
           held={holders.members.has(member.id)}
           styles={styles}
@@ -177,28 +240,32 @@ function TeamBlock({ team, index, teams, edit, holders, styles }: TeamBlockProps
 interface MemberRowProps {
   team: RosterTeam;
   at: number;
-  teams: RosterTeam[];
-  edit(next: RosterTeam[]): Promise<boolean>;
+  edit: EditRoster;
   held: boolean;
   styles: OfficeStyles;
 }
 
-function MemberRow({ team, at, teams, edit, held, styles }: MemberRowProps) {
+function MemberRow({ team, at, edit, held, styles }: MemberRowProps) {
   const member = team.members[at];
-  const within = useCallback(
-    (members: RosterTeam["members"]) =>
-      edit(teams.map((entry) => (entry.id === team.id ? { ...entry, members } : entry))),
-    [edit, teams, team.id],
-  );
   const rename = useCallback(
-    (name: string) => edit(renameMember(teams, team.id, member.id, name)),
-    [edit, teams, team.id, member.id],
+    (name: string) =>
+      edit((draft) => ({ ...draft, teams: renameMember(draft.teams, team.id, member.id, name) })),
+    [edit, team.id, member.id],
   );
-  const up = useCallback(() => void within(moved(team.members, at, -1)), [within, team, at]);
-  const down = useCallback(() => void within(moved(team.members, at, 1)), [within, team, at]);
+  const up = useCallback(
+    () =>
+      void edit((draft) => ({ ...draft, teams: moveMember(draft.teams, team.id, member.id, -1) })),
+    [edit, team.id, member.id],
+  );
+  const down = useCallback(
+    () =>
+      void edit((draft) => ({ ...draft, teams: moveMember(draft.teams, team.id, member.id, 1) })),
+    [edit, team.id, member.id],
+  );
   const remove = useCallback(
-    () => void edit(removeMember(teams, team.id, member.id)),
-    [edit, teams, team.id, member.id],
+    () =>
+      void edit((draft) => ({ ...draft, teams: removeMember(draft.teams, team.id, member.id) })),
+    [edit, team.id, member.id],
   );
   return (
     <View style={layout.row}>

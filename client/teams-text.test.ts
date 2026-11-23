@@ -5,7 +5,9 @@ import {
   addMember,
   addTeam,
   holdersOf,
+  moveMember,
   moved,
+  moveTeam,
   newId,
   removeMember,
   removeTeam,
@@ -52,6 +54,18 @@ test("a move swaps with the neighbour and stops at the ends", () => {
   expect(moved(["a", "b", "c"], 1, 1)).toEqual(["a", "c", "b"]);
   expect(moved(["a", "b", "c"], 0, -1)).toEqual(["a", "b", "c"]);
   expect(moved(["a", "b", "c"], 2, 1)).toEqual(["a", "b", "c"]);
+});
+
+test("a team or teammate is moved by its id, so a second move acts on the list as it now is", () => {
+  expect(moveTeam(TEAMS, "t2", -1).map((team) => team.id)).toEqual(["t2", "t1"]);
+  expect(moveTeam(TEAMS, "t1", -1)).toEqual(TEAMS);
+  expect(moveTeam(TEAMS, "gone", 1)).toEqual(TEAMS);
+  expect(moveMember(TEAMS, "t1", "m2", -1)[0].members.map((member) => member.id)).toEqual([
+    "m2",
+    "m1",
+  ]);
+  expect(moveMember(TEAMS, "t1", "m2", 1)).toEqual(TEAMS);
+  expect(moveMember(TEAMS, "t1", "gone", 1)).toEqual(TEAMS);
 });
 
 test("ids are short and differ", () => {

@@ -3,7 +3,7 @@
  */
 // The Teams section, mounted. Its saves go through the header's `change`, so a stand-in records
 // each patch and answers as the host would.
-import { act, useCallback, type ComponentProps } from "react";
+import { act, useCallback, useEffect, useState, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -26,29 +26,51 @@ const DEFAULTS: HostValues = officeHostSettings.schema.parse({});
 type ChangeTeams = ComponentProps<typeof TeamsSettings>["change"];
 
 let values: HostValues;
-let patches: Partial<HostValues>[];
+// The host's revision: a save made from an older one is refused, as the settings file refuses it.
+let revision: number;
+let hidden: boolean;
+let gate: Promise<void>;
+let saves: { patch: Partial<HostValues>; current: boolean }[];
 let problem: string | null;
 let holders: RosterHolders;
 let container: HTMLElement;
 let root: Root;
+let redraw: () => void;
 
 function Harness() {
   const styles = useOfficeStyles(THEME, true, true);
-  // As the host: the patch is checked, kept when valid, and the section drawn again.
-  const change = useCallback<ChangeTeams>(async (_setting, patch) => {
-    patches.push(patch);
-    const checked = officeHostSettings.schema.safeParse({ ...values, ...patch });
-    if (!checked.success) {
-      problem = checked.error.issues.map((issue) => issue.message).join("\n");
-      return false;
-    }
-    values = checked.data;
-    problem = null;
-    return true;
+  const [, setDrawn] = useState(0);
+  useEffect(() => {
+    redraw = () => setDrawn((count) => count + 1);
   }, []);
+  // As the host: `change` closes over the values and revision this render saw; the patch is checked
+  // against them, kept when valid and current, and the section is drawn again with the new values.
+  const seen = values;
+  const seenRevision = revision;
+  const change = useCallback<ChangeTeams>(
+    async (_setting, patch) => {
+      saves.push({ patch, current: seenRevision === revision });
+      await gate;
+      await Promise.resolve();
+      const checked = officeHostSettings.schema.safeParse({ ...seen, ...patch });
+      if (seenRevision !== revision) {
+        problem = "The settings changed since they were read.";
+      } else if (!checked.success) {
+        problem = checked.error.issues.map((issue) => issue.message).join("\n");
+      } else {
+        values = checked.data;
+        revision += 1;
+        problem = null;
+      }
+      const kept = problem === null;
+      redraw();
+      return kept;
+    },
+    [seen, seenRevision],
+  );
   return (
     <TeamsSettings
-      values={values}
+      values={hidden ? null : values}
       change={change}
       problem={problem}
       holders={holders}
@@ -61,7 +83,10 @@ const mount = () => act(async () => root.render(<Harness />));
 
 beforeEach(() => {
   values = { ...DEFAULTS };
-  patches = [];
+  revision = 0;
+  hidden = false;
+  gate = Promise.resolve();
+  saves = [];
   problem = null;
   holders = { teams: new Map(), members: new Set() };
   container = document.createElement("div");
@@ -80,20 +105,33 @@ function byLabel<Found extends HTMLElement>(label: string): Found {
   return found;
 }
 
+// Lets every save the last action started be answered, and the section drawn again.
+const settle = () => act(async () => new Promise((done) => setTimeout(done, 0)));
+
+const patches = () => saves.map((save) => save.patch);
+
 async function press(label: string): Promise<void> {
   await act(async () => byLabel(label).click());
-  await mount();
+  await settle();
 }
 
-async function type(label: string, text: string): Promise<void> {
+function typeInto(label: string, text: string): Promise<void> {
   const input = byLabel<HTMLInputElement>(label);
-  await act(async () => {
+  return act(async () => {
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     set?.call(input, text);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await act(async () => input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
-  await mount();
+}
+
+const leave = (label: string) => {
+  byLabel(label).dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+};
+
+async function type(label: string, text: string): Promise<void> {
+  await typeInto(label, text);
+  await act(async () => leave(label));
+  await settle();
 }
 
 test("the switch turns the roster on and raises the edition", async () => {
@@ -101,9 +139,9 @@ test("the switch turns the roster on and raises the edition", async () => {
   const roster = byLabel("Name teams and agents from the roster");
   expect(roster.getAttribute("aria-checked")).toBe("false");
   await press("Name teams and agents from the roster");
-  expect(patches).toEqual([{ rosterOn: true, rosterEdition: 1, teams: [] }]);
+  expect(patches()).toEqual([{ rosterOn: true, rosterEdition: 1, teams: [] }]);
   await press("Name teams and agents from the roster");
-  expect(patches.at(-1)).toEqual({ rosterOn: false, rosterEdition: 1, teams: [] });
+  expect(patches().at(-1)).toEqual({ rosterOn: false, rosterEdition: 1, teams: [] });
 });
 
 test("a team and its teammates are added, renamed, moved and removed", async () => {
@@ -177,6 +215,84 @@ test("a held team says which workspace has it, and a held teammate is marked", a
   expect(container.textContent).toContain("Workspace paseo-7f3a");
   expect(byLabel("TJ, at a desk")).toBeTruthy();
   expect(container.querySelector('[aria-label="Zaki, at a desk"]')).toBeNull();
+});
+
+test("two Add team presses before a re-render keep both teams and raise the edition", async () => {
+  values = { ...DEFAULTS, rosterOn: true, rosterEdition: 1 };
+  await mount();
+  await act(async () => {
+    byLabel("Add team").click();
+    byLabel("Add team").click();
+  });
+  await settle();
+  expect(values.teams.map((team) => team.name)).toEqual(["Team 1", "Team 2"]);
+  expect(values.rosterEdition).toBeGreaterThan(1);
+  expect(saves.every((save) => save.current)).toBe(true);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("a rename and an Add teammate pressed before the rename is answered both land", async () => {
+  values = {
+    ...DEFAULTS,
+    rosterOn: true,
+    teams: [{ id: "t1", name: "PR-DEV", members: [] }],
+  };
+  await mount();
+  await typeInto("PR-DEV name", "Platform");
+  await act(async () => {
+    leave("PR-DEV name");
+    byLabel("Add teammate to PR-DEV").click();
+  });
+  await settle();
+  expect(values.teams.map((team) => team.name)).toEqual(["Platform"]);
+  expect(values.teams[0].members.map((member) => member.name)).toEqual(["Teammate 1"]);
+  expect(saves.every((save) => save.current)).toBe(true);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("a refused save does not block the edit queued behind it", async () => {
+  values = {
+    ...DEFAULTS,
+    rosterOn: true,
+    teams: [
+      { id: "t1", name: "PR-DEV", members: [] },
+      { id: "t2", name: "PR-QA", members: [] },
+    ],
+  };
+  await mount();
+  await typeInto("PR-QA name", "pr-dev");
+  await act(async () => {
+    leave("PR-QA name");
+    byLabel("Add team").click();
+  });
+  await settle();
+  expect(values.teams.map((team) => team.name)).toEqual(["PR-DEV", "PR-QA", "Team 3"]);
+  expect(byLabel<HTMLInputElement>("PR-QA name").value).toBe("PR-QA");
+});
+
+test("an edit queued while the settings cannot be read is answered, not saved later", async () => {
+  values = {
+    ...DEFAULTS,
+    rosterOn: true,
+    teams: [{ id: "t1", name: "PR-DEV", members: [] }],
+  };
+  await mount();
+  let release = () => {};
+  gate = new Promise((done) => (release = () => done()));
+  await typeInto("PR-DEV name", "Platform");
+  await act(async () => {
+    leave("PR-DEV name");
+    byLabel("Add teammate to PR-DEV").click();
+  });
+  hidden = true;
+  await act(async () => redraw());
+  release();
+  await settle();
+  hidden = false;
+  await act(async () => redraw());
+  await settle();
+  expect(saves).toHaveLength(1);
+  expect(values.teams[0].members).toEqual([]);
 });
 
 const refuse = async () => false;
