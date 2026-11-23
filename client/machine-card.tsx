@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
@@ -18,8 +18,10 @@ import {
   readAtText,
   type HostTone,
 } from "../shared/machine-text.js";
-import { planTone, resetText, type PlanUsage } from "../shared/plan-usage.js";
-import { usePlanUsageValue } from "./use-plan-usage.js";
+import { closestLimit, planTone, resetText, type PlanUsage } from "../shared/plan-usage.js";
+import { PlanPickerContext, usePlanUsageValue, type PlanPicker } from "./use-plan-usage.js";
+import { SegmentPill } from "./segment-pill.js";
+import { LabeledSwitch } from "./labeled-switch.js";
 import type { OfficeStyles } from "./styles.js";
 
 interface MeterProps {
@@ -72,41 +74,115 @@ function Meter({ label, icon, detail, percent, tone, styles }: MeterProps) {
 
 const PLAN_TONE = { ok: "muted", warning: "warning", danger: "danger" } as const;
 
-/** Each plan's limits as meters: how much is used, and when it resets. */
-function PlanLimits({
-  usage,
+/** A provider's limits as meters: how much is used, and when each resets. */
+function ProviderMeters({
+  provider,
   now,
   styles,
 }: {
-  usage: readonly PlanUsage[];
+  provider: PlanUsage;
   now: number;
   styles: OfficeStyles;
 }) {
-  if (usage.length === 0) return null;
+  return (
+    <View style={styles.host.meters}>
+      {provider.windows.map((window) => (
+        <Meter
+          key={window.id}
+          icon="Gauge"
+          label={window.label}
+          detail={resetText(window.resetsAt, now) || (provider.plan ?? undefined)}
+          percent={Math.floor(window.usedPct)}
+          tone={PLAN_TONE[planTone(window.usedPct)]}
+          styles={styles}
+        />
+      ))}
+    </View>
+  );
+}
+
+/** A provider on the Plan tab: its name, the switch that counts it, and its limits while it counts. */
+function ProviderPlan({
+  provider,
+  counted,
+  setCounted,
+  now,
+  styles,
+}: {
+  provider: PlanUsage;
+  counted: boolean;
+  setCounted: PlanPicker["setCounted"];
+  now: number;
+  styles: OfficeStyles;
+}) {
+  const change = useCallback(
+    (next: boolean) => void setCounted?.(provider.provider, next).catch(() => undefined),
+    [setCounted, provider.provider],
+  );
   return (
     <View style={styles.host.group}>
-      <Text accessibilityRole="header" style={styles.host.title}>
-        Plan limits
+      <LabeledSwitch
+        label={provider.name}
+        note={
+          counted ? (provider.plan ?? undefined) : "Left out: not shown, and no warning from it"
+        }
+        value={setCounted === null ? null : counted}
+        onChange={change}
+        styles={styles}
+      />
+      {counted && <ProviderMeters provider={provider} now={now} styles={styles} />}
+    </View>
+  );
+}
+
+/** The Plan tab: every provider the host reports, each with the switch that counts it. */
+function PlanTab({ now, styles }: { now: number; styles: OfficeStyles }) {
+  const picker = useContext(PlanPickerContext);
+  const counted = usePlanUsageValue();
+  // Without the picker (a surface that gives none) the limits that count are listed as they are.
+  const all = picker?.all ?? counted;
+  if (all.length === 0) {
+    return <Text style={styles.host.empty}>This host reports no plan limits.</Text>;
+  }
+  return (
+    <View style={styles.host.body}>
+      <Text style={styles.host.note}>
+        Switch off a provider you do not use: its limits then leave this card, the toolbar and the
+        floor. A plan nobody pays for reads as used up.
       </Text>
-      {usage.map((provider) => (
-        <View key={provider.provider} style={styles.host.meters}>
-          {provider.windows.map((window) => (
-            <Meter
-              key={window.id}
-              icon="Gauge"
-              label={`${provider.name} ${window.label}`}
-              detail={resetText(window.resetsAt, now) || (provider.plan ?? undefined)}
-              percent={Math.floor(window.usedPct)}
-              tone={PLAN_TONE[planTone(window.usedPct)]}
-              styles={styles}
-            />
-          ))}
-        </View>
+      {all.map((provider) => (
+        <ProviderPlan
+          key={provider.provider}
+          provider={provider}
+          counted={!(picker?.hidden.has(provider.provider) ?? false)}
+          setCounted={picker?.setCounted ?? null}
+          now={now}
+          styles={styles}
+        />
       ))}
       <Text style={styles.host.note}>
         To switch accounts, use the account-switcher plugin. The office reads the limits and handles
         no sign-in.
       </Text>
+    </View>
+  );
+}
+
+/** The Overview's one plan figure: the limit closest to used up, of the providers that count. */
+function ClosestLimit({ now, styles }: { now: number; styles: OfficeStyles }) {
+  const closest = closestLimit(usePlanUsageValue());
+  if (closest === null) return null;
+  const { provider, window } = closest;
+  return (
+    <View style={styles.host.meters}>
+      <Meter
+        icon="Gauge"
+        label={`${provider.name} ${window.label}`}
+        detail={resetText(window.resetsAt, now) || "The closest plan limit"}
+        percent={Math.floor(window.usedPct)}
+        tone={PLAN_TONE[planTone(window.usedPct)]}
+        styles={styles}
+      />
     </View>
   );
 }
@@ -256,6 +332,15 @@ const NO_WORKSPACES: readonly OfficeWorkspace[] = [];
 
 const NO_AGENTS: readonly OfficeAgent[] = [];
 
+/** The Host card's tabs: what matters first, then one subject each. */
+const HOST_TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "plan", label: "Plan" },
+  { id: "agents", label: "Agents" },
+  { id: "system", label: "System" },
+] as const;
+type HostTab = (typeof HOST_TABS)[number]["id"];
+
 function MachineBody({
   machine,
   cleanUp,
@@ -263,9 +348,7 @@ function MachineBody({
   workspaces = NO_WORKSPACES,
   agents = NO_AGENTS,
 }: MachineBodyProps) {
-  const usage = usePlanUsageValue();
-  const [expanded, setExpanded] = useState(false);
-  const toggle = useCallback(() => setExpanded((value) => !value), []);
+  const [tab, setTab] = useState<HostTab>("overview");
   const now = Date.parse(machine.readAt);
   const left = useMemo(() => machine.agents.filter((agent) => agent.forgotten), [machine.agents]);
   const others = useMemo(
@@ -292,71 +375,95 @@ function MachineBody({
     (agent: MachineAgent) => (canClose && agent.status === "idle" ? CLOSE : null),
     [canClose],
   );
+  const leftRunning =
+    left.length > 0 ? (
+      <View style={styles.host.group}>
+        <AgentGroup
+          title="Left running"
+          agents={left}
+          now={now}
+          actionFor={forLeft}
+          cleanUp={cleanUp}
+          styles={styles}
+        />
+        <Text style={styles.rowMeta}>
+          {canClose
+            ? "Cleaning up closes an idle agent, which its next prompt resumes, and stops what a closed agent left behind."
+            : `This host cannot close an idle agent's runtime.${cleanable.length > 0 ? " Cleaning up stops what a closed agent left behind." : ""}`}
+        </Text>
+        {cleanable.length > 1 ? (
+          <ActionButton
+            label={`Clean up all ${cleanable.length}`}
+            pendingLabel="Cleaning up..."
+            onPress={cleanAll}
+            styles={styles}
+            primary
+          />
+        ) : null}
+      </View>
+    ) : null;
   return (
     <View style={styles.host.body}>
-      <View style={styles.host.meters}>
-        <Meter
-          icon="MemoryStick"
-          label="Memory"
-          detail={memoryText(machine)}
-          percent={percent}
-          tone={memoryTone(percent)}
-          styles={styles}
-        />
-        <Meter icon="Cpu" label="CPU" percent={machine.cpuPercent} tone="muted" styles={styles} />
-      </View>
-      <View style={styles.host.groupHead}>
-        <Text style={styles.host.note}>Read at {readAtText(machine.readAt)}</Text>
-        <ActionButton
-          label={expanded ? "Hide details" : "Details"}
-          pendingLabel="Details"
-          onPress={toggle}
-          styles={styles}
-        />
-      </View>
-      {expanded && <LocalHostDetails machine={machine} workspaces={workspaces} styles={styles} />}
-      <PlanLimits usage={usage} now={now} styles={styles} />
-      <SubagentModels agents={agents} styles={styles} />
-      <ForgottenWork styles={styles} />
-      {left.length > 0 ? (
-        <View style={styles.host.group}>
-          <AgentGroup
-            title="Left running"
-            agents={left}
-            now={now}
-            actionFor={forLeft}
-            cleanUp={cleanUp}
+      <View role="group" aria-label="Host sections" style={styles.host.tabs}>
+        {HOST_TABS.map((each) => (
+          <SegmentPill
+            key={each.id}
+            value={each.id}
+            name={each.label}
+            on={tab === each.id}
+            disabled={false}
+            onPress={setTab}
             styles={styles}
           />
-          <Text style={styles.rowMeta}>
-            {canClose
-              ? "Cleaning up closes an idle agent, which its next prompt resumes, and stops what a closed agent left behind."
-              : `This host cannot close an idle agent's runtime.${cleanable.length > 0 ? " Cleaning up stops what a closed agent left behind." : ""}`}
-          </Text>
-          {cleanable.length > 1 ? (
-            <ActionButton
-              label={`Clean up all ${cleanable.length}`}
-              pendingLabel="Cleaning up..."
-              onPress={cleanAll}
+        ))}
+      </View>
+      {tab === "overview" && (
+        <>
+          <View style={styles.host.meters}>
+            <Meter
+              icon="MemoryStick"
+              label="Memory"
+              detail={memoryText(machine)}
+              percent={percent}
+              tone={memoryTone(percent)}
               styles={styles}
-              primary
             />
-          ) : null}
-        </View>
-      ) : null}
-      <AgentGroup
-        title="Memory by agent"
-        agents={others}
-        now={now}
-        actionFor={forOther}
-        cleanUp={cleanUp}
-        styles={styles}
-        empty={
-          left.length === 0
-            ? "No agent holds a process on this host."
-            : "No other agent holds a process on this host."
-        }
-      />
+            <Meter
+              icon="Cpu"
+              label="CPU"
+              percent={machine.cpuPercent}
+              tone="muted"
+              styles={styles}
+            />
+          </View>
+          <ClosestLimit now={now} styles={styles} />
+          {leftRunning}
+          <Text style={styles.host.note}>Read at {readAtText(machine.readAt)}</Text>
+        </>
+      )}
+      {tab === "plan" && <PlanTab now={now} styles={styles} />}
+      {tab === "agents" && (
+        <>
+          <AgentGroup
+            title="Memory by agent"
+            agents={others}
+            now={now}
+            actionFor={forOther}
+            cleanUp={cleanUp}
+            styles={styles}
+            empty={
+              left.length === 0
+                ? "No agent holds a process on this host."
+                : "No other agent holds a process on this host."
+            }
+          />
+          <SubagentModels agents={agents} styles={styles} />
+          <ForgottenWork styles={styles} />
+        </>
+      )}
+      {tab === "system" && (
+        <LocalHostDetails machine={machine} workspaces={workspaces} styles={styles} />
+      )}
     </View>
   );
 }
@@ -396,7 +503,7 @@ export function MachineCard({
   );
   const visible = open && (machine !== null || ssh.servers.length > 0);
   return (
-    <Modal icon={icon} title="Host" open={visible} onOpenChange={change}>
+    <Modal icon={icon} title="Host" size="wide" open={visible} onOpenChange={change}>
       <Modal.Content>
         {visible && (
           <HostViews discovery={ssh} hasLocal={machine !== null} styles={styles}>

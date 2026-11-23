@@ -50,6 +50,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      planHidden: [],
       stickyNotes: "",
       jiraProjects: "",
       sentryOrg: "",
@@ -58,6 +59,10 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       weatherManual: "season" as const,
       weatherUrl: "",
       sentryUrl: "https://sentry.io",
+      awsProfile: "",
+      awsRegion: "",
+      awsLogGroups: "",
+      awsLogPattern: "ERROR",
     },
   };
 }

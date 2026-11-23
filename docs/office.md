@@ -96,8 +96,8 @@ closes as it does. In walk-in mode, face an agent and press **E** or tap the on-
 ## Team names
 
 A room is a workspace and goes by the workspace's name, which is often a branch or a ticket.
-"Rename team", under a room's title in the List view, gives the team a name of the office's own,
-at most 40 characters. It is kept on the workspace in the plugin's data (`office.team.name`), so
+"Rename team", under a room's title in the List view and at the top of a room's board in every
+view, gives the team a name of the office's own, at most 40 characters. It is kept on the workspace in the plugin's data (`office.team.name`), so
 it needs a host that keeps plugin data on workspaces, and every device sees it. The office shows
 it wherever it showed the workspace's name: the room and its board, the session lists, the
 stand-up and its notes, the team chat and the 3D floor. The workspace keeps its own name in Paseo,
@@ -169,7 +169,15 @@ Open sessions and the chosen tab last while the office is mounted, not across a 
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
   something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,
-  Janitor, Stand-up, Reviews, QA and Library.
+  Janitor, Stand-up, Reviews, QA and Library. The tab's count is the agents waiting and the cards
+  in a warning or danger colour; a card that only informs is not counted.
+
+In the full screen layout, Attention and Activity are icons in the header, beside the session
+details icon, and the column's own row keeps Sessions, Chat and the open sessions. An icon opens
+its tab in the column and, pressed again, closes the column. There the Attention tab lists only
+the cards that need a look; Janitor, Stand-up, Reviews, QA and Library are icons in the toolbar
+instead, each named with what its card would say.
+
 - **Sessions** groups agents by status. Green marks working agents, amber marks agents that need you and gray marks resting agents. Task bars count completed checklist items. When only context usage is available it has its own label. Searching and status filters work together. Its "New agent"
   button opens a form in the tab's place (`client/new-agent-form.tsx`, `client/use-new-agent.ts`):
   enter an optional agent name and open **Customize character** to choose gender, avatar and color.
@@ -493,7 +501,7 @@ The gear in fullscreen opens **Office settings** over the floor. You can also op
 | ---------- | -------------------------------------------------------------------------------------------- |
 | Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
 | Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
-| Services   | Jira and Sentry connections and projects, and the optional weather service.                  |
+| Services   | Jira, Sentry and CloudWatch, and the optional weather service.                               |
 
 View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
@@ -610,8 +618,13 @@ In **Host → This instance → Details**, inspect system swap, disk space on th
 
 ### Plan limits
 
-The Host card lists each provider's plan limits (the 5 hours, the week, whatever the provider
-reports) with how much is used and when it resets. The office asks Paseo for them
+The Host card is in four sections: Overview (memory, CPU, the closest plan limit and what was
+left running), Plan, Agents (memory by agent, models and forgotten work) and System. Plan lists
+each provider's plan limits (the 5 hours, the week, whatever the provider reports) with how much
+is used and when it resets, and a switch to count the provider. A provider switched off stays
+listed there and is left out everywhere else: the toolbar's button, the closest limit and the 3D
+floor. A plan nobody pays for reads as used up, so switch that one off (`planHidden` in the host
+settings, shared by every device). The office asks Paseo for them
 (`office.plan.usage.request`, which reads `providers.listUsage()`) when it opens and every two
 minutes after; it stores none of it. A provider that is unavailable or reports no percentage is not
 listed, and a host whose Paseo has no provider usage shows no limits at all.
@@ -737,7 +750,8 @@ office sets them from its settings each time it starts and at each save, and sto
 
 ## Incidents
 
-The office rings my-office's incident alarm for a new Jira bug or Sentry issue. "Jira projects"
+The office rings my-office's incident alarm for a new Jira bug, a new Sentry issue, a CloudWatch
+alarm or error lines in a CloudWatch log group. "Jira projects"
 takes project keys, and a new issue of type Bug in one of them rings. "Sentry organisation",
 "Sentry projects" and "Sentry address" (`https://sentry.io` by default) do the same for a new
 unresolved Sentry issue. Jira does not refuse a project key it does not know, so a mistyped key
@@ -756,7 +770,20 @@ A host with no saved connection reads `ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL` an
 `ATLASSIAN_API_TOKEN`, and `SENTRY_AUTH_TOKEN`, from the daemon's environment, as before. A saved
 connection comes first, and a changed variable takes a daemon restart.
 
-The first check records what exists and rings nothing. Each check reads from the last successful
+CloudWatch needs no token in the office. "AWS profile" names a profile of the `aws` CLI on the
+host and "AWS region" the region; with both set, each check runs
+`aws cloudwatch describe-alarms --state-value ALARM` through that profile, and an alarm rings each
+time it goes into ALARM. "CloudWatch log groups" takes up to 10 log group names, and "Error
+pattern" a CloudWatch Logs filter pattern (`ERROR` by default): lines that match ring once an hour
+for each group, as "12 error lines in /aws/lambda/pay". The office counts the lines and never
+copies one, since a log line can hold a customer's data; the incident opens the log group in the
+AWS console. The profile needs `cloudwatch:DescribeAlarms` and `logs:FilterLogEvents` only, and
+the office writes nothing to AWS. The CLI is looked for on the daemon's PATH and in
+`~/.local/bin`. When an SSO sign-in runs out, the Incidents card and the profile's field say to
+run `aws sso login --profile <name>` on the host, and the next check after that works again.
+
+The first check records what exists and rings nothing: an alarm already in ALARM when CloudWatch
+is turned on is not rung. Each check reads from the last successful
 one less 10 minutes, because Jira compares `created` to the minute; the office writes the time in
 the token user's profile zone, read from `/myself` each check. A check opens at most 20 incidents
 per tracker, the oldest first, leaving the rest to the next check. The office keeps each tracker's

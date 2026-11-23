@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
-import type { IncidentSource, TrackersChange } from "../shared/contracts.js";
+import type { TrackersChange } from "../shared/contracts.js";
 import { isTokenSafe } from "../shared/settings.js";
 import { jiraEnv, type JiraEnv } from "./incidents-jira.js";
 import { sentryToken } from "./incidents-sentry.js";
@@ -111,7 +111,7 @@ export function trackerCredentials(
 
 export type SavedChange = { saved: SavedTrackers } | { problem: string };
 
-function without(saved: SavedTrackers, tracker: IncidentSource): SavedTrackers {
+function without(saved: SavedTrackers, tracker: "jira" | "sentry"): SavedTrackers {
   const { [tracker]: _removed, ...kept } = saved;
   return kept;
 }

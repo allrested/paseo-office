@@ -77,6 +77,10 @@ const NONE: IncidentsSettings = {
   sentryOrg: "",
   sentryProjects: "",
   sentryUrl: "https://sentry.io",
+  awsProfile: "",
+  awsRegion: "",
+  awsLogGroups: "",
+  awsLogPattern: "ERROR",
 };
 
 /** Placeholder values: no test holds a real token. */
@@ -154,6 +158,7 @@ test("the readers read the settings' projects from the environment's Jira and th
   });
   const readers = incidentsReaders(
     {
+      ...NONE,
       jiraProjects: " OPS, QA ",
       sentryOrg: " acme ",
       sentryProjects: "pos",
@@ -175,4 +180,15 @@ test("the readers read the settings' projects from the environment's Jira and th
   ]);
   expect(server.asked[1].searchParams.get("jql")).toMatch(/^project in \("OPS", "QA"\) AND /);
   expect(server.asked[3].searchParams.getAll("project")).toEqual(["7"]);
+});
+
+test("CloudWatch is on with a profile and a region, and needs no saved sign-in", () => {
+  const none = trackerCredentials(NO_SAVED_TRACKERS, {});
+  expect(Object.keys(incidentsReaders({ ...NONE, awsProfile: "nprd" }, none))).toEqual([]);
+  expect(Object.keys(incidentsReaders({ ...NONE, awsRegion: "ap-southeast-1" }, none))).toEqual([]);
+  const on = { ...NONE, awsProfile: " nprd ", awsRegion: "ap-southeast-1" };
+  expect(Object.keys(incidentsReaders(on, none))).toEqual(["cloudwatch"]);
+  // A hand edit the settings would refuse never reaches the CLI.
+  const edited = { ...on, awsProfile: "--debug" };
+  expect(Object.keys(incidentsReaders(edited, none))).toEqual([]);
 });

@@ -75,6 +75,10 @@ const NO_TRACKERS = {
   weatherManual: "season" as const,
   weatherUrl: "",
   sentryUrl: "https://sentry.io",
+  awsProfile: "",
+  awsRegion: "",
+  awsLogGroups: "",
+  awsLogPattern: "ERROR",
 };
 const ON: SettingsState = {
   status: "ready",
@@ -89,6 +93,7 @@ const ON: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    planHidden: [],
     stickyNotes: "",
   },
 };
@@ -105,6 +110,7 @@ const OFF: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    planHidden: [],
     stickyNotes: "",
   },
 };
@@ -619,6 +625,7 @@ function notesSettings(
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      planHidden: [],
       stickyNotes: "",
     },
   };
@@ -1102,6 +1109,7 @@ const NOTES: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    planHidden: [],
     stickyNotes: "",
   },
 };
@@ -1155,6 +1163,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      planHidden: [],
       stickyNotes: "",
     },
   });
@@ -1516,6 +1525,7 @@ const JIRA_ON: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    planHidden: [],
     stickyNotes: "",
     jiraProjects: "OPS",
   },

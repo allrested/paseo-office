@@ -1,5 +1,13 @@
 import type { IncidentSource } from "../shared/contracts.js";
-import { JIRA_KEY, parseKeys, SENTRY_SLUG } from "../shared/settings.js";
+import {
+  AWS_LOG_GROUP,
+  AWS_PROFILE,
+  AWS_REGION,
+  JIRA_KEY,
+  parseKeys,
+  SENTRY_SLUG,
+} from "../shared/settings.js";
+import { createCloudWatchReader } from "./incidents-cloudwatch.js";
 import type { TrackerReader } from "./incidents-http.js";
 import { createJiraReader } from "./incidents-jira.js";
 import { createSentryReader } from "./incidents-sentry.js";
@@ -21,11 +29,16 @@ export interface IncidentsSettings {
   sentryOrg: string;
   sentryProjects: string;
   sentryUrl: string;
+  awsProfile: string;
+  awsRegion: string;
+  awsLogGroups: string;
+  awsLogPattern: string;
 }
 
 /**
  * The trackers that are on: each needs a sign-in in `credentials` and a project in the settings,
- * and Sentry an organisation too.
+ * and Sentry an organisation too. CloudWatch needs a profile and a region: the sign-in is the
+ * host's own AWS CLI's.
  */
 export function incidentsReaders(
   values: IncidentsSettings,
@@ -46,6 +59,16 @@ export function incidentsReaders(
       projects: sentryProjects,
       token: sentry.token,
       tokenVariable: sentry.tokenVariable,
+    });
+  }
+  const profile = values.awsProfile.trim();
+  const region = values.awsRegion.trim();
+  if (AWS_PROFILE.test(profile) && AWS_REGION.test(region)) {
+    readers.cloudwatch = createCloudWatchReader({
+      profile,
+      region,
+      logGroups: parseKeys(values.awsLogGroups, AWS_LOG_GROUP),
+      pattern: values.awsLogPattern.trim() || "ERROR",
     });
   }
   return readers;

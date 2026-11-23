@@ -1,3 +1,4 @@
+import type { ColumnTab } from "./column-model.js";
 import { OfficeMark } from "./office-mark.js";
 import { useOfficeBrand } from "./office-brand-context.js";
 import { useCallback, useState, type ReactNode } from "react";
@@ -76,7 +77,21 @@ export function FullscreenHeader({
   const { sessionsOpen, hideSessions, column } = sidebars;
   const { collapsed, setCollapsed } = column;
   const sessions = useCallback(() => hideSessions(sessionsOpen), [hideSessions, sessionsOpen]);
-  const details = useCallback(() => setCollapsed(!collapsed), [setCollapsed, collapsed]);
+  const { view, show, openSession } = column;
+  const lastSession = column.sessions.at(-1);
+  // Details is the agent's detail: opened from Attention or Activity, it goes to the last open session.
+  const details = useCallback(() => {
+    if (collapsed && view.kind === "tab" && lastSession !== undefined) openSession(lastSession);
+    else setCollapsed(!collapsed);
+  }, [setCollapsed, collapsed, view, lastSession, openSession]);
+  // A press on the icon whose panel shows closes it, as a toggle does.
+  const pick = useCallback(
+    (tab: ColumnTab) => {
+      if (!collapsed && view.kind === "tab" && view.tab === tab) setCollapsed(true);
+      else show(tab);
+    },
+    [collapsed, view, setCollapsed, show],
+  );
   return (
     <View style={styles.fullscreenHeader}>
       <View style={styles.headerTools}>
@@ -104,24 +119,23 @@ export function FullscreenHeader({
       </View>
       <View style={styles.headerTools}>
         <View style={styles.headerModes}>{modes}</View>
-        {collapsed && (
-          <ColumnTabs
-            hideSessions
-            view={null}
-            badges={badges}
-            sessions={NO_HEADER_SESSIONS}
-            sessionTabs={false}
-            touch={false}
-            color={color}
-            iconSize={16}
-            labels={false}
-            vertical={false}
-            onPress={column.show}
-            onSession={column.openSession}
-            onClose={column.closeSession}
-            styles={styles}
-          />
-        )}
+        {/* Always here, so the Details sidebar is for an agent's detail: the chosen one is lit while its panel shows. */}
+        <ColumnTabs
+          hideSessions
+          view={collapsed ? null : column.view}
+          badges={badges}
+          sessions={NO_HEADER_SESSIONS}
+          sessionTabs={false}
+          touch={false}
+          color={color}
+          iconSize={16}
+          labels={false}
+          vertical={false}
+          onPress={pick}
+          onSession={column.openSession}
+          onClose={column.closeSession}
+          styles={styles}
+        />
         <SidebarButton
           name="Details"
           icon={collapsed ? "PanelRightOpen" : "PanelRightClose"}

@@ -8,6 +8,13 @@ import { PINNED_NOTES_MAX } from "./alerts.js";
 /** A Jira project key and a Sentry slug: only these reach a JQL query or a Sentry address. */
 export const JIRA_KEY = /^[A-Z][A-Z0-9_]+$/;
 export const SENTRY_SLUG = /^[a-z0-9][a-z0-9_-]*$/;
+/** What reaches the host's AWS CLI as an argument: none can start with a dash. */
+export const AWS_PROFILE = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+export const AWS_REGION = /^[a-z]{2}(-[a-z]+)+-\d$/;
+export const AWS_LOG_GROUP = /^[A-Za-z0-9_/#.][A-Za-z0-9_/#.-]*$/;
+/** The most log groups one check reads: each is a run of the CLI. */
+export const AWS_LOG_GROUPS_MAX = 10;
+const AWS_PATTERN_MAX = 200;
 
 /** The hosts plain http is accepted on, as the URL parser writes them. */
 const LOOPBACK = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/;
@@ -85,6 +92,7 @@ const HostValuesSchema = z.object({
   historyVault: z.boolean().default(false),
   pinnedNotes: z.string().max(PINNED_NOTES_MAX).default(""),
   cacheClock: z.enum(CACHE_CLOCKS).default("1h").catch("1h"),
+  planHidden: z.array(z.string().max(200)).max(50).default([]),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
@@ -93,13 +101,43 @@ const HostValuesSchema = z.object({
   weatherManual: z.enum(MANUAL_CHOICES).default("season"),
   weatherUrl: z.string().default(""),
   sentryUrl: z.string().default("https://sentry.io"),
+  awsProfile: z.string().default(""),
+  awsRegion: z.string().default(""),
+  awsLogGroups: z.string().default(""),
+  awsLogPattern: z.string().max(AWS_PATTERN_MAX).default("ERROR"),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
 const LISTS = [
   { field: "jiraProjects", pattern: JIRA_KEY, what: "a Jira project key" },
   { field: "sentryProjects", pattern: SENTRY_SLUG, what: "a Sentry project slug" },
+  { field: "awsLogGroups", pattern: AWS_LOG_GROUP, what: "a CloudWatch log group name" },
 ] as const;
+
+const AWS_WORDS = [
+  { field: "awsProfile", pattern: AWS_PROFILE, what: "an AWS profile name" },
+  { field: "awsRegion", pattern: AWS_REGION, what: "an AWS region" },
+] as const;
+
+function refuseBadAwsValues(values: HostValues, context: z.RefinementCtx): void {
+  for (const { field, pattern, what } of AWS_WORDS) {
+    const word = values[field].trim();
+    if (word !== "" && !pattern.test(word)) {
+      context.addIssue({
+        code: "custom",
+        path: [field],
+        message: `${field}: "${word}" is not ${what}`,
+      });
+    }
+  }
+  if (listEntries(values.awsLogGroups).length > AWS_LOG_GROUPS_MAX) {
+    context.addIssue({
+      code: "custom",
+      path: ["awsLogGroups"],
+      message: `awsLogGroups: at most ${AWS_LOG_GROUPS_MAX} log groups`,
+    });
+  }
+}
 
 function refuseBadTrackerValues(values: HostValues, context: z.RefinementCtx): void {
   for (const { field, pattern, what } of LISTS) {
@@ -155,15 +193,20 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * keep what is said in each conversation in a file on the host; it is off until the owner turns
  * it on. `pinnedNotes` is said again to an agent whose conversation is compacted during a turn;
  * empty says nothing. `cacheClock` is how long a prompt cache is taken to last after a turn, for
- * the steaming cup on a resting desk of the 3D floor; `off` draws none. `jiraProjects`
+ * the steaming cup on a resting desk of the 3D floor; `off` draws none. `planHidden` are the
+ * providers whose plan limits the office leaves out: a plan nobody pays for reads as used up.
+ * `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
- * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
+ * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`
+ * name a profile of the host's AWS CLI whose CloudWatch alarms are checked too, `awsLogGroups` the
+ * comma separated log groups read for lines that match `awsLogPattern`.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
   version: 6,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
+    .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
     .superRefine(({ weatherUrl }, ctx) => {
       if (weatherUrl.trim() && !isTokenSafe(weatherUrl.trim()))
