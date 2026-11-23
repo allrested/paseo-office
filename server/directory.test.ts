@@ -176,6 +176,13 @@ test("workspaces project, drop while archiving, and update", () => {
     projectName: "paseo",
   });
   expect(projectWorkspace(workspaceInput({ archivingAt: "2026-11-11T09:00:00.000Z" }))).toBe(null);
+  // A team name of the office's own is the name shown, and the workspace's own is kept beside it.
+  expect(
+    projectWorkspace(workspaceInput({ metadata: { "office.team.name": " Payments " } })),
+  ).toEqual({ id: "w1", name: "Payments", workspaceName: "main", projectName: "paseo" });
+  expect(projectWorkspace(workspaceInput({ metadata: { "office.team.name": " " } }))?.name).toBe(
+    "main",
+  );
 
   const start = workspacesFromSnapshot([
     workspaceInput({}),

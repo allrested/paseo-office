@@ -44,6 +44,7 @@ import {
 } from "./server/incidents-schedule.js";
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
+import { TEAM_NAME_KEY, teamNameOf, tidyTeamName } from "./shared/team-name.js";
 import {
   changeSavedTrackers,
   createTrackerCredentialsStore,
@@ -109,6 +110,7 @@ import {
   dutyActedRpc,
   incidentsDismissRpc,
   notesModesRpc,
+  teamRenameRpc,
   trackersSaveRpc,
   trackersTestRpc,
   type TrackersChange,
@@ -651,6 +653,24 @@ export function createOfficePlugin(
       throw error;
     }
   }
+  server.handle(teamRenameRpc, async ({ workspaceId, name }, context) => {
+    holder.remember(context.paseo);
+    try {
+      const workspace = context.paseo.workspaces.ref(workspaceId);
+      const current = await workspace.refresh();
+      if (current === null) return { ok: false as const, problem: "The workspace is gone" };
+      const next = tidyTeamName(name);
+      // Null removes the key, and the team goes by the workspace's name again.
+      await workspace.setMetadata({ [TEAM_NAME_KEY]: next === "" ? null : next });
+      const shown = next === "" ? current.name : next;
+      // The directory's next view would carry the tenure over too; a restart before it would not.
+      (await lifeReady)?.renamed(teamNameOf(current), shown);
+      return { ok: true as const, name: shown };
+    } catch (error) {
+      log(`[office] team rename failed: ${errorMessage(error)}`);
+      return { ok: false as const, problem: errorMessage(error) };
+    }
+  });
   server.handle(notesModesRpc, async (_input, context) => {
     holder.remember(context.paseo);
     try {
@@ -772,7 +792,8 @@ export function createOfficePlugin(
               ? (await context.paseo.agents.ref(agent.parentAgentId).refresh())?.agent.workspaceId
               : null);
           if (!workspaceId) return null;
-          return (await context.paseo.workspaces.ref(workspaceId).refresh())?.name ?? null;
+          const workspace = await context.paseo.workspaces.ref(workspaceId).refresh();
+          return workspace ? teamNameOf(workspace) : null;
         });
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);

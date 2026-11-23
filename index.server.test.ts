@@ -180,6 +180,10 @@ function listOf(entries: object[]) {
 interface FakeDirectory {
   agents: object[];
   timelines: Map<string, { turnId: string; item: object }[]>;
+  /** What plugins keep on the workspace w1; a null value is a removed key. */
+  workspaceMetadata?: Record<string, unknown>;
+  /** Thrown by a metadata write, as a host without entity metadata does. */
+  metadataFailure?: Error;
 }
 
 /** An idle agent as the daemon's agent list gives it. */
@@ -237,7 +241,14 @@ function fakeContext(
         }),
       },
       workspaces: {
-        ref: (id: string) => ({ refresh: async () => (id === "w1" ? { name: "api" } : null) }),
+        ref: (id: string) => ({
+          refresh: async () =>
+            id === "w1" ? { name: "api", metadata: directory.workspaceMetadata } : null,
+          setMetadata: async (patch: Record<string, unknown>) => {
+            if (directory.metadataFailure) throw directory.metadataFailure;
+            directory.workspaceMetadata = { ...directory.workspaceMetadata, ...patch };
+          },
+        }),
         list: async () => listOf([]),
         open: async (cwd: string) => ({
           id: "wks_notes",
@@ -825,6 +836,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.team.rename.request",
     "office.notes.modes.request",
     "office.trackers.save.request",
     "office.trackers.test.request",
@@ -1071,6 +1083,33 @@ function writeEntry(): Promise<void> {
   const text = "# Notes\n\n---\n\n## 11 November 2026\n\nB\n";
   return writeFile(join(NOTES_FOLDER, "daily-standup-202611.md"), text, "utf8");
 }
+
+test("a team is given a name of the office's own, kept on its workspace, and an empty one takes it back", async () => {
+  const { recorded, directory, context, logs, stop } = setup(async () => ON);
+  const rename = recorded.handlers.get("office.team.rename.request");
+  expect(await rename?.({ workspaceId: "w1", name: "  Payments \n team " }, context)).toEqual({
+    ok: true,
+    name: "Payments team",
+  });
+  expect(directory.workspaceMetadata).toEqual({ "office.team.name": "Payments team" });
+  expect(await rename?.({ workspaceId: "w1", name: " " }, context)).toEqual({
+    ok: true,
+    name: "api",
+  });
+  expect(directory.workspaceMetadata).toEqual({ "office.team.name": null });
+
+  expect(await rename?.({ workspaceId: "gone", name: "x" }, context)).toEqual({
+    ok: false,
+    problem: "The workspace is gone",
+  });
+  directory.metadataFailure = new Error("This host does not keep plugin data on workspaces");
+  expect(await rename?.({ workspaceId: "w1", name: "x" }, context)).toEqual({
+    ok: false,
+    problem: "This host does not keep plugin data on workspaces",
+  });
+  expect(logs.at(-1)).toContain("team rename failed");
+  await stop();
+});
 
 test("the writer starts in the settings' mode, and accepts edits while none is set", async () => {
   const withMode = (notesMode: string): SettingsState => ({

@@ -1,3 +1,4 @@
+import { TeamName } from "./team-name.js";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   Platform,
@@ -241,6 +242,7 @@ function RoomCard({
             {room.subtitle}
           </Text>
         ) : null}
+        <TeamName room={room} styles={styles} />
       </View>
       {room.rows.length === 0 ? <Text style={styles.empty}>No agents</Text> : null}
       {room.rows.map((row, index) => (

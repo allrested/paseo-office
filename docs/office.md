@@ -84,6 +84,18 @@ turn, and is offered only on a host whose SDK has an agent's
 "Open session" shows the session in the office's column (see below) in every app, and the card
 closes as it does. In walk-in mode, face an agent and press **E** or tap the on-screen prompt to open their workspace. The same action wakes a sleeping character. **Open in workspace** also opens the selected session’s Paseo workbench over the office. In the browser it uses the paired host’s own workspace, including files, diffs, terminals and session tools. **Office controls** offers session replies, permissions and the room board on native clients and when the workspace cannot be embedded. Closing the overlay returns to the same floor and camera.
 
+## Team names
+
+A room is a workspace and goes by the workspace's name, which is often a branch or a ticket.
+"Rename team", under a room's title in the List view, gives the team a name of the office's own,
+at most 40 characters. It is kept on the workspace in the plugin's data (`office.team.name`), so
+it needs a host that keeps plugin data on workspaces, and every device sees it. The office shows
+it wherever it showed the workspace's name: the room and its board, the session lists, the
+stand-up and its notes, the team chat and the 3D floor. The workspace keeps its own name in Paseo,
+and the room's card says which workspace it is. An empty name goes back to the workspace's.
+
+The 3D floor remembers where a team sat by its name, so a renamed team is seated as a new one.
+
 ## Views
 
 The office has three views: a 3D floor, a 2D floor and the list. A switch over the floor's top
@@ -727,8 +739,10 @@ quarterly fire drill. They run on the office clock. During the 12:30–13:30 des
 floor pauses new activities. Street outings are separate.
 
 The accountant reads provider-reported spending. HR uses the repository’s first commit month for
-birthdays. The tenure ledger identifies each team by workspace name. A rename starts a new team
-record and the previous name goes quiet. The first set of workspaces is permanent. A later team
+birthdays. The tenure ledger identifies each team by the name it goes by. A team that
+takes another name, the office's own or its workspace's in Paseo, keeps its record while the
+office runs; a workspace renamed in Paseo while the office is not loaded starts a new record and
+the previous name goes quiet. The first set of workspaces is permanent. A later team
 can graduate after 20 turns over
 two days. A previously active team can have a farewell after 30 quiet days. The lift is serviced
 for three minutes at server start or five when the scene build has changed. Commits put letters in the post box and pushes send the postman to collect them. The other indoor scenes
