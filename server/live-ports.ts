@@ -21,6 +21,7 @@ import type { SkillFolder } from "./paths.js";
 import type { ScriptLogPorts } from "./script-log.js";
 import { nodeSkillFiles, type SkillsPorts } from "./skills.js";
 import type { Timers } from "./timers.js";
+import type { WatchedEntry } from "./watchers.js";
 
 /** Hub ports on the daemon's own API. The holder is set before the first attach. */
 export function liveHubPorts(
@@ -29,6 +30,8 @@ export function liveHubPorts(
   log: (message: string) => void,
   /** Whether steps name what they are at: the host's streamer mode is off. */
   named: () => boolean = () => false,
+  /** Told each read's entries, for whoever watches the calls themselves. */
+  onTail?: (agentId: string, entries: readonly WatchedEntry[]) => void,
 ): HubPorts {
   return {
     openDirectory: (onChange, onEnd) => openPaseoDirectory(holder.require(), onChange, log, onEnd),
@@ -40,6 +43,10 @@ export function liveHubPorts(
           const page = await paseo.agents
             .ref(agentId)
             .timeline.refetch({ direction: "tail", limit: ACTIVITY_TAIL_LIMIT });
+          onTail?.(
+            agentId,
+            page.entries.map((entry) => ({ seq: entry.seqEnd, item: entry.item })),
+          );
           return page.entries.map((entry) => entry.item);
         },
         timers,

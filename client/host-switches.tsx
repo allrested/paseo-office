@@ -34,6 +34,7 @@ type HostSetting =
   | "Agent tools"
   | "Streamer mode"
   | "History vault"
+  | "Pinned notes"
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
@@ -257,6 +258,7 @@ export function HostSwitches({
             saveProblem={saveProblem}
             styles={styles}
           />
+          <PinnedNotes values={stored} change={change} saveProblem={saveProblem} styles={styles} />
           <Text style={styles.sheetLabel}>Stand-up schedule</Text>
           <View style={styles.headerFields}>
             <SettingField
@@ -496,6 +498,30 @@ function FloorSettings({
         value={stored?.stickyNotes ?? null}
         onSave={saveNotes}
         problem={saveProblem("Sticky notes")}
+        styles={styles}
+      />
+    </View>
+  );
+}
+
+function PinnedNotes({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const save = useCallback(
+    (next: string) => change("Pinned notes", { pinnedNotes: next }),
+    [change],
+  );
+  return (
+    <View style={styles.headerFields}>
+      <SettingField
+        label="Pinned notes"
+        hint="Said again to an agent whose conversation is compacted during a turn, so a rule you gave it is not lost. Empty says nothing."
+        value={stored?.pinnedNotes ?? null}
+        onSave={save}
+        problem={saveProblem("Pinned notes")}
         styles={styles}
       />
     </View>

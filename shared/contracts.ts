@@ -4,6 +4,7 @@ import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { PlanUsageSchema } from "./plan-usage.js";
 import { TimelineSchema } from "./timeline.js";
+import { AlertSchema } from "./alerts.js";
 import { PromptReportSchema, VaultHitSchema, VaultTalkSchema } from "./vault.js";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
@@ -834,6 +835,20 @@ export const vaultReportRpc = defineRpc({
   name: "office.vault.report.request",
   input: z.object({}),
   output: z.object({ on: z.boolean(), report: PromptReportSchema }),
+});
+
+/** What the office noticed and nobody dismissed, newest first. */
+export const alertsRpc = defineRpc({
+  name: "office.alerts.request",
+  input: z.object({}),
+  output: z.object({ alerts: z.array(AlertSchema) }),
+});
+
+/** Dismisses an alert; the same thing is not raised again while it lasts. */
+export const alertDismissRpc = defineRpc({
+  name: "office.alerts.dismiss.request",
+  input: z.object({ id: z.string() }),
+  output: z.object({ alerts: z.array(AlertSchema) }),
 });
 
 export const WriterModesSchema = z.object({

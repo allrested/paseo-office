@@ -516,6 +516,36 @@ surface is open on some device, at the directory's changes and the 5-second acti
 the office was closed is a gap in every lane, not a rest, and the week's figures count only what
 was seen. `office.timeline.request` reads it.
 
+## What the office notices
+
+Upstream does these with Claude Code hooks. Here the office's server does them from what it reads
+anyway: each running agent's newest timeline entries every 5 seconds, and the directory
+(`server/watchers.ts`). So they work for every provider, only while an office surface is open, and
+a few seconds after the fact, not before it. Each is a card in the Attention strip; opening it
+shows what can be done.
+
+- **A loop.** The same call (the tool and what it was given) failed three times running. **Stop**
+  ends the turn; **Send a hint** sends a line into it. It goes when the agent gets past it or its
+  turn ends.
+- **A refused call.** The provider's auto mode refused a call. The card has the call and the
+  reason, for half an hour. Nothing waits on it.
+- **Two agents in one file.** Both changed the same path within ten minutes. **Tell both** sends
+  each a line about the other.
+- **A taken port.** A command failed with "address already in use". **Tell the agent** sends it a
+  line to use another port, naming the session whose server holds it when the Host readings say.
+- **Failing checks.** The checks of a workspace's pull request fail. **Fix it** sends the failing
+  checks to an agent of that workspace that is resting; while none rests, the card says so.
+
+A line sent from a card joins the agent's running turn ("steer"), except Fix it, which is a
+prompt. With streamer mode on, a card names the tool and not the file or the command.
+
+**Pinned notes** (Settings) are said again to an agent whose conversation is compacted during a
+turn, as a line into that turn. A compaction of a resting agent sends nothing, since that would
+start a turn.
+
+Not done here: blocking a call before it runs and undoing a turn's edits. Both need real Claude
+Code hooks written into the host's `~/.claude/settings.json`.
+
 ## History vault and the prompt report
 
 **History vault** (Settings, host-wide, off by default) has the office keep what is said in each

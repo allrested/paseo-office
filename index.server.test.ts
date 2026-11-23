@@ -87,6 +87,7 @@ const ON: SettingsState = {
     floorPlan: "pro",
     streamerMode: true,
     historyVault: false,
+    pinnedNotes: "",
     stickyNotes: "",
   },
 };
@@ -101,6 +102,7 @@ const OFF: SettingsState = {
     floorPlan: "pro",
     streamerMode: true,
     historyVault: false,
+    pinnedNotes: "",
     stickyNotes: "",
   },
 };
@@ -613,6 +615,7 @@ function notesSettings(
       floorPlan: "pro",
       streamerMode: true,
       historyVault: false,
+      pinnedNotes: "",
       stickyNotes: "",
     },
   };
@@ -846,6 +849,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.notes.write.request",
     "office.incidents.dismiss.request",
     "office.timeline.request",
+    "office.alerts.request",
+    "office.alerts.dismiss.request",
     "office.vault.search.request",
     "office.vault.talk.request",
     "office.vault.report.request",
@@ -1091,6 +1096,7 @@ const NOTES: SettingsState = {
     floorPlan: "pro",
     streamerMode: true,
     historyVault: false,
+    pinnedNotes: "",
     stickyNotes: "",
   },
 };
@@ -1142,6 +1148,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       floorPlan: "pro",
       streamerMode: true,
       historyVault: false,
+      pinnedNotes: "",
       stickyNotes: "",
     },
   });
@@ -1501,6 +1508,7 @@ const JIRA_ON: SettingsState = {
     floorPlan: "pro",
     streamerMode: true,
     historyVault: false,
+    pinnedNotes: "",
     stickyNotes: "",
     jiraProjects: "OPS",
   },

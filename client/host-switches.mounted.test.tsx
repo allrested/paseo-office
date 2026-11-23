@@ -145,6 +145,7 @@ beforeEach(() => {
     floorPlan: "pro",
     streamerMode: true,
     historyVault: false,
+    pinnedNotes: "",
     stickyNotes: "",
     ...NO_TRACKERS,
   };
@@ -205,6 +206,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         floorPlan: "pro",
         streamerMode: true,
         historyVault: false,
+        pinnedNotes: "",
         stickyNotes: "",
         ...NO_TRACKERS,
       },
@@ -264,6 +266,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       floorPlan: "pro",
       streamerMode: true,
       historyVault: false,
+      pinnedNotes: "",
       stickyNotes: "",
       ...NO_TRACKERS,
     },

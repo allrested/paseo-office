@@ -63,6 +63,8 @@ import { JanitorCard } from "./janitor-card.js";
 import { TimelineCard } from "./timeline-card.js";
 import { OpenHistoryContext, OpenTimelineContext } from "./timeline-open.js";
 import { VaultCard } from "./vault-card.js";
+import { AlertCard } from "./alert-card.js";
+import { useAlerts } from "./use-alerts.js";
 import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
@@ -1946,6 +1948,7 @@ export function OfficeSurface(
   const planUsage = usePlanUsage(live);
   const timeline = useTimelineCard(live);
   const history = useTimelineCard(live);
+  const alerts = useAlerts(live);
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   // Until the host sends its duty list (an older host has none) nothing offers the duty board.
@@ -2075,6 +2078,7 @@ export function OfficeSurface(
     () =>
       [
         incidentsStripEntry,
+        ...alerts.cards,
         settingsStripEntry,
         weatherStripEntry,
         hostEntry,
@@ -2086,6 +2090,7 @@ export function OfficeSurface(
       ].filter((card) => card !== null),
     [
       incidentsStripEntry,
+      alerts.cards,
       settingsStripEntry,
       weatherStripEntry,
       hostEntry,
@@ -2297,6 +2302,15 @@ export function OfficeSurface(
       />
       <TimelineCard open={timeline.open} styles={styles} onClose={timeline.close} />
       <VaultCard open={history.open} styles={styles} onClose={history.close} />
+      <AlertCard
+        alert={alerts.open}
+        nameOf={name}
+        machine={machine}
+        actions={actions}
+        styles={styles}
+        onClose={alerts.close}
+        onDismiss={alerts.dismiss}
+      />
       <JanitorCard
         rows={contexts}
         open={janitorOpen && live}

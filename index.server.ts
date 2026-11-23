@@ -46,6 +46,8 @@ import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
 import { promptReport } from "./shared/vault.js";
+import { pinnedNote } from "./shared/alerts.js";
+import { createWatchers } from "./server/watchers.js";
 import {
   VAULT_TAIL_LIMIT,
   VaultFileSchema,
@@ -128,6 +130,8 @@ import {
   notesModesRpc,
   planUsageRpc,
   timelineRpc,
+  alertDismissRpc,
+  alertsRpc,
   vaultReportRpc,
   vaultSearchRpc,
   vaultTalkRpc,
@@ -235,7 +239,24 @@ export function createOfficePlugin(
   const holder = createPaseoHolder();
   // Off until the settings are read: nothing is named before the host has said it may be.
   let stepsNamed = false;
-  const hubPorts = liveHubPorts(holder, deps.clock, log, () => stepsNamed);
+  // The owner's pinned notes; empty until the settings are read.
+  let pinnedNotes = "";
+  const watchers = createWatchers({
+    now: () => deps.clock.now(),
+    named: () => stepsNamed,
+    pinnedNotes: () => pinnedNotes,
+    remind: (agentId, notes) => {
+      if (!holder.held()) return;
+      holder
+        .require()
+        .agents.ref(agentId)
+        .send(pinnedNote(notes), { activeTurnBehavior: "steer" })
+        .catch((error: unknown) =>
+          log(`[office] pinned notes to ${agentId}: ${errorMessage(error)}`),
+        );
+    },
+  });
+  const hubPorts = liveHubPorts(holder, deps.clock, log, () => stepsNamed, watchers.tail);
   // Set once its file is read; what the office sees before that is not kept.
   let timeline: TimelineLog | null = null;
   const hub = createHub({
@@ -279,6 +300,7 @@ export function createOfficePlugin(
     );
     stopVault = hub.watch(vault.view);
   })().catch((error: unknown) => log(`[office] history vault unavailable: ${errorMessage(error)}`));
+  const stopWatchers = hub.watch(watchers.view);
   let stopTimeline: (() => void) | undefined;
   const timelineReady = (async () => {
     const kept = (await deps.timelineFile?.load()) ?? null;
@@ -513,6 +535,7 @@ export function createOfficePlugin(
     agentToolsOn = false;
     stepsNamed = false;
     vaultOn = false;
+    pinnedNotes = "";
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
@@ -534,6 +557,7 @@ export function createOfficePlugin(
     agentToolsOn = state.values.agentTools;
     stepsNamed = !state.values.streamerMode;
     vaultOn = state.values.historyVault;
+    pinnedNotes = state.values.pinnedNotes;
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
@@ -742,6 +766,11 @@ export function createOfficePlugin(
     const end = Math.min(to, deps.clock.now());
     const start = Math.max(from, end - TIMELINE_KEEP_MS);
     return { ok: true as const, timeline: timeline.read(start, end) };
+  });
+  server.handle(alertsRpc, async () => ({ alerts: watchers.alerts() }));
+  server.handle(alertDismissRpc, async ({ id }) => {
+    watchers.dismiss(id);
+    return { alerts: watchers.alerts() };
   });
   server.handle(vaultSearchRpc, async ({ query }) => {
     await vaultReady;
@@ -974,6 +1003,7 @@ export function createOfficePlugin(
     await lifeReady;
     stopLife?.();
     stopTimeline?.();
+    stopWatchers();
     stopVault?.();
     await vaultSaves?.flush();
     await timelineSaves?.flush();
