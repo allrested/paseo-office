@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
 import { OfficeModal as Modal } from "./office-modal.js";
 import type { SkillInfo, SkillsResult } from "../shared/contracts.js";
@@ -10,7 +10,13 @@ import {
   LIBRARY_HELP,
   librarySummary,
   HOST_SKILLS_SHOWN,
+  SEARCH_FROM,
+  busyLine,
+  skillMatches,
+  skillTeams,
   skillWhere,
+  unreadLine,
+  workspaceSkills,
   TOPIC_MAX,
   askHint,
   type LibraryAsked,
@@ -20,29 +26,54 @@ import type { OfficeStyles } from "./styles.js";
 
 interface SkillRowProps {
   skill: SkillInfo;
+  /** Where it is, after its folders: the workspaces that have it. */
+  where?: string;
   styles: OfficeStyles;
 }
 
-function SkillRow({ skill, styles }: SkillRowProps) {
+/** A description is two lines until the row is pressed. */
+function SkillRow({ skill, where, styles }: SkillRowProps) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const place = where ? `${skillWhere(skill)} · ${where}` : skillWhere(skill);
+  if (skill.description === null) {
+    return (
+      <View style={styles.skillRow}>
+        <Text style={styles.skillName}>{skill.name}</Text>
+        <Text style={styles.rowMeta}>{place}</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.qaRow}>
-      <Text style={styles.sheetText}>{skill.name}</Text>
-      {skill.description === null ? null : <Text style={styles.rowMeta}>{skill.description}</Text>}
-      <Text style={styles.rowMeta}>{skillWhere(skill)}</Text>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${skill.name}: ${open ? "show less" : "show all of what it is for"}`}
+      aria-expanded={open}
+      onPress={toggle}
+      style={styles.skillRow}
+    >
+      <Text style={styles.skillName}>{skill.name}</Text>
+      <Text style={styles.rowMeta} numberOfLines={open ? undefined : 2}>
+        {skill.description}
+      </Text>
+      <Text style={styles.rowMeta}>{place}</Text>
+    </Pressable>
   );
 }
 
 interface AskedProps {
+  team: LibraryTeam;
   asked: LibraryAsked;
-  onOpenBoard(): void;
+  onOpenBoard(roomId: string): void;
   styles: OfficeStyles;
 }
 
-/** The newest request for a skill and what came of it. */
-function Asked({ asked, onOpenBoard, styles }: AskedProps) {
+/** A team's newest request for a skill and what came of it. */
+function Asked({ team, asked, onOpenBoard, styles }: AskedProps) {
+  const openBoard = useCallback(() => onOpenBoard(team.roomId), [onOpenBoard, team.roomId]);
   return (
-    <View style={styles.reviewAnswer}>
+    <View style={styles.libraryPanel}>
+      <Text style={styles.sheetLabel}>{team.name}</Text>
       {asked.text === null ? (
         <Text style={styles.rowMeta}>
           Asked {asked.title} for “{asked.topic}”. Its note shows here once it is on the board.
@@ -60,7 +91,7 @@ function Asked({ asked, onOpenBoard, styles }: AskedProps) {
         <ActionButton
           label="Open board"
           pendingLabel="Opening..."
-          onPress={onOpenBoard}
+          onPress={openBoard}
           styles={styles}
         />
       </View>
@@ -119,7 +150,12 @@ function Teach({ team, wakesPaused, teach, styles }: TeachProps) {
         style={styles.input}
       />
       {team.writers.length > 1 ? (
-        <View accessibilityRole="radiogroup" accessibilityLabel="Who writes it">
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Who writes it"
+          style={styles.sheetField}
+        >
+          <Text style={styles.rowMeta}>Who writes it</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -158,63 +194,98 @@ function Teach({ team, wakesPaused, teach, styles }: TeachProps) {
   );
 }
 
-interface TeamProps {
-  team: LibraryTeam;
-  /** The skills were read at least once; "failed" when the first reading failed. */
-  read: boolean | "failed";
+interface TeachTabProps {
+  teams: readonly LibraryTeam[];
   wakesPaused: boolean;
   teach(team: LibraryTeam, agentId: string, topic: string): Promise<void>;
   onOpenBoard(roomId: string): void;
   styles: OfficeStyles;
 }
 
-function teamSkillsLine(team: LibraryTeam, read: boolean | "failed"): string | null {
-  if (read === "failed") return "Not read.";
-  if (!read) return "Reading...";
-  if (team.skills === null) return "The host has no folder for this workspace.";
-  return team.skills.length === 0 ? "None in this workspace yet." : null;
-}
-
-function Team({ team, read, wakesPaused, teach, onOpenBoard, styles }: TeamProps) {
-  const openBoard = useCallback(() => onOpenBoard(team.roomId), [onOpenBoard, team.roomId]);
-  const line = teamSkillsLine(team, read);
+/** One form for the team picked, the teams nobody of can be asked in one line, and the answers. */
+function TeachTab({ teams, wakesPaused, teach, onOpenBoard, styles }: TeachTabProps) {
+  const askable = teams.filter((team) => team.writers.length > 0);
+  const [picked, setPicked] = useState<string | null>(null);
+  // The team picked may have gone to work since: then the first with an idle agent is asked.
+  const team = askable.find((candidate) => candidate.roomId === picked) ?? askable[0] ?? null;
+  const busy = busyLine(teams);
+  const asked = teams.filter((candidate) => candidate.asked !== null);
   return (
-    <View style={styles.qaTeam}>
-      <Text accessibilityRole="header" style={styles.standupHeading}>
-        {team.name}
-      </Text>
-      {team.atSkill.length === 0 ? null : (
-        <Text style={styles.rowMeta}>At a skill now: {team.atSkill.join(", ")}</Text>
+    <View style={styles.sheet}>
+      <Text style={styles.rowMeta}>{LIBRARY_HELP}</Text>
+      {team === null ? null : (
+        <View style={styles.libraryPanel}>
+          {askable.length > 1 ? (
+            <View style={styles.sheetField}>
+              <Text style={styles.rowMeta}>Team</Text>
+              <View accessibilityRole="radiogroup" accessibilityLabel="Team" style={styles.chips}>
+                {askable.map((candidate) => (
+                  <Chip
+                    key={candidate.roomId}
+                    label={candidate.name}
+                    value={candidate.roomId}
+                    selected={candidate.roomId === team.roomId}
+                    onSelect={setPicked}
+                    styles={styles}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.sheetLabel}>{team.name}</Text>
+          )}
+          {/* (keyed by team: a topic typed for one team is not sent to another) */}
+          <Teach
+            key={team.roomId}
+            team={team}
+            wakesPaused={wakesPaused}
+            teach={teach}
+            styles={styles}
+          />
+        </View>
       )}
-      <View style={styles.qaGroup}>
-        <Text style={styles.sheetLabel}>Skills</Text>
-        {line === null ? null : <Text style={styles.muted}>{line}</Text>}
-        {(team.skills ?? []).map((skill) => (
-          <SkillRow key={skill.name} skill={skill} styles={styles} />
-        ))}
-      </View>
-      <View style={styles.qaGroup}>
-        <Text style={styles.sheetLabel}>Teach a skill</Text>
-        <Teach team={team} wakesPaused={wakesPaused} teach={teach} styles={styles} />
-        {team.asked ? <Asked asked={team.asked} onOpenBoard={openBoard} styles={styles} /> : null}
-      </View>
+      {busy === null ? null : <Text style={styles.muted}>{busy}</Text>}
+      {asked.length === 0 ? null : (
+        <View style={styles.qaGroup}>
+          <Text accessibilityRole="header" style={styles.standupHeading}>
+            Requests
+          </Text>
+          {asked.map((candidate) =>
+            candidate.asked === null ? null : (
+              <Asked
+                key={candidate.roomId}
+                team={candidate}
+                asked={candidate.asked}
+                onOpenBoard={onOpenBoard}
+                styles={styles}
+              />
+            ),
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
 interface HostSkillsProps {
   skills: readonly SkillInfo[];
-  /** The office has teams, which come first. */
+  /** What is searched for; empty when nothing is. */
+  query: string;
+  /** The office has teams, which come first: many of the host's fold behind a button. */
   afterTeams: boolean;
   styles: OfficeStyles;
 }
 
-/** The host's own skills, folded when there are many and teams come before them. */
-function HostSkills({ skills, afterTeams, styles }: HostSkillsProps) {
-  const folds = afterTeams && skills.length > HOST_SKILLS_SHOWN;
-  const [shown, setShown] = useState(false);
-  const toggle = useCallback(() => setShown((current) => !current), []);
-  const label = shown ? "Hide the host's skills" : `Show ${skills.length} skills`;
+function HostSkills({ skills, query, afterTeams, styles }: HostSkillsProps) {
+  const shown = useMemo(
+    () => (query === "" ? skills : skills.filter((skill) => skillMatches(skill, query))),
+    [skills, query],
+  );
+  // A search opens the fold: what it found must show.
+  const folded = afterTeams && query === "" && skills.length > HOST_SKILLS_SHOWN;
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const label = open ? "Hide the host's skills" : `Show ${skills.length} skills`;
   return (
     <View style={styles.qaGroup}>
       <Text accessibilityRole="header" style={styles.standupHeading}>
@@ -222,14 +293,82 @@ function HostSkills({ skills, afterTeams, styles }: HostSkillsProps) {
       </Text>
       <Text style={styles.rowMeta}>Every agent of a tool that reads these folders has them.</Text>
       {skills.length === 0 ? <Text style={styles.muted}>No skills.</Text> : null}
-      {folds ? (
+      {skills.length > 0 && shown.length === 0 ? (
+        <Text style={styles.muted}>None match.</Text>
+      ) : null}
+      {folded ? (
         <View style={styles.actions}>
           <ActionButton label={label} pendingLabel={label} onPress={toggle} styles={styles} />
         </View>
       ) : null}
-      {!folds || shown
-        ? skills.map((skill) => <SkillRow key={skill.name} skill={skill} styles={styles} />)
+      {!folded || open
+        ? shown.map((skill) => <SkillRow key={skill.name} skill={skill} styles={styles} />)
         : null}
+    </View>
+  );
+}
+
+interface SkillsTabProps {
+  teams: readonly LibraryTeam[];
+  skills: SkillsResult | null;
+  read: boolean | "failed";
+  styles: OfficeStyles;
+}
+
+/** Every skill once: the workspaces' first, then the host's, with a search over both. */
+function SkillsTab({ teams, skills, read, styles }: SkillsTabProps) {
+  const [query, setQuery] = useState("");
+  const inTeams = workspaceSkills(teams);
+  const total = inTeams.length + (skills?.host.length ?? 0);
+  const searching = query.trim() !== "";
+  const teamRows = searching
+    ? inTeams.filter((skill) => skillMatches(skill, query.trim()))
+    : inTeams;
+  const at = teams.flatMap((team) => team.atSkill);
+  const unread = unreadLine(teams, read);
+  return (
+    <View style={styles.sheet}>
+      {total < SEARCH_FROM ? null : (
+        <TextInput
+          accessibilityLabel="Search the skills"
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by name or what it is for"
+          placeholderTextColor={styles.placeholderColor}
+          style={styles.searchInput}
+        />
+      )}
+      {at.length === 0 ? null : <Text style={styles.rowMeta}>At a skill now: {at.join(", ")}</Text>}
+      {teams.length === 0 ? null : (
+        <View style={styles.qaGroup}>
+          <Text accessibilityRole="header" style={styles.standupHeading}>
+            {"In the teams' workspaces"}
+          </Text>
+          {unread === null ? null : <Text style={styles.muted}>{unread}</Text>}
+          {read === true && inTeams.length === 0 ? (
+            <Text style={styles.muted}>None yet. Ask a team for one under Teach a skill.</Text>
+          ) : null}
+          {searching && inTeams.length > 0 && teamRows.length === 0 ? (
+            <Text style={styles.muted}>None match.</Text>
+          ) : null}
+          {teamRows.map((skill) => (
+            <SkillRow
+              key={`${skill.name} ${skill.teams.join()}`}
+              skill={skill}
+              where={skillTeams(skill.teams)}
+              styles={styles}
+            />
+          ))}
+        </View>
+      )}
+      {skills === null ? null : (
+        <HostSkills
+          skills={skills.host}
+          query={query.trim()}
+          afterTeams={teams.length > 0}
+          styles={styles}
+        />
+      )}
     </View>
   );
 }
@@ -265,6 +404,7 @@ export function LibraryCard({
   styles,
   onClose,
 }: LibraryCardProps) {
+  const [view, setView] = useState("skills");
   const change = useCallback(
     (next: boolean) => {
       if (!next) onClose();
@@ -276,10 +416,17 @@ export function LibraryCard({
       <Modal.Content>
         <View style={styles.sheet}>
           <View style={styles.sheetActions}>
-            <Text style={styles.muted}>{librarySummary(teams, skills, readFailure !== null)}</Text>
-            {/* It tells how to ask a team's agent, which an office without a team cannot. */}
-            {teams.length === 0 ? null : <Text style={styles.rowMeta}>{LIBRARY_HELP}</Text>}
-            <View style={styles.actions}>
+            <View style={styles.libraryHead}>
+              <View style={styles.libraryHeadText}>
+                <Text style={styles.sheetText}>
+                  {librarySummary(teams, skills, readFailure !== null)}
+                </Text>
+                {skills === null ? null : (
+                  <Text style={styles.rowMeta}>
+                    Read at {new Date(skills.readAt).toLocaleTimeString()}
+                  </Text>
+                )}
+              </View>
               <ActionButton
                 label="Read again"
                 pendingLabel="Reading..."
@@ -287,39 +434,50 @@ export function LibraryCard({
                 styles={styles}
               />
             </View>
-            {skills === null ? null : (
-              <Text style={styles.rowMeta}>
-                Read at {new Date(skills.readAt).toLocaleTimeString()}
-              </Text>
-            )}
             {readFailure ? (
               <Text accessibilityRole="alert" style={styles.actionError}>
                 {readFailure}
               </Text>
             ) : null}
           </View>
-          {teams.length === 0 && skills === null ? null : (
-            <View style={styles.standupTeams}>
-              {teams.map((team, index) => (
-                <Fragment key={team.roomId}>
-                  {index === 0 ? null : <View style={styles.rowDivider} />}
-                  <Team
-                    team={team}
-                    read={skills === null && readFailure !== null ? "failed" : skills !== null}
-                    wakesPaused={wakesPaused}
-                    teach={teach}
-                    onOpenBoard={onOpenBoard}
-                    styles={styles}
-                  />
-                </Fragment>
-              ))}
-              {skills === null ? null : (
-                <>
-                  {teams.length === 0 ? null : <View style={styles.rowDivider} />}
-                  <HostSkills skills={skills.host} afterTeams={teams.length > 0} styles={styles} />
-                </>
-              )}
+          {/* Teaching asks a team's agent, which an office without a team cannot. */}
+          {teams.length === 0 ? null : (
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Library view"
+              style={styles.chips}
+            >
+              <Chip
+                label="Skills"
+                value="skills"
+                selected={view === "skills"}
+                onSelect={setView}
+                styles={styles}
+              />
+              <Chip
+                label="Teach a skill"
+                value="teach"
+                selected={view === "teach"}
+                onSelect={setView}
+                styles={styles}
+              />
             </View>
+          )}
+          {view === "teach" && teams.length > 0 ? (
+            <TeachTab
+              teams={teams}
+              wakesPaused={wakesPaused}
+              teach={teach}
+              onOpenBoard={onOpenBoard}
+              styles={styles}
+            />
+          ) : (
+            <SkillsTab
+              teams={teams}
+              skills={skills}
+              read={skills === null && readFailure !== null ? "failed" : skills !== null}
+              styles={styles}
+            />
           )}
         </View>
       </Modal.Content>

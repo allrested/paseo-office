@@ -129,7 +129,8 @@ export function librarySummary(
   if (skills === null) {
     return failed ? "The skills could not be read." : "Reading the skills on this host.";
   }
-  const inTeams = teams.reduce((sum, team) => sum + (team.skills?.length ?? 0), 0);
+  // (counted as the card lists them: a skill several workspaces carry is one)
+  const inTeams = workspaceSkills(teams).length;
   const listed =
     skills.host.length === 0 && inTeams === 0
       ? "No skills on this host or in the teams' workspaces."
@@ -145,11 +146,76 @@ export function librarySummary(
 export const LIBRARY_HELP =
   "Name what a skill should teach and an idle agent of the team writes it from its work in the workspace, as a folder with a SKILL.md. It is in the workspace's changes, to review before it is merged.";
 
+/** One skill of the teams' workspaces, listed once however many workspaces have it. */
+export interface LibrarySkill extends SkillInfo {
+  /** The teams whose workspace has it, by name, in the office's order. */
+  teams: string[];
+}
+
+/**
+ * The workspaces' skills, each once. Worktrees of one repository carry the same skill, so a skill
+ * with the same name, description and folders in several workspaces is one row that names them.
+ */
+export function workspaceSkills(teams: readonly LibraryTeam[]): LibrarySkill[] {
+  const found = new Map<string, LibrarySkill>();
+  for (const team of teams) {
+    for (const skill of team.skills ?? []) {
+      const key = JSON.stringify([skill.name, skill.description, skill.folders]);
+      const known = found.get(key);
+      if (known) known.teams.push(team.name);
+      else found.set(key, { ...skill, teams: [team.name] });
+    }
+  }
+  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function listOf(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** The workspaces a skill is in: "BWLT-1" or "4 workspaces: A, B, C and D". */
+export function skillTeams(teams: readonly string[]): string {
+  return teams.length <= 1 ? (teams[0] ?? "") : `${teams.length} workspaces: ${listOf(teams)}`;
+}
+
+/** Whether a skill's name or description has the words searched for. */
+export function skillMatches(
+  skill: Pick<SkillInfo, "name" | "description">,
+  query: string,
+): boolean {
+  const text = `${skill.name} ${skill.description ?? ""}`.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .every((word) => text.includes(word));
+}
+
+/** The line that says why some workspaces list no skill, or null when there is nothing to say. */
+export function unreadLine(teams: readonly LibraryTeam[], read: boolean | "failed"): string | null {
+  if (teams.length === 0) return null;
+  if (read === "failed") return "The workspaces' skills were not read.";
+  if (!read) return "Reading the workspaces' skills...";
+  const missing = teams.filter((team) => team.skills === null).map((team) => team.name);
+  return missing.length === 0 ? null : `The host has no folder for ${listOf(missing)}.`;
+}
+
+/** The teams nobody of can be asked, in one line; null when every team has an idle agent. */
+export function busyLine(teams: readonly LibraryTeam[]): string | null {
+  const busy = teams.filter((team) => team.writers.length === 0).map((team) => team.name);
+  if (busy.length === 0) return null;
+  return busy.length === teams.length
+    ? "No agent of any team is idle, so nobody can be asked. A team shows here once one of its agents is idle."
+    : `No idle agent, so nobody can be asked, in ${listOf(busy)}.`;
+}
+
+/** The skills are searched from this many on. */
+export const SEARCH_FROM = 6;
+
 /** The folders a skill is in: "In .claude and .agents". */
 export function skillWhere(skill: Pick<SkillInfo, "folders">): string {
   const { folders } = skill;
-  if (folders.length <= 1) return `In ${folders[0] ?? ""}`;
-  return `In ${folders.slice(0, -1).join(", ")} and ${folders.at(-1)}`;
+  return `In ${listOf(folders)}`;
 }
 
 /** The line under the button: who is asked, or why nobody can be. */

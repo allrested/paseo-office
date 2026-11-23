@@ -43,11 +43,17 @@ const NO_TEAMS: readonly LibraryTeam[] = [];
 const nothing = async () => undefined;
 const ignore = () => undefined;
 
-function Harness({ skills }: { skills: SkillsResult | null }) {
+function Harness({
+  skills,
+  teams = NO_TEAMS,
+}: {
+  skills: SkillsResult | null;
+  teams?: readonly LibraryTeam[];
+}) {
   const styles = useOfficeStyles(THEME, false, false);
   return (
     <LibraryCard
-      teams={NO_TEAMS}
+      teams={teams}
       skills={skills}
       readFailure={null}
       open
@@ -96,4 +102,36 @@ test("without a team the host's skills are all shown, and the help about teams i
   expect(card?.querySelector('[aria-label="Show 7 skills"]')).toBeNull();
   expect(card?.textContent).not.toContain("Show 7 skills");
   expect(card?.textContent).not.toContain(LIBRARY_HELP);
+});
+
+const HUMANIZER = { name: "humanizer", description: "Rewrite AI text", folders: [".claude"] };
+function team(name: string, patch: Partial<LibraryTeam> = {}): LibraryTeam {
+  return {
+    roomId: name,
+    name,
+    atSkill: [],
+    writers: [],
+    asked: null,
+    skills: [HUMANIZER],
+    ...patch,
+  };
+}
+const TEAMS = [team("A"), team("B"), team("C", { writers: [{ agentId: "c1", title: "Cy" }] })];
+
+test("a skill of several workspaces is one row, and the form to teach is on its own tab", async () => {
+  await act(async () => root.render(<Harness skills={SEVEN} teams={TEAMS} />));
+  const card = container.querySelector('section[aria-label="Library"]');
+  expect(card?.textContent?.split("humanizer").length).toBe(2);
+  expect(card?.textContent).toContain("3 workspaces: A, B and C");
+  expect(card?.textContent).not.toContain(LIBRARY_HELP);
+  expect(card?.querySelector('[aria-label="Show 7 skills"]')).not.toBeNull();
+
+  const tab = [...(card?.querySelectorAll('[role="radio"]') ?? [])].find(
+    (radio) => radio.textContent === "Teach a skill",
+  );
+  await act(async () => (tab as HTMLElement).click());
+  expect(card?.textContent).toContain(LIBRARY_HELP);
+  expect(card?.textContent).toContain("Ask Cy to write it");
+  expect(card?.textContent).toContain("No idle agent, so nobody can be asked, in A and B.");
+  expect(card?.textContent).not.toContain("humanizer");
 });
