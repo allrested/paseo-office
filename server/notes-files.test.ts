@@ -48,6 +48,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       floorPlan: "pro",
       streamerMode: true,
       historyVault: false,
+      pinnedNotes: "",
       stickyNotes: "",
       jiraProjects: "",
       sentryOrg: "",

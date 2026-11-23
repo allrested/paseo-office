@@ -3,6 +3,7 @@ import { LANGUAGE_CHOICES } from "./scene-language.js";
 import { defineSettings } from "@getpaseo/plugin";
 import { WEATHER_MODES, MANUAL_CHOICES } from "./weather.js";
 import { z } from "zod";
+import { PINNED_NOTES_MAX } from "./alerts.js";
 
 /** A Jira project key and a Sentry slug: only these reach a JQL query or a Sentry address. */
 export const JIRA_KEY = /^[A-Z][A-Z0-9_]+$/;
@@ -78,6 +79,7 @@ const HostValuesSchema = z.object({
   floorPlan: z.enum(FLOOR_PLANS).default("pro").catch("pro"),
   streamerMode: z.boolean().default(true),
   historyVault: z.boolean().default(false),
+  pinnedNotes: z.string().max(PINNED_NOTES_MAX).default(""),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
@@ -146,7 +148,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * sends to the floor; off, a person's bubble names what they are at. `stickyNotes` are the
  * owner's notes on the 3D whiteboard, with `;` between them. `historyVault` on has the office
  * keep what is said in each conversation in a file on the host; it is off until the owner turns
- * it on. `jiraProjects`
+ * it on. `pinnedNotes` is said again to an agent whose conversation is compacted during a turn;
+ * empty says nothing. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */
