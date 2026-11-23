@@ -63,7 +63,8 @@ import {
   type TimelineFile,
   type TimelineLog,
 } from "./server/timeline.js";
-import { TEAM_NAME_KEY, teamNameOf, tidyTeamName } from "./shared/team-name.js";
+import { NO_ROSTER, rosterOf, shownTeamName, type Roster } from "./shared/roster.js";
+import { TEAM_NAME_KEY, tidyTeamName } from "./shared/team-name.js";
 import {
   changeSavedTrackers,
   createTrackerCredentialsStore,
@@ -539,6 +540,8 @@ export function createOfficePlugin(
     log(`[office] chat unavailable: ${errorMessage(error)}`),
   );
   let agentToolsOn = false;
+  // The roster the names follow; off until the settings are read.
+  let roster: Roster = NO_ROSTER;
   void holder.wait().then(() => office.setPickupEnabled(agentToolsOn));
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {
@@ -564,6 +567,8 @@ export function createOfficePlugin(
       return;
     }
     hub.setBrand(hostBrand(state.values, deps.env));
+    roster = rosterOf(state.values);
+    hub.setRoster(roster);
     agentToolsOn = state.values.agentTools;
     stepsNamed = !state.values.streamerMode;
     vaultOn = state.values.historyVault;
@@ -817,9 +822,13 @@ export function createOfficePlugin(
       const next = tidyTeamName(name);
       // Null removes the key, and the team goes by the workspace's name again.
       await workspace.setMetadata({ [TEAM_NAME_KEY]: next === "" ? null : next });
-      const shown = next === "" ? current.name : next;
+      // Cleared, the team goes by its roster name where it has one, else by the workspace's.
+      const shown = shownTeamName(
+        { name: current.name, metadata: { ...current.metadata, [TEAM_NAME_KEY]: next } },
+        roster,
+      );
       // The directory's next view would carry the tenure over too; a restart before it would not.
-      (await lifeReady)?.renamed(teamNameOf(current), shown);
+      (await lifeReady)?.renamed(shownTeamName(current, roster), shown);
       return { ok: true as const, name: shown };
     } catch (error) {
       log(`[office] team rename failed: ${errorMessage(error)}`);
@@ -948,7 +957,7 @@ export function createOfficePlugin(
               : null);
           if (!workspaceId) return null;
           const workspace = await context.paseo.workspaces.ref(workspaceId).refresh();
-          return workspace ? teamNameOf(workspace) : null;
+          return workspace ? shownTeamName(workspace, roster) : null;
         });
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);

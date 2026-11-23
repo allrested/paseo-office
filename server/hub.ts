@@ -17,9 +17,17 @@ import type {
   WorkspaceScript,
 } from "../shared/contracts.js";
 import type { ActivityLines, ActivitySteps } from "./activity.js";
-import { settleResets } from "./directory.js";
+import { settleResets, sortWorkspaces } from "./directory.js";
 import { errorMessage } from "./errors.js";
 import type { Timers } from "./timers.js";
+import {
+  NO_ROSTER,
+  ROSTER_MEMBER_KEY,
+  ROSTER_TEAM_KEY,
+  type Roster,
+  type RosterMark,
+} from "../shared/roster.js";
+import { planRoster, rosterNames, type RosterWrite } from "./roster.js";
 import { NEXT_KEY, NUMBER_KEY, officeNames, planNumbers } from "./subagent-names.js";
 
 /** Directory updates come in bursts while agents stream; one event per window is enough. */
@@ -61,7 +69,9 @@ export interface HubPorts {
   timers: Timers;
   log(message: string): void;
   /** Stores data on an agent; the office keeps its sub-agent numbers there. */
-  setAgentMetadata?(agentId: string, patch: Record<string, number>): Promise<void>;
+  setAgentMetadata?(agentId: string, patch: Record<string, string | number>): Promise<void>;
+  /** Stores the office's own data on a workspace: its roster team. */
+  setWorkspaceMetadata?(workspaceId: string, patch: Record<string, string | number>): Promise<void>;
 }
 
 export interface Hub {
@@ -79,6 +89,8 @@ export interface Hub {
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
   setBrand(brand: OfficeSnapshot["brand"]): void;
+  /** The roster names follow from now on; what is open is planned and named again at once. */
+  setRoster(roster: Roster): void;
   setWeather(weather: WeatherState): void;
   /**
    * The conversation each snapshot carries from now on; null removes it. Every subscriber gets a
@@ -277,8 +289,73 @@ export function createHub(ports: HubPorts): Hub {
     }
   }
 
-  function named(agents: readonly OfficeAgent[]): OfficeAgent[] {
-    const names = officeNames(agents);
+  let roster: Roster = NO_ROSTER;
+  // Marks sent and not yet reported back, by `workspace:<id>` or `agent:<id>`. They are planned
+  // as if stored, so a team or teammate in flight is never handed out twice; names come from
+  // what the directory reports, so none shows before its mark is stored.
+  const pendingRoster = new Map<string, RosterMark>();
+
+  function withPendingRoster<Entry extends { id: string; roster?: RosterMark }>(
+    kind: RosterWrite["kind"],
+    entries: readonly Entry[],
+  ): Entry[] {
+    return entries.map((entry) => {
+      const key = `${kind}:${entry.id}`;
+      const mark = pendingRoster.get(key);
+      if (mark === undefined) return entry;
+      if (entry.roster === mark) {
+        pendingRoster.delete(key);
+        return entry;
+      }
+      return { ...entry, roster: mark };
+    });
+  }
+
+  function writeRoster(next: DirectoryView): void {
+    const toWorkspace = ports.setWorkspaceMetadata;
+    const toAgent = ports.setAgentMetadata;
+    if (toWorkspace === undefined || toAgent === undefined) return;
+    const planned = planRoster(
+      roster,
+      withPendingRoster("workspace", next.workspaces),
+      withPendingRoster("agent", next.agents),
+    );
+    for (const { kind, id, mark } of planned) {
+      const key = `${kind}:${id}`;
+      pendingRoster.set(key, mark);
+      const sent =
+        kind === "workspace"
+          ? toWorkspace(id, { [ROSTER_TEAM_KEY]: mark })
+          : toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
+      sent.catch((error: unknown) => {
+        // Planned again at the next change.
+        pendingRoster.delete(key);
+        ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
+      });
+    }
+  }
+
+  /** The workspaces under their roster team's name, where the owner typed none. */
+  function teamed(
+    workspaces: readonly OfficeWorkspace[],
+    teams: ReadonlyMap<string, string>,
+  ): readonly OfficeWorkspace[] {
+    if (teams.size === 0) return workspaces;
+    return sortWorkspaces(
+      workspaces.map((workspace) => {
+        const team = teams.get(workspace.id);
+        // A workspaceName says the owner typed a team name: it stays.
+        if (team === undefined || workspace.workspaceName !== undefined) return workspace;
+        return { ...workspace, name: team, workspaceName: workspace.name };
+      }),
+    );
+  }
+
+  function named(
+    agents: readonly OfficeAgent[],
+    given: ReadonlyMap<string, string>,
+  ): OfficeAgent[] {
+    const names = officeNames(agents, given);
     return agents.map((agent) => {
       const name = names.get(agent.id);
       return name === undefined ? agent : { ...agent, name };
@@ -313,11 +390,13 @@ export function createHub(ports: HubPorts): Hub {
       if (stopDirectory !== null) broadcast(activityEvent());
     }
     writeNumbers(next.agents);
+    writeRoster(next);
     const settled = settleResets(next.agents, resets);
     resets = settled.resets;
+    const names = rosterNames(roster, next.workspaces, next.agents);
     view = {
-      agents: named(resets.size === 0 ? next.agents : settled.agents),
-      workspaces: next.workspaces,
+      agents: named(resets.size === 0 ? next.agents : settled.agents, names.members),
+      workspaces: teamed(next.workspaces, names.teams),
       folders: next.folders,
     };
     tell(view);
@@ -532,6 +611,13 @@ export function createHub(ports: HubPorts): Hub {
       brand = next;
       broadcast({ type: "snapshot", state: snapshot() });
     },
+    setRoster(next) {
+      if (JSON.stringify(roster) === JSON.stringify(next)) return;
+      roster = next;
+      // What is open is planned and named again. A closed office is planned when it next opens:
+      // its directory's first view goes through onDirectory.
+      if (stopDirectory !== null) onDirectory(reported);
+    },
     setWeather(next) {
       const text = JSON.stringify(next);
       if (text === sentWeather) return;
@@ -571,7 +657,12 @@ export function createHub(ports: HubPorts): Hub {
       } catch (error) {
         ports.log(`[office] directory stop failed: ${errorMessage(error)}`);
       }
-      return { ...snapshot(), agents: named(latest.agents), workspaces: [...latest.workspaces] };
+      const names = rosterNames(roster, latest.workspaces, latest.agents);
+      return {
+        ...snapshot(),
+        agents: named(latest.agents, names.members),
+        workspaces: [...teamed(latest.workspaces, names.teams)],
+      };
     },
     script(workspaceId, name) {
       const workspace = reported.workspaces.find((candidate) => candidate.id === workspaceId);

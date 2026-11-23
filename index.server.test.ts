@@ -1159,6 +1159,33 @@ test("a team is given a name of the office's own, kept on its workspace, and an 
   await stop();
 });
 
+test("a team whose typed name is cleared goes back to its roster name", async () => {
+  if (ON.status !== "ready") throw new Error("ON is the ready state");
+  const rostered: SettingsState = {
+    ...ON,
+    values: {
+      ...ON.values,
+      rosterOn: true,
+      rosterEdition: 1,
+      teams: [{ id: "dev", name: "PR-DEV", members: [] }],
+    },
+  };
+  const { recorded, directory, context, stop } = setup(async () => rostered);
+  // The server follows the settings it read at its start.
+  for (const listener of recorded.listeners) await listener(rostered);
+  directory.workspaceMetadata = { "office.roster.team": "dev", "office.team.name": "Payments" };
+  const rename = recorded.handlers.get("office.team.rename.request");
+  expect(await rename?.({ workspaceId: "w1", name: "" }, context)).toEqual({
+    ok: true,
+    name: "PR-DEV",
+  });
+  expect(directory.workspaceMetadata).toEqual({
+    "office.roster.team": "dev",
+    "office.team.name": null,
+  });
+  await stop();
+});
+
 test("the writer starts in the settings' mode, and accepts edits while none is set", async () => {
   const withMode = (notesMode: string): SettingsState => ({
     status: "ready",
