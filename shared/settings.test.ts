@@ -38,6 +38,7 @@ test("version 1 settings keep their Agent tools choice and have no notes folder"
     agentTools: false,
     notesFolder: "",
     notesTimeZone: "",
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
     ...COMPANY,
@@ -48,6 +49,8 @@ test("host settings: version 2 values stay and the incident fields take their de
   const stored = { agentTools: false, notesFolder: "/n", notesTimeZone: "" };
   expect(await upgraded(stored, 2)).toEqual({
     ...stored,
+    // The writer's mode came later: a document without it has none set.
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
     ...INCIDENT_DEFAULTS,
     ...COMPANY,
@@ -59,6 +62,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     agentTools: false,
     notesFolder: "/n",
     notesTimeZone: "Asia/Riyadh",
+    notesMode: "",
     jiraProjects: "SHOP",
     sentryOrg: "acme",
     sentryProjects: "web",
@@ -77,6 +81,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     agentTools: false,
     notesFolder: "/n",
     notesTimeZone: "Asia/Riyadh",
+    notesMode: "",
     notesDays: [1, 3],
     jiraProjects: "SHOP",
     sentryOrg: "acme",
@@ -110,6 +115,7 @@ test("a plan this build does not know reads as the company floor and the rest is
     agentTools: false,
     notesFolder: "/n",
     notesTimeZone: "Asia/Riyadh",
+    notesMode: "",
     notesDays: [1, 3],
     jiraProjects: "SHOP",
     sentryOrg: "acme",

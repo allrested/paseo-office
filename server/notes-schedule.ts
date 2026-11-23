@@ -9,6 +9,8 @@ const NOTES: OfficeSchedule = { name: NOTES_SCHEDULE, label: "Stand-up notes", l
 export interface NotesSettings {
   notesFolder: string;
   notesTimeZone: string;
+  /** The mode the writer starts in, by the provider's id; empty or absent for the office's choice. */
+  notesMode?: string;
 }
 
 /** What the 8:00 run follows: the folder and zone, and its weekdays, 0 for Sunday. */

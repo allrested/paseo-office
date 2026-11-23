@@ -48,6 +48,8 @@ export interface WriterStart {
   cwd: string;
   title: string;
   prompt: string;
+  /** The settings' mode for the writer; absent when none is set. */
+  mode?: string;
 }
 
 export interface NotesPorts {
@@ -219,7 +221,13 @@ export function createNotesWriter(ports: NotesPorts): NotesWriter {
       report: standupReport(await ports.snapshot(), now),
     });
     endedWhileStarting = new Map();
-    const writerId = await ports.startAgent({ cwd: folder, title: NOTES_WRITER_TITLE, prompt });
+    const mode = settings.notesMode?.trim() ?? "";
+    const writerId = await ports.startAgent({
+      cwd: folder,
+      title: NOTES_WRITER_TITLE,
+      prompt,
+      ...(mode === "" ? {} : { mode }),
+    });
     return { writerId, entry: { folder, ...day } };
   }
 

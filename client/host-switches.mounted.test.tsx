@@ -27,6 +27,18 @@ interface Saved {
 let saved: Saved[];
 let calls: { name: string; input: unknown }[];
 let rpcAnswer: { ok: true } | { ok: false; problem: string };
+let modesAnswer: unknown;
+const CLAUDE_MODES = {
+  ok: true,
+  provider: "Claude",
+  modes: [
+    { id: "acceptEdits", label: "Accept File Edits" },
+    { id: "auto", label: "Auto mode" },
+    { id: "bypassPermissions", label: "Bypass" },
+  ],
+  modeId: "acceptEdits",
+  fellBack: false,
+};
 let saveError: string | null;
 /** Set to keep each save waiting for the host's answer. */
 let answer: Promise<boolean> | null;
@@ -52,6 +64,8 @@ vi.mock("./world/adapter.js", async (importOriginal) => ({
 vi.mock("@getpaseo/plugin/client", () => ({
   // The two tracker calls: what was sent is recorded, and `rpcAnswer` is the host's reply.
   useRpc: (contract: { name: string }) => async (input: unknown) => {
+    // The mode row asks as it shows; only the tracker calls are recorded.
+    if (contract.name === "office.notes.modes.request") return modesAnswer;
     calls.push({ name: contract.name, input });
     return rpcAnswer;
   },
@@ -118,6 +132,7 @@ beforeEach(() => {
   saved = [];
   calls = [];
   rpcAnswer = { ok: true };
+  modesAnswer = CLAUDE_MODES;
   saveError = null;
   answer = null;
   stored = {
@@ -125,6 +140,7 @@ beforeEach(() => {
     agentTools: false,
     notesFolder: "",
     notesTimeZone: "Asia/Riyadh",
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
     floorPlan: "pro",
     ...NO_TRACKERS,
@@ -181,6 +197,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         agentTools: false,
         notesFolder: "/workspace/notes",
         notesTimeZone: "Asia/Riyadh",
+        notesMode: "",
         notesDays: SUNDAY_TO_THURSDAY,
         floorPlan: "pro",
         ...NO_TRACKERS,
@@ -236,6 +253,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       agentTools: true,
       notesFolder: "",
       notesTimeZone: "Asia/Riyadh",
+      notesMode: "",
       notesDays: SUNDAY_TO_THURSDAY,
       floorPlan: "pro",
       ...NO_TRACKERS,
@@ -459,6 +477,53 @@ test("a refused plan goes back and shows the reason under the row", async () => 
   expect(planButtons()).toEqual(["Company floor true", "Cozy room false", "Headquarters false"]);
   expect(planRow().parentElement?.textContent).toContain(
     "Unable to save the Floor plan setting: Settings changed on another client.",
+  );
+});
+
+function modeRow(): HTMLElement {
+  const row = container.querySelector<HTMLElement>('[role="group"][aria-label="Writer mode"]');
+  if (!row) throw new Error("No writer mode row");
+  return row;
+}
+const modePills = () =>
+  [...modeRow().querySelectorAll('[role="button"]')].map(
+    (pill) => `${pill.getAttribute("aria-label")} ${pill.getAttribute("aria-pressed")}`,
+  );
+
+test("the writer mode row lists the provider's modes, the office's choice pressed while none is set", async () => {
+  await mount();
+  expect(modePills()).toEqual([
+    "Office's choice true",
+    "Accept File Edits false",
+    "Auto mode false",
+    "Bypass false",
+  ]);
+  await act(async () =>
+    modeRow().querySelector<HTMLElement>('[role="button"][aria-label="Bypass"]')?.click(),
+  );
+  expect(saved.at(-1)?.values.notesMode).toBe("bypassPermissions");
+});
+
+test("a mode that asks for nothing says so, and one the provider lacks says what is used", async () => {
+  stored = { ...stored, notesMode: "bypassPermissions" };
+  await mount();
+  expect(modeRow().parentElement?.textContent).toContain(
+    "In this mode the writer runs any tool or command without asking.",
+  );
+
+  stored = { ...stored, notesMode: "full-access" };
+  modesAnswer = { ...CLAUDE_MODES, fellBack: true };
+  await mount();
+  expect(modePills().at(-1)).toBe("full-access true");
+  expect(modeRow().parentElement?.textContent).toContain(
+    'Claude has no mode "full-access": the writer starts in Accept File Edits.',
+  );
+
+  modesAnswer = { ok: false, problem: "No agent provider is ready on this host" };
+  stored = { ...stored, notesMode: "" };
+  await mount();
+  expect(modeRow().parentElement?.textContent).toContain(
+    "The writer's modes cannot be listed: No agent provider is ready on this host",
   );
 });
 

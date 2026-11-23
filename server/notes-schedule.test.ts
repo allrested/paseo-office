@@ -156,6 +156,7 @@ test("a failed save is logged and kept until a later save succeeds", async () =>
   await notes.sync({
     notesFolder: "/n",
     notesTimeZone: "Mars/Base",
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
   });
   expect(notes.error()).toBe("Invalid cron time zone: Mars/Base");
@@ -171,6 +172,7 @@ test("a failed save is logged and kept until a later save succeeds", async () =>
   await notes.sync({
     notesFolder: "/n",
     notesTimeZone: "Europe/Berlin",
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
   });
   expect(notes.error()).toBeNull();
@@ -191,6 +193,7 @@ test("changes are synced one at a time, so a slow save cannot land after a later
   const second = notes.sync({
     notesFolder: "/n",
     notesTimeZone: "Europe/Berlin",
+    notesMode: "",
     notesDays: SUNDAY_TO_THURSDAY,
   });
   release();

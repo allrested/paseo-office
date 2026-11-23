@@ -52,6 +52,7 @@ const HostValuesSchema = z.object({
   agentTools: z.boolean().default(true),
   notesFolder: z.string().default(""),
   notesTimeZone: z.string().default(""),
+  notesMode: z.string().max(100).default(""),
   notesDays: z
     .array(z.number())
     .default([1, 2, 3, 4, 5])
@@ -117,7 +118,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 /**
  * Host-wide. `agentTools` off removes the office tools from agent sessions opened afterwards.
  * `notesFolder` is the absolute path the stand-up notes are written in, empty for none, and
- * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `notesDays` are the
+ * `notesTimeZone` the IANA zone of their 8:00 run, empty for the host's. `notesMode` is the
+ * mode the notes writer starts in, by its provider's id, empty for the office's own choice. `notesDays` are the
  * weekdays of that run, 0 for Sunday to 6 for Saturday, in order; none is no run. `floorPlan` is
  * the 3D floor's plan: `pro` the company floor, `cozy` one open room, or `hq` headquarters. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
