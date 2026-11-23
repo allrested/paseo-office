@@ -1,6 +1,14 @@
 import type { ChecklistStep, OfficeAgent, Post, WakeState } from "../shared/contracts.js";
 import { LOBBY, USER_AUTHOR } from "../shared/names.js";
-import { agentTitle } from "../shared/model.js";
+import {
+  agentTitle,
+  attentionReason,
+  waitingOnText,
+  type AgentTaskGroup,
+  type OfficeRoom,
+  type OfficeRow,
+} from "../shared/model.js";
+import { tabOf } from "./list-text.js";
 
 /** How many posts a room card shows before it counts the rest. The board sheet shows them all. */
 export const CARD_POSTS = 3;
@@ -89,6 +97,73 @@ export function todoPreview(todos: readonly Post[], max: number = CARD_POSTS): B
 /** The mark before an agent's checklist step: in progress, or waiting. */
 export function stepMark(status: ChecklistStep["status"]): string {
   return status === "in_progress" ? "◐" : "○";
+}
+
+/**
+ * What an agent is at, in words: who needs the user first, then who waits on sub-agents, then the
+ * "doing now" line. The 3D whiteboard says the same of the person at the desk (`boardText` in
+ * world/adapter.ts); a test holds the two together.
+ */
+export function workText(row: OfficeRow): string {
+  const reason = attentionReason(row.agent);
+  if (reason === "error") return "Stopped on an error";
+  if (reason === "permission") return "Waiting for your answer";
+  if (row.waitingOn > 0) return waitingOnText(row.waitingOn);
+  const { status } = row.agent;
+  return status === "running" || status === "initializing"
+    ? (row.activity ?? "Working")
+    : "Resting";
+}
+
+/** An agent as a board shows it: its row, and the unfinished steps of its own checklist. */
+export interface BoardAgent {
+  row: OfficeRow;
+  steps: readonly ChecklistStep[];
+}
+
+/** A room's agents on the lobby's board. */
+export interface BoardTeam {
+  room: OfficeRoom;
+  agents: BoardAgent[];
+}
+
+const NO_STEPS: readonly ChecklistStep[] = [];
+
+function agentsOf(
+  room: OfficeRoom,
+  steps: ReadonlyMap<string, readonly ChecklistStep[]>,
+): BoardAgent[] {
+  return room.rows.map((row) => ({ row, steps: steps.get(row.agent.id) ?? NO_STEPS }));
+}
+
+function stepsByAgent(
+  agentTasks: readonly AgentTaskGroup[],
+): Map<string, readonly ChecklistStep[]> {
+  return new Map(agentTasks.map((group) => [group.agentId, group.steps]));
+}
+
+/** Every agent of a room in the room's own order, for its board: whoever sits there is on it. */
+export function roomAgents(room: OfficeRoom, agentTasks: readonly AgentTaskGroup[]): BoardAgent[] {
+  return agentsOf(room, stepsByAgent(agentTasks));
+}
+
+/**
+ * The lobby's board, room by room: whoever is at work or needs the user, and whoever has steps
+ * left of a checklist. An agent that rests with nothing left is not on it, nor a room of only those.
+ */
+export function officeWork(
+  rooms: readonly OfficeRoom[],
+  agentTasks: readonly AgentTaskGroup[],
+): BoardTeam[] {
+  const steps = stepsByAgent(agentTasks);
+  const teams: BoardTeam[] = [];
+  for (const room of rooms) {
+    const agents = agentsOf(room, steps).filter(
+      (entry) => tabOf(entry.row) !== "resting" || entry.steps.length > 0,
+    );
+    if (agents.length > 0) teams.push({ room, agents });
+  }
+  return teams;
 }
 
 export function queuedWakes(wake: WakeState): number {

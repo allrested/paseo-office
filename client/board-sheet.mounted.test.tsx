@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-// A board's sheet, mounted: its form, the page that chooses who a post wakes, and what is posted;
-// on the lobby, the to-do list and the agents' tasks.
+// A board's sheet, mounted: its form, the page that chooses who a post wakes, the room's agents
+// and what is posted; on the lobby, the to-do list and the agents at work in every room.
 // The sheet, the inputs and the icon are the host's, so plain stand-ins show what they were given.
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -71,6 +71,22 @@ function officeRooms(agents: OfficeAgent[], boards: OfficeSnapshot["boards"] = {
   return buildOfficeModel(snapshot).rooms;
 }
 
+/** The office with these agents and what the host reads of them: its rooms, and its agents' steps. */
+function office(agents: OfficeAgent[], read: Partial<OfficeSnapshot> = {}) {
+  const model = buildOfficeModel({
+    agents,
+    workspaces: [
+      { id: "w1", name: "shop-api", projectName: "shop" },
+      { id: "w2", name: "landing", projectName: "site" },
+    ],
+    activity: {},
+    boards: {},
+    wake: { paused: false, queued: {} },
+    ...read,
+  });
+  return { rooms: model.rooms, agentTasks: model.agentTasks };
+}
+
 function post(seq: number, fields: Partial<Post>): Post {
   const at = `2026-11-17T09:00:${String(seq).padStart(2, "0")}.000Z`;
   return {
@@ -100,6 +116,9 @@ let refusal: Error | null;
 /** While set, a change waits for it: the host has not answered yet. */
 let answer: Promise<void> | null;
 let closed: number;
+/** The agents asked for from a board, and the boards asked for from the lobby's, in order. */
+let selected: string[];
+let opened: string[];
 
 async function change(request: string): Promise<void> {
   asked.push(request);
@@ -121,6 +140,12 @@ const ACTIONS: BoardActions = {
 const nameOf = (author: string) => author;
 const onClose = () => {
   closed += 1;
+};
+const onSelectAgent = (agentId: string) => {
+  selected.push(agentId);
+};
+const onOpenBoard = (roomId: string) => {
+  opened.push(roomId);
 };
 
 const NO_TASKS: AgentTaskGroup[] = [];
@@ -155,6 +180,8 @@ function Harness({
       wakesPaused={wakesPaused}
       sheetLeavesFirst={sheetLeavesFirst}
       styles={styles}
+      onSelectAgent={onSelectAgent}
+      onOpenBoard={onOpenBoard}
       onClose={onClose}
     />
   );
@@ -169,6 +196,8 @@ beforeEach(() => {
   refusal = null;
   answer = null;
   closed = 0;
+  selected = [];
+  opened = [];
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -619,39 +648,129 @@ test("a claimed lobby to-do says it is on its claimer's board", async () => {
   expect(lines()).toContain("claimed by a1 · on a1's board");
 });
 
-test("agent tasks show each agent's steps, or say there are none", async () => {
-  const agentTasks: AgentTaskGroup[] = [
-    {
-      agentId: "a1",
-      steps: [
-        { text: "Run typecheck", status: "in_progress" },
-        { text: "Commit", status: "pending" },
-      ],
-    },
-    {
-      agentId: "a2",
-      steps: [
-        { text: "Run tests", status: "pending" },
-        { text: "Draft the release notes", status: "pending" },
-        { text: "Run tests", status: "pending" },
-      ],
-    },
-  ];
-  await mount({ rooms: lobbyRooms([]), roomId: "lobby", agentTasks });
+const AT_WORK = [
+  agent("1", { title: "Fix the cart", status: "running" }),
+  agent("2", { title: "Review the pull request" }),
+  agent("3", { title: "Write the docs", status: "running", workspaceId: "w2" }),
+  agent("4", { title: "Tidy the lobby", status: "running", workspaceId: null }),
+];
+const READING = {
+  activity: { "1": "Running Bash", "3": "Thinking" },
+  checklists: {
+    "1": [
+      { text: "Run typecheck", status: "in_progress" as const },
+      { text: "Commit", status: "pending" as const },
+    ],
+  },
+};
+
+test("a room's board lists the room's agents, what each is at and its unfinished steps", async () => {
+  await mount(office(AT_WORK, READING));
+
+  expect(title()).toBe("shop-api board");
+  expect(linesFrom("Agents")).toEqual([
+    "Agents",
+    "Fix the cart",
+    "Running Bash",
+    "◐ Run typecheck",
+    "○ Commit",
+    "Review the pull request",
+    "Resting",
+    "No posts",
+  ]);
+  // Another room's agents are on their own board.
+  expect(lines()).not.toContain("Write the docs");
+});
+
+test("a room's board with nobody in the room says so", async () => {
+  await mount(office([agent("3", { workspaceId: "w2" })]));
+  expect(lines().slice(-2)).toEqual(["No agents", "No posts"]);
+});
+
+test("a press on an agent of a board asks for that agent", async () => {
+  await mount(office(AT_WORK, READING));
+  await press("Fix the cart: Running Bash");
+  await press("Review the pull request: Resting");
+  expect(selected).toEqual(["1", "2"]);
+});
+
+test("an agent's steps are words under its button, so a screen reader reads them too", async () => {
+  await mount(office(AT_WORK, READING));
+  const button = byLabel("Fix the cart: Running Bash");
+  expect(button.textContent).toBe("Fix the cartRunning Bash");
+  expect(lines()).toContain("◐ Run typecheck");
+});
+
+test("the room's agents follow the office while the board is open", async () => {
+  await mount(office(AT_WORK, READING));
+  const stopped = AT_WORK.map((each) =>
+    each.id === "1" ? { ...each, status: "idle" as const } : each,
+  );
+  await mount(office(stopped, { checklists: {} }));
+  expect(linesFrom("Agents")).toEqual([
+    "Agents",
+    "Fix the cart",
+    "Resting",
+    "Review the pull request",
+    "Resting",
+    "No posts",
+  ]);
+});
+
+test("agent tasks list who is at work room by room, with each one's steps", async () => {
+  await mount({ ...office(AT_WORK, READING), roomId: "lobby" });
   expect(container.textContent).toContain("No to-dos");
   expect(linesFrom("Agent tasks")).toEqual([
     "Agent tasks",
-    "a1",
+    "Lobby",
+    "Tidy the lobby",
+    "Working",
+    "shop-api",
+    "Fix the cart",
+    "Running Bash",
     "◐ Run typecheck",
     "○ Commit",
-    "a2",
+    "landing",
+    "Write the docs",
+    "Thinking",
+  ]);
+});
+
+test("agent tasks keep a resting agent while it has steps left, and a line said twice", async () => {
+  const steps = [
+    { text: "Run tests", status: "pending" as const },
+    { text: "Draft the release notes", status: "pending" as const },
+    { text: "Run tests", status: "pending" as const },
+  ];
+  await mount({
+    ...office([agent("2", { title: "Review the pull request" })], { checklists: { "2": steps } }),
+    roomId: "lobby",
+  });
+  expect(linesFrom("Agent tasks")).toEqual([
+    "Agent tasks",
+    "shop-api",
+    "Review the pull request",
+    "Resting",
     "○ Run tests",
     "○ Draft the release notes",
     "○ Run tests",
   ]);
+});
 
-  await mount({ rooms: lobbyRooms([]), roomId: "lobby", agentTasks: [] });
+test("agent tasks say there are none when everyone rests with nothing left", async () => {
+  await mount({ ...office([agent("2")]), roomId: "lobby" });
   expect(linesFrom("Agent tasks")).toEqual(["Agent tasks", "No agent tasks"]);
+});
+
+test("from the lobby's board a room's name opens that room's board, and an agent its card", async () => {
+  await mount({ ...office(AT_WORK, READING), roomId: "lobby" });
+
+  await press("Open shop-api board");
+  await press("Write the docs: Thinking");
+  expect(opened).toEqual(["w1"]);
+  expect(selected).toEqual(["3"]);
+  // The lobby's own agents are on the board that is open: its name opens nothing.
+  expect(container.querySelector('[aria-label="Open Lobby board"]')).toBeNull();
 });
 
 test("another room's board still shows the posts form", async () => {

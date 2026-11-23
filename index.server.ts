@@ -159,7 +159,7 @@ import {
   streetRpc,
   worldWordsRpc,
 } from "./shared/contracts.js";
-import { chatT } from "./shared/chat-words.js";
+import { chatWords } from "./shared/chat-words.js";
 import { officeHostSettings } from "./shared/settings.js";
 
 /** What the office needs from outside the daemon's plugin API. */
@@ -521,13 +521,21 @@ export function createOfficePlugin(
   // then the chat call waits, and a snapshot has no chat.
   let chat: ChatService | null = null;
   let stopWatching: (() => void) | null = null;
+  // What the chat's people write follows the host's setting from the next line on; the lines
+  // already in the chat stay as they were written.
+  let chatLines = chatWords("international");
+  function chatTr(key: string, vars?: object | null): string;
+  function chatTr(key: string, vars: object | null, as: "list"): string[];
+  function chatTr(key: string, vars?: object | null, as?: "list"): string | string[] {
+    return as === "list" ? chatLines(key, vars ?? null, as) : chatLines(key, vars);
+  }
   const chatPorts = liveChatPorts(holder);
   async function startChat(): Promise<void> {
     const service = await createChatService({
       store: deps.chatStore,
       lobbyPosts: office.lobbyPosts,
       clock: deps.clock,
-      tr: chatT,
+      tr: chatTr,
       ...chatPorts,
       emit: (change) => hub.chatChange(change),
       log,
@@ -572,6 +580,7 @@ export function createOfficePlugin(
     agentToolsOn = state.values.agentTools;
     stepsNamed = !state.values.streamerMode;
     vaultOn = state.values.historyVault;
+    chatLines = chatWords(state.values.chatCulture);
     pinnedNotes = state.values.pinnedNotes;
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);

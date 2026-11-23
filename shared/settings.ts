@@ -73,6 +73,13 @@ export function stickyNotesOf(text: string): string[] {
 }
 
 /** How long a prompt cache is taken to stay warm after a turn, for the cup on a resting desk. */
+/**
+ * Whose food, prices and places the team chat's people write about, and in which language:
+ * `international` English with nothing local, `indonesian` Indonesian, `vietnamese` English with
+ * the Vietnamese lunch of the project the chat comes from.
+ */
+export const CHAT_CULTURES = ["international", "indonesian", "vietnamese"] as const;
+export type ChatCulture = (typeof CHAT_CULTURES)[number];
 export const CACHE_CLOCKS = ["off", "5m", "1h"] as const;
 export type CacheClock = (typeof CACHE_CLOCKS)[number];
 
@@ -93,6 +100,7 @@ const HostValuesSchema = z.object({
   historyVault: z.boolean().default(false),
   pinnedNotes: z.string().max(PINNED_NOTES_MAX).default(""),
   cacheClock: z.enum(CACHE_CLOCKS).default("1h").catch("1h"),
+  chatCulture: z.enum(CHAT_CULTURES).default("international").catch("international"),
   planHidden: z.array(z.string().max(200)).max(50).default([]),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   rosterOn: z.boolean().default(false),

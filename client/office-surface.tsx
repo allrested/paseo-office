@@ -849,6 +849,17 @@ function useBoardSheet(model: OfficeModel, live: boolean): BoardSheetState {
   return { room, open: setRoomId, close };
 }
 
+/** An agent chosen on a board: the board leaves, and the agent opens as it does from its desk. */
+function useBoardSelect(close: () => void, select: (agentId: string) => void) {
+  return useCallback(
+    (agentId: string) => {
+      close();
+      select(agentId);
+    },
+    [close, select],
+  );
+}
+
 interface CardOpening {
   open: boolean;
   /** When the card last opened: the notes line's "today", the incidents' ages. */
@@ -883,8 +894,6 @@ interface ViewControlsProps {
   onTeam(): void;
   machine: Machine | null;
   onMachine?: () => void;
-  onTimeline?: () => void;
-  onHistory?: () => void;
   shortcuts?: readonly Shortcut[];
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
@@ -966,18 +975,14 @@ function stripCards(
 /** The toolbar's buttons for what was: the timeline and the history, each while it is offered. */
 const NO_SHORTCUTS: readonly Shortcut[] = [];
 
-function PastButtons({
+function ShortcutButtons({
   shortcuts = NO_SHORTCUTS,
-  onTimeline,
-  onHistory,
   size,
   color,
   styles,
 }: {
   /** The office's own cards, each an icon named by its card and what it says. */
   shortcuts?: readonly Shortcut[] | undefined;
-  onTimeline: (() => void) | undefined;
-  onHistory: (() => void) | undefined;
   size: number;
   color: string;
   styles: OfficeStyles;
@@ -996,28 +1001,6 @@ function PastButtons({
           styles={styles}
         />
       ))}
-      {onTimeline ? (
-        <PanelButton
-          label="Timeline"
-          icon="History"
-          screenId="timeline"
-          size={size}
-          color={color}
-          onOpen={onTimeline}
-          styles={styles}
-        />
-      ) : null}
-      {onHistory ? (
-        <PanelButton
-          label="History"
-          icon="Archive"
-          screenId="history"
-          size={size}
-          color={color}
-          onOpen={onHistory}
-          styles={styles}
-        />
-      ) : null}
     </>
   );
 }
@@ -1035,8 +1018,6 @@ function ViewControls({
   onTeam,
   machine,
   onMachine,
-  onTimeline,
-  onHistory,
   shortcuts,
   onChange,
   compact,
@@ -1081,10 +1062,8 @@ function ViewControls({
         />
       )}
       {sidebars ? (
-        <PastButtons
+        <ShortcutButtons
           shortcuts={shortcuts}
-          onTimeline={onTimeline}
-          onHistory={onHistory}
           size={touchScreen ? 20 : 16}
           color={color}
           styles={styles}
@@ -2080,6 +2059,7 @@ export function OfficeSurface(
     selectFromStrip,
     showAgentWorkspace,
   );
+  const selectFromBoard = useBoardSelect(board.close, panels.selectAgent);
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
     (agentId: string) => {
@@ -2228,8 +2208,6 @@ export function OfficeSurface(
       onTeam={openTeam}
       machine={machine}
       onMachine={hostEntry?.onOpen}
-      onTimeline={timeline.onOpen}
-      onHistory={history.onOpen}
       shortcuts={shortcuts}
       onChange={changeView}
       compact={compact}
@@ -2449,6 +2427,8 @@ export function OfficeSurface(
         wakesPaused={office.state.wake.paused}
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
+        onSelectAgent={selectFromBoard}
+        onOpenBoard={board.open}
         onClose={board.close}
       />
       <DutySheet

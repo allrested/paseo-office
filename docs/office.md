@@ -437,13 +437,22 @@ A session whose board tools became unavailable after a reload can finish its own
 
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 
-The lobby also shows each agent's unfinished checklist steps, text included, which the
-"doing now" read takes from the newest `todo` item among the agent's newest timeline items. The
-steps stay after the agent stops and go when it is archived or closed. The server keeps them in
-memory, and only while an office surface is open: after the last one closes or the daemon restarts,
-an agent's steps are back when it next updates its checklist. A board is removed when its workspace
-is archived while the daemon runs; a board left from a workspace archived otherwise stays until its
-posts are deleted.
+A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
+form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
+steps of its checklist. What an agent is at is said in the 3D whiteboard's words: its "doing now"
+line, "Waiting for your answer", "Stopped on an error", "Waiting on N sub-agents" or "Resting". The
+lobby's board lists the same for the whole office under **Agent tasks**, room by room: the agents
+at work, the ones that need you, and the resting ones with steps left. A resting agent with nothing
+left is on its own room's board only. A press on an agent opens it as a press on its desk does, and
+a room's name on the lobby's board opens that room's board. None of this is a post: it is the
+office's live state, as fresh as the "doing now" read, and nothing of it is kept in `boards.json`.
+
+The checklist steps, text included, are what the "doing now" read takes from the newest `todo` item
+among the agent's newest timeline items. The steps stay after the agent stops and go when it is
+archived or closed. The server keeps them in memory, and only while an office surface is open:
+after the last one closes or the daemon restarts, an agent's steps are back when it next updates
+its checklist. A board is removed when its workspace is archived while the daemon runs; a board
+left from a workspace archived otherwise stays until its posts are deleted.
 
 Interactive agent sessions get three tools, `office_read`, `office_post` and `office_update`,
 unless the "Agent tools" setting is off when the session opens. A provider with Paseo's agent tools

@@ -7,6 +7,17 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - Team roster: a **Teams** section in the settings holds teams and their teammates, and the
   office names workspaces and agents from it by itself. Paseo's own names are not changed.
 
+## 0.2.10 (2026-11-23)
+
+- A room's board lists the room's agents under its form, each with what it is at and the
+  unfinished steps of its checklist, so a room at work with nothing posted is no empty board. The
+  lobby's board lists the same for every room under Agent tasks. A press on an agent opens it,
+  and a room's name on the lobby's board opens that room's board (#40).
+- Team chat, a host setting, picks whose words the team chat's people write: International, the
+  default, is English worded for any office; Indonesia is Indonesian, with Indonesia's food,
+  prices and places; Vietnam is upstream's lines as before. Lines already in the chat stay (#41).
+- 0.2.9 was tagged and never published to npm: this version carries its changes too.
+
 ## 0.2.9 (2026-11-23)
 
 - CloudWatch incidents: with an AWS profile and region in the settings, alarms in ALARM and error

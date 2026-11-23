@@ -50,6 +50,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      chatCulture: "international",
       planHidden: [],
       stickyNotes: "",
       rosterOn: false,
