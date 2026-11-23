@@ -2,6 +2,16 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.5 (2026-11-23)
+
+- Timeline: a lane per agent over the last hour, 6 hours or 24 hours, replayed at 30, 60 or 120
+  times the clock. Each lane says what its agent was at then. The replay is in the card; the 3D
+  floor keeps showing the present (#33).
+- This week: the last seven days added up, with time at work, turns, edits, commands, cost and
+  the busiest team (#33).
+- The office keeps the log itself, in `office/timeline.json`, for eight days. It holds what was
+  seen while an office was open; the time between is a gap.
+
 ## 0.2.4 (2026-11-23)
 
 - Plan limits: the Host card lists each provider's limits with how much is used and when each
