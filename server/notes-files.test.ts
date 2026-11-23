@@ -47,6 +47,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       notesDays: [1, 2, 3, 4, 5],
       floorPlan: "pro",
       streamerMode: true,
+      historyVault: false,
       stickyNotes: "",
       jiraProjects: "",
       sentryOrg: "",

@@ -33,6 +33,7 @@ type HostSetting =
   | "Archive idle sessions"
   | "Agent tools"
   | "Streamer mode"
+  | "History vault"
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
@@ -447,6 +448,11 @@ function FloorSettings({
     [change],
   );
   const problem = saveProblem("Streamer mode");
+  const toggleVault = useCallback(
+    (next: boolean) => void change("History vault", { historyVault: next }),
+    [change],
+  );
+  const vaultProblem = saveProblem("History vault");
   return (
     <View style={settingsLayout.block}>
       {stored && (
@@ -464,6 +470,24 @@ function FloorSettings({
       {problem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {problem}
+        </Text>
+      )}
+      {stored && (
+        <LabeledSwitch
+          label="History vault"
+          value={stored.historyVault}
+          onChange={toggleVault}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default. On, the office keeps the prompts and the replies of each conversation in a
+        file on this host, readable by its owner only, so they can be searched from History after
+        the agent is gone.
+      </Text>
+      {vaultProblem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {vaultProblem}
         </Text>
       )}
       <SettingField

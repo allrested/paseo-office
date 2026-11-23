@@ -4,7 +4,7 @@ import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { dotTone, type DotTone } from "../shared/model.js";
 import { ActionButton } from "./action-button.js";
-import { OpenTimelineContext } from "./timeline-open.js";
+import { OpenHistoryContext, OpenTimelineContext } from "./timeline-open.js";
 import {
   feedCards,
   feedStore,
@@ -226,6 +226,7 @@ export function ActivityPanel({ office, styles, link, layout }: ColumnPanelProps
   const problem = loadProblem(subscription);
   // What the agents did before now: the lanes, their replay and the week.
   const openTimeline = useContext(OpenTimelineContext);
+  const openHistory = useContext(OpenHistoryContext);
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
@@ -247,6 +248,14 @@ export function ActivityPanel({ office, styles, link, layout }: ColumnPanelProps
                 label="Timeline"
                 pendingLabel="Timeline"
                 onPress={openTimeline}
+                styles={styles}
+              />
+            ) : null}
+            {openHistory ? (
+              <ActionButton
+                label="History"
+                pendingLabel="History"
+                onPress={openHistory}
                 styles={styles}
               />
             ) : null}

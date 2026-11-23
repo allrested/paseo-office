@@ -81,6 +81,11 @@ export function timelineFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "timeline.json");
 }
 
+/** What was said in each conversation, while the owner has the history vault on. */
+export function vaultFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "vault.json");
+}
+
 export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "tenure.json");
 }

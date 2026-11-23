@@ -516,6 +516,25 @@ surface is open on some device, at the directory's changes and the 5-second acti
 the office was closed is a gap in every lane, not a rest, and the week's figures count only what
 was seen. `office.timeline.request` reads it.
 
+## History vault and the prompt report
+
+**History vault** (Settings, host-wide, off by default) has the office keep what is said in each
+conversation: the prompts and the replies, not the tool calls. It reads an agent's timeline through
+Paseo when it first sees the agent and after each of its turns, for every provider, so it holds
+what was said while an office surface was open. A message is cut at 2,000 characters, a
+conversation at its newest 300 messages, and the vault at its 200 most recent conversations. It is
+one file on the host, `office/vault.json`, mode 600; turning the setting off stops the reading and
+hides what is kept, and deleting the file empties it.
+
+**History**, in the toolbar of a wide office and at the top of the Activity tab, searches it with **Find**: the
+newest 40 messages that hold every word typed, each with the words around the match. A hit opens
+its conversation, which stays readable after the agent is archived.
+
+**Prompt report**, the card's other tab, puts the last seven days' prompts in the vault against the
+prompt helper's rules (`shared/upstream/prompt-coach.js`): how many had nothing to improve, and for
+each rule how many prompts it spoke to, with up to three of them. It is worked out on the host by
+the helper's own code. No model reads the prompts.
+
 ## Streamer mode, graphics and sticky notes
 
 **Streamer mode** (Settings, host-wide, on by default) keeps file names, commands, search queries

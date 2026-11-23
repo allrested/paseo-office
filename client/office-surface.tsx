@@ -61,7 +61,8 @@ import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
 import { TimelineCard } from "./timeline-card.js";
-import { OpenTimelineContext } from "./timeline-open.js";
+import { OpenHistoryContext, OpenTimelineContext } from "./timeline-open.js";
+import { VaultCard } from "./vault-card.js";
 import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
@@ -876,6 +877,7 @@ interface ViewControlsProps {
   machine: Machine | null;
   onMachine?: () => void;
   onTimeline?: () => void;
+  onHistory?: () => void;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -926,6 +928,48 @@ function HostResourceButton({
   );
 }
 
+/** The toolbar's buttons for what was: the timeline and the history, each while it is offered. */
+function PastButtons({
+  onTimeline,
+  onHistory,
+  size,
+  color,
+  styles,
+}: {
+  onTimeline: (() => void) | undefined;
+  onHistory: (() => void) | undefined;
+  size: number;
+  color: string;
+  styles: OfficeStyles;
+}) {
+  return (
+    <>
+      {onTimeline ? (
+        <PanelButton
+          label="Timeline"
+          icon="History"
+          screenId="timeline"
+          size={size}
+          color={color}
+          onOpen={onTimeline}
+          styles={styles}
+        />
+      ) : null}
+      {onHistory ? (
+        <PanelButton
+          label="History"
+          icon="Archive"
+          screenId="history"
+          size={size}
+          color={color}
+          onOpen={onHistory}
+          styles={styles}
+        />
+      ) : null}
+    </>
+  );
+}
+
 /** The view switch and the settings button. */
 function ViewControls({
   keyboardVisible,
@@ -940,6 +984,7 @@ function ViewControls({
   machine,
   onMachine,
   onTimeline,
+  onHistory,
   onChange,
   compact,
   touchScreen,
@@ -982,14 +1027,12 @@ function ViewControls({
           styles={styles}
         />
       )}
-      {sidebars && onTimeline ? (
-        <PanelButton
-          label="Timeline"
-          icon="History"
-          screenId="timeline"
+      {sidebars ? (
+        <PastButtons
+          onTimeline={onTimeline}
+          onHistory={onHistory}
           size={touchScreen ? 20 : 16}
           color={color}
-          onOpen={onTimeline}
           styles={styles}
         />
       ) : null}
@@ -1796,23 +1839,27 @@ function OfficeContexts({
   brand,
   planUsage,
   onTimeline,
+  onHistory,
   children,
 }: {
   brand: OfficeState["state"]["brand"];
   planUsage: readonly PlanUsage[];
   onTimeline: (() => void) | undefined;
+  onHistory: (() => void) | undefined;
   children: ReactNode;
 }) {
   return (
     <OfficeBrandContext.Provider value={brand}>
       <PlanUsageContext.Provider value={planUsage}>
-        <OpenTimelineContext.Provider value={onTimeline}>{children}</OpenTimelineContext.Provider>
+        <OpenTimelineContext.Provider value={onTimeline}>
+          <OpenHistoryContext.Provider value={onHistory}>{children}</OpenHistoryContext.Provider>
+        </OpenTimelineContext.Provider>
       </PlanUsageContext.Provider>
     </OfficeBrandContext.Provider>
   );
 }
 
-/** The timeline card: offered and shown only while the office's data is live. */
+/** A card of the toolbar's, the timeline's or the history's: offered and shown only while the office's data is live. */
 function useTimelineCard(live: boolean) {
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
@@ -1898,6 +1945,7 @@ export function OfficeSurface(
   );
   const planUsage = usePlanUsage(live);
   const timeline = useTimelineCard(live);
+  const history = useTimelineCard(live);
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   // Until the host sends its duty list (an older host has none) nothing offers the duty board.
@@ -2116,6 +2164,7 @@ export function OfficeSurface(
       machine={machine}
       onMachine={hostEntry?.onOpen}
       onTimeline={timeline.onOpen}
+      onHistory={history.onOpen}
       onChange={changeView}
       compact={compact}
       touchScreen={touchScreen}
@@ -2247,6 +2296,7 @@ export function OfficeSurface(
         onClose={closeMachine}
       />
       <TimelineCard open={timeline.open} styles={styles} onClose={timeline.close} />
+      <VaultCard open={history.open} styles={styles} onClose={history.close} />
       <JanitorCard
         rows={contexts}
         open={janitorOpen && live}
@@ -2357,7 +2407,12 @@ export function OfficeSurface(
     </View>
   );
   return (
-    <OfficeContexts brand={office.state.brand} planUsage={planUsage} onTimeline={timeline.onOpen}>
+    <OfficeContexts
+      brand={office.state.brand}
+      planUsage={planUsage}
+      onTimeline={timeline.onOpen}
+      onHistory={history.onOpen}
+    >
       <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
         {surface}
       </OfficeDialogs>

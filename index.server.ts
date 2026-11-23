@@ -9,7 +9,7 @@ import { createStreetWatch, streetReaders } from "./server/street-watch.js";
 import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
-import { liftFile, tenureFile, timelineFile } from "./server/paths.js";
+import { liftFile, tenureFile, timelineFile, vaultFile } from "./server/paths.js";
 import { createDepartureArchiver } from "./server/home-departure.js";
 import {
   lifeSubscription,
@@ -45,6 +45,14 @@ import {
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
+import { promptReport } from "./shared/vault.js";
+import {
+  VAULT_TAIL_LIMIT,
+  VaultFileSchema,
+  createVault,
+  type Vault,
+  type VaultFile,
+} from "./server/vault.js";
 import {
   TIMELINE_KEEP_MS,
   TimelineFileSchema,
@@ -120,6 +128,9 @@ import {
   notesModesRpc,
   planUsageRpc,
   timelineRpc,
+  vaultReportRpc,
+  vaultSearchRpc,
+  vaultTalkRpc,
   teamRenameRpc,
   trackersSaveRpc,
   trackersTestRpc,
@@ -159,6 +170,8 @@ export interface OfficePluginDeps {
   tenureFile: LifeFile<TenureLedger>;
   /** Where the timeline is kept; without it the timeline lasts as long as the server. */
   timelineFile?: LifeFile<TimelineFile>;
+  /** Where the history vault is kept; without it the vault lasts as long as the server. */
+  vaultFile?: LifeFile<VaultFile>;
   liftFile: LifeFile<LiftKept>;
   /** The owner's duty list. */
   dutiesFile: LifeFile<DutiesFile>;
@@ -237,6 +250,35 @@ export function createOfficePlugin(
     deps.timelineFile === undefined
       ? null
       : createSaveQueue(deps.timelineFile, deps.clock, log, 30_000);
+  // Off until the settings are read: nothing is kept before the owner has said it may be.
+  let vaultOn = false;
+  let vault: Vault | null = null;
+  const vaultSaves =
+    deps.vaultFile === undefined ? null : createSaveQueue(deps.vaultFile, deps.clock, log, 30_000);
+  let stopVault: (() => void) | undefined;
+  const vaultReady = (async () => {
+    const kept = (await deps.vaultFile?.load()) ?? null;
+    vault = createVault(
+      {
+        tail: async (agentId) => {
+          const page = await holder
+            .require()
+            .agents.ref(agentId)
+            .timeline.refetch({ direction: "tail", limit: VAULT_TAIL_LIMIT });
+          return page.entries.map((entry) => ({
+            at: Date.parse(entry.timestamp),
+            seq: entry.seqEnd,
+            item: entry.item,
+          }));
+        },
+        on: () => vaultOn,
+        save: (file) => vaultSaves?.save(file),
+        log,
+      },
+      kept,
+    );
+    stopVault = hub.watch(vault.view);
+  })().catch((error: unknown) => log(`[office] history vault unavailable: ${errorMessage(error)}`));
   let stopTimeline: (() => void) | undefined;
   const timelineReady = (async () => {
     const kept = (await deps.timelineFile?.load()) ?? null;
@@ -470,6 +512,7 @@ export function createOfficePlugin(
   function settingsUnreadable(reason: string): void {
     agentToolsOn = false;
     stepsNamed = false;
+    vaultOn = false;
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
@@ -490,6 +533,7 @@ export function createOfficePlugin(
     hub.setBrand(hostBrand(state.values, deps.env));
     agentToolsOn = state.values.agentTools;
     stepsNamed = !state.values.streamerMode;
+    vaultOn = state.values.historyVault;
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);
@@ -698,6 +742,19 @@ export function createOfficePlugin(
     const end = Math.min(to, deps.clock.now());
     const start = Math.max(from, end - TIMELINE_KEEP_MS);
     return { ok: true as const, timeline: timeline.read(start, end) };
+  });
+  server.handle(vaultSearchRpc, async ({ query }) => {
+    await vaultReady;
+    return { on: vaultOn, hits: vaultOn ? (vault?.search(query) ?? []) : [] };
+  });
+  server.handle(vaultTalkRpc, async ({ agentId }) => {
+    await vaultReady;
+    return { talk: vaultOn ? (vault?.talk(agentId) ?? null) : null };
+  });
+  server.handle(vaultReportRpc, async () => {
+    await vaultReady;
+    const from = deps.clock.now() - 7 * 24 * 60 * 60 * 1000;
+    return { on: vaultOn, report: vault?.report(from) ?? promptReport([]) };
   });
   server.handle(planUsageRpc, async (_input, context) => {
     holder.remember(context.paseo);
@@ -917,6 +974,8 @@ export function createOfficePlugin(
     await lifeReady;
     stopLife?.();
     stopTimeline?.();
+    stopVault?.();
+    await vaultSaves?.flush();
     await timelineSaves?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
@@ -949,6 +1008,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
     timelineFile: createLifeFile(timelineFile(process.env, homedir()), TimelineFileSchema),
+    vaultFile: createLifeFile(vaultFile(process.env, homedir()), VaultFileSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     chatStore: createChatStore({

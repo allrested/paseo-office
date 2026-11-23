@@ -36,6 +36,7 @@ const COMPANY = {
   archiveOnDeparture: false,
   floorPlan: "pro",
   streamerMode: true,
+  historyVault: false,
   stickyNotes: "",
   ...WEATHER_DEFAULTS,
 };
