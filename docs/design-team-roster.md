@@ -73,8 +73,8 @@ Every team and every teammate has an id, made when its row is added and never sh
 store ids, not names, so:
 
 - changing a name's spelling renames whoever holds it, at once;
-- deleting a teammate or a team makes its holder show today's name, and the holder is treated as
-  passed over (it is not given another);
+- deleting a teammate or a team makes its holder show today's name, and the holder is marked
+  passed over: it is not given another now, and a later, longer roster reaches it by rule 8;
 - reordering changes nothing that is already handed out, only who is offered next;
 - adding a teammate or a team offers it by rule 8: to what was passed over, oldest first, then to
   the next new one.
@@ -103,7 +103,8 @@ Metadata, written by the office and never read by Paseo:
 
 A passed-over mark older than the settings' edition reads as not looked at yet (rule 8). An id
 that is no longer in the settings reads as passed over at the current edition: deleting a name
-gives its holder no other.
+gives its holder no other. The office then writes the edition over that id, and over a teammate's
+id on an agent now in a workspace of another team, so the mark says what it reads as.
 
 ## Parts
 

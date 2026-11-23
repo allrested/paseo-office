@@ -174,17 +174,97 @@ test("switching on with no team marks everything, and the first team then reache
   ]);
 });
 
-test("a deleted team or teammate gives its holder no other", () => {
+test("a deleted team or teammate gives its holder no other, and it is marked passed over", () => {
   const workspaces = [ws("w1", 0, "gone-team"), ws("w2", 1, "dev")];
-  const agents = [agent("a1", "w2", 2, "gone-member"), agent("a2", "w2", 3)];
-  // w1 is not offered PR-QA; a1 is not offered a teammate; a2 is new and takes the first.
-  expect(planRoster(ROSTER, workspaces, agents)).toEqual([member("a2", "tj")]);
+  const agents = [
+    agent("a0", "w1", 1, "gone-member"),
+    agent("a1", "w2", 2, "gone-member"),
+    agent("a2", "w2", 3),
+  ];
+  // w1 is not offered PR-QA; a1 is not offered a teammate; a2 is new and takes the first. a0 is
+  // in a workspace without a team: nothing names it either way.
+  expect(planRoster(ROSTER, workspaces, agents)).toEqual([
+    team("w1", 1),
+    member("a1", 1),
+    member("a2", "tj"),
+  ]);
+});
+
+test("a deleted teammate's holder is offered a name again once the roster grows", () => {
+  const workspaces = [ws("w1", 0, "dev")];
+  const agents = [agent("a1", "w1", 1, "gone-member")];
+  const first = planRoster(ROSTER, workspaces, agents);
+  expect(first).toEqual([member("a1", 1)]);
+  const after = stored(workspaces, agents, first);
+  expect(planRoster(ROSTER, after.workspaces, after.agents)).toEqual([]);
+  expect(planRoster({ ...ROSTER, edition: 2 }, after.workspaces, after.agents)).toEqual([
+    member("a1", "tj"),
+  ]);
 });
 
 test("a teammate of another team reads as passed over", () => {
   const workspaces = [ws("w2", 1, "qa")];
   const agents = [agent("moved", "w2", 2, "tj"), agent("b1", "w2", 3)];
-  expect(planRoster(ROSTER, workspaces, agents)).toEqual([member("b1", "rosalyn")]);
+  expect(planRoster(ROSTER, workspaces, agents)).toEqual([
+    member("moved", 1),
+    member("b1", "rosalyn"),
+  ]);
+});
+
+test("an agent that moves away and back does not show the teammate handed on meanwhile", () => {
+  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa")];
+  // m held tj in w1 and is now in w2; n is new in w1.
+  const away = [agent("m", "w2", 1, "tj"), agent("n", "w1", 2)];
+  const planned = planRoster(ROSTER, workspaces, away);
+  expect(planned).toEqual([member("n", "tj"), member("m", 1)]);
+  const after = stored(workspaces, away, planned);
+  const back = after.agents.map((entry) =>
+    entry.id === "m" ? { ...entry, workspaceId: "w1" } : entry,
+  );
+  expect(planRoster(ROSTER, after.workspaces, back)).toEqual([]);
+  expect([...rosterNames(ROSTER, after.workspaces, back).members]).toEqual([["n", "Tze Jun Tan"]]);
+});
+
+test("the marks are kept through off and on again", () => {
+  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, 1)];
+  const agents = [
+    agent("a1", "w1", 1, "tj"),
+    agent("a2", "w1", 2, "zaki"),
+    agent("b1", "w2", 3, 1),
+  ];
+  expect(planRoster({ ...ROSTER, on: false }, workspaces, agents)).toEqual([]);
+  expect(planRoster(ROSTER, workspaces, agents)).toEqual([]);
+});
+
+test("a longer roster and an archive together: the passed over are looked at first", () => {
+  const grown: Roster = {
+    ...ROSTER,
+    edition: 2,
+    teams: [
+      { ...ROSTER.teams[0], members: [...ROSTER.teams[0].members, { id: "ali", name: "Ali" }] },
+      ROSTER.teams[1],
+    ],
+  };
+  // a2 (zaki) was archived; a5 was passed over at edition 1; a6 is new.
+  const workspaces = [ws("w1", 0, "dev")];
+  const agents = [
+    agent("a1", "w1", 1, "tj"),
+    agent("a3", "w1", 3, "shashwat"),
+    agent("a4", "w1", 4, "taufik"),
+    agent("a5", "w1", 5, 1),
+    agent("a6", "w1", 6),
+  ];
+  expect(planRoster(grown, workspaces, agents)).toEqual([
+    member("a5", "zaki"),
+    member("a6", "ali"),
+  ]);
+});
+
+test("a sub-agent draws from its workspace's list like any agent", () => {
+  // child is a1's sub-agent in the caller's eyes; the planner sees two agents of w1.
+  const workspaces = [ws("w1", 0, "dev")];
+  const agents = [agent("a1", "w1", 1, "tj"), agent("child", "w1", 2)];
+  expect(planRoster(ROSTER, workspaces, agents)).toEqual([member("child", "zaki")]);
 });
 
 test("an agent without a workspace and a roster that is off are left alone", () => {

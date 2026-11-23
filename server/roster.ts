@@ -34,6 +34,10 @@ function open(mark: RosterMark | undefined, edition: number): boolean {
   return mark === undefined || (typeof mark === "number" && mark < edition);
 }
 
+/** An id that names nothing here any more: its holder is passed over at this edition. */
+const lost = (mark: RosterMark | undefined, found: unknown): boolean =>
+  typeof mark === "string" && found === null;
+
 function oldestFirst<Entry extends { id: string }>(
   entries: readonly Entry[],
   madeAt: (entry: Entry) => string | undefined,
@@ -59,7 +63,9 @@ function agentsByWorkspace(agents: readonly RosterAgent[]): Map<string, RosterAg
  * not looked at yet, oldest first, take the first team no listed workspace holds; agents of a
  * workspace with a team, oldest first, take its first teammate no listed agent there holds. One
  * the roster has nothing left for gets the edition, so a name freed later goes to a new one and
- * never to it. Every workspace's write comes before any agent's. Nothing when the roster is off.
+ * never to it. An id that no longer names a team, or a teammate of the workspace's team, is
+ * written over with the edition: its holder is passed over, and only a longer roster reaches it.
+ * Every workspace's write comes before any agent's. Nothing when the roster is off.
  */
 export function planRoster(
   roster: Roster,
@@ -84,6 +90,10 @@ export function planRoster(
     held.add(team.id);
   }
   for (const workspace of ordered) {
+    if (lost(workspace.roster, teamOf(roster, workspace.roster))) {
+      writes.push({ kind: "workspace", id: workspace.id, mark: roster.edition });
+      continue;
+    }
     if (!open(workspace.roster, roster.edition)) continue;
     const team = roster.teams.find((candidate) => !held.has(candidate.id));
     writes.push({ kind: "workspace", id: workspace.id, mark: team?.id ?? roster.edition });
@@ -95,17 +105,32 @@ export function planRoster(
     const team = teams.get(workspace.id);
     if (team === undefined) continue;
     const own = oldestFirst(members.get(workspace.id) ?? [], (agent) => agent.createdAt);
-    const taken = new Set<string>();
-    for (const agent of own) {
-      const member = memberOf(team, agent.roster);
-      if (member !== null) taken.add(member.id);
+    writes.push(...planMembers(team, own, roster.edition));
+  }
+  return writes;
+}
+
+/** The writes for the agents of one workspace with a team, oldest first. */
+function planMembers(
+  team: RosterTeam,
+  own: readonly RosterAgent[],
+  edition: number,
+): RosterWrite[] {
+  const writes: RosterWrite[] = [];
+  const taken = new Set<string>();
+  for (const agent of own) {
+    const member = memberOf(team, agent.roster);
+    if (member !== null) taken.add(member.id);
+  }
+  for (const agent of own) {
+    if (lost(agent.roster, memberOf(team, agent.roster))) {
+      writes.push({ kind: "agent", id: agent.id, mark: edition });
+      continue;
     }
-    for (const agent of own) {
-      if (!open(agent.roster, roster.edition)) continue;
-      const member = team.members.find((candidate) => !taken.has(candidate.id));
-      writes.push({ kind: "agent", id: agent.id, mark: member?.id ?? roster.edition });
-      if (member !== undefined) taken.add(member.id);
-    }
+    if (!open(agent.roster, edition)) continue;
+    const member = team.members.find((candidate) => !taken.has(candidate.id));
+    writes.push({ kind: "agent", id: agent.id, mark: member?.id ?? edition });
+    if (member !== undefined) taken.add(member.id);
   }
   return writes;
 }
