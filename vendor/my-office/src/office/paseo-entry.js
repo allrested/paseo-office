@@ -481,6 +481,8 @@ const api = {
     if (!started || !e || !sessions.has(e.sess)) return;
     if (e.type === 'testend') { clearRun(e.sess); return; }
     if (e.type === 'subwait') { waitOnSubs(e.sess); return; }
+    // a provider's own sub-agent: `agent` is its id, `label` its kind, the name over its head
+    if (e.type === 'substart' || e.type === 'substop') { if (e.agent) onEvent({ ts: Date.now(), sess: e.sess, type: e.type, agent: e.agent, label: e.label || '' }); return; }
     // the test board writes a run's label beside its result: Paseo gives the time it ended
     const ended = e.type === 'testok' || e.type === 'testfail';
     onEvent({ ts: Date.now(), sess: e.sess, type: e.type, label: ended ? clockTime() : '', of: e.of });

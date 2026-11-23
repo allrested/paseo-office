@@ -199,7 +199,7 @@ cards, voice, push notifications and prompt rewriting are not. All seven staff h
 ### What the scene is told
 
 Paseo sends the scene who is there and what kind of thing each person does (`client/world/
-world-api.ts`), never a file name, a command or a prompt. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It sends the day's duties (`setDuties`): each one's name, chore, holder and state, never its instructions. It also sends the weather mode or reading and the open incidents' keys
+world-api.ts`), never a file name, a command or a prompt. It sends the sub-agents a provider runs inside an agent’s session, each by an id and the kind of sub-agent the provider names (`subs`, then `substart` and `substop`), for upstream’s own sub-agent scene. It sends each agent’s reported spending and, through `office.life`, the repository birthdays, team tenure and lift servicing. It sends the day's duties (`setDuties`): each one's name, chore, holder and state, never its instructions. It also sends the weather mode or reading and the open incidents' keys
 and titles for the banner. A translated scene receives its language and dictionary. The scene runs in upstream's streamer mode, which writes "a file" and
 "a command" where upstream would write the name, and the entry keeps the feed and the counts
 upstream's server would keep, from the moment the office opens.

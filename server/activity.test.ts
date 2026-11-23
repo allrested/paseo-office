@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Checklists, ChecklistCounts } from "../shared/contracts.js";
+import type { Checklists, ChecklistCounts, SubagentCalls } from "../shared/contracts.js";
 import {
   ACTIVITY_INTERVAL_MS,
   callsIn,
@@ -7,6 +7,7 @@ import {
   describeStep,
   nextStep,
   readChecklist,
+  runningSubagents,
   startActivityPoller,
   type ActivityItem,
   type ActivityPoller,
@@ -447,6 +448,7 @@ interface PollerHarness {
   steps: Record<string, ActivityStep>[];
   checklists: Checklists[];
   counts: ChecklistCounts[];
+  subagents: SubagentCalls[];
   logs: string[];
   poller: ActivityPoller;
 }
@@ -458,6 +460,7 @@ function startHarness(running: string[], tails: Map<string, ActivityItem[]>): Po
   const steps: Record<string, ActivityStep>[] = [];
   const checklists: Checklists[] = [];
   const counts: ChecklistCounts[] = [];
+  const subagents: SubagentCalls[] = [];
   const logs: string[] = [];
   const poller = startActivityPoller({
     running: () => running,
@@ -469,14 +472,27 @@ function startHarness(running: string[], tails: Map<string, ActivityItem[]>): Po
     },
     timers: clock,
     log: (message) => logs.push(message),
-    onChange: (activity, doing, report, progress) => {
+    onChange: (activity, doing, report, progress, working) => {
+      subagents.push({ ...working });
       counts.push({ ...progress });
       changes.push({ ...activity });
       steps.push({ ...doing });
       checklists.push({ ...report });
     },
   });
-  return { clock, running, tails, reads, changes, steps, checklists, counts, logs, poller };
+  return {
+    clock,
+    running,
+    tails,
+    reads,
+    changes,
+    steps,
+    checklists,
+    counts,
+    subagents,
+    logs,
+    poller,
+  };
 }
 
 test("reads each running agent once per interval and reports only changes", async () => {
@@ -754,4 +770,61 @@ test("a completion beyond the step text cap still updates the total", async () =
     { a: { completed: 1, total: 81 } },
   ]);
   h.poller.stop();
+});
+
+const subCall = (callId: string, patch: Partial<ActivityItem> = {}): ActivityItem => ({
+  type: "tool_call",
+  name: "Agent",
+  status: "running",
+  callId,
+  detail: { type: "sub_agent", subAgentType: "Explore", description: "Find the secret plan" },
+  ...patch,
+});
+
+test("an agent's running sub-agent calls are its sub-agents, told by kind and never by task", () => {
+  const found = runningSubagents([
+    subCall("c1"),
+    { type: "tool_call", name: "Bash", status: "running", callId: "c2" },
+    subCall("c3", { status: "completed" }),
+    // A provider that names no kind, and one the host knows only by the tool's name.
+    subCall("c4", { detail: { type: "sub_agent" } }),
+    { type: "tool_call", name: "Task", status: "running", callId: "c5" },
+    // The same call twice in a tail is one sub-agent; a call with no id cannot be followed.
+    subCall("c1"),
+    subCall("", {}),
+  ]);
+  expect(found).toEqual([
+    { id: "c1", type: "Explore" },
+    { id: "c4", type: "agent" },
+    { id: "c5", type: "agent" },
+  ]);
+  expect(JSON.stringify(found)).not.toContain("secret");
+  expect(runningSubagents([{ type: "assistant_message" }])).toEqual([]);
+});
+
+test("the poller reports sub-agents as they start and end, and nothing while they stay", async () => {
+  const tails = new Map<string, ActivityItem[]>([["a", [subCall("c1")]]]);
+  const harness = startHarness(["a"], tails);
+  await settle();
+  expect(harness.subagents).toEqual([{ a: [{ id: "c1", type: "Explore" }] }]);
+
+  harness.clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(harness.subagents).toHaveLength(1);
+
+  tails.set("a", [subCall("c1"), subCall("c2")]);
+  harness.clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(harness.subagents.at(-1)).toEqual({
+    a: [
+      { id: "c1", type: "Explore" },
+      { id: "c2", type: "Explore" },
+    ],
+  });
+
+  tails.set("a", [subCall("c1", { status: "completed" }), subCall("c2", { status: "completed" })]);
+  harness.clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(harness.subagents.at(-1)).toEqual({});
+  harness.poller.stop();
 });

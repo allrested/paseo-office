@@ -120,6 +120,16 @@ export const WorkspacePullRequestSchema = z.object({
 });
 export type WorkspacePullRequest = z.output<typeof WorkspacePullRequestSchema>;
 
+/**
+ * A sub-agent a provider runs inside an agent's own session, as the tool call that started it.
+ * It is no Paseo agent: it has no session of its own. `type` is the kind of sub-agent the
+ * provider names ("Explore"), never its task.
+ */
+export const SubagentCallSchema = z.object({ id: z.string(), type: z.string() });
+export type SubagentCall = z.output<typeof SubagentCallSchema>;
+export const SubagentCallsSchema = z.record(z.string(), z.array(SubagentCallSchema));
+export type SubagentCalls = z.output<typeof SubagentCallsSchema>;
+
 export const OfficeWorkspaceSchema = z.object({
   id: z.string(),
   /** The name its team goes by: the office's own when the owner gave one, else the workspace's. */
@@ -471,6 +481,8 @@ export const OfficeSnapshotSchema = z.object({
   activity: z.record(z.string(), z.string()),
   /** The step of each running agent: the tool call it is at, or made since the read before. */
   doing: z.record(z.string(), ActivityStepSchema).optional(),
+  /** The provider's own sub-agents each running agent has at work now; absent from an older server. */
+  subagents: SubagentCallsSchema.optional(),
   /** Each agent's own checklist, kept after the agent stops. */
   checklists: ChecklistsSchema.optional(),
   checklistProgress: ChecklistCountsSchema.optional(),
@@ -496,6 +508,7 @@ export const OfficeEventSchema = z.discriminatedUnion("type", [
     type: z.literal("activity"),
     activity: z.record(z.string(), z.string()),
     doing: z.record(z.string(), ActivityStepSchema).optional(),
+    subagents: SubagentCallsSchema.optional(),
     checklists: ChecklistsSchema.optional(),
     checklistProgress: ChecklistCountsSchema.optional(),
   }),

@@ -7,6 +7,8 @@ import type {
   OfficeSnapshot,
   OfficeWorkspace,
   Post,
+  SubagentCall,
+  SubagentCalls,
 } from "./contracts.js";
 import { dutyRows, type DutyRow } from "./duties.js";
 import { DUTY, LOBBY } from "./names.js";
@@ -26,6 +28,11 @@ export interface OfficeRow {
    * them, so it is not idle. 0 for everyone else.
    */
   waitingOn: number;
+  /**
+   * The provider's own sub-agents a running agent has at work, inside its session. They are no
+   * agents of the office: only the 3D floor draws them. Absent for an agent with none.
+   */
+  subagents?: readonly SubagentCall[];
 }
 
 export interface OfficeRoom {
@@ -170,6 +177,7 @@ function orderRows(
   activity: Readonly<Record<string, string>>,
   doing: Readonly<Record<string, ActivityStep>>,
   waitingOn: ReadonlyMap<string, number>,
+  subagents: Readonly<SubagentCalls> = {},
 ): OfficeRow[] {
   const sorted = [...agents].sort(byCreation);
   const ids = new Set(sorted.map((agent) => agent.id));
@@ -195,6 +203,7 @@ function orderRows(
       activity: running ? (activity[agent.id] ?? null) : null,
       step: running ? (doing[agent.id] ?? null) : null,
       waitingOn: waitingOn.get(agent.id) ?? 0,
+      ...(running && subagents[agent.id]?.length ? { subagents: subagents[agent.id] } : {}),
     });
     for (const child of children.get(agent.id) ?? []) visit(child, 1);
   }
@@ -280,7 +289,13 @@ export function buildOfficeModel(state: OfficeSnapshot): OfficeModel {
       subtitle,
       lobby,
       workspace,
-      rows: orderRows(byRoom.get(id) ?? [], state.activity, state.doing ?? {}, waitingOn),
+      rows: orderRows(
+        byRoom.get(id) ?? [],
+        state.activity,
+        state.doing ?? {},
+        waitingOn,
+        state.subagents,
+      ),
       posts: visiblePosts(posts),
       todos,
     };

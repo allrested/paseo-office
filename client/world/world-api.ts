@@ -44,7 +44,11 @@ export interface WorldSession {
    * Paseo's `paseo-entry.js` does, for the `subwait` bubble.
    */
   waitingOn?: number;
-  subs: never[];
+  /**
+   * The provider's own sub-agents the agent has at work. The scene seats the ones already there
+   * when the person is first drawn; later ones come by `substart` and go by `substop`.
+   */
+  subs: { id: string; type: string }[];
   /**
    * The context window, in tokens: the paper on the desk grows with it, and a flag stands in it
    * from 85%. Absent when the provider has not said.
@@ -59,6 +63,10 @@ export interface WorldSession {
 export interface WorldEvent {
   sess: string;
   type: WorldEventType;
+  /** On `substart` and `substop`: the sub-agent's id. */
+  agent?: string;
+  /** On `substart`: the kind of sub-agent, which is the name over its head. */
+  label?: string;
   /** On a `fail` that is not the agent's own: what failed. The scene words the bubble by it. */
   of?: "deploy";
 }
@@ -77,6 +85,9 @@ export type WorldEventType =
   | "web"
   | "mcp"
   | "agent"
+  /** A sub-agent of the provider's own comes in through the door, and leaves with its report. */
+  | "substart"
+  | "substop"
   | "plan"
   | "test"
   | "commit"

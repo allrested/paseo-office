@@ -243,6 +243,46 @@ describe("what changed, as things the people do", () => {
     ]);
   });
 
+  it("brings a provider's own sub-agent in through the door, and sends it out when its call ends", () => {
+    const withSubs = (calls: { id: string; type: string }[]) =>
+      worldPeople(
+        buildOfficeModel({
+          ...office([agent("1", { status: "running" })]),
+          subagents: calls.length > 0 ? { "1": calls } : undefined,
+        }),
+        PLAN_DESKS.pro,
+      );
+    const none = withSubs([]);
+    const one = withSubs([{ id: "c1", type: "Explore" }]);
+    const two = withSubs([
+      { id: "c1", type: "Explore" },
+      { id: "c2", type: "agent" },
+    ]);
+
+    // The scene keys a sub-agent by its parent and its call: a call's id is the session's own.
+    expect(one.sessions[0]?.subs).toEqual([{ id: "1:c1", type: "Explore" }]);
+    expect(worldEvents(rememberPeople(none), one)).toEqual([
+      { sess: "1", type: "substart", agent: "1:c1", label: "Explore" },
+    ]);
+    expect(worldEvents(rememberPeople(one), two)).toEqual([
+      { sess: "1", type: "substart", agent: "1:c2", label: "agent" },
+    ]);
+    expect(worldEvents(rememberPeople(two), one)).toEqual([
+      { sess: "1", type: "substop", agent: "1:c2" },
+    ]);
+    // Whoever opens the office finds them already there: the scene seats them from `subs`.
+    expect(worldEvents(null, two)).toEqual([]);
+    // An agent that has stopped has none, whatever the last read said.
+    const stopped = worldPeople(
+      buildOfficeModel({
+        ...office([agent("1")]),
+        subagents: { "1": [{ id: "c1", type: "Explore" }] },
+      }),
+      PLAN_DESKS.pro,
+    );
+    expect(stopped.sessions[0]?.subs).toEqual([]);
+  });
+
   it("sends an agent that turns busy with a sub-agent to wait at its desk, with no prompt", () => {
     const sub = (status: OfficeAgent["status"]) => agent("2", { parentAgentId: "1", status });
     const resting = people([agent("1"), sub("idle")]);
