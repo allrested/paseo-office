@@ -89,6 +89,7 @@ const ON: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    chatCulture: "international",
     stickyNotes: "",
   },
 };
@@ -105,6 +106,7 @@ const OFF: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    chatCulture: "international",
     stickyNotes: "",
   },
 };
@@ -619,6 +621,7 @@ function notesSettings(
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      chatCulture: "international",
       stickyNotes: "",
     },
   };
@@ -1102,6 +1105,7 @@ const NOTES: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    chatCulture: "international",
     stickyNotes: "",
   },
 };
@@ -1155,6 +1159,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      chatCulture: "international",
       stickyNotes: "",
     },
   });
@@ -1516,6 +1521,7 @@ const JIRA_ON: SettingsState = {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    chatCulture: "international",
     stickyNotes: "",
     jiraProjects: "OPS",
   },

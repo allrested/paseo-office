@@ -39,6 +39,7 @@ const COMPANY = {
   historyVault: false,
   pinnedNotes: "",
   cacheClock: "1h",
+  chatCulture: "international",
   stickyNotes: "",
   ...WEATHER_DEFAULTS,
 };
@@ -311,4 +312,14 @@ test("sticky notes are the setting's text split at ; and cut to what the board h
     streamerMode: true,
     stickyNotes: "",
   });
+});
+
+test("the team chat writes for any office until a host chooses, and an unknown choice does too", () => {
+  expect(officeHostSettings.schema.parse({}).chatCulture).toBe("international");
+  expect(officeHostSettings.schema.parse({ chatCulture: "indonesian" }).chatCulture).toBe(
+    "indonesian",
+  );
+  expect(officeHostSettings.schema.parse({ chatCulture: "martian" }).chatCulture).toBe(
+    "international",
+  );
 });

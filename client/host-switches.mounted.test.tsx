@@ -147,6 +147,7 @@ beforeEach(() => {
     historyVault: false,
     pinnedNotes: "",
     cacheClock: "1h",
+    chatCulture: "international",
     stickyNotes: "",
     ...NO_TRACKERS,
   };
@@ -209,6 +210,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         historyVault: false,
         pinnedNotes: "",
         cacheClock: "1h",
+        chatCulture: "international",
         stickyNotes: "",
         ...NO_TRACKERS,
       },
@@ -270,6 +272,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       historyVault: false,
       pinnedNotes: "",
       cacheClock: "1h",
+      chatCulture: "international",
       stickyNotes: "",
       ...NO_TRACKERS,
     },

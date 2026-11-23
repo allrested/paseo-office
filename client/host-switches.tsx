@@ -9,9 +9,11 @@ import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
 import {
   CACHE_CLOCKS,
+  CHAT_CULTURES,
   officeHostSettings,
   STICKY_NOTES_MAX,
   type CacheClock,
+  type ChatCulture,
   STICKY_NOTE_MAX,
   type FloorPlanChoice,
 } from "../shared/settings.js";
@@ -39,6 +41,7 @@ type HostSetting =
   | "History vault"
   | "Pinned notes"
   | "Cache clock"
+  | "Team chat"
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
@@ -438,6 +441,12 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
   );
 }
 
+const CHAT_CULTURE_NAMES: Readonly<Record<ChatCulture, string>> = {
+  international: "International",
+  indonesian: "Indonesia",
+  vietnamese: "Vietnam",
+};
+
 const CACHE_CLOCK_NAMES: Readonly<Record<CacheClock, string>> = {
   off: "No cup",
   "5m": "5 minutes",
@@ -470,6 +479,11 @@ function FloorSettings({
     [change],
   );
   const cacheProblem = saveProblem("Cache clock");
+  const saveCulture = useCallback(
+    (next: ChatCulture) => void change("Team chat", { chatCulture: next }),
+    [change],
+  );
+  const cultureProblem = saveProblem("Team chat");
   return (
     <View style={settingsLayout.block}>
       {stored && (
@@ -534,6 +548,36 @@ function FloorSettings({
         {cacheProblem && (
           <Text accessibilityRole="alert" style={styles.actionError}>
             {cacheProblem}
+          </Text>
+        )}
+      </View>
+      <View style={styles.headerField}>
+        <Text style={styles.sheetLabel}>Team chat</Text>
+        <View
+          role="group"
+          aria-label="Team chat"
+          style={stored ? styles.segments : styles.segmentsDisabled}
+        >
+          {CHAT_CULTURES.map((value) => (
+            <SegmentPill
+              key={value}
+              value={value}
+              name={CHAT_CULTURE_NAMES[value]}
+              on={stored?.chatCulture === value}
+              disabled={stored === null}
+              onPress={saveCulture}
+              styles={styles}
+            />
+          ))}
+        </View>
+        <Text style={styles.fieldHint}>
+          Whose lunch, prices and places the team chat&apos;s people write about. Indonesia also
+          writes in Indonesian; the other two write in English. It changes what is written from now
+          on, not the lines already in the chat.
+        </Text>
+        {cultureProblem && (
+          <Text accessibilityRole="alert" style={styles.actionError}>
+            {cultureProblem}
           </Text>
         )}
       </View>
