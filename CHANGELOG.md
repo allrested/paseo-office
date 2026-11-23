@@ -2,6 +2,17 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.8 (2026-11-23)
+
+- What eats your plan: under This week, the five agents that used the most, by cost where
+  reported and by time at work otherwise (#36).
+- Forgotten work: the Host card checks each workspace's folder and its repository's other
+  worktrees for files not committed, commits no remote has, and stashes (#36).
+- Models: the Host card lists each agent that has sub-agents with the models they run on (#36).
+- The cache clock: a resting desk's cup steams while the session's prompt cache is taken to be
+  warm, estimated from the end of its last turn. An hour by default; five minutes or no cup in
+  the settings (#36).
+
 ## 0.2.7 (2026-11-23)
 
 - The office notices, as cards in the Attention strip: the same call failing three times running
