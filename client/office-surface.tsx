@@ -849,6 +849,17 @@ function useBoardSheet(model: OfficeModel, live: boolean): BoardSheetState {
   return { room, open: setRoomId, close };
 }
 
+/** An agent chosen on a board: the board leaves, and the agent opens as it does from its desk. */
+function useBoardSelect(close: () => void, select: (agentId: string) => void) {
+  return useCallback(
+    (agentId: string) => {
+      close();
+      select(agentId);
+    },
+    [close, select],
+  );
+}
+
 interface CardOpening {
   open: boolean;
   /** When the card last opened: the notes line's "today", the incidents' ages. */
@@ -2080,6 +2091,7 @@ export function OfficeSurface(
     selectFromStrip,
     showAgentWorkspace,
   );
+  const selectFromBoard = useBoardSelect(board.close, panels.selectAgent);
   // The writer opens in the column like any session; the office is left only by "Open in workspace".
   const openWriter = useCallback(
     (agentId: string) => {
@@ -2449,6 +2461,8 @@ export function OfficeSurface(
         wakesPaused={office.state.wake.paused}
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
+        onSelectAgent={selectFromBoard}
+        onOpenBoard={board.open}
         onClose={board.close}
       />
       <DutySheet

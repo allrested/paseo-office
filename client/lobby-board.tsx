@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
-import { POST_TEXT_MAX, type ChecklistStep, type Post } from "../shared/contracts.js";
-import type { AgentTaskGroup } from "../shared/model.js";
+import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
 import { AgentPicker } from "./agent-picker.js";
 import { NOBODY } from "./agent-picker-text.js";
+import { BoardTeams } from "./board-agents.js";
 import { PostWithActions, WakeField, useWakeChoice, type SheetBodyProps } from "./board-sheet.js";
-import { clearQuestion, stepMark, todoMeta } from "./board-text.js";
+import { clearQuestion, officeWork, todoMeta } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 import { listenForSpace } from "./web-env.web.js";
@@ -189,53 +189,15 @@ function TodoHeading({ board, done, actions, styles }: TodoHeadingProps) {
   );
 }
 
-interface StepLine {
-  key: string;
-  text: string;
+export interface LobbyBodyProps extends SheetBodyProps {
+  /** A room's name was chosen under "Agent tasks": that room's board opens. */
+  onOpenBoard(roomId: string): void;
 }
 
 /**
- * A step's line, with a key: a step has no id, and a checklist may repeat a line ("Run tests"),
- * so the key is the text and how many times it has come so far.
+ * The lobby's board: a to-do list, the lobby's notes, and who is at work in every room, each with
+ * what it is at and the steps it is working through.
  */
-function stepLines(steps: readonly ChecklistStep[]): StepLine[] {
-  const seen = new Map<string, number>();
-  return steps.map((step) => {
-    const count = (seen.get(step.text) ?? 0) + 1;
-    seen.set(step.text, count);
-    return { key: `${count}:${step.text}`, text: `${stepMark(step.status)} ${step.text}` };
-  });
-}
-
-interface TaskGroupProps {
-  group: AgentTaskGroup;
-  name(author: string): string;
-  styles: OfficeStyles;
-}
-
-/** An agent's name, then its unfinished steps in its own order, one line each. Read only. */
-function TaskGroup({ group, name, styles }: TaskGroupProps) {
-  const lines = useMemo(() => stepLines(group.steps), [group.steps]);
-  return (
-    <View style={styles.lobbyTask}>
-      <View style={styles.post}>
-        <Text style={styles.rowTitle}>{name(group.agentId)}</Text>
-        {lines.map((line) => (
-          <Text key={line.key} style={styles.postText}>
-            {line.text}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-export interface LobbyBodyProps extends SheetBodyProps {
-  /** Every agent's unfinished checklist steps, in the office's order. */
-  agentTasks: readonly AgentTaskGroup[];
-}
-
-/** The lobby's board: a to-do list, the lobby's notes, and the steps each agent is working through. */
 export function LobbyBody({
   room,
   rooms,
@@ -245,6 +207,8 @@ export function LobbyBody({
   wakesPaused,
   picking,
   onPicking,
+  onSelectAgent,
+  onOpenBoard,
   styles,
 }: LobbyBodyProps) {
   const [text, setText] = useState("");
@@ -282,6 +246,7 @@ export function LobbyBody({
   const done = room.todos.filter((post) => post.state === "done").length;
   // The lobby's tasks are the to-dos; what is left of its posts are notes, oldest first.
   const notes = useMemo(() => room.posts.filter((post) => post.kind === "note"), [room.posts]);
+  const teams = useMemo(() => officeWork(rooms, agentTasks), [rooms, agentTasks]);
   if (picking) {
     return (
       <AgentPicker
@@ -365,10 +330,16 @@ export function LobbyBody({
         <Text accessibilityRole="header" style={styles.lobbyHeading}>
           Agent tasks
         </Text>
-        {agentTasks.length === 0 ? <Text style={styles.muted}>No agent tasks</Text> : null}
-        {agentTasks.map((group) => (
-          <TaskGroup key={group.agentId} group={group} name={name} styles={styles} />
-        ))}
+        {teams.length === 0 ? (
+          <Text style={styles.muted}>No agent tasks</Text>
+        ) : (
+          <BoardTeams
+            teams={teams}
+            styles={styles}
+            onSelectAgent={onSelectAgent}
+            onOpenBoard={onOpenBoard}
+          />
+        )}
       </View>
     </View>
   );

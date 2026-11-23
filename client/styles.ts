@@ -269,6 +269,21 @@ export interface OfficeStyles {
   boardPosts: ViewStyle;
   /** One post in the sheet with its buttons. */
   boardPost: ViewStyle;
+  /** The agents on a board: who sits in the room, what each is at and the steps each has left. */
+  boardAgents: ViewStyle;
+  /** One of them: a to-do's box around its name and its steps. */
+  boardAgent: ViewStyle;
+  /** The agent's name and what it is at, with a row's dot before them. A press opens the agent. */
+  boardAgentHead: ViewStyle;
+  boardAgentTitle: TextStyle;
+  /** The steps left of its checklist, on the name's rail. */
+  boardAgentSteps: ViewStyle;
+  /** The lobby's board: each room's name over its agents. */
+  boardTeams: ViewStyle;
+  boardTeam: ViewStyle;
+  /** A room's name, which opens that room's board. */
+  boardTeamHead: ViewStyle;
+  boardTeamName: TextStyle;
   lobbyForm: ViewStyle;
   lobbySection: ViewStyle;
   lobbyHeading: TextStyle;
@@ -1181,6 +1196,46 @@ export function useOfficeStyles(
       // A post and its buttons are one block: closer to each other than to the next post.
       boardPosts: { gap: 16 },
       boardPost: { gap: 8 },
+      boardAgents: { gap: 6 },
+      boardAgent: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        overflow: "hidden",
+      },
+      boardAgentHead: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: DOT_GAP,
+        minHeight: TOUCH_CONTROL,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+      },
+      // The name of the steps under it, and what a press opens.
+      boardAgentTitle: { ...base, color: colors.foreground, fontWeight: "500" },
+      // Pulled up into the name's own padding, so the steps read as its lines, not as a second block.
+      boardAgentSteps: {
+        marginTop: -8,
+        paddingLeft: 12 + TEXT_RAIL,
+        paddingRight: 12,
+        paddingBottom: 12,
+        gap: 2,
+      },
+      boardTeams: { gap: 12 },
+      boardTeam: { gap: 4 },
+      boardTeamHead: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        maxWidth: "100%",
+        minHeight: controlHeight,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        gap: 4,
+        overflow: "hidden",
+      },
+      boardTeamName: { ...base, flexShrink: 1, color: colors.foreground, fontWeight: "500" },
       lobbyForm: {
         padding: 12,
         gap: 6,
