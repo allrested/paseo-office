@@ -19,6 +19,8 @@ export function createLifeFeed(deps: {
   let connected = false;
   /** The name each workspace went by at the last view, to tell a rename. */
   const shown = new Map<string, string>();
+  /** Workspaces whose shown name's entry this feed made, while they went by it, in this run. */
+  const made = new Set<string>();
   let queuedAge = Promise.resolve();
   function snapshot(): Snapshot {
     const born = new Map<string, string>();
@@ -74,23 +76,36 @@ export function createLifeFeed(deps: {
   /**
    * A workspace that goes by another name since the last view is the same team: its tenure goes
    * with it, so a rename makes nobody an intern again. When the new name has an entry of its own (a
-   * team's name handed back), that team is back, and the name the workspace showed in between is
-   * left to nobody.
+   * team's name handed back), that team is back. The name the workspace showed in between is left
+   * to nobody only when this feed made its entry for that workspace today and nobody else goes by
+   * it: an entry with days or a start before this run is a team's history, and stays.
    */
   function followRenames(names: ReadonlyMap<string, string>) {
     const inView = new Set(names.values());
+    for (const id of made) if (!names.has(id)) made.delete(id);
+    const today = new Date(deps.now()).toLocaleDateString("sv");
     for (const [id, name] of names) {
       const before = shown.get(id);
-      if (
-        before !== undefined &&
-        before !== name &&
-        !deps.tenure.rename(before, name) &&
-        deps.tenure.get(name) !== null &&
-        !inView.has(before)
-      )
-        deps.tenure.forget(before);
+      if (before !== undefined && before !== name) {
+        const left = deps.tenure.rename(before, name) ? null : deps.tenure.get(before);
+        if (
+          left &&
+          made.has(id) &&
+          left.days <= 1 &&
+          left.lastDay === today &&
+          deps.tenure.get(name) !== null &&
+          !inView.has(before)
+        )
+          deps.tenure.forget(before);
+        made.delete(id);
+      }
       shown.set(id, name);
     }
+  }
+  /** An entry the ledger made just now belongs to the workspaces going by its name. */
+  function noteMade(name: string, touched: ReturnType<Tenure["touch"]>) {
+    if (touched !== "new") return;
+    for (const [id, shownName] of shown) if (shownName === name) made.add(id);
   }
   return {
     snapshot,
@@ -143,7 +158,7 @@ export function createLifeFeed(deps: {
         deps.tenure.seed(
           [...seeds].map(([name, s]) => ({ name, first: s.first, daysSeen: s.days.size })),
         );
-      for (const name of active) deps.tenure.touch(name, { at });
+      for (const name of active) noteMade(name, deps.tenure.touch(name, { at }));
       readFolders(view, names);
       changed();
     },
@@ -154,7 +169,7 @@ export function createLifeFeed(deps: {
     async turnEnded(id: string, lookup?: () => Promise<string | null>) {
       const name = teams.get(id) ?? (await lookup?.());
       if (name) {
-        deps.tenure.touch(name, { at: deps.now(), turn: true });
+        noteMade(name, deps.tenure.touch(name, { at: deps.now(), turn: true }));
         changed();
       }
     },

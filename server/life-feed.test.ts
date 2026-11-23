@@ -254,13 +254,13 @@ const running = (id: string, workspaceId: string) =>
     parentAgentId: null,
   }) as never;
 
-function ledger() {
+function ledger(clock = { at: Date.parse("2026-11-19T00:00:00Z") }) {
   let saved: unknown = null;
   const tenure = createTenure({
     store: { load: () => saved, save: (data) => (saved = structuredClone(data)) },
-    now: () => Date.parse("2026-11-19T00:00:00Z"),
+    now: () => clock.at,
   });
-  const d = { ...deps(), tenure };
+  const d = { ...deps(), tenure, now: () => clock.at };
   return { d, tenure, feed: createLifeFeed(d) };
 }
 
@@ -285,6 +285,55 @@ test("a workspace that takes back a team's name leaves no intern under the name 
   expect(tenure.get("feature-x")).toBeNull();
   expect(tenure.list(new Set()).map((p) => p.name)).toEqual([]);
   expect(tenure.get("PR-DEV")).toMatchObject({ first: team?.first, pre: true });
+});
+
+test("a team that takes a name with an entry of its own keeps the entry it had before", () => {
+  const { tenure, feed } = ledger();
+  const both = {
+    agents: [running("a1", "w1"), running("a2", "w2")],
+    workspaces: [
+      { id: "w1", name: "PR-DEV", projectName: "p" } as never,
+      { id: "w2", name: "api", projectName: "p" } as never,
+    ],
+    folders: {},
+  };
+  feed.view(view(both));
+  const api = structuredClone(tenure.get("api"));
+  expect(api?.pre).toBe(true);
+  // PR-DEV's workspace is archived, and api, long passed over, takes the freed team.
+  feed.view(view({ agents: [running("a2", "w2")], workspaces: [both.workspaces[1]], folders: {} }));
+  feed.view(
+    view({
+      agents: [running("a2", "w2")],
+      workspaces: [{ id: "w2", name: "PR-DEV", projectName: "p" } as never],
+      folders: {},
+    }),
+  );
+  expect(tenure.get("api")).toEqual(api);
+  expect(tenure.get("PR-DEV")).not.toBeNull();
+});
+
+test("a workspace that worked days under its own name keeps that entry when it takes a team's", () => {
+  const clock = { at: Date.parse("2026-11-19T00:00:00Z") };
+  const { tenure, feed } = ledger(clock);
+  feed.view(view({ workspaces: [{ id: "w1", name: "PR-DEV", projectName: "p" } as never] }));
+  feed.view(view({ agents: [], workspaces: [] }));
+  const opened = {
+    agents: [running("a2", "w2")],
+    workspaces: [{ id: "w2", name: "feature-x", projectName: "p" } as never],
+    folders: {},
+  };
+  feed.view(view(opened));
+  feed.view(view(opened));
+  clock.at += 86_400_000;
+  feed.view(view(opened));
+  const worked = structuredClone(tenure.get("feature-x"));
+  expect(worked?.days).toBe(2);
+  feed.view(
+    view({ ...opened, workspaces: [{ id: "w2", name: "PR-DEV", projectName: "p" } as never] }),
+  );
+  expect(tenure.get("feature-x")).toEqual(worked);
+  expect(tenure.get("PR-DEV")?.pre).toBe(true);
 });
 
 test("a name another workspace still goes by is not forgotten when a rename is refused", () => {
