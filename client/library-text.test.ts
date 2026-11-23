@@ -16,6 +16,12 @@ import {
   topicOf,
   TOPIC_MAX,
   askHint,
+  busyLine,
+  skillMatches,
+  skillTeams,
+  unreadLine,
+  workspaceSkills,
+  type LibraryTeam,
 } from "./library-text.js";
 import { buildOfficeModel } from "../shared/model.js";
 
@@ -226,4 +232,50 @@ test("the line under the button names who is asked, or why nobody can be", () =>
   expect(askHint({ writers }, "Builder", false)).toBe(
     "Builder writes it and answers on the team's board.",
   );
+});
+
+function team(name: string, patch: Partial<LibraryTeam> = {}): LibraryTeam {
+  return { roomId: name, name, atSkill: [], writers: [], asked: null, skills: [], ...patch };
+}
+const HUMANIZER = { name: "humanizer", description: "Rewrite AI text", folders: [".claude"] };
+
+test("a skill several workspaces carry is listed once, with the workspaces that have it", () => {
+  const teams = [
+    team("A", { skills: [HUMANIZER, { name: "deploy", description: null, folders: [".agents"] }] }),
+    team("B", { skills: [HUMANIZER] }),
+    team("C", { skills: [{ ...HUMANIZER, description: "Another text" }] }),
+    team("D", { skills: null }),
+  ];
+  expect(workspaceSkills(teams)).toEqual([
+    { name: "deploy", description: null, folders: [".agents"], teams: ["A"] },
+    { ...HUMANIZER, teams: ["A", "B"] },
+    { ...HUMANIZER, description: "Another text", teams: ["C"] },
+  ]);
+  expect(skillTeams(["A"])).toBe("A");
+  expect(skillTeams(["A", "B", "C"])).toBe("3 workspaces: A, B and C");
+});
+
+test("a search matches every word in the name or the description", () => {
+  expect(skillMatches(HUMANIZER, "rewrite HUMAN")).toBe(true);
+  expect(skillMatches(HUMANIZER, "rewrite deploy")).toBe(false);
+  expect(skillMatches({ name: "deploy", description: null }, "dep")).toBe(true);
+});
+
+test("one line says why workspaces list no skill", () => {
+  expect(unreadLine([], true)).toBeNull();
+  expect(unreadLine([team("A")], false)).toBe("Reading the workspaces' skills...");
+  expect(unreadLine([team("A")], "failed")).toBe("The workspaces' skills were not read.");
+  expect(unreadLine([team("A")], true)).toBeNull();
+  expect(unreadLine([team("A", { skills: null }), team("B", { skills: null })], true)).toBe(
+    "The host has no folder for A and B.",
+  );
+});
+
+test("the teams nobody of can be asked are named once", () => {
+  const idle = team("A", { writers: [{ agentId: "a1", title: "Ada" }] });
+  expect(busyLine([idle])).toBeNull();
+  expect(busyLine([idle, team("B"), team("C")])).toBe(
+    "No idle agent, so nobody can be asked, in B and C.",
+  );
+  expect(busyLine([team("B")])).toContain("No agent of any team is idle");
 });

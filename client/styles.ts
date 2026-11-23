@@ -250,6 +250,16 @@ export interface OfficeStyles {
   sheetLabel: TextStyle;
   sheetText: TextStyle;
   input: TextStyle;
+  /** The library's first line and its button, side by side. */
+  libraryHead: ViewStyle;
+  libraryHeadText: ViewStyle;
+  /** A one-line field that filters a list. */
+  searchInput: TextStyle;
+  /** One skill: its name, what it is for, and where it is. */
+  skillRow: ViewStyle;
+  skillName: TextStyle;
+  /** A block set apart from the list around it: the form that asks for a skill, an answer. */
+  libraryPanel: ViewStyle;
   boardSection: ViewStyle;
   boardTitleRow: ViewStyle;
   /** The board's name and, beside it, that it is empty. */
@@ -1121,6 +1131,37 @@ export function useOfficeStyles(
         backgroundColor: colors.surface1,
         color: colors.foreground,
         textAlignVertical: "top",
+      },
+      libraryHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+      libraryHeadText: { flex: 1, minWidth: 0, gap: 4 },
+      searchInput: {
+        ...prompt,
+        minHeight: controlHeight,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        color: colors.foreground,
+      },
+      skillRow: {
+        gap: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+      },
+      skillName: { ...base, color: colors.foreground, fontWeight: "600" },
+      libraryPanel: {
+        gap: 12,
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
       },
       boardSection: {
         borderTopWidth: 1,
