@@ -13,6 +13,7 @@ import { wakeSummary } from "./board-text.js";
 import { FLOOR_PLAN_LABEL, FloorPlanRow } from "./floor-plan-row.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
+import { NOTES_MODE_LABEL, NotesModeRow } from "./notes-mode-row.js";
 import { JiraConnection, SentryConnection } from "./tracker-connections.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -29,6 +30,7 @@ type HostSetting =
   | "Notes folder"
   | "Time zone"
   | typeof NOTES_DAYS_LABEL
+  | typeof NOTES_MODE_LABEL
   | typeof FLOOR_PLAN_LABEL
   | "Jira projects"
   | "Sentry organisation"
@@ -166,6 +168,10 @@ export function HostSwitches({
     (next: number[]) => change(NOTES_DAYS_LABEL, { notesDays: next }),
     [change],
   );
+  const saveMode = useCallback(
+    (next: string) => change(NOTES_MODE_LABEL, { notesMode: next }),
+    [change],
+  );
   const savePlan = useCallback(
     (next: FloorPlanChoice) => change(FLOOR_PLAN_LABEL, { floorPlan: next }),
     [change],
@@ -261,6 +267,12 @@ export function HostSwitches({
               problem={saveProblem(NOTES_DAYS_LABEL)}
               styles={styles}
             />
+            <NotesModeRow
+              value={storedMode(stored)}
+              onSave={saveMode}
+              problem={saveProblem(NOTES_MODE_LABEL)}
+              styles={styles}
+            />
           </View>
           {problems.length > 0 ? (
             <View style={styles.headerProblems}>
@@ -295,6 +307,11 @@ export function HostSwitches({
       }
     />
   );
+}
+
+/** The stored writer mode; null while the settings are read or cannot be read. */
+function storedMode(values: HostValues | null): string | null {
+  return values === null ? null : values.notesMode;
 }
 
 type TrackerField = "jiraProjects" | "sentryOrg" | "sentryProjects" | "sentryUrl";

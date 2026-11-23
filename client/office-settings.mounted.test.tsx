@@ -65,7 +65,7 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
     if (contract.name === "office.state") deliver = onEvent;
     return { status: "live" };
   },
-  useRpc: () => async () => undefined,
+  useRpc: () => async () => ({ ok: false, problem: "not asked in this test" }),
   usePaseo: () => ({ agents: { ref: () => ({}) } }),
 }));
 

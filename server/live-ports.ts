@@ -7,6 +7,8 @@ import {
   type ChatServicePorts,
 } from "./chat-service.js";
 import { PARENT_AGENT_ID_LABEL } from "./directory.js";
+import { writerMode, writerModeChoices } from "./writer-mode.js";
+import type { WriterModes } from "../shared/contracts.js";
 import type { Hub, HubPorts } from "./hub.js";
 import type { JanitorPorts } from "./janitor.js";
 import { wakeTargetOf } from "./mention-queue.js";
@@ -250,28 +252,45 @@ export function liveScriptLogPorts(
 
 type AgentConfig = Parameters<Paseo["agents"]["create"]>[0]["config"];
 
-// Claude's "Accept File Edits", which a provider extending Claude lists too. The owner's call:
-// nobody watches the 8:00 writer, so it edits the notes without asking.
-const ACCEPT_EDITS_MODE = "acceptEdits";
-
 /**
  * The host's default provider, as the host can tell it. The app's new-agent form starts from the
  * provider the device chose last, which the host never sees; so this takes the first enabled,
  * ready provider in the daemon's order, with the model the form gives that provider: its default
- * (else its first selectable one). The mode is the provider's that accepts edits, else its
- * default: Codex's and OpenCode's default modes edit in the workspace without asking already.
+ * (else its first selectable one). The mode is `writerMode`'s: the settings' where the provider
+ * offers it, else the one that accepts edits, else the provider's default. Nobody watches the
+ * 8:00 writer, so by default it edits the notes without asking.
  */
-async function defaultAgentConfig(paseo: Paseo, cwd: string): Promise<AgentConfig> {
+async function writerProvider(paseo: Paseo, cwd: string) {
   const { entries } = await paseo.providers.waitForReady({ cwd });
   const entry = entries.find((candidate) => candidate.enabled && candidate.status === "ready");
   if (entry === undefined) throw new Error("No agent provider is ready on this host");
+  return entry;
+}
+
+/** The provider the writer would start on now, its modes, and the one `wanted` comes to. */
+export async function readWriterModes(
+  holder: PaseoHolder,
+  cwd: string,
+  wanted: string,
+): Promise<WriterModes> {
+  const entry = await writerProvider(holder.require(), cwd);
+  const { modeId, fellBack } = writerMode(entry, wanted);
+  return {
+    provider: entry.label ?? entry.provider,
+    modes: writerModeChoices(entry),
+    modeId: modeId ?? null,
+    fellBack,
+  };
+}
+
+async function defaultAgentConfig(paseo: Paseo, cwd: string, wanted: string): Promise<AgentConfig> {
+  const entry = await writerProvider(paseo, cwd);
   const models = (entry.models ?? []).filter((model) => model.isSelectable !== false);
   const model = models.find((candidate) => candidate.isDefault) ?? models[0];
   if (model === undefined) {
     throw new Error(`The provider ${entry.label ?? entry.provider} offers no model`);
   }
-  const acceptsEdits = (entry.modes ?? []).some((mode) => mode.id === ACCEPT_EDITS_MODE);
-  const modeId = acceptsEdits ? ACCEPT_EDITS_MODE : entry.defaultModeId;
+  const { modeId } = writerMode(entry, wanted);
   return {
     provider: `${entry.provider}/${model.id}`,
     ...(modeId ? { modeId } : {}),
@@ -290,9 +309,9 @@ export function liveNotesPorts(
         (found) => found.isDirectory(),
         () => false,
       ),
-    async startAgent({ cwd, title, prompt }) {
+    async startAgent({ cwd, title, prompt, mode }) {
       const paseo = holder.require();
-      const config = await defaultAgentConfig(paseo, cwd);
+      const config = await defaultAgentConfig(paseo, cwd, mode ?? "");
       const workspace = await paseo.workspaces.open(cwd);
       const agent = await workspace.agents.create({ config, title, prompt });
       return agent.id;

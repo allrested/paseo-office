@@ -61,7 +61,12 @@ interface Sent {
 }
 
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
-const NO_NOTES = { notesFolder: "", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY };
+const NO_NOTES = {
+  notesFolder: "",
+  notesTimeZone: "",
+  notesMode: "",
+  notesDays: SUNDAY_TO_THURSDAY,
+};
 const NO_TRACKERS = {
   jiraProjects: "",
   sentryOrg: "",
@@ -195,6 +200,8 @@ interface Writers {
   /** The agents created, as "<folder> <provider> <title>". */
   created: string[];
   prompts: string[];
+  /** The mode each was created in. */
+  modes: (string | undefined)[];
   archived: string[];
 }
 
@@ -216,7 +223,14 @@ function fakeContext(
               provider: "claude",
               status: "ready",
               enabled: true,
+              label: "Claude",
               defaultModeId: "auto",
+              modes: [
+                { id: "plan", label: "Plan Mode" },
+                { id: "acceptEdits", label: "Accept File Edits" },
+                { id: "auto", label: "Auto mode" },
+                { id: "bypassPermissions", label: "Bypass" },
+              ],
               models: [{ id: "opus", isDefault: true }],
             },
           ],
@@ -230,12 +244,13 @@ function fakeContext(
           directory: cwd,
           agents: {
             create: async (options: {
-              config: { provider: string };
+              config: { provider: string; modeId?: string };
               title: string;
               prompt: string;
             }) => {
               writers.created.push(`${cwd} ${options.config.provider} ${options.title}`);
               writers.prompts.push(options.prompt);
+              writers.modes.push(options.config.modeId);
               const id = `writer-${writers.created.length}`;
               statuses.set(id, "running");
               return { id };
@@ -403,7 +418,7 @@ function setup(
   const sent: Sent[] = [];
   const statuses = new Map<string, string>();
   const stopped: number[] = [];
-  const writers: Writers = { created: [], prompts: [], archived: [] };
+  const writers: Writers = { created: [], prompts: [], modes: [], archived: [] };
   const directory: FakeDirectory = { agents: [], timelines: new Map() };
   const notesStore = memoryNotesStore();
   const incidentsStore = memoryIncidentsStore();
@@ -575,6 +590,7 @@ function notesSettings(
       agentTools: true,
       notesFolder,
       notesTimeZone,
+      notesMode: "",
       notesDays,
       ...NO_TRACKERS,
       floorPlan: "pro",
@@ -809,6 +825,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.notes.modes.request",
     "office.trackers.save.request",
     "office.trackers.test.request",
     "office.chat.request",
@@ -1054,6 +1071,45 @@ function writeEntry(): Promise<void> {
   const text = "# Notes\n\n---\n\n## 11 November 2026\n\nB\n";
   return writeFile(join(NOTES_FOLDER, "daily-standup-202611.md"), text, "utf8");
 }
+
+test("the writer starts in the settings' mode, and accepts edits while none is set", async () => {
+  const withMode = (notesMode: string): SettingsState => ({
+    status: "ready",
+    revision: notesMode,
+    values: {
+      ...NO_TRACKERS,
+      ...NO_NOTES,
+      notesFolder: NOTES_FOLDER,
+      notesMode,
+      archiveOnDeparture: false,
+      agentTools: true,
+      floorPlan: "pro",
+    },
+  });
+  let saved: SettingsState = NOTES;
+  const { recorded, writers, context, stop } = setup(async () => saved);
+  const modes = recorded.handlers.get("office.notes.modes.request");
+  expect(await modes?.({}, context)).toEqual({
+    ok: true,
+    provider: "Claude",
+    modes: [
+      { id: "acceptEdits", label: "Accept File Edits" },
+      { id: "auto", label: "Auto mode" },
+      { id: "bypassPermissions", label: "Bypass" },
+    ],
+    modeId: "acceptEdits",
+    fellBack: false,
+  });
+  // Codex's mode on a host whose writer is Claude: said, and the writer accepts edits.
+  saved = withMode("full-access");
+  expect(await modes?.({}, context)).toMatchObject({ modeId: "acceptEdits", fellBack: true });
+
+  saved = withMode("bypassPermissions");
+  const write = recorded.handlers.get("office.notes.write.request");
+  expect(await write?.({}, context)).toEqual({ started: true });
+  expect(writers.modes).toEqual(["bypassPermissions"]);
+  await stop();
+});
 
 test("the bell's request starts one writer in the notes folder, and its good end with the entry archives it", async () => {
   const { recorded, writers, notesStore, context, clock, stop } = setup(async () => NOTES);

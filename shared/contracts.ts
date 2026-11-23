@@ -750,6 +750,31 @@ export const notesWriteRpc = defineRpc({
   output: z.object({ started: z.boolean() }),
 });
 
+export const WriterModesSchema = z.object({
+  /** The provider the writer would start on now, by its label. */
+  provider: z.string(),
+  /** Its modes the writer can start in, by the provider's own names. */
+  modes: z.array(z.object({ id: z.string(), label: z.string() })),
+  /** The mode the settings come to; null where the provider names none. */
+  modeId: z.string().nullable(),
+  /** The settings name a mode this provider does not offer. */
+  fellBack: z.boolean(),
+});
+export type WriterModes = z.output<typeof WriterModesSchema>;
+
+/**
+ * The modes the stand-up writer can start in, for the settings. `problem` when no provider is
+ * ready or the settings cannot be read.
+ */
+export const notesModesRpc = defineRpc({
+  name: "office.notes.modes.request",
+  input: z.object({}),
+  output: z.union([
+    WriterModesSchema.extend({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
+});
+
 const JiraConnectionSchema = z.object({
   baseUrl: z.string().max(500),
   email: z.string().max(320),

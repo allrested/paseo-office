@@ -58,6 +58,7 @@ import {
   liveHubPorts,
   liveJanitorPorts,
   liveNotesPorts,
+  readWriterModes,
   liveScriptLogPorts,
   liveSkillsPorts,
 } from "./server/live-ports.js";
@@ -107,6 +108,7 @@ import {
   dutiesSaveRpc,
   dutyActedRpc,
   incidentsDismissRpc,
+  notesModesRpc,
   trackersSaveRpc,
   trackersTestRpc,
   type TrackersChange,
@@ -649,6 +651,17 @@ export function createOfficePlugin(
       throw error;
     }
   }
+  server.handle(notesModesRpc, async (_input, context) => {
+    holder.remember(context.paseo);
+    try {
+      const values = await readHostSettings();
+      // The provider is asked for the notes folder, as the writer's start asks it.
+      const cwd = values.notesFolder.trim() || homedir();
+      return { ok: true as const, ...(await readWriterModes(holder, cwd, values.notesMode)) };
+    } catch (error) {
+      return { ok: false as const, problem: errorMessage(error) };
+    }
+  });
   // One save at a time: each starts from what the one before it kept.
   let trackerSaves: Promise<unknown> = Promise.resolve();
   server.handle(trackersSaveRpc, (input) => {

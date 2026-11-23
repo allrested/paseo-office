@@ -568,6 +568,17 @@ its turn again, no new writer starts. "Stand-up notes" under the Stand-up card's
 notes reader at the month’s newest entry. Select a date to read that entry, or use the month arrows to browse earlier files. The entry strip also includes the file’s introduction and Contents when present. Contents links open their entries. The
 server reads only `daily-standup-YYYYMM.md` directly in the notes folder.
 
+"Writer mode" in the settings is the mode the writer starts in. Its pills are the modes of the
+provider the writer runs on, by the provider's own names, less the one that only plans: for Claude
+Always Ask, Accept File Edits, Auto mode and Bypass; for Codex Default Permissions, Auto-review and
+Full Access. "Office's choice" is no mode set: the writer accepts file edits where its provider
+offers that, else takes the provider's default. Accepting edits approves edits only, so a writer
+that calls another tool or a command then waits for an answer nobody gives at 8:00 and leaves no
+entry; a mode that asks for less lets it finish. A mode that asks for nothing (Bypass, Full Access)
+runs any tool or command unattended, and the row says so. A stored mode the provider does not
+offer falls back to the office's choice, and the row says which mode is used. The mode holds from
+the next run.
+
 ## Schedules
 
 The office runs three schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
