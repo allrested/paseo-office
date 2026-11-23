@@ -2,6 +2,16 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.9 (2026-11-23)
+
+- CloudWatch incidents: with an AWS profile and region in the settings, alarms in ALARM and error
+  lines in chosen log groups ring the incident alarm, read through the host's own `aws` CLI.
+- The Host card is wider and in four sections (Overview, Plan, Agents, System); Plan has a switch
+  for each provider, so a plan nobody pays for no longer reads as "Out of".
+- "Rename team" is at the top of a room's board in every view, not only the List view.
+- The Attention count leaves out cards that only inform. In the full screen layout Attention and
+  Activity are header icons, and Janitor, Stand-up, Reviews, QA and Library are toolbar icons.
+
 ## 0.2.8 (2026-11-23)
 
 - What eats your plan: under This week, the five agents that used the most, by cost where
