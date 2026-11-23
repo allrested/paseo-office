@@ -294,6 +294,10 @@ export function createHub(ports: HubPorts): Hub {
   // as if stored, so a team or teammate in flight is never handed out twice; names come from
   // what the directory reports, so none shows before its mark is stored.
   const pendingRoster = new Map<string, RosterMark>();
+  // Marks the host refused, by key. They are planned as if still in flight and not sent again
+  // until the roster is set again or the directory is opened again: a host that refuses every
+  // write would otherwise be sent one, and log one, at each directory change.
+  const failedRoster = new Map<string, RosterMark>();
 
   function withPendingRoster<Entry extends { id: string; roster?: RosterMark }>(
     kind: RosterWrite["kind"],
@@ -301,6 +305,8 @@ export function createHub(ports: HubPorts): Hub {
   ): Entry[] {
     return entries.map((entry) => {
       const key = `${kind}:${entry.id}`;
+      const failed = failedRoster.get(key);
+      if (failed !== undefined) return { ...entry, roster: failed };
       const mark = pendingRoster.get(key);
       if (mark === undefined) return entry;
       if (entry.roster === mark) {
@@ -315,6 +321,23 @@ export function createHub(ports: HubPorts): Hub {
     const toWorkspace = ports.setWorkspaceMetadata;
     const toAgent = ports.setAgentMetadata;
     if (toWorkspace === undefined || toAgent === undefined) return;
+    const send = (key: string, sending: () => Promise<void>, mark: RosterMark): Promise<boolean> =>
+      sending().then(
+        () => true,
+        (error: unknown) => {
+          // A later mark for the same key may be out already: that one stands.
+          if (pendingRoster.get(key) === mark) {
+            pendingRoster.delete(key);
+            failedRoster.set(key, mark);
+          }
+          ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
+          return false;
+        },
+      );
+    const workspaceOf = new Map(next.agents.map((agent) => [agent.id, agent.workspaceId]));
+    // A workspace's team is stored before its agents' teammates go out (as planNumbers holds a
+    // sub-agent's number on its parent's next): a teammate is never stored under no team.
+    const teamStored = new Map<string, Promise<boolean>>();
     const planned = planRoster(
       roster,
       withPendingRoster("workspace", next.workspaces),
@@ -322,15 +345,28 @@ export function createHub(ports: HubPorts): Hub {
     );
     for (const { kind, id, mark } of planned) {
       const key = `${kind}:${id}`;
+      if (failedRoster.has(key)) continue;
+      if (kind === "workspace") {
+        pendingRoster.set(key, mark);
+        teamStored.set(
+          id,
+          send(key, () => toWorkspace(id, { [ROSTER_TEAM_KEY]: mark }), mark),
+        );
+        continue;
+      }
+      const workspaceId = workspaceOf.get(id) ?? "";
+      if (failedRoster.has(`workspace:${workspaceId}`)) continue;
       pendingRoster.set(key, mark);
-      const sent =
-        kind === "workspace"
-          ? toWorkspace(id, { [ROSTER_TEAM_KEY]: mark })
-          : toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
-      sent.catch((error: unknown) => {
-        // Planned again at the next change.
-        pendingRoster.delete(key);
-        ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
+      const sending = () => toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
+      const team = teamStored.get(workspaceId);
+      if (team === undefined) {
+        void send(key, sending, mark);
+        continue;
+      }
+      void team.then((stored) => {
+        if (stored) return send(key, sending, mark);
+        if (pendingRoster.get(key) === mark) pendingRoster.delete(key);
+        return false;
       });
     }
   }
@@ -444,6 +480,7 @@ export function createHub(ports: HubPorts): Hub {
   async function start(): Promise<void> {
     generation += 1;
     const mine = generation;
+    failedRoster.clear();
     const stop = await ports.openDirectory(onDirectory, () => onDirectoryEnd(mine));
     if (subscribers.size === 0 || mine !== generation) {
       view = EMPTY_VIEW;
@@ -614,6 +651,7 @@ export function createHub(ports: HubPorts): Hub {
     setRoster(next) {
       if (JSON.stringify(roster) === JSON.stringify(next)) return;
       roster = next;
+      failedRoster.clear();
       // What is open is planned and named again. A closed office is planned when it next opens:
       // its directory's first view goes through onDirectory.
       if (stopDirectory !== null) onDirectory(reported);
