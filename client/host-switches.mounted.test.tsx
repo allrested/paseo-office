@@ -710,3 +710,18 @@ test("weather defaults off, manual and service expose their own controls", async
   expect(container.textContent).toContain("plain http only on this machine");
   expect(container.textContent).not.toContain("SECRET");
 });
+
+test("the Teams section saves the roster with the other host settings", async () => {
+  await mount();
+  const roster = container.querySelector<HTMLElement>(
+    '[aria-label="Name teams and agents from the roster"]',
+  );
+  if (!roster) throw new Error("The Teams section is not there");
+  await act(async () => roster.click());
+  expect(saved.at(-1)?.values).toMatchObject({
+    rosterOn: true,
+    rosterEdition: 1,
+    teams: [],
+    agentTools: false,
+  });
+});

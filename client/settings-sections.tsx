@@ -4,9 +4,14 @@ import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import { useFullscreenDialog } from "./office-modal.js";
 import type { OfficeStyles } from "./styles.js";
 
-const sections = ["Appearance", "Automation", "Services"] as const;
+const sections = ["Appearance", "Teams", "Automation", "Services"] as const;
 type Section = (typeof sections)[number];
-const icons = { Appearance: "Palette", Automation: "CalendarClock", Services: "Plug" };
+const icons = {
+  Appearance: "Palette",
+  Teams: "UsersRound",
+  Automation: "CalendarClock",
+  Services: "Plug",
+};
 export const settingsLayout = StyleSheet.create({
   fill: { flex: 1, minHeight: 0 },
   flush: { padding: 0, gap: 0 },
@@ -77,18 +82,25 @@ function SectionButton({
 
 export function SettingsSections({
   appearance,
+  teams,
   automation,
   services,
   styles,
 }: {
   appearance: ReactNode;
+  teams: ReactNode;
   automation: ReactNode;
   services: ReactNode;
   styles: OfficeStyles;
 }) {
   const [section, select] = useState<Section>("Appearance");
   const fullscreen = useFullscreenDialog();
-  const pages = { Appearance: appearance, Automation: automation, Services: services };
+  const pages = {
+    Appearance: appearance,
+    Teams: teams,
+    Automation: automation,
+    Services: services,
+  };
   const contentStyle = fullscreen ? settingsLayout.fill : undefined;
   const content = sections.map((name) => (
     <View key={name} style={name !== section ? styles.hidden : contentStyle}>
