@@ -1,6 +1,6 @@
 # Design: team roster
 
-Status: design approved in chat on 2026-11-23; not built.
+Status: built on branch feat/team-roster; plan in docs/plan-team-roster.md.
 
 ## Problem
 

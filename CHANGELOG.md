@@ -2,6 +2,11 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## Unreleased
+
+- Team roster: a **Teams** section in the settings holds teams and their teammates, and the
+  office names workspaces and agents from it by itself. Paseo's own names are not changed.
+
 ## 0.2.9 (2026-11-23)
 
 - CloudWatch incidents: with an AWS profile and region in the settings, alarms in ALARM and error
