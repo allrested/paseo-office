@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useContext, useMemo, useState, useSyncExternalStore } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { dotTone, type DotTone } from "../shared/model.js";
 import { ActionButton } from "./action-button.js";
+import { OpenTimelineContext } from "./timeline-open.js";
 import {
   feedCards,
   feedStore,
@@ -223,6 +224,8 @@ export function ActivityPanel({ office, styles, link, layout }: ColumnPanelProps
     });
   }, []);
   const problem = loadProblem(subscription);
+  // What the agents did before now: the lanes, their replay and the week.
+  const openTimeline = useContext(OpenTimelineContext);
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.panelFeed}>
@@ -238,6 +241,14 @@ export function ActivityPanel({ office, styles, link, layout }: ColumnPanelProps
                 <View style={styles.dot.running} />
                 <Text style={styles.panelLiveText}>Live</Text>
               </View>
+            ) : null}
+            {openTimeline ? (
+              <ActionButton
+                label="Timeline"
+                pendingLabel="Timeline"
+                onPress={openTimeline}
+                styles={styles}
+              />
             ) : null}
           </View>
           <View role="group" aria-label="Feed" style={styles.activityTabs}>

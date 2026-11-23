@@ -9,7 +9,7 @@ import { createStreetWatch, streetReaders } from "./server/street-watch.js";
 import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
-import { liftFile, tenureFile } from "./server/paths.js";
+import { liftFile, tenureFile, timelineFile } from "./server/paths.js";
 import { createDepartureArchiver } from "./server/home-departure.js";
 import {
   lifeSubscription,
@@ -45,6 +45,13 @@ import {
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
+import {
+  TIMELINE_KEEP_MS,
+  TimelineFileSchema,
+  createTimelineLog,
+  type TimelineFile,
+  type TimelineLog,
+} from "./server/timeline.js";
 import { TEAM_NAME_KEY, teamNameOf, tidyTeamName } from "./shared/team-name.js";
 import {
   changeSavedTrackers,
@@ -112,6 +119,7 @@ import {
   incidentsDismissRpc,
   notesModesRpc,
   planUsageRpc,
+  timelineRpc,
   teamRenameRpc,
   trackersSaveRpc,
   trackersTestRpc,
@@ -149,6 +157,8 @@ export interface OfficePluginDeps {
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
+  /** Where the timeline is kept; without it the timeline lasts as long as the server. */
+  timelineFile?: LifeFile<TimelineFile>;
   liftFile: LifeFile<LiftKept>;
   /** The owner's duty list. */
   dutiesFile: LifeFile<DutiesFile>;
@@ -212,7 +222,30 @@ export function createOfficePlugin(
   const holder = createPaseoHolder();
   // Off until the settings are read: nothing is named before the host has said it may be.
   let stepsNamed = false;
-  const hub = createHub(liveHubPorts(holder, deps.clock, log, () => stepsNamed));
+  const hubPorts = liveHubPorts(holder, deps.clock, log, () => stepsNamed);
+  // Set once its file is read; what the office sees before that is not kept.
+  let timeline: TimelineLog | null = null;
+  const hub = createHub({
+    ...hubPorts,
+    startActivity: (running, onChange) =>
+      hubPorts.startActivity(running, (activity, doing, ...rest) => {
+        timeline?.steps(doing);
+        onChange(activity, doing, ...rest);
+      }),
+  });
+  const timelineSaves =
+    deps.timelineFile === undefined
+      ? null
+      : createSaveQueue(deps.timelineFile, deps.clock, log, 30_000);
+  let stopTimeline: (() => void) | undefined;
+  const timelineReady = (async () => {
+    const kept = (await deps.timelineFile?.load()) ?? null;
+    timeline = createTimelineLog(
+      { now: () => deps.clock.now(), save: (file) => timelineSaves?.save(file) },
+      kept,
+    );
+    stopTimeline = hub.watch(timeline.view);
+  })().catch((error: unknown) => log(`[office] timeline unavailable: ${errorMessage(error)}`));
   hub.setBrand(hostBrand({}, deps.env));
   const office = createOffice({
     store: deps.store,
@@ -659,6 +692,13 @@ export function createOfficePlugin(
       throw error;
     }
   }
+  server.handle(timelineRpc, async ({ from, to }) => {
+    await timelineReady;
+    if (timeline === null) return { ok: false as const, problem: "The timeline cannot be read" };
+    const end = Math.min(to, deps.clock.now());
+    const start = Math.max(from, end - TIMELINE_KEEP_MS);
+    return { ok: true as const, timeline: timeline.read(start, end) };
+  });
   server.handle(planUsageRpc, async (_input, context) => {
     holder.remember(context.paseo);
     try {
@@ -876,6 +916,8 @@ export function createOfficePlugin(
     streets.stop();
     await lifeReady;
     stopLife?.();
+    stopTimeline?.();
+    await timelineSaves?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
@@ -906,6 +948,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
       log,
     }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
+    timelineFile: createLifeFile(timelineFile(process.env, homedir()), TimelineFileSchema),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     chatStore: createChatStore({
