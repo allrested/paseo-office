@@ -57,6 +57,8 @@ export interface Tenure {
   get(team: string): TenureEntry | null;
   /** A team that goes by another name keeps its entry; false when it has none or `to` is taken. */
   rename(from: string, to: string): boolean;
+  /** A name no team goes by any more leaves the ledger; false when it has no entry. */
+  forget(team: string): boolean;
   /** True once seed() has run on this ledger, now or on an earlier start. */
   seeded(): boolean;
 }
@@ -101,6 +103,12 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
       if (!entry || !to || from === to || projects[to]) return false;
       projects[to] = entry;
       delete projects[from];
+      save();
+      return true;
+    },
+    forget(team) {
+      if (!projects[team]) return false;
+      delete projects[team];
       save();
       return true;
     },

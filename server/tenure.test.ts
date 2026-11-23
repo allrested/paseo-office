@@ -130,3 +130,16 @@ test("a name that is an object's own key is a team like any other", () => {
   expect(t.get("constructor")).toBeNull();
   expect(t.markOfficial("toString")).toBe(false);
 });
+
+test("a forgotten team leaves the ledger, and an unknown one changes nothing", () => {
+  const now = 10 * DAY;
+  const store = memory();
+  const t = createTenure({ store, now: () => now });
+  t.touch("feature-x", { at: now });
+  expect(t.forget("feature-x")).toBe(true);
+  expect(t.get("feature-x")).toBeNull();
+  expect(t.list(new Set())).toEqual([]);
+  expect(t.forget("feature-x")).toBe(false);
+  // Kept as it is now, on the next start too.
+  expect(createTenure({ store, now: () => now }).get("feature-x")).toBeNull();
+});

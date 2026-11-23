@@ -71,6 +71,27 @@ export function createLifeFeed(deps: {
       pending.set(folder, queuedAge);
     }
   }
+  /**
+   * A workspace that goes by another name since the last view is the same team: its tenure goes
+   * with it, so a rename makes nobody an intern again. When the new name has an entry of its own (a
+   * team's name handed back), that team is back, and the name the workspace showed in between is
+   * left to nobody.
+   */
+  function followRenames(names: ReadonlyMap<string, string>) {
+    const inView = new Set(names.values());
+    for (const [id, name] of names) {
+      const before = shown.get(id);
+      if (
+        before !== undefined &&
+        before !== name &&
+        !deps.tenure.rename(before, name) &&
+        deps.tenure.get(name) !== null &&
+        !inView.has(before)
+      )
+        deps.tenure.forget(before);
+      shown.set(id, name);
+    }
+  }
   return {
     snapshot,
     async settled() {
@@ -86,13 +107,7 @@ export function createLifeFeed(deps: {
         return;
       }
       const names = new Map(view.workspaces.map((w) => [w.id, w.name]));
-      // A workspace that goes by another name since the last view is the same team: its tenure
-      // goes with it, so a rename makes nobody an intern again.
-      for (const [id, name] of names) {
-        const before = shown.get(id);
-        if (before !== undefined && before !== name) deps.tenure.rename(before, name);
-        shown.set(id, name);
-      }
+      followRenames(names);
       const at = deps.now();
       const today = new Date(at).toDateString();
       const seeds = new Map(
