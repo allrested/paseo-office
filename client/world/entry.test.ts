@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   sessions: new Map<string, Record<string, unknown>>(),
   workers: new Map<string, Record<string, unknown>>(),
   applauded: [] as string[],
+  subsSpawned: [] as string[],
+  subsDropped: [] as string[],
   played: [] as string[],
   incidentsOpened: 0,
   /** How many times the meeting table's bell rang. */
@@ -132,8 +134,9 @@ vi.mock("../../vendor/my-office/src/office/people/workers.js", () => ({
   sessions: h.sessions,
   workers: h.workers,
   subs: new Map(),
-  dropSub() {},
-  spawnSub() {},
+  dropSub: (agent: string) => void h.subsDropped.push(agent),
+  spawnSub: (_parent: unknown, agent: string, type: string) =>
+    void h.subsSpawned.push(`${agent} ${type}`),
   subAct() {},
 }));
 vi.mock("../../vendor/my-office/src/office/people/director.js", () => ({ director: null }));
@@ -184,7 +187,7 @@ const { sound } = await import("../../vendor/my-office/src/office/paseo-sound.js
 interface World {
   start(options?: object): void;
   setSessions(list: object[]): void;
-  event(e: { sess: string; type: string }): void;
+  event(e: { sess: string; type: string; agent?: string; label?: string }): void;
   setIncidents(list: object[]): void;
   photoRelease(tag: string): void;
   setClaudeVersion(reading: { version: string; at: number } | null): void;
@@ -264,6 +267,8 @@ beforeEach(() => {
   h.sessions.clear();
   h.workers.clear();
   h.applauded.length = 0;
+  h.subsSpawned.length = 0;
+  h.subsDropped.length = 0;
   h.played.length = 0;
   h.sound.length = 0;
   h.soundAsked.length = 0;
@@ -288,6 +293,17 @@ test("a worker's name opens the conversation once per tap or key press after a f
   tagEl.click();
   tagEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
   expect(h.openSession.mock.calls).toEqual([["a"], ["a"]]);
+});
+
+test("a sub-agent comes in for its boss on substart and goes on substop", () => {
+  seat("a");
+  world.event({ sess: "a", type: "substart", agent: "a:c1", label: "Explore" });
+  expect(h.subsSpawned).toEqual(["a:c1 Explore"]);
+  world.event({ sess: "a", type: "substop", agent: "a:c1" });
+  expect(h.subsDropped).toEqual(["a:c1"]);
+  // Nobody is seated for this session: there is no boss to come in for.
+  world.event({ sess: "gone", type: "substart", agent: "gone:c1", label: "Explore" });
+  expect(h.subsSpawned).toHaveLength(1);
 });
 
 test("a deploy that succeeded is applauded, also right after a push or another deploy", () => {

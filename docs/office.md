@@ -63,6 +63,15 @@ script), it is a command.
 The reads are 5 s apart. A tool call that starts and ends between two of them, as a web search
 often does, is the step of the read after it, for that one read.
 
+A provider can also run sub-agents inside an agent's own session, as Claude's Agent tool does.
+Those are no Paseo agents: they have no session, no card and no row. The office finds them in
+the agent's timeline, as `Task` or `Agent` calls that still run, at its 5 s reads, and the 3D
+floor draws each one as upstream draws a sub-agent: it comes in through the door, takes its brief
+from the agent that started it, works, reports back when its call ends, and leaves. Its name is
+the kind of sub-agent the provider gives ("Explore"), never its task. A call that starts and ends
+between two reads is not seen, and a call older than the tail the office reads is missed. The 2D
+floor and the lists do not show them.
+
 An agent whose own turn has ended is not idle while an agent it started, or one those started,
 runs, starts or waits for you: it waits on them. `waitingOnOf` in `shared/model.ts` is the one
 place the rule is worked out. On both floors such an agent stays at its desk, at work; the

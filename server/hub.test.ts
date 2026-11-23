@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import type {
   ChecklistStep,
   ChecklistCounts,
+  SubagentCalls,
   Checklists,
   OfficeAgent,
   OfficeEvent,
@@ -83,6 +84,7 @@ interface FakeActivity {
     doing?: ActivitySteps,
     checklists?: Checklists,
     progress?: ChecklistCounts,
+    subagents?: SubagentCalls,
   ): void;
 }
 
@@ -103,6 +105,7 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
         doing: ActivitySteps,
         checklists: Checklists,
         progress?: ChecklistCounts,
+        subagents?: SubagentCalls,
       ) => void)
     | null = null;
   let runningList: () => readonly string[] = () => [];
@@ -120,8 +123,8 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
     starts: 0,
     stops: 0,
     running: () => runningList(),
-    emit: (next, doing = {}, checklists = {}, progress) =>
-      activityListener?.(next, doing, checklists, progress),
+    emit: (next, doing = {}, checklists = {}, progress, subagents) =>
+      activityListener?.(next, doing, checklists, progress, subagents),
   };
   const ports: HubPorts = {
     async openDirectory(listener, onEnd) {
@@ -270,6 +273,36 @@ test("activity covers the running agents and is pushed as it changes", async () 
   expect(late.events[0]).toMatchObject({
     type: "snapshot",
     state: { activity: { a: "Running Bash" }, doing: { a: { kind: "deploy", key: "c7" } } },
+  });
+  late.controller.abort();
+  await late.done;
+  subscriber.controller.abort();
+  await subscriber.done;
+});
+
+test("an agent's sub-agents travel with the activity, reach a late subscriber, and go when they end", async () => {
+  const harness = startHarness({ agents: [agent("a", "running")], workspaces: [] });
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  const working = { a: [{ id: "c1", type: "Explore" }] };
+  harness.activity.emit({ a: "Running Agent" }, {}, {}, undefined, working);
+  expect(subscriber.events.at(-1)).toEqual({
+    type: "activity",
+    activity: { a: "Running Agent" },
+    doing: {},
+    subagents: working,
+    checklists: {},
+  });
+  const late = subscribe(harness.hub);
+  await settle();
+  expect(late.events[0]).toMatchObject({ type: "snapshot", state: { subagents: working } });
+  // The call ended: the next report has none, and neither has the event.
+  harness.activity.emit({ a: "Thinking" });
+  expect(subscriber.events.at(-1)).toEqual({
+    type: "activity",
+    activity: { a: "Thinking" },
+    doing: {},
+    checklists: {},
   });
   late.controller.abort();
   await late.done;

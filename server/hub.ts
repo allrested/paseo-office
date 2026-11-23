@@ -12,6 +12,7 @@ import type {
   OfficeSnapshot,
   OfficeWorkspace,
   Post,
+  SubagentCalls,
   WakeState,
   WorkspaceScript,
 } from "../shared/contracts.js";
@@ -54,6 +55,7 @@ export interface HubPorts {
       doing: ActivitySteps,
       checklists: Readonly<Checklists>,
       progress?: Readonly<ChecklistCounts>,
+      subagents?: Readonly<SubagentCalls>,
     ) => void,
   ): () => void;
   timers: Timers;
@@ -138,6 +140,8 @@ export function createHub(ports: HubPorts): Hub {
   // Kept after an agent stops, as the poller reads only running agents; dropped when it leaves.
   let checklists: Checklists = {};
   let checklistProgress: ChecklistCounts = {};
+  /** The provider's own sub-agents each running agent has at work, as the last round read them. */
+  let subagents: Readonly<SubagentCalls> = {};
   let boards: Record<string, readonly Post[]> = {};
   let wake: WakeState = { paused: false, queued: {} };
   let notes: NotesState | null = null;
@@ -168,6 +172,7 @@ export function createHub(ports: HubPorts): Hub {
       workspaces: [...view.workspaces],
       activity: { ...activity },
       doing: { ...doing },
+      ...(Object.keys(subagents).length ? { subagents: { ...subagents } } : {}),
       checklists: { ...checklists },
       ...(Object.keys(checklistProgress).length
         ? { checklistProgress: { ...checklistProgress } }
@@ -285,6 +290,7 @@ export function createHub(ports: HubPorts): Hub {
       type: "activity",
       activity: { ...activity },
       doing: { ...doing },
+      ...(Object.keys(subagents).length ? { subagents: { ...subagents } } : {}),
       checklists: { ...checklists },
       ...(Object.keys(checklistProgress).length
         ? { checklistProgress: { ...checklistProgress } }
@@ -335,9 +341,11 @@ export function createHub(ports: HubPorts): Hub {
     steps: ActivitySteps,
     report: Readonly<Checklists>,
     progress: Readonly<ChecklistCounts> = {},
+    working: Readonly<SubagentCalls> = {},
   ): void {
     activity = next;
     doing = steps;
+    subagents = working;
     const listed = new Set(view.agents.map((agent) => agent.id));
     const fresh = Object.entries(report).filter(([agentId]) => listed.has(agentId));
     const merged = Object.entries({ ...checklists, ...Object.fromEntries(fresh) });
@@ -444,6 +452,7 @@ export function createHub(ports: HubPorts): Hub {
     doing = {};
     checklists = {};
     checklistProgress = {};
+    subagents = {};
     const stop = stopDirectory;
     stopDirectory = null;
     view = EMPTY_VIEW;

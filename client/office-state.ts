@@ -26,6 +26,7 @@ export function applyOfficeEvent(state: OfficeSnapshot, event: OfficeEvent): Off
         ...state,
         activity: event.activity,
         doing: event.doing ?? {},
+        subagents: event.subagents,
         checklists: event.checklists ?? {},
         checklistProgress: event.checklistProgress,
       };

@@ -65,6 +65,11 @@ function rank(session: WorldSession): number {
   return session.status === "work" ? 1 : 2;
 }
 
+/** A sub-agent's id in the scene: its call's id is only unique within its parent's session. */
+function subId(parentId: string, callId: string): string {
+  return `${parentId}:${callId}`;
+}
+
 function toSession(
   row: OfficeRow,
   team: string,
@@ -98,7 +103,7 @@ function toSession(
       : {}),
     stuck,
     ...(row.waitingOn > 0 ? { waitingOn: row.waitingOn } : {}),
-    subs: [],
+    subs: (row.subagents ?? []).map((sub) => ({ id: subId(agent.id, sub.id), type: sub.type })),
     ...(agent.context === undefined && agent.costUsd === undefined
       ? {}
       : {
@@ -237,6 +242,8 @@ interface Told {
   running: Run | null;
   /** How full the context was, 0 to 1; null when unknown. */
   full: number | null;
+  /** The sub-agents the scene had been told of. */
+  subs?: readonly string[];
 }
 export type WorldMemory = ReadonlyMap<string, Told>;
 
@@ -244,6 +251,30 @@ export interface WorldChanges {
   events: WorldEvent[];
   /** What the scene knows once it has the events. */
   memory: WorldMemory;
+}
+
+/**
+ * A sub-agent that came since the scene was last told walks in, and one that is gone leaves.
+ * Someone seen for the first time gets neither: the scene seats who is already there (`subs`).
+ */
+function subEvents(session: WorldSession, was: Told | undefined): WorldEvent[] {
+  if (was === undefined) return [];
+  const told = was.subs ?? [];
+  const here = new Set(session.subs.map((sub) => sub.id));
+  const starts = session.subs
+    .filter((sub) => !told.includes(sub.id))
+    .map(
+      (sub): WorldEvent => ({
+        sess: session.id,
+        type: "substart",
+        agent: sub.id,
+        label: sub.type,
+      }),
+    );
+  const stops = told
+    .filter((id) => !here.has(id))
+    .map((id): WorldEvent => ({ sess: session.id, type: "substop", agent: id }));
+  return [...starts, ...stops];
 }
 
 /**
@@ -329,6 +360,7 @@ export function worldChanges(before: WorldMemory | null, people: WorldPeople): W
     }
     const full = fullness(session);
     if (tidied(was?.full ?? null, full)) events.push({ sess: session.id, type: "compact" });
+    for (const event of subEvents(session, was)) events.push(event);
     const steps = stepEvents(session, people.steps.get(session.id), was);
     for (const event of steps.events) events.push({ sess: session.id, ...event });
     memory.set(session.id, {
@@ -338,6 +370,7 @@ export function worldChanges(before: WorldMemory | null, people: WorldPeople): W
       step: steps.step,
       running: steps.running,
       full,
+      subs: session.subs.map((sub) => sub.id),
     });
   }
   return { events, memory };

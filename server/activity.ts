@@ -5,6 +5,8 @@ import {
   type ChecklistCounts,
   type ChecklistProgress,
   type Checklists,
+  type SubagentCall,
+  type SubagentCalls,
 } from "../shared/contracts.js";
 import type { ActivityKind, ActivityStep, TestResult } from "../shared/names.js";
 import { errorMessage } from "./errors.js";
@@ -286,6 +288,30 @@ export function readChecklist(items: readonly ActivityItem[]): {
   return { steps, progress };
 }
 
+/** The most sub-agents told of one agent: a tail holds no more calls than it has items. */
+const SUBAGENTS_MAX = 12;
+
+/**
+ * The sub-agents an agent has at work: its `Task` or `Agent` calls in the tail that still run, the
+ * oldest first. Each is told by its call's id and the kind of sub-agent the provider names, never
+ * by its task, which is the prompt it was given. A call older than the tail is not seen.
+ */
+export function runningSubagents(items: readonly ActivityItem[]): SubagentCall[] {
+  const calls: SubagentCall[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (item.type !== "tool_call" || item.status !== "running") continue;
+    const id = item.callId;
+    if (typeof id !== "string" || id === "" || seen.has(id)) continue;
+    if (toolKind(item) !== "subagent") continue;
+    seen.add(id);
+    const named = field(item.detail, "subAgentType");
+    const type = typeof named === "string" ? named.trim().slice(0, 40) : "";
+    calls.push({ id, type: type === "" ? "agent" : type });
+  }
+  return calls.slice(-SUBAGENTS_MAX);
+}
+
 /** What the poller knows of each running agent: its line, and its step when it is at one. */
 export type ActivityLines = Readonly<Record<string, string>>;
 export type ActivitySteps = Readonly<Record<string, ActivityStep>>;
@@ -306,6 +332,8 @@ export interface ActivityPorts {
     doing: ActivitySteps,
     checklists: Readonly<Checklists>,
     progress: Readonly<ChecklistCounts>,
+    /** The sub-agents each agent read this round has at work; an agent with none is absent. */
+    subagents: Readonly<SubagentCalls>,
   ): void;
 }
 
@@ -337,6 +365,7 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
   let previous: ActivityLines = {};
   let previousSteps: ActivitySteps = {};
   let previousChecklists = "[{},{}]";
+  let previousSubagents = "{}";
   let wasRunning: readonly string[] = [];
   // The calls each agent's last read saw, kept while the poller runs: an agent's next turn is
   // read against them too. A prompt ends the look back, so an old turn's call is never told.
@@ -348,9 +377,12 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     steps: Record<string, ActivityStep>,
     checklists: Checklists,
     progress: ChecklistCounts,
+    subagents: SubagentCalls,
   ): Promise<void> {
     try {
       const items = await ports.tail(agentId);
+      const working = runningSubagents(items);
+      if (working.length > 0) subagents[agentId] = working;
       const line = describeActivity(items);
       if (line !== null) next[agentId] = line;
       const seen = seenCalls.get(agentId);
@@ -398,10 +430,12 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     const steps: Record<string, ActivityStep> = {};
     const checklists: Checklists = {};
     const progress: ChecklistCounts = {};
+    // An agent whose read failed has none here, so its sub-agents leave until a read succeeds.
+    const subagents: SubagentCalls = {};
     const running = [...ports.running()];
     for (const agentId of running) {
       if (stopped) return;
-      await readOne(agentId, next, steps, checklists, progress);
+      await readOne(agentId, next, steps, checklists, progress, subagents);
     }
     for (const agentId of wasRunning) {
       if (stopped) return;
@@ -409,15 +443,18 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     }
     wasRunning = running;
     const checklistsText = JSON.stringify([checklists, progress]);
+    const subagentsText = JSON.stringify(subagents);
     const unchanged =
       sameLines(previous, next) &&
       sameSteps(previousSteps, steps) &&
-      checklistsText === previousChecklists;
+      checklistsText === previousChecklists &&
+      subagentsText === previousSubagents;
     if (stopped || unchanged) return;
     previous = next;
     previousSteps = steps;
     previousChecklists = checklistsText;
-    ports.onChange(next, steps, checklists, progress);
+    previousSubagents = subagentsText;
+    ports.onChange(next, steps, checklists, progress, subagents);
   }
 
   function runLogged(): void {
