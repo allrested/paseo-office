@@ -85,6 +85,7 @@ import {
 } from "./session-pane.js";
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
+import { OfficeCardsDialog, type OfficeCard } from "./office-cards.js";
 import { OfficeDialogs } from "./office-modal.js";
 import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
@@ -945,10 +946,8 @@ function HostResourceButton({
   );
 }
 
-/** A card of the office as a toolbar icon. */
-interface Shortcut extends StripCard {
-  icon: string;
-}
+/** A card of the office, listed behind the toolbar's Office button. */
+type Shortcut = OfficeCard;
 
 function shortcutsOf(entries: readonly (readonly [StripCard | null, string])[]): Shortcut[] {
   return entries.flatMap(([entry, icon]) => (entry === null ? [] : [{ ...entry, icon }]));
@@ -972,35 +971,50 @@ function stripCards(
   return docked ? all.filter(needsLook) : all;
 }
 
-/** The toolbar's buttons for what was: the timeline and the history, each while it is offered. */
 const NO_SHORTCUTS: readonly Shortcut[] = [];
 
+/**
+ * One button for the office's own cards: it opens their names, each with what it says. Its count
+ * is the cards that ask for a look.
+ */
 function ShortcutButtons({
   shortcuts = NO_SHORTCUTS,
+  caption,
   size,
   color,
   styles,
 }: {
-  /** The office's own cards, each an icon named by its card and what it says. */
   shortcuts?: readonly Shortcut[] | undefined;
+  /** The button's name beside its icon, where the toolbar has room for names. */
+  caption: boolean;
   size: number;
   color: string;
   styles: OfficeStyles;
 }) {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  if (shortcuts.length === 0) return null;
   return (
     <>
-      {shortcuts.map((shortcut) => (
-        <PanelButton
-          key={shortcut.title}
-          label={`${shortcut.title}: ${shortcut.note.text}`}
-          icon={shortcut.icon}
-          screenId={shortcut.title}
-          size={size}
-          color={color}
-          onOpen={shortcut.onOpen}
-          styles={styles}
-        />
-      ))}
+      <PanelButton
+        label="Office cards"
+        caption={caption ? "Office" : undefined}
+        icon="LayoutGrid"
+        screenId="office-cards"
+        size={size}
+        count={countLabel(shortcuts.filter(needsLook).length)}
+        color={color}
+        onOpen={show}
+        styles={styles}
+      />
+      <OfficeCardsDialog
+        cards={shortcuts}
+        open={open}
+        color={color}
+        onClose={close}
+        styles={styles}
+      />
     </>
   );
 }
@@ -1064,6 +1078,7 @@ function ViewControls({
       {sidebars ? (
         <ShortcutButtons
           shortcuts={shortcuts}
+          caption={toolbarLabels}
           size={touchScreen ? 20 : 16}
           color={color}
           styles={styles}
