@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
 import {
   MEMBER_NAME_MAX,
   ROSTER_MEMBERS_MAX,
@@ -38,6 +38,8 @@ const layout = StyleSheet.create({
   field: { flex: 1, minWidth: 0 },
   // A touch target, whatever the label's length.
   button: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, justifyContent: "center" },
+  // Three of these beside a name leave the name room on a phone: a word each did not fit.
+  iconButton: { height: 44, width: 44, alignItems: "center", justifyContent: "center" },
   dot: { width: 8, height: 8, borderRadius: 4 },
 });
 
@@ -235,11 +237,16 @@ function TeamBlock({ team, edit, holders, styles }: TeamBlockProps) {
           onSave={rename}
           styles={styles}
         />
-        <TextButton label={`Move ${team.name} up`} text="Up" onPress={up} styles={styles} />
-        <TextButton label={`Move ${team.name} down`} text="Down" onPress={down} styles={styles} />
+        <TextButton label={`Move ${team.name} up`} icon="ChevronUp" onPress={up} styles={styles} />
+        <TextButton
+          label={`Move ${team.name} down`}
+          icon="ChevronDown"
+          onPress={down}
+          styles={styles}
+        />
         <TextButton
           label={`Remove team ${team.name}`}
-          text="Remove"
+          icon="Trash2"
           onPress={remove}
           styles={styles}
         />
@@ -314,9 +321,14 @@ function MemberRow({ team, at, edit, held, styles }: MemberRowProps) {
         onSave={rename}
         styles={styles}
       />
-      <TextButton label={`Move ${member.name} up`} text="Up" onPress={up} styles={styles} />
-      <TextButton label={`Move ${member.name} down`} text="Down" onPress={down} styles={styles} />
-      <TextButton label={`Remove ${member.name}`} text="Remove" onPress={remove} styles={styles} />
+      <TextButton label={`Move ${member.name} up`} icon="ChevronUp" onPress={up} styles={styles} />
+      <TextButton
+        label={`Move ${member.name} down`}
+        icon="ChevronDown"
+        onPress={down}
+        styles={styles}
+      />
+      <TextButton label={`Remove ${member.name}`} icon="Trash2" onPress={remove} styles={styles} />
     </View>
   );
 }
@@ -374,20 +386,29 @@ function NameField({ label, value, max, onSave, styles }: NameFieldProps) {
 
 interface TextButtonProps {
   label: string;
-  text: string;
+  /** The words on the button, or the icon that stands for its label. */
+  text?: string;
+  icon?: "ChevronUp" | "ChevronDown" | "Trash2";
   onPress(): void;
   styles: OfficeStyles;
 }
 
-function TextButton({ label, text, onPress, styles }: TextButtonProps) {
+function TextButton({ label, text, icon, onPress, styles }: TextButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={StyleSheet.compose(styles.workspaceAction, layout.button)}
+      style={StyleSheet.compose(
+        styles.workspaceAction,
+        icon === undefined ? layout.button : layout.iconButton,
+      )}
     >
-      <Text style={styles.sidebarButtonText}>{text}</Text>
+      {icon === undefined ? (
+        <Text style={styles.sidebarButtonText}>{text}</Text>
+      ) : (
+        <Icon name={icon} size={18} color={styles.iconColor} />
+      )}
     </Pressable>
   );
 }
