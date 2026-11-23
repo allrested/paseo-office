@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
+import { ROSTER_MEMBER_KEY, ROSTER_TEAM_KEY } from "../shared/roster.js";
 import {
   agentsFromSnapshot,
   applyAgentUpdate,
@@ -536,4 +537,30 @@ test("reads a saved Office appearance, ignoring cleared and invalid profiles", (
   expect(project(appearance)?.appearance).toEqual(appearance);
   expect(project(null)?.appearance).toBeUndefined();
   expect(project({ color: "broken" })?.appearance).toBeUndefined();
+});
+
+test("an agent carries its roster mark, an id or the edition it was passed over at", () => {
+  const marked = (mark: unknown) =>
+    projectAgent(agentInput({ metadata: { [ROSTER_MEMBER_KEY]: mark } }));
+  expect(marked("tj")?.roster).toBe("tj");
+  expect(marked(2)?.roster).toBe(2);
+  expect(marked(false)).not.toHaveProperty("roster");
+  expect(projectAgent(agentInput({}))).not.toHaveProperty("roster");
+});
+
+test("a workspace carries its roster mark and when it was made", () => {
+  const made = projectWorkspace(
+    workspaceInput({
+      createdAt: "2026-11-23T08:00:00.000Z",
+      metadata: { [ROSTER_TEAM_KEY]: "dev" },
+    }),
+  );
+  expect(made?.roster).toBe("dev");
+  expect(made?.createdAt).toBe("2026-11-23T08:00:00.000Z");
+  // The name is still the workspace's here: the hub turns the mark into a name.
+  expect(made?.name).toBe("main");
+  expect(made).not.toHaveProperty("workspaceName");
+  const bare = projectWorkspace(workspaceInput({ createdAt: null }));
+  expect(bare).not.toHaveProperty("roster");
+  expect(bare).not.toHaveProperty("createdAt");
 });

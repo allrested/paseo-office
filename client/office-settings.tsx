@@ -14,6 +14,7 @@ import { useOffice } from "./use-office.js";
 import { useOfficeScene } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
 import { SceneChoices } from "./scene-picker.js";
+import { holdersOf } from "./teams-text.js";
 import { ViewSwitch } from "./view-switch.js";
 
 export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
@@ -52,9 +53,14 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
   const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
+  const rosterHolders = useMemo(
+    () => holdersOf(office.state.workspaces, office.state.agents),
+    [office.state.workspaces, office.state.agents],
+  );
   return (
     <OfficeBrandContext.Provider value={office.state.brand}>
       <HostSwitches
+        rosterHolders={rosterHolders}
         language={language}
         wake={office.loaded && live ? office.state.wake : null}
         actions={actions}

@@ -2,6 +2,11 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## Unreleased
+
+- Team roster: a **Teams** section in the settings holds teams and their teammates, and the
+  office names workspaces and agents from it by itself. Paseo's own names are not changed.
+
 ## 0.2.10 (2026-11-23)
 
 - A room's board lists the room's agents under its form, each with what it is at and the

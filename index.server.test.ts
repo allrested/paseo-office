@@ -96,6 +96,9 @@ const ON: SettingsState = {
     chatCulture: "international",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 const OFF: SettingsState = {
@@ -114,6 +117,9 @@ const OFF: SettingsState = {
     chatCulture: "international",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 const OWN_TOOL = defineAgentTool({
@@ -202,6 +208,8 @@ interface FakeDirectory {
   workspaceMetadata?: Record<string, unknown>;
   /** Thrown by a metadata write, as a host without entity metadata does. */
   metadataFailure?: Error;
+  /** The workspaces the daemon lists; none by default. */
+  workspaces?: object[];
 }
 
 /** An idle agent as the daemon's agent list gives it. */
@@ -267,7 +275,7 @@ function fakeContext(
             directory.workspaceMetadata = { ...directory.workspaceMetadata, ...patch };
           },
         }),
-        list: async () => listOf([]),
+        list: async () => listOf(directory.workspaces ?? []),
         open: async (cwd: string) => ({
           id: "wks_notes",
           directory: cwd,
@@ -630,6 +638,9 @@ function notesSettings(
       chatCulture: "international",
       planHidden: [],
       stickyNotes: "",
+      rosterOn: false,
+      rosterEdition: 0,
+      teams: [],
     },
   };
 }
@@ -1115,6 +1126,9 @@ const NOTES: SettingsState = {
     chatCulture: "international",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 
@@ -1151,6 +1165,60 @@ test("a team is given a name of the office's own, kept on its workspace, and an 
   await stop();
 });
 
+test("a team whose typed name is cleared goes back to its roster name", async () => {
+  if (ON.status !== "ready") throw new Error("ON is the ready state");
+  const rostered: SettingsState = {
+    ...ON,
+    values: {
+      ...ON.values,
+      rosterOn: true,
+      rosterEdition: 1,
+      teams: [{ id: "dev", name: "PR-DEV", members: [] }],
+    },
+  };
+  const { recorded, directory, context, stop } = setup(async () => rostered);
+  // The server follows the settings it read at its start.
+  for (const listener of recorded.listeners) await listener(rostered);
+  directory.workspaceMetadata = { "office.roster.team": "dev", "office.team.name": "Payments" };
+  const rename = recorded.handlers.get("office.team.rename.request");
+  expect(await rename?.({ workspaceId: "w1", name: "" }, context)).toEqual({
+    ok: true,
+    name: "PR-DEV",
+  });
+  expect(directory.workspaceMetadata).toEqual({
+    "office.roster.team": "dev",
+    "office.team.name": null,
+  });
+  await stop();
+});
+
+test("a settings save that switches the roster on hands the open office's workspace its team", async () => {
+  if (ON.status !== "ready") throw new Error("ON is the ready state");
+  const { recorded, directory, context, stop } = setup(async () => ON);
+  directory.workspaces = [
+    { id: "w1", name: "api", projectDisplayName: "shop", createdAt: "2026-11-11T08:00:00.000Z" },
+  ];
+  await settle();
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(directory.workspaceMetadata).toBeUndefined();
+  const rostered: SettingsState = {
+    ...ON,
+    revision: "roster",
+    values: {
+      ...ON.values,
+      rosterOn: true,
+      rosterEdition: 1,
+      teams: [{ id: "dev", name: "PR-DEV", members: [] }],
+    },
+  };
+  for (const listener of recorded.listeners) await listener(rostered);
+  await settle();
+  expect(directory.workspaceMetadata).toEqual({ "office.roster.team": "dev" });
+  await office.leave();
+  await stop();
+});
+
 test("the writer starts in the settings' mode, and accepts edits while none is set", async () => {
   const withMode = (notesMode: string): SettingsState => ({
     status: "ready",
@@ -1170,6 +1238,9 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       chatCulture: "international",
       planHidden: [],
       stickyNotes: "",
+      rosterOn: false,
+      rosterEdition: 0,
+      teams: [],
     },
   });
   let saved: SettingsState = NOTES;
@@ -1533,6 +1604,9 @@ const JIRA_ON: SettingsState = {
     chatCulture: "international",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
     jiraProjects: "OPS",
   },
 };

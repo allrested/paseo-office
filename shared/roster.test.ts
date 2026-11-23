@@ -1,0 +1,145 @@
+import { expect, test } from "vitest";
+import { z } from "zod";
+import {
+  NO_ROSTER,
+  ROSTER_TEAM_KEY,
+  RosterTeamsSchema,
+  memberOf,
+  nextEdition,
+  refuseBadTeams,
+  rosterOf,
+  shownTeamName,
+  storedRosterMark,
+  teamOf,
+  tidyMemberName,
+  type Roster,
+  type RosterTeam,
+} from "./roster.js";
+import { TEAM_NAME_KEY } from "./team-name.js";
+
+const DEV: RosterTeam = {
+  id: "t1",
+  name: "PR-DEV",
+  members: [
+    { id: "m1", name: "Tze Jun Tan" },
+    { id: "m2", name: "Kharisma Muzaki Ghufron" },
+  ],
+};
+const QA: RosterTeam = { id: "t2", name: "PR-QA", members: [{ id: "m3", name: "Rosalyn" }] };
+const ON: Roster = { on: true, edition: 1, teams: [DEV, QA] };
+
+const Checked = RosterTeamsSchema.superRefine(refuseBadTeams);
+
+test("a stored mark is an id or a whole edition, else nothing", () => {
+  expect(storedRosterMark("t1")).toBe("t1");
+  expect(storedRosterMark(0)).toBe(0);
+  expect(storedRosterMark(3)).toBe(3);
+  expect(storedRosterMark("")).toBeUndefined();
+  expect(storedRosterMark(-1)).toBeUndefined();
+  expect(storedRosterMark(1.5)).toBeUndefined();
+  expect(storedRosterMark(false)).toBeUndefined();
+  expect(storedRosterMark(null)).toBeUndefined();
+});
+
+test("a team and a teammate are found by id, and only while the roster is on", () => {
+  expect(teamOf(ON, "t2")).toBe(QA);
+  expect(teamOf(ON, "gone")).toBeNull();
+  expect(teamOf(ON, 1)).toBeNull();
+  expect(teamOf(ON, undefined)).toBeNull();
+  expect(teamOf({ ...ON, on: false }, "t2")).toBeNull();
+  expect(memberOf(DEV, "m2")?.name).toBe("Kharisma Muzaki Ghufron");
+  expect(memberOf(DEV, "m3")).toBeNull();
+  expect(memberOf(null, "m1")).toBeNull();
+});
+
+test("the settings' three values read as one roster", () => {
+  expect(rosterOf({ rosterOn: true, rosterEdition: 4, teams: [DEV] })).toEqual({
+    on: true,
+    edition: 4,
+    teams: [DEV],
+  });
+  expect(NO_ROSTER).toEqual({ on: false, edition: 0, teams: [] });
+});
+
+test("names are tidied to one line and their length", () => {
+  expect(tidyMemberName("  Tze   Jun\nTan ")).toBe("Tze Jun Tan");
+  expect(tidyMemberName("x".repeat(80))).toHaveLength(60);
+  const parsed = Checked.parse([
+    { id: "t1", name: "  PR-DEV  ", members: [{ id: "m1", name: " TJ " }] },
+  ]);
+  expect(parsed).toEqual([{ id: "t1", name: "PR-DEV", members: [{ id: "m1", name: "TJ" }] }]);
+});
+
+test("an empty name, a name twice and an id twice are refused", () => {
+  const messages = (teams: unknown) => {
+    const result = Checked.safeParse(teams);
+    return result.success ? [] : result.error.issues.map((issue) => issue.message);
+  };
+  expect(messages([{ id: "t1", name: " ", members: [] }])).not.toEqual([]);
+  expect(messages([{ id: "t1", name: "A", members: [{ id: "m1", name: "" }] }])).not.toEqual([]);
+  expect(
+    messages([
+      { id: "t1", name: "A", members: [] },
+      { id: "t2", name: "a", members: [] },
+    ]),
+  ).toEqual(['teams: "a" is there twice']);
+  expect(
+    messages([
+      {
+        id: "t1",
+        name: "A",
+        members: [
+          { id: "m1", name: "TJ" },
+          { id: "m2", name: "tj" },
+        ],
+      },
+    ]),
+  ).toEqual(['teams: "tj" is twice in A']);
+  expect(
+    messages([
+      { id: "t1", name: "A", members: [{ id: "m1", name: "TJ" }] },
+      { id: "t2", name: "B", members: [{ id: "m1", name: "Zaki" }] },
+    ]),
+  ).toEqual(["teams: an id is there twice"]);
+  expect(messages([DEV, QA])).toEqual([]);
+});
+
+test("too many teams or teammates are refused", () => {
+  const many = Array.from({ length: 51 }, (_, index) => ({
+    id: `t${index}`,
+    name: `Team ${index}`,
+    members: [],
+  }));
+  expect(z.object({ teams: RosterTeamsSchema }).safeParse({ teams: many }).success).toBe(false);
+});
+
+test("the edition goes up when a team or a teammate is added or the roster is switched on", () => {
+  const before: Roster = { on: true, edition: 2, teams: [DEV] };
+  expect(nextEdition(before, { on: true, teams: [DEV] })).toBe(2);
+  expect(nextEdition(before, { on: true, teams: [DEV, QA] })).toBe(3);
+  expect(
+    nextEdition(before, {
+      on: true,
+      teams: [{ ...DEV, members: [...DEV.members, { id: "m9", name: "Shashwat Gupta" }] }],
+    }),
+  ).toBe(3);
+  // A rename, a removal and a new order hand nothing new out.
+  expect(nextEdition(before, { on: true, teams: [{ ...DEV, name: "DEV" }] })).toBe(2);
+  expect(nextEdition(before, { on: true, teams: [] })).toBe(2);
+  expect(nextEdition({ ...before, on: false }, { on: true, teams: [DEV] })).toBe(3);
+  expect(nextEdition(before, { on: false, teams: [DEV, QA] })).toBe(3);
+});
+
+test("a team goes by its hand-typed name, then the roster's, then the workspace's", () => {
+  const plain = { name: "paseo-7f3a", metadata: {} };
+  const rostered = { name: "paseo-7f3a", metadata: { [ROSTER_TEAM_KEY]: "t1" } };
+  const typed = {
+    name: "paseo-7f3a",
+    metadata: { [ROSTER_TEAM_KEY]: "t1", [TEAM_NAME_KEY]: "Payments" },
+  };
+  expect(shownTeamName(plain, ON)).toBe("paseo-7f3a");
+  expect(shownTeamName(rostered, ON)).toBe("PR-DEV");
+  expect(shownTeamName(typed, ON)).toBe("Payments");
+  expect(shownTeamName(rostered, { ...ON, on: false })).toBe("paseo-7f3a");
+  expect(shownTeamName({ name: "x", metadata: { [ROSTER_TEAM_KEY]: 1 } }, ON)).toBe("x");
+});

@@ -105,6 +105,31 @@ and the room's card says which workspace it is. An empty name goes back to the w
 
 The 3D floor remembers where a team sat by its name, so a renamed team is seated as a new one.
 
+## Team roster
+
+Settings > Office 3D > **Teams** holds a roster: teams, in the order they
+are handed out, each with its teammates. With "Name teams and agents from the roster" on, the office names by itself:
+
+- each workspace takes the first team no open workspace holds, oldest workspace first;
+- each agent in that workspace, sub-agents too, takes one of the team's teammates no agent there
+  holds, picked by chance, oldest agent first;
+- when the roster has nothing left, the workspace or agent keeps the name it has today. A
+  sub-agent is then `<parent's name>-<number>`, and the parent's name can be a teammate's.
+
+A name sticks until its workspace or agent is archived. A freed name goes to the next new one;
+nothing that already runs is renamed. Adding a team or a teammate, or switching the roster on,
+offers the longer list to what was passed over before.
+
+The names are the office's own: Paseo's sidebar, tabs and CLI show the workspace and session
+names they always did. A name you type on a team or an agent wins over the roster. Renaming a
+team or teammate in the settings renames whoever holds it; removing one leaves its holder with
+today's name until the roster next grows, when it is offered a name again. Switching the roster
+off shows today's names everywhere, and on again brings the same assignments back and looks once
+more at what was passed over.
+
+What is stored: `office.roster.team` on a workspace and `office.roster.member` on an agent, each
+the id of the team or teammate held, or a number when the roster had nothing left for it.
+
 ## Views
 
 The office has three views: a 3D floor, a 2D floor and the list. A switch over the floor's top
@@ -509,6 +534,7 @@ The gear in fullscreen opens **Office settings** over the floor. You can also op
 | Section    | Controls                                                                                     |
 | ---------- | -------------------------------------------------------------------------------------------- |
 | Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
+| Teams      | The [team roster](#team-roster): teams, their teammates, and the switch for naming from it.  |
 | Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
 | Services   | Jira, Sentry and CloudWatch, and the optional weather service.                               |
 

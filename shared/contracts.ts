@@ -61,6 +61,8 @@ export const OfficeAgentSchema = z.object({
   number: z.number().int().positive().optional(),
   /** On a parent: the number its next sub-agent gets. */
   next: z.number().int().positive().optional(),
+  /** The roster teammate it holds, by id, or the edition it was passed over at; absent before either. */
+  roster: z.union([z.string(), z.number()]).optional(),
   /** The office's name for a numbered sub-agent: `<parent's name>-<number>`. */
   name: z.string().optional(),
   /**
@@ -141,6 +143,10 @@ export const OfficeWorkspaceSchema = z.object({
   name: z.string(),
   /** The workspace's own name in Paseo; present only while the team goes by another. */
   workspaceName: z.string().optional(),
+  /** The roster team it holds, by id, or the edition it was passed over at; absent before either. */
+  roster: z.union([z.string(), z.number()]).optional(),
+  /** When it was made; absent on a host that does not say. */
+  createdAt: z.string().optional(),
   projectName: z.string(),
   branch: z.string().optional(),
   ticket: WorkspaceTicketSchema.optional(),

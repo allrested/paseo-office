@@ -50,6 +50,9 @@ const COMPANY = {
   awsLogGroups: "",
   awsLogPattern: "ERROR",
   stickyNotes: "",
+  rosterOn: false,
+  rosterEdition: 0,
+  teams: [],
   ...WEATHER_DEFAULTS,
 };
 
@@ -88,7 +91,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(6);
+  expect(officeHostSettings.version).toBe(7);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -108,7 +111,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(6);
+  expect(officeHostSettings.version).toBe(7);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -346,4 +349,19 @@ test("AWS values that could not be CLI arguments are refused", () => {
   expect(schema.safeParse({ awsLogGroups: "ok, -bad" }).success).toBe(false);
   const many = Array.from({ length: 11 }, (_, index) => `g${index}`).join(",");
   expect(schema.safeParse({ awsLogGroups: many }).success).toBe(false);
+});
+
+test("the roster is off and empty until the owner writes it, and a bad team is refused", () => {
+  const defaults = officeHostSettings.schema.parse({});
+  expect(defaults.rosterOn).toBe(false);
+  expect(defaults.rosterEdition).toBe(0);
+  expect(defaults.teams).toEqual([]);
+  const twice = officeHostSettings.schema.safeParse({
+    teams: [
+      { id: "t1", name: "PR-DEV", members: [] },
+      { id: "t2", name: "PR-DEV", members: [] },
+    ],
+  });
+  expect(twice.success).toBe(false);
+  expect(officeHostSettings.version).toBe(7);
 });

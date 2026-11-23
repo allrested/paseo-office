@@ -1,6 +1,6 @@
 import { useOfficeBrand } from "./office-brand-context.js";
 import { OfficeMark } from "./office-mark.js";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
 import { SettingsSections, settingsLayout } from "./settings-sections.js";
@@ -24,6 +24,8 @@ import { SegmentPill } from "./segment-pill.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { NOTES_DAYS_LABEL, NotesDays } from "./notes-days.js";
 import { NOTES_MODE_LABEL, NotesModeRow } from "./notes-mode-row.js";
+import { TeamsSettings } from "./teams-settings.js";
+import { NO_HOLDERS, TEAMS_LABEL, type RosterHolders } from "./teams-text.js";
 import { JiraConnection, SentryConnection } from "./tracker-connections.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -45,6 +47,7 @@ type HostSetting =
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
+  | typeof TEAMS_LABEL
   | typeof NOTES_DAYS_LABEL
   | typeof NOTES_MODE_LABEL
   | typeof FLOOR_PLAN_LABEL
@@ -102,6 +105,8 @@ export interface HostSwitchesProps {
   incidents: TrackerState | undefined;
   /** The device's own switch: last in the row, so on a phone it wraps to the line above the view. */
   weather?: import("../shared/contracts.js").WeatherState | undefined;
+  /** Who holds which team and teammate, for the Teams section; none until the office has loaded. */
+  rosterHolders?: RosterHolders;
   language?: ReactNode;
   children?: ReactNode;
 }
@@ -120,6 +125,7 @@ export function HostSwitches({
   scheduleError,
   incidents,
   weather,
+  rosterHolders,
   language,
   children,
 }: HostSwitchesProps) {
@@ -214,6 +220,19 @@ export function HostSwitches({
     settings.status === "error" ? failureText("Read the office settings", settings.error) : null,
     saveProblem("Agent tools"),
   ].filter((problem): problem is string => problem !== null);
+  const teams = useMemo(
+    () => (
+      <TeamsSettings
+        values={stored}
+        revision={revision}
+        change={change}
+        problem={saveProblem(TEAMS_LABEL)}
+        holders={rosterHolders ?? NO_HOLDERS}
+        styles={styles}
+      />
+    ),
+    [stored, revision, change, saveProblem, rosterHolders, styles],
+  );
   return (
     <SettingsSections
       styles={styles}
@@ -243,6 +262,7 @@ export function HostSwitches({
           )}
         </>
       }
+      teams={teams}
       automation={
         <>
           <View style={settingsLayout.block}>
