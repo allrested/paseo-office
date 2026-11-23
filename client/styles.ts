@@ -316,6 +316,10 @@ export interface OfficeStyles {
   pickerFieldBody: ViewStyle;
   /** The rows of a page of choices, and one of them: an agent, or nobody. */
   pickerRows: ViewStyle;
+  /** A card of the office in the Office list: its icon, its name and what it says. */
+  officeCardRow: ViewStyle;
+  officeCardRowHover: ViewStyle;
+  officeCardText: ViewStyle;
   pickerRow: ViewStyle;
   pickerRowSelected: ViewStyle;
   pickerLead: ViewStyle;
@@ -1327,6 +1331,15 @@ export function useOfficeStyles(
       },
       pickerFieldBody: { flex: 1, minWidth: 0 },
       pickerRows: { gap: 4 },
+      officeCardRow: { ...pickerRow, alignItems: "center", gap: 12 },
+      officeCardRowHover: {
+        ...pickerRow,
+        alignItems: "center",
+        gap: 12,
+        backgroundColor: colors.surface1,
+        borderColor: colors.border,
+      },
+      officeCardText: { flex: 1, minWidth: 0, gap: 2 },
       pickerRow,
       // The chosen row differs by more than tone, as the chosen chip does: it has an outline.
       pickerRowSelected: {

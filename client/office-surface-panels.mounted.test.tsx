@@ -1395,7 +1395,12 @@ test("wide fullscreen gives Sessions its own rail and opens the chosen conversat
         deliver?.({ type: "snapshot", state: { ...OFFICE_WITH_ONE_AGENT, notes } }),
       );
       await openAttention();
+      // The header has one button for the office's cards: it lists them, and a row opens its card.
+      await pressFirst("Office cards");
+      expect(surface.querySelector('dialog[open][aria-label="Office"]')).not.toBeNull();
+      expect(container.querySelector('[aria-label="Timeline"]')).toBeNull();
       await pressFirst("Stand-up:");
+      expect(surface.querySelectorAll("dialog[open]")).toHaveLength(1);
       expect(surface.querySelector('dialog[open][aria-label="Stand-up"]')).not.toBeNull();
       await press("Stand-up notes");
       expect(surface.querySelectorAll("dialog[open]")).toHaveLength(1);
