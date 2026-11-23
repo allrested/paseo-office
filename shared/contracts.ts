@@ -3,6 +3,7 @@ import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { PlanUsageSchema } from "./plan-usage.js";
+import { TimelineSchema } from "./timeline.js";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
 import { ACTIVITY_KINDS, TEST_RESULTS } from "./names.js";
@@ -793,6 +794,19 @@ export const planUsageRpc = defineRpc({
   input: z.object({}),
   output: z.union([
     z.object({ ok: z.literal(true), providers: z.array(PlanUsageSchema) }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
+});
+
+/**
+ * What the office saw each agent do between two times (epoch ms), a lane per agent. It holds
+ * what was seen while an office was open, for the last eight days.
+ */
+export const timelineRpc = defineRpc({
+  name: "office.timeline.request",
+  input: z.object({ from: z.number(), to: z.number() }),
+  output: z.union([
+    z.object({ ok: z.literal(true), timeline: TimelineSchema }),
     z.object({ ok: z.literal(false), problem: z.string() }),
   ]),
 });

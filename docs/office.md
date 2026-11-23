@@ -497,6 +497,25 @@ The gear in fullscreen opens **Office settings** over the floor. You can also op
 
 View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
+## Timeline and the week
+
+The **Timeline** button, in the toolbar of a wide office and at the top of the Activity tab, opens a card with a lane for each agent over the last hour,
+6 hours or 24 hours: green at work, amber waiting for the user, red stopped on an error, grey
+resting, and a mark at each tool call. **Replay** moves a head across the lanes from the start of
+the range at 30, 60 or 120 times the clock, and each lane says what its agent was at then
+("editing", "running tests", "waiting for you"). **Now** ends the replay. The replay is in the card
+only: the 3D floor keeps showing the present.
+
+**This week** adds the last seven days up: time at work, turns started, edits, commands, cost where
+the provider reports one, the busiest team, and a bar for each 24 hours.
+
+The office's server keeps this log itself (`server/timeline.ts`, `office/timeline.json`, mode 600):
+each change of an agent's state, the kind of each tool call (never its file, command or text) and
+each rise of its cost, for eight days and at most 40,000 marks. It sees only while an office
+surface is open on some device, at the directory's changes and the 5-second activity reads. A time
+the office was closed is a gap in every lane, not a rest, and the week's figures count only what
+was seen. `office.timeline.request` reads it.
+
 ## Streamer mode, graphics and sticky notes
 
 **Streamer mode** (Settings, host-wide, on by default) keeps file names, commands, search queries

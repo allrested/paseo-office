@@ -76,6 +76,11 @@ export function liftFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "lift.json");
 }
 
+/** What the office saw each agent do, for the timeline and the week's recap. */
+export function timelineFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "timeline.json");
+}
+
 export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "tenure.json");
 }

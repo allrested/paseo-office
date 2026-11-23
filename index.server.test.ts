@@ -842,6 +842,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.timeline.request",
     "office.plan.usage.request",
     "office.team.rename.request",
     "office.notes.modes.request",

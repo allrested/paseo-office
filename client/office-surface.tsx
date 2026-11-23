@@ -60,6 +60,8 @@ import { weatherEntry } from "./weather-text.js";
 import { incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
+import { TimelineCard } from "./timeline-card.js";
+import { OpenTimelineContext } from "./timeline-open.js";
 import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
 import { hostNote, memoryPercent, namedMachine, type HostNote } from "../shared/machine-text.js";
@@ -113,7 +115,7 @@ import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
 import { PlanUsageContext, usePlanUsage } from "./use-plan-usage.js";
-import { planNote } from "../shared/plan-usage.js";
+import { planNote, type PlanUsage } from "../shared/plan-usage.js";
 import { useOffice, type OfficeState } from "./use-office.js";
 import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
@@ -873,6 +875,7 @@ interface ViewControlsProps {
   onTeam(): void;
   machine: Machine | null;
   onMachine?: () => void;
+  onTimeline?: () => void;
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
   touchScreen: boolean;
@@ -936,6 +939,7 @@ function ViewControls({
   onTeam,
   machine,
   onMachine,
+  onTimeline,
   onChange,
   compact,
   touchScreen,
@@ -978,6 +982,17 @@ function ViewControls({
           styles={styles}
         />
       )}
+      {sidebars && onTimeline ? (
+        <PanelButton
+          label="Timeline"
+          icon="History"
+          screenId="timeline"
+          size={touchScreen ? 20 : 16}
+          color={color}
+          onOpen={onTimeline}
+          styles={styles}
+        />
+      ) : null}
       {full.available ? (
         <PanelButton
           label={full.active ? "Exit full screen" : "Full screen"}
@@ -1776,6 +1791,35 @@ function useWorkspaceOverlay(
   return { workspace, closeWorkspace, showWorkspace, showAgentWorkspace, openWorkspaceBoard };
 }
 
+/** What the surface's parts read without it being handed down: the brand, the plans' limits, the timeline's opener. */
+function OfficeContexts({
+  brand,
+  planUsage,
+  onTimeline,
+  children,
+}: {
+  brand: OfficeState["state"]["brand"];
+  planUsage: readonly PlanUsage[];
+  onTimeline: (() => void) | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <OfficeBrandContext.Provider value={brand}>
+      <PlanUsageContext.Provider value={planUsage}>
+        <OpenTimelineContext.Provider value={onTimeline}>{children}</OpenTimelineContext.Provider>
+      </PlanUsageContext.Provider>
+    </OfficeBrandContext.Provider>
+  );
+}
+
+/** The timeline card: offered and shown only while the office's data is live. */
+function useTimelineCard(live: boolean) {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  return { open: open && live, onOpen: live ? show : undefined, close };
+}
+
 function useHostResources(machine: Machine | null, live: boolean) {
   const [machineOpen, setMachineOpen] = useState(false);
   const openMachine = useCallback(() => setMachineOpen(true), []);
@@ -1853,6 +1897,7 @@ export function OfficeSurface(
     live,
   );
   const planUsage = usePlanUsage(live);
+  const timeline = useTimelineCard(live);
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   // Until the host sends its duty list (an older host has none) nothing offers the duty board.
@@ -2070,6 +2115,7 @@ export function OfficeSurface(
       onTeam={openTeam}
       machine={machine}
       onMachine={hostEntry?.onOpen}
+      onTimeline={timeline.onOpen}
       onChange={changeView}
       compact={compact}
       touchScreen={touchScreen}
@@ -2200,6 +2246,7 @@ export function OfficeSurface(
         styles={styles}
         onClose={closeMachine}
       />
+      <TimelineCard open={timeline.open} styles={styles} onClose={timeline.close} />
       <JanitorCard
         rows={contexts}
         open={janitorOpen && live}
@@ -2310,12 +2357,10 @@ export function OfficeSurface(
     </View>
   );
   return (
-    <OfficeBrandContext.Provider value={office.state.brand}>
-      <PlanUsageContext.Provider value={planUsage}>
-        <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
-          {surface}
-        </OfficeDialogs>
-      </PlanUsageContext.Provider>
-    </OfficeBrandContext.Provider>
+    <OfficeContexts brand={office.state.brand} planUsage={planUsage} onTimeline={timeline.onOpen}>
+      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+        {surface}
+      </OfficeDialogs>
+    </OfficeContexts>
   );
 }
