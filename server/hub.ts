@@ -364,8 +364,10 @@ export function createHub(ports: HubPorts): Hub {
         continue;
       }
       void team.then((stored) => {
+        // A later plan may have given the agent a newer mark meanwhile: that one stands.
+        if (pendingRoster.get(key) !== mark) return false;
         if (stored) return send(key, sending, mark);
-        if (pendingRoster.get(key) === mark) pendingRoster.delete(key);
+        pendingRoster.delete(key);
         return false;
       });
     }

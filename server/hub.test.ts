@@ -1546,6 +1546,42 @@ test("a failed write does not drop a later mark planned for the same workspace",
   await watcher.done;
 });
 
+test("a held teammate mark is not sent once a newer mark is planned for the agent", async () => {
+  const agents: [string, Record<string, string | number>][] = [];
+  const answers: (() => void)[] = [];
+  const roster: Roster = {
+    ...ROSTER,
+    teams: [...ROSTER.teams, { id: "qa", name: "PR-QA", members: [{ id: "mo", name: "Mo" }] }],
+  };
+  const { hub, directory } = startHarness(
+    { agents: [member("a1", 1)], workspaces: [room("w1"), room("w2", { roster: "qa" })] },
+    {
+      setWorkspaceMetadata: () => new Promise<void>((resolve) => answers.push(resolve)),
+      setAgentMetadata: async (id, patch) => {
+        agents.push([id, patch]);
+      },
+    },
+  );
+  hub.setRoster(roster);
+  const watcher = subscribe(hub);
+  await settle();
+  // w1's team is out and a1's teammate waits on it.
+  expect(answers).toHaveLength(1);
+  expect(agents).toEqual([]);
+  // a1 now reports in w2, whose team has no tj: it is passed over there.
+  directory.emit({
+    agents: [member("a1", 1, { workspaceId: "w2" })],
+    workspaces: [room("w1"), room("w2", { roster: "qa" })],
+  });
+  await settle();
+  expect(agents).toEqual([["a1", { [ROSTER_MEMBER_KEY]: 1 }]]);
+  answers[0]();
+  await settle();
+  expect(agents).toEqual([["a1", { [ROSTER_MEMBER_KEY]: 1 }]]);
+  watcher.controller.abort();
+  await watcher.done;
+});
+
 test("a mark reported back is no longer held, and a longer roster can reach its holder", async () => {
   const writes: RosterWrites = { workspaces: [], agents: [] };
   const { hub, directory } = startHarness(
