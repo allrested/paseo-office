@@ -505,6 +505,20 @@ memory, the process count and the TCP ports of the processes that carry its `PAS
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
 In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
 
+### Plan limits
+
+The Host card lists each provider's plan limits (the 5 hours, the week, whatever the provider
+reports) with how much is used and when it resets. The office asks Paseo for them
+(`office.plan.usage.request`, which reads `providers.listUsage()`) when it opens and every two
+minutes after; it stores none of it. A provider that is unavailable or reports no percentage is not
+listed, and a host whose Paseo has no provider usage shows no limits at all.
+
+From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the
+warning colour; from 95% in the danger colour; at 100% it reads "Out of Claude" (or the provider's
+name). On the 3D floor a plan at 100% puts the countdown board on the wall, and the people on that
+plan who are resting take a break in the pantry until it resets. Whoever is still working keeps
+working.
+
 Local process readings require Linux. On other platforms the Host card is available when Office
 finds a configured SSH-MCP installation.
 

@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 // What the hook sends a started scene, with a recording stand-in for the scene's API.
+import { PlanUsageContext } from "../use-plan-usage.js";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -43,6 +44,15 @@ function input(overrides: Partial<WorldFeedInput> = {}): WorldFeedInput {
     ...overrides,
   };
 }
+
+const USAGE = [
+  {
+    provider: "claude",
+    name: "Claude",
+    plan: null,
+    windows: [{ id: "5h", label: "5 hours", usedPct: 100, resetsAt: null }],
+  },
+];
 
 function fakeScene() {
   const calls: string[] = [];
@@ -140,6 +150,18 @@ test("follows the selection and the stand-up", async () => {
   );
   expect(calls).toContain('select:["a1"]');
   expect(calls).toContain("meet:[]");
+});
+
+test("the limits of the plans are sent to the scene", async () => {
+  const { api, calls } = fakeScene();
+  await act(async () =>
+    root.render(
+      <PlanUsageContext.Provider value={USAGE}>
+        <Probe api={api} feed={input()} />
+      </PlanUsageContext.Provider>,
+    ),
+  );
+  expect(calls).toContain('setLimits:[[{"name":"Claude","windows":[{"pct":100,"resetsAt":0}]}]]');
 });
 
 test("a request for a person is sent once", async () => {

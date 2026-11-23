@@ -836,6 +836,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duty.acted.request",
     "office.notes.write.request",
     "office.incidents.dismiss.request",
+    "office.plan.usage.request",
     "office.team.rename.request",
     "office.notes.modes.request",
     "office.trackers.save.request",
@@ -1837,5 +1838,37 @@ test("a notes time zone the host does not know leaves the duty board on the host
   expect(snapshot?.duties?.day).toBe("2026-11-11");
   expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
   await office.leave();
+  await stop();
+});
+
+test("the plans' limits come from the host's usage, and a host without it says so", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  const usage = recorded.handlers.get("office.plan.usage.request");
+  // (this fake host has no provider usage, as a Paseo older than it)
+  expect(await usage?.({}, context)).toMatchObject({ ok: false });
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => ({
+    providers: [
+      {
+        providerId: "claude",
+        displayName: "Claude",
+        status: "available",
+        planLabel: "Max",
+        windows: [{ id: "5h", label: "5 hours", usedPct: 91, resetsAt: null }],
+      },
+      { providerId: "codex", displayName: "Codex", status: "unavailable" },
+    ],
+  });
+  expect(await usage?.({}, context)).toEqual({
+    ok: true,
+    providers: [
+      {
+        provider: "claude",
+        name: "Claude",
+        plan: "Max",
+        windows: [{ id: "5h", label: "5 hours", usedPct: 91, resetsAt: null }],
+      },
+    ],
+  });
   await stop();
 });

@@ -67,6 +67,12 @@ describe("the office's agents as the scene's people", () => {
     );
 
     const { sessions, overflow } = worldPeople(model, PLAN_DESKS.pro);
+    // Whoever runs on a plan that is used up is named with it; nobody else is.
+    const out = worldPeople(model, PLAN_DESKS.pro, {}, new Map([["codex", "Codex"]]));
+    expect(out.sessions.map((s) => [s.id, s.acct]).filter(([, acct]) => acct)).toEqual([
+      ["4", "Codex"],
+    ]);
+    expect(sessions.every((s) => s.acct === undefined)).toBe(true);
 
     expect(overflow).toBe(0);
     expect(sessions.map((s) => [s.id, s.git.repo, s.status, s.stuck, s.agent])).toEqual([

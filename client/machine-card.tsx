@@ -17,6 +17,8 @@ import {
   readAtText,
   type HostTone,
 } from "../shared/machine-text.js";
+import { planTone, resetText, type PlanUsage } from "../shared/plan-usage.js";
+import { usePlanUsageValue } from "./use-plan-usage.js";
 import type { OfficeStyles } from "./styles.js";
 
 interface MeterProps {
@@ -63,6 +65,43 @@ function Meter({ label, icon, detail, percent, tone, styles }: MeterProps) {
         {(detail || percent === null) && <Text style={host.note}>{detail ?? value}</Text>}
       </View>
       <View style={host.track}>{percent !== null && <View style={fill} />}</View>
+    </View>
+  );
+}
+
+const PLAN_TONE = { ok: "muted", warning: "warning", danger: "danger" } as const;
+
+/** Each plan's limits as meters: how much is used, and when it resets. */
+function PlanLimits({
+  usage,
+  now,
+  styles,
+}: {
+  usage: readonly PlanUsage[];
+  now: number;
+  styles: OfficeStyles;
+}) {
+  if (usage.length === 0) return null;
+  return (
+    <View style={styles.host.group}>
+      <Text accessibilityRole="header" style={styles.host.title}>
+        Plan limits
+      </Text>
+      {usage.map((provider) => (
+        <View key={provider.provider} style={styles.host.meters}>
+          {provider.windows.map((window) => (
+            <Meter
+              key={window.id}
+              icon="Gauge"
+              label={`${provider.name} ${window.label}`}
+              detail={resetText(window.resetsAt, now) || (provider.plan ?? undefined)}
+              percent={Math.floor(window.usedPct)}
+              tone={PLAN_TONE[planTone(window.usedPct)]}
+              styles={styles}
+            />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -209,6 +248,7 @@ const CLOSE = { label: "Close runtime", pendingLabel: "Closing...", primary: fal
 const NO_WORKSPACES: readonly OfficeWorkspace[] = [];
 
 function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: MachineBodyProps) {
+  const usage = usePlanUsageValue();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((value) => !value), []);
   const now = Date.parse(machine.readAt);
@@ -260,6 +300,7 @@ function MachineBody({ machine, cleanUp, styles, workspaces = NO_WORKSPACES }: M
         />
       </View>
       {expanded && <LocalHostDetails machine={machine} workspaces={workspaces} styles={styles} />}
+      <PlanLimits usage={usage} now={now} styles={styles} />
       {left.length > 0 ? (
         <View style={styles.host.group}>
           <AgentGroup

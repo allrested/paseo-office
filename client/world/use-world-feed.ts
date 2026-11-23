@@ -13,6 +13,7 @@ import {
   worldBoardRows,
   worldChanges,
   worldDuties,
+  worldLimits,
   worldWeather,
   worldMachine,
   worldPeople,
@@ -20,6 +21,8 @@ import {
   type WorldMemory,
   type WorldPlan,
 } from "./adapter.js";
+import { providersOut } from "../../shared/plan-usage.js";
+import { usePlanUsageValue } from "../use-plan-usage.js";
 import { useIncidentAlarm } from "./use-incident-alarm.js";
 import type { WorldApi } from "./world-api.js";
 
@@ -94,9 +97,12 @@ export function useWorldFeed(
     if (sound !== null) world.current?.setSound?.(sound);
   }, [sound, api]);
 
+  // Whose plan is used up is named on their session, so the scene knows who takes the break.
+  const usage = usePlanUsageValue();
+  const out = useMemo(() => providersOut(usage, Date.now()), [usage]);
   const people = useMemo(
-    () => worldPeople(model, PLAN_DESKS[plan], life?.born),
-    [model, plan, life?.born],
+    () => worldPeople(model, PLAN_DESKS[plan], life?.born, out),
+    [model, plan, life?.born, out],
   );
   useEffect(() => {
     const scene = world.current;
@@ -117,6 +123,11 @@ export function useWorldFeed(
   useEffect(() => {
     world.current?.setMachine(worldReadings);
   }, [worldReadings, api]);
+
+  // After the people: the break is for the sessions already named with their plan.
+  useEffect(() => {
+    world.current?.setLimits?.(worldLimits(usage));
+  }, [usage, api]);
 
   useEffect(() => {
     world.current?.setWeather?.(worldWeather(weather));

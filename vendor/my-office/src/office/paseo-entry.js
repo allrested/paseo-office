@@ -567,8 +567,8 @@ const api = {
   setTenure(data) { if (!started || stopped || !data) return; setTenure(data); },
   /** The lift's servicing after the office's server started: { left (ms still to go), total, newBuild, sticker: { version, at, build } | null }. */
   setLiftService(info) { if (!started || stopped || !info) return; setLiftService(info); },
-  /** Usage windows of the accounts in use: [{ key, pct, resetsAt }]. */
-  setLimits(list) { limits = Array.isArray(list) ? list : []; },
+  /** The plans in use: [{ name, windows: [{ pct, resetsAt }] }]. One at its limit sends its resting people (sessions with that `acct`) on a break. */
+  setLimits(list) { if (!started || stopped) return; state.limits = { others: Array.isArray(list) ? list : [] }; },
 };
 
 globalThis.PaseoOfficeWorld = api;
