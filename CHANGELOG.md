@@ -2,6 +2,15 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.6 (2026-11-23)
+
+- History vault, off by default: turned on, the office keeps the prompts and the replies of each
+  conversation in `office/vault.json` on the host, read through Paseo for every provider (#34).
+- History searches what was said and opens a conversation, also after its agent is archived
+  (#34).
+- Prompt report: the last seven days' prompts against the prompt helper's rules, worked out on
+  the host with no model (#34).
+
 ## 0.2.5 (2026-11-23)
 
 - Timeline: a lane per agent over the last hour, 6 hours or 24 hours, replayed at 30, 60 or 120
