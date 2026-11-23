@@ -155,6 +155,8 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
     },
     timers: clock,
     log: () => undefined,
+    // A teammate is picked by chance: fixed here on the first free one, so no test turns on luck.
+    random: () => 0,
     ...extra,
   };
   return { hub: createHub(ports), clock, directory, activity };
@@ -1309,8 +1311,10 @@ interface RosterWrites {
   agents: [string, Record<string, string | number>][];
 }
 
-function rosterPorts(writes: RosterWrites): Partial<HubPorts> {
+function rosterPorts(writes: RosterWrites, random: () => number = () => 0): Partial<HubPorts> {
   return {
+    // The first free teammate unless a test says another: a pick by chance, with the chance fixed.
+    random,
     setWorkspaceMetadata: async (id, patch) => {
       writes.workspaces.push([id, patch]);
     },
@@ -1620,6 +1624,32 @@ test("a workspace named by the roster goes back to its own name when the roster 
   const after = lastView(watcher.events).workspaces[0];
   expect(after.name).toBe("w1");
   expect(after.workspaceName).toBeUndefined();
+  watcher.controller.abort();
+  await watcher.done;
+});
+
+test("an agent takes one of its team's free teammates by chance, and keeps it", async () => {
+  const writes: RosterWrites = { workspaces: [], agents: [] };
+  const view = {
+    agents: [member("a1", 1), member("a2", 2)],
+    workspaces: [room("w1", { roster: "dev" })],
+  };
+  // The chance falls on the last free teammate each time it is asked.
+  const { hub, directory } = startHarness(
+    view,
+    rosterPorts(writes, () => 0.999),
+  );
+  hub.setRoster(ROSTER);
+  const watcher = subscribe(hub);
+  await settle();
+  expect(writes.agents).toEqual([
+    ["a1", { [ROSTER_MEMBER_KEY]: "zaki" }],
+    ["a2", { [ROSTER_MEMBER_KEY]: "tj" }],
+  ]);
+  // The echoes not yet back: the chance is not asked again for what is already in flight.
+  directory.emit(view);
+  await settle();
+  expect(writes.agents).toHaveLength(2);
   watcher.controller.abort();
   await watcher.done;
 });

@@ -3,6 +3,7 @@ import {
   teamOf,
   type Roster,
   type RosterMark,
+  type RosterMember,
   type RosterTeam,
 } from "../shared/roster.js";
 
@@ -24,6 +25,17 @@ export interface RosterWrite {
   kind: "workspace" | "agent";
   id: string;
   mark: RosterMark;
+}
+
+/** Which of a team's free teammates the next agent takes; `free` is never empty. */
+export type PickMember = (free: readonly RosterMember[]) => RosterMember;
+
+/** The first in the settings' order: what the planner does when it is told no other way. */
+export const firstFree: PickMember = (free) => free[0];
+
+/** One of the free teammates by chance, from a number in [0, 1) such as Math.random gives. */
+export function byChance(random: () => number): PickMember {
+  return (free) => free[Math.min(free.length - 1, Math.floor(random() * free.length))];
 }
 
 /**
@@ -61,7 +73,8 @@ function agentsByWorkspace(agents: readonly RosterAgent[]): Map<string, RosterAg
 /**
  * The metadata to write so every workspace and agent the roster can name has a mark. Workspaces
  * not looked at yet, oldest first, take the first team no listed workspace holds; agents of a
- * workspace with a team, oldest first, take its first teammate no listed agent there holds. One
+ * workspace with a team, oldest first, take one of its teammates no listed agent there holds:
+ * the one `pick` chooses among them, the first in order unless told otherwise. One
  * the roster has nothing left for gets the edition, so a name freed later goes to a new one and
  * never to it. An id that no longer names a team, or a teammate of the workspace's team, is
  * written over with the edition: its holder is passed over, and only a longer roster reaches it.
@@ -71,6 +84,7 @@ export function planRoster(
   roster: Roster,
   workspaces: readonly RosterWorkspace[],
   agents: readonly RosterAgent[],
+  pick: PickMember = firstFree,
 ): RosterWrite[] {
   if (!roster.on) return [];
   const members = agentsByWorkspace(agents);
@@ -105,7 +119,7 @@ export function planRoster(
     const team = teams.get(workspace.id);
     if (team === undefined) continue;
     const own = oldestFirst(members.get(workspace.id) ?? [], (agent) => agent.createdAt);
-    writes.push(...planMembers(team, own, roster.edition));
+    writes.push(...planMembers(team, own, roster.edition, pick));
   }
   return writes;
 }
@@ -115,6 +129,7 @@ function planMembers(
   team: RosterTeam,
   own: readonly RosterAgent[],
   edition: number,
+  pick: PickMember,
 ): RosterWrite[] {
   const writes: RosterWrite[] = [];
   const taken = new Set<string>();
@@ -128,9 +143,14 @@ function planMembers(
       continue;
     }
     if (!open(agent.roster, edition)) continue;
-    const member = team.members.find((candidate) => !taken.has(candidate.id));
-    writes.push({ kind: "agent", id: agent.id, mark: member?.id ?? edition });
-    if (member !== undefined) taken.add(member.id);
+    const free = team.members.filter((candidate) => !taken.has(candidate.id));
+    if (free.length === 0) {
+      writes.push({ kind: "agent", id: agent.id, mark: edition });
+      continue;
+    }
+    const member = pick(free);
+    writes.push({ kind: "agent", id: agent.id, mark: member.id });
+    taken.add(member.id);
   }
   return writes;
 }

@@ -1,8 +1,11 @@
 import { expect, test } from "vitest";
 import type { Roster, RosterMark } from "../shared/roster.js";
 import {
+  byChance,
+  firstFree,
   planRoster,
   rosterNames,
+  type PickMember,
   type RosterAgent,
   type RosterWorkspace,
   type RosterWrite,
@@ -293,4 +296,45 @@ test("the names are those of what is stored", () => {
   expect([...names.members]).toEqual([["a1", "Tze Jun Tan"]]);
   const off = rosterNames({ ...ROSTER, on: false }, workspaces, agents);
   expect(off.teams.size + off.members.size).toBe(0);
+});
+
+test("the pick chooses among the free teammates only, and each is taken once", () => {
+  const offered: string[][] = [];
+  const last: PickMember = (free) => {
+    offered.push(free.map((entry) => entry.id));
+    return free[free.length - 1];
+  };
+  const workspaces = [ws("w1", 0, "dev")];
+  const agents = [
+    agent("a1", "w1", 1, "zaki"),
+    agent("a2", "w1", 2),
+    agent("a3", "w1", 3),
+    agent("a4", "w1", 4),
+    agent("a5", "w1", 5),
+  ];
+  expect(planRoster(ROSTER, workspaces, agents, last)).toEqual([
+    member("a2", "taufik"),
+    member("a3", "shashwat"),
+    member("a4", "tj"),
+    member("a5", 1),
+  ]);
+  // zaki is held and never offered; nothing is asked once none is free.
+  expect(offered).toEqual([["tj", "shashwat", "taufik"], ["tj", "shashwat"], ["tj"]]);
+});
+
+test("a pick by chance takes the teammate its number falls on, and never one out of range", () => {
+  const free = ROSTER.teams[0].members;
+  expect(byChance(() => 0)(free).id).toBe("tj");
+  expect(byChance(() => 0.5)(free).id).toBe("shashwat");
+  expect(byChance(() => 0.999)(free).id).toBe("taufik");
+  expect(byChance(() => 1)(free).id).toBe("taufik");
+  expect(firstFree(free).id).toBe("tj");
+});
+
+test("teams still go to workspaces in the settings' order, whatever the pick", () => {
+  const last: PickMember = (free) => free[free.length - 1];
+  expect(planRoster(ROSTER, [ws("w1", 0), ws("w2", 1)], [], last)).toEqual([
+    team("w1", "dev"),
+    team("w2", "qa"),
+  ]);
 });

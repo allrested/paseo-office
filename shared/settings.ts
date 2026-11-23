@@ -207,8 +207,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * empty says nothing. `cacheClock` is how long a prompt cache is taken to last after a turn, for
  * the steaming cup on a resting desk of the 3D floor; `off` draws none. `planHidden` are the
  * providers whose plan limits the office leaves out: a plan nobody pays for reads as used up.
- * `rosterOn` has the office name teams and agents from `teams`, each a team with its teammates
- * in the order they are handed out; `rosterEdition` goes up when that list grows or is switched
+ * `rosterOn` has the office name teams and agents from `teams`, teams in the order
+ * they are handed out, each with its teammates; `rosterEdition` goes up when that list grows or is switched
  * on, so what was passed over is looked at again.
  * `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their

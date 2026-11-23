@@ -107,12 +107,12 @@ The 3D floor remembers where a team sat by its name, so a renamed team is seated
 
 ## Team roster
 
-Settings > Office 3D > **Teams** holds a roster: teams, each with its teammates, in the order they
-are handed out. With "Name teams and agents from the roster" on, the office names by itself:
+Settings > Office 3D > **Teams** holds a roster: teams, in the order they
+are handed out, each with its teammates. With "Name teams and agents from the roster" on, the office names by itself:
 
 - each workspace takes the first team no open workspace holds, oldest workspace first;
-- each agent in that workspace, sub-agents too, takes the team's first teammate no agent there
-  holds, oldest agent first;
+- each agent in that workspace, sub-agents too, takes one of the team's teammates no agent there
+  holds, picked by chance, oldest agent first;
 - when the roster has nothing left, the workspace or agent keeps the name it has today. A
   sub-agent is then `<parent's name>-<number>`, and the parent's name can be a teammate's.
 

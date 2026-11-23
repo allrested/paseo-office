@@ -29,8 +29,8 @@ import {
 
 const SWITCH_LABEL = "Name teams and agents from the roster";
 const INTRO =
-  "Each workspace takes the first free team, oldest first, and each agent in it the first free " +
-  "teammate. Paseo's own names stay. A name you type on a team or an agent wins.";
+  "Each workspace takes the first free team, oldest first, and each agent in it a free " +
+  "teammate, by chance. Paseo's own names stay. A name you type on a team or an agent wins.";
 
 const layout = StyleSheet.create({
   team: { gap: 8, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
@@ -88,7 +88,7 @@ function sameRoster(draft: Draft, values: HostValues): boolean {
 }
 
 /**
- * The roster: a switch, then each team with its teammates in the order they are handed out.
+ * The roster: a switch, then the teams in the order they are handed out, each with its teammates.
  * Every change is one save of the whole list, with the edition a longer list or the switch
  * going on calls for. The saves go one at a time, each from the values the host last kept, so an
  * edit made before the last one is answered is saved after it, on top of it. An edit that leaves

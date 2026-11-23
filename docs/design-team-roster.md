@@ -19,8 +19,8 @@ Example. Two teams are configured, in this order:
 - `PR-DEV`: Tze Jun Tan, Kharisma Muzaki Ghufron, Shashwat Gupta, Taufik Suryaman
 - `PR-QA`: Rosalyn, QX
 
-The first workspace is shown as PR-DEV. Its first two agents are Tze Jun Tan and Kharisma Muzaki
-Ghufron; a third is Shashwat Gupta, a fourth Taufik Suryaman, and a fifth keeps the name it has
+The first workspace is shown as PR-DEV. Its first four agents each take one of the four teammates
+by chance, none twice, and a fifth keeps the name it has
 today. A second workspace is shown as PR-QA with Rosalyn and QX. A third workspace keeps its
 Paseo name, and so do its agents. When the PR-DEV workspace is archived, the next new workspace is
 PR-DEV.
@@ -34,8 +34,9 @@ the sidebar, the tabs and the CLI show what they show today.
    oldest first, each take the first team in the configured order that no open workspace holds.
    When every team is held, the workspace is marked as passed over.
 2. **A teammate goes to an agent.** In a workspace that holds a team, agents that have no
-   teammate and have not been passed over, oldest first, each take the first teammate of that
-   team that no live agent in the workspace holds. Sub-agents are agents here: they draw from the
+   teammate and have not been passed over, oldest first, each take one teammate of that
+   team that no live agent in the workspace holds, picked by chance among those (the owner's
+   answer of 2026-11-23; teams still go to workspaces in the configured order). Sub-agents are agents here: they draw from the
    same list. When every teammate is held, the agent is marked as passed over.
 3. **A name sticks.** A team stays with its workspace and a teammate with its agent until that
    workspace or agent is archived or closed. Nothing that already runs is renamed when a name
@@ -75,7 +76,8 @@ store ids, not names, so:
 - changing a name's spelling renames whoever holds it, at once;
 - deleting a teammate or a team makes its holder show today's name, and the holder is marked
   passed over: it is not given another now, and a later, longer roster reaches it by rule 8;
-- reordering changes nothing that is already handed out, only who is offered next;
+- reordering changes nothing that is already handed out; the order of the teams decides which
+  workspace is offered which, and the order of a team's teammates only how they are listed;
 - adding a teammate or a team offers it by rule 8: to what was passed over, oldest first, then to
   the next new one.
 
@@ -113,7 +115,9 @@ id on an agent now in a workspace of another team, so the mark says what it read
 - `server/roster.ts` (new): `planRoster(teams, workspaces, agents)`, a pure function that returns
   the metadata writes rules 1, 2 and 4 call for, in the manner of `planNumbers` in
   `server/subagent-names.ts`. It takes only what it reads: ids, creation times, the workspace of
-  each agent, and the stored roster values. It plans nothing when the roster is off.
+  each agent, and the stored roster values, plus the pick among a team's free teammates: the
+  hub passes one by chance (`byChance` over its `random` port), and a test passes its own. It
+  plans nothing when the roster is off.
 - `server/hub.ts`: runs the planner where it runs `planNumbers`, on every directory change and
   when the settings change, and writes the result through the same metadata port. An agent's
   write waits for its workspace's write of the same plan, and is not sent if that one fails. A

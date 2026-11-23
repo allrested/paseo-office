@@ -27,7 +27,7 @@ import {
   type Roster,
   type RosterMark,
 } from "../shared/roster.js";
-import { planRoster, rosterNames, type RosterWrite } from "./roster.js";
+import { byChance, planRoster, rosterNames, type RosterWrite } from "./roster.js";
 import { NEXT_KEY, NUMBER_KEY, officeNames, planNumbers } from "./subagent-names.js";
 
 /** Directory updates come in bursts while agents stream; one event per window is enough. */
@@ -70,6 +70,8 @@ export interface HubPorts {
   log(message: string): void;
   /** Stores data on an agent; the office keeps its sub-agent numbers there. */
   setAgentMetadata?(agentId: string, patch: Record<string, string | number>): Promise<void>;
+  /** The chance a teammate is picked by, a number in [0, 1); Math.random when absent. */
+  random?(): number;
   /** Stores the office's own data on a workspace: its roster team. */
   setWorkspaceMetadata?(workspaceId: string, patch: Record<string, string | number>): Promise<void>;
 }
@@ -338,10 +340,12 @@ export function createHub(ports: HubPorts): Hub {
     // A workspace's team is stored before its agents' teammates go out (as planNumbers holds a
     // sub-agent's number on its parent's next): a teammate is never stored under no team.
     const teamStored = new Map<string, Promise<boolean>>();
+    const pickMember = byChance(ports.random ?? Math.random);
     const planned = planRoster(
       roster,
       withPendingRoster("workspace", next.workspaces),
       withPendingRoster("agent", next.agents),
+      pickMember,
     );
     for (const { kind, id, mark } of planned) {
       const key = `${kind}:${id}`;
