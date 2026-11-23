@@ -129,3 +129,26 @@ test("a parent without a title is named as the office names it", () => {
   ]);
   expect(names.get("c")).toBe("Agent p1234567-1");
 });
+
+test("a roster name is an agent's office name, under a hand-typed one", () => {
+  const lead = agent("lead", "Refactor auth");
+  const helper = agent("helper", "Explore", { parent: "lead", number: 1 });
+  const named = { ...agent("typed", "Fix"), appearance: { name: "Boss" } };
+  const given = new Map([
+    ["lead", "Tze Jun Tan"],
+    ["typed", "Rosalyn"],
+  ]);
+  const names = officeNames([lead, helper, named], given);
+  expect(names.get("lead")).toBe("Tze Jun Tan");
+  // A passed-over sub-agent is named after its parent's roster name.
+  expect(names.get("helper")).toBe("Tze Jun Tan-1");
+  expect(names.get("typed")).toBe("Boss");
+});
+
+test("a sub-agent with a roster name of its own goes by it", () => {
+  const lead = agent("lead", "Refactor auth");
+  const helper = agent("helper", "Explore", { parent: "lead", number: 1 });
+  const names = officeNames([lead, helper], new Map([["helper", "QX"]]));
+  expect(names.get("helper")).toBe("QX");
+  expect(names.has("lead")).toBe(false);
+});

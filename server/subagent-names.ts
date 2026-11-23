@@ -67,14 +67,21 @@ function ownTitle(agent: OfficeAgent): string {
   return title ? title : `Agent ${agent.id.slice(0, 8)}`;
 }
 
-/** `<parent's office name>-<number>` for each numbered sub-agent of a shown parent, by id. */
-export function officeNames(agents: readonly OfficeAgent[]): Map<string, string> {
+/**
+ * Each agent's office name, by id: its hand-typed name, else the roster's (`given`), else
+ * `<parent's office name>-<number>` for a numbered sub-agent of a shown parent.
+ */
+export function officeNames(
+  agents: readonly OfficeAgent[],
+  given: ReadonlyMap<string, string> = new Map(),
+): Map<string, string> {
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
   const names = new Map<string, string>();
   const nameOf = (agent: OfficeAgent, seen: Set<string>): string | null => {
-    if (agent.appearance?.name) {
-      names.set(agent.id, agent.appearance.name);
-      return agent.appearance.name;
+    const own = agent.appearance?.name ?? given.get(agent.id);
+    if (own) {
+      names.set(agent.id, own);
+      return own;
     }
     const known = names.get(agent.id);
     if (known !== undefined) return known;

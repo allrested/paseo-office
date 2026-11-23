@@ -12,6 +12,7 @@ import {
   type WorkspaceScript,
   type WorkspaceTicket,
 } from "../shared/contracts.js";
+import { ROSTER_MEMBER_KEY, ROSTER_TEAM_KEY, storedRosterMark } from "../shared/roster.js";
 import { APPEARANCE_KEY, AppearanceSchema } from "../shared/appearance.js";
 import { storedTeamName } from "../shared/team-name.js";
 import { NEXT_KEY, NUMBER_KEY, storedNumber } from "./subagent-names.js";
@@ -121,6 +122,8 @@ export interface DirectoryWorkspaceInput {
   projectRootPath?: string | null;
   id: string;
   name: string;
+  /** When the workspace was made; an older host does not say. */
+  createdAt?: string | null;
   projectDisplayName: string;
   archivingAt?: string | null;
   /** Data kept on the workspace; the office reads a ticket from it (`tasks.key`, `tasks.url`). */
@@ -245,6 +248,12 @@ function stateTimes(
   return times;
 }
 
+/** The roster mark as a field to spread: nothing when the value is not a stored mark. */
+function rosterField(value: unknown): { roster?: string | number } {
+  const roster = storedRosterMark(value);
+  return roster === undefined ? {} : { roster };
+}
+
 /** The office's view of an agent, or null when the office does not show it. */
 export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
   if (agent.internal === true || agent.background === true || agent.archivedAt) return null;
@@ -280,6 +289,7 @@ export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
     ...(context === undefined ? {} : { context }),
     ...(number === undefined ? {} : { number }),
     ...(next === undefined ? {} : { next }),
+    ...rosterField(agent.metadata?.[ROSTER_MEMBER_KEY]),
     ...(cost === undefined ? {} : { costUsd: cost }),
   };
 }
@@ -359,6 +369,8 @@ export function projectWorkspace(workspace: DirectoryWorkspaceInput): OfficeWork
     // The team's name is the workspace's everywhere in the office once the owner has given one.
     name: teamName ?? workspace.name,
     ...(teamName === null ? {} : { workspaceName: workspace.name }),
+    ...rosterField(workspace.metadata?.[ROSTER_TEAM_KEY]),
+    ...(workspace.createdAt ? { createdAt: workspace.createdAt } : {}),
     projectName: workspace.projectDisplayName,
     ...(branch ? { branch } : {}),
     ...(ticket ? { ticket } : {}),
