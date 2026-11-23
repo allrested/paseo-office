@@ -25,9 +25,14 @@ const DEFAULTS: HostValues = officeHostSettings.schema.parse({});
 
 type ChangeTeams = ComponentProps<typeof TeamsSettings>["change"];
 
+// The host's values and revision: a save made from an older revision is refused, as the settings
+// file refuses it.
 let values: HostValues;
-// The host's revision: a save made from an older one is refused, as the settings file refuses it.
 let revision: number;
+// What the section is drawn with. The host draws a kept save only on a later turn, after the save
+// has been answered, as the settings query hands its new data on.
+let drawnValues: HostValues;
+let drawnRevision: number;
 let hidden: boolean;
 let gate: Promise<void>;
 let saves: { patch: Partial<HostValues>; current: boolean }[];
@@ -43,13 +48,16 @@ function Harness() {
   useEffect(() => {
     redraw = () => setDrawn((count) => count + 1);
   }, []);
-  // As the host: `change` closes over the values and revision this render saw; the patch is checked
-  // against them, kept when valid and current, and the section is drawn again with the new values.
-  const seen = values;
-  const seenRevision = revision;
+  // As the host: the values are parsed again on every render, so they are a new object each time;
+  // `change` closes over the values and revision this render saw, and the patch is checked against
+  // them, kept when valid and current.
+  const seen = officeHostSettings.schema.parse(drawnValues);
+  const seenRevision = drawnRevision;
   const change = useCallback<ChangeTeams>(
     async (_setting, patch) => {
       saves.push({ patch, current: seenRevision === revision });
+      // The host draws the section again while the save is out.
+      redraw();
       await gate;
       await Promise.resolve();
       const checked = officeHostSettings.schema.safeParse({ ...seen, ...patch });
@@ -63,14 +71,19 @@ function Harness() {
         problem = null;
       }
       const kept = problem === null;
-      redraw();
+      setTimeout(() => {
+        drawnValues = values;
+        drawnRevision = revision;
+        redraw();
+      }, 0);
       return kept;
     },
     [seen, seenRevision],
   );
   return (
     <TeamsSettings
-      values={hidden ? null : values}
+      values={hidden ? null : seen}
+      revision={hidden ? null : String(seenRevision)}
       change={change}
       problem={problem}
       holders={holders}
@@ -79,7 +92,12 @@ function Harness() {
   );
 }
 
-const mount = () => act(async () => root.render(<Harness />));
+const mount = () =>
+  act(async () => {
+    drawnValues = values;
+    drawnRevision = revision;
+    root.render(<Harness />);
+  });
 
 beforeEach(() => {
   values = { ...DEFAULTS };
@@ -106,7 +124,11 @@ function byLabel<Found extends HTMLElement>(label: string): Found {
 }
 
 // Lets every save the last action started be answered, and the section drawn again.
-const settle = () => act(async () => new Promise((done) => setTimeout(done, 0)));
+const settle = async () => {
+  for (let turn = 0; turn < 5; turn += 1) {
+    await act(async () => new Promise((done) => setTimeout(done, 0)));
+  }
+};
 
 const patches = () => saves.map((save) => save.patch);
 
@@ -295,12 +317,37 @@ test("an edit queued while the settings cannot be read is answered, not saved la
   expect(values.teams[0].members).toEqual([]);
 });
 
+test("an edit that changes nothing saves nothing, and the next edit still saves", async () => {
+  values = {
+    ...DEFAULTS,
+    rosterOn: true,
+    rosterEdition: 1,
+    teams: [
+      { id: "t1", name: "PR-DEV", members: [] },
+      { id: "t2", name: "PR-QA", members: [] },
+    ],
+  };
+  await mount();
+  await press("Move PR-DEV up");
+  expect(saves).toEqual([]);
+  await press("Add team");
+  expect(values.teams.map((team) => team.name)).toEqual(["PR-DEV", "PR-QA", "Team 3"]);
+  expect(saves.every((save) => save.current)).toBe(true);
+});
+
 const refuse = async () => false;
 
 function Unread() {
   const styles = useOfficeStyles(THEME, true, true);
   return (
-    <TeamsSettings values={null} change={refuse} problem={null} holders={holders} styles={styles} />
+    <TeamsSettings
+      values={null}
+      revision={null}
+      change={refuse}
+      problem={null}
+      holders={holders}
+      styles={styles}
+    />
   );
 }
 

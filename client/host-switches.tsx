@@ -221,13 +221,14 @@ export function HostSwitches({
     () => (
       <TeamsSettings
         values={stored}
+        revision={revision}
         change={change}
         problem={saveProblem(TEAMS_LABEL)}
         holders={rosterHolders ?? NO_HOLDERS}
         styles={styles}
       />
     ),
-    [stored, change, saveProblem, rosterHolders, styles],
+    [stored, revision, change, saveProblem, rosterHolders, styles],
   );
   return (
     <SettingsSections

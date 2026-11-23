@@ -61,6 +61,8 @@ interface Queued {
 interface TeamsSettingsProps {
   /** Null while the settings are read or cannot be read: nothing can then be changed. */
   values: HostValues | null;
+  /** The revision the values were read at; it changes when the host keeps a save. */
+  revision: string | null;
   /** Resolves false when the host refuses the save; never rejects. */
   change(setting: typeof TEAMS_LABEL, patch: Partial<HostValues>): Promise<boolean>;
   problem: string | null;
@@ -68,18 +70,44 @@ interface TeamsSettingsProps {
   styles: OfficeStyles;
 }
 
+/** The same switch position and the same teams, team for team and teammate for teammate. */
+function sameRoster(draft: Draft, values: HostValues): boolean {
+  if (draft.on !== values.rosterOn || draft.teams.length !== values.teams.length) return false;
+  return draft.teams.every((team, at) => {
+    const kept = values.teams[at];
+    return (
+      team.id === kept.id &&
+      team.name === kept.name &&
+      team.members.length === kept.members.length &&
+      team.members.every(
+        (member, place) =>
+          member.id === kept.members[place].id && member.name === kept.members[place].name,
+      )
+    );
+  });
+}
+
 /**
  * The roster: a switch, then each team with its teammates in the order they are handed out.
  * Every change is one save of the whole list, with the edition a longer list or the switch
  * going on calls for. The saves go one at a time, each from the values the host last kept, so an
- * edit made before the last one is answered is saved after it, on top of it.
+ * edit made before the last one is answered is saved after it, on top of it. An edit that leaves
+ * the roster as it is saves nothing.
  */
-export function TeamsSettings({ values, change, problem, holders, styles }: TeamsSettingsProps) {
-  const latest = useRef({ values, change });
-  latest.current = { values, change };
+export function TeamsSettings({
+  values,
+  revision,
+  change,
+  problem,
+  holders,
+  styles,
+}: TeamsSettingsProps) {
+  const latest = useRef({ values, revision, change });
+  latest.current = { values, revision, change };
   const queue = useRef<Queued[]>([]);
-  // A save that kept its values is followed only once the host has drawn the new ones.
-  const last = useRef<{ busy: boolean; kept: boolean; from: HostValues | null }>({
+  // A save that kept its values is followed only once the host has drawn them: the values are a
+  // new object on every draw, so only a new revision says they are the kept ones.
+  const last = useRef<{ busy: boolean; kept: boolean; from: string | null }>({
     busy: false,
     kept: false,
     from: null,
@@ -87,23 +115,27 @@ export function TeamsSettings({ values, change, problem, holders, styles }: Team
   const mounted = useRef(true);
   const [answered, setAnswered] = useState(0);
   const drain = useCallback(() => {
-    const { values: current, change: save } = latest.current;
+    const { values: current, revision: read, change: save } = latest.current;
     if (last.current.busy || queue.current.length === 0) return;
     if (current === null) {
       for (const { answer } of queue.current.splice(0)) answer(false);
       return;
     }
-    if (last.current.kept && last.current.from === current) return;
+    if (last.current.kept && last.current.from === read) return;
     const taken = queue.current.splice(0);
     const draft = taken.reduce<Draft>((now, { edit }) => edit(now), {
       on: current.rosterOn,
       teams: current.teams,
     });
+    if (sameRoster(draft, current)) {
+      for (const { answer } of taken) answer(true);
+      return;
+    }
     const rosterEdition = nextEdition(rosterOf(current), draft);
-    last.current = { busy: true, kept: false, from: current };
+    last.current = { busy: true, kept: false, from: read };
     void save(TEAMS_LABEL, { rosterOn: draft.on, rosterEdition, teams: draft.teams }).then(
       (kept) => {
-        last.current = { busy: false, kept, from: current };
+        last.current = { busy: false, kept, from: read };
         for (const { answer } of taken) answer(kept);
         if (mounted.current) setAnswered((count) => count + 1);
         return kept;
@@ -116,7 +148,7 @@ export function TeamsSettings({ values, change, problem, holders, styles }: Team
       mounted.current = false;
     };
   }, []);
-  useEffect(drain, [drain, values, answered]);
+  useEffect(drain, [drain, values, revision, answered]);
   const edit = useCallback<EditRoster>(
     (next) =>
       new Promise<boolean>((answer) => {
