@@ -33,6 +33,8 @@ const INTRO =
   "teammate, by chance. Paseo's own names stay. A name you type on a team or an agent wins.";
 
 const layout = StyleSheet.create({
+  // One column the width of the page: each row then shrinks its name to make room for its buttons.
+  section: { gap: 14, alignSelf: "stretch" },
   team: { gap: 8, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   field: { flex: 1, minWidth: 0 },
@@ -170,7 +172,7 @@ export function TeamsSettings({
     void edit((draft) => ({ ...draft, teams: addTeam(draft.teams, id) }));
   }, [edit]);
   return (
-    <View style={styles.headerFields}>
+    <View style={layout.section}>
       <LabeledSwitch
         label={SWITCH_LABEL}
         value={values === null ? null : on}
