@@ -894,8 +894,6 @@ interface ViewControlsProps {
   onTeam(): void;
   machine: Machine | null;
   onMachine?: () => void;
-  onTimeline?: () => void;
-  onHistory?: () => void;
   shortcuts?: readonly Shortcut[];
   onChange(next: OfficeViewChoice): void;
   compact: boolean;
@@ -977,18 +975,14 @@ function stripCards(
 /** The toolbar's buttons for what was: the timeline and the history, each while it is offered. */
 const NO_SHORTCUTS: readonly Shortcut[] = [];
 
-function PastButtons({
+function ShortcutButtons({
   shortcuts = NO_SHORTCUTS,
-  onTimeline,
-  onHistory,
   size,
   color,
   styles,
 }: {
   /** The office's own cards, each an icon named by its card and what it says. */
   shortcuts?: readonly Shortcut[] | undefined;
-  onTimeline: (() => void) | undefined;
-  onHistory: (() => void) | undefined;
   size: number;
   color: string;
   styles: OfficeStyles;
@@ -1007,28 +1001,6 @@ function PastButtons({
           styles={styles}
         />
       ))}
-      {onTimeline ? (
-        <PanelButton
-          label="Timeline"
-          icon="History"
-          screenId="timeline"
-          size={size}
-          color={color}
-          onOpen={onTimeline}
-          styles={styles}
-        />
-      ) : null}
-      {onHistory ? (
-        <PanelButton
-          label="History"
-          icon="Archive"
-          screenId="history"
-          size={size}
-          color={color}
-          onOpen={onHistory}
-          styles={styles}
-        />
-      ) : null}
     </>
   );
 }
@@ -1046,8 +1018,6 @@ function ViewControls({
   onTeam,
   machine,
   onMachine,
-  onTimeline,
-  onHistory,
   shortcuts,
   onChange,
   compact,
@@ -1092,10 +1062,8 @@ function ViewControls({
         />
       )}
       {sidebars ? (
-        <PastButtons
+        <ShortcutButtons
           shortcuts={shortcuts}
-          onTimeline={onTimeline}
-          onHistory={onHistory}
           size={touchScreen ? 20 : 16}
           color={color}
           styles={styles}
@@ -2240,8 +2208,6 @@ export function OfficeSurface(
       onTeam={openTeam}
       machine={machine}
       onMachine={hostEntry?.onOpen}
-      onTimeline={timeline.onOpen}
-      onHistory={history.onOpen}
       shortcuts={shortcuts}
       onChange={changeView}
       compact={compact}
