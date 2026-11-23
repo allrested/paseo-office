@@ -4,6 +4,7 @@ import { defineSettings } from "@getpaseo/plugin";
 import { WEATHER_MODES, MANUAL_CHOICES } from "./weather.js";
 import { z } from "zod";
 import { PINNED_NOTES_MAX } from "./alerts.js";
+import { RosterTeamsSchema, refuseBadTeams } from "./roster.js";
 
 /** A Jira project key and a Sentry slug: only these reach a JQL query or a Sentry address. */
 export const JIRA_KEY = /^[A-Z][A-Z0-9_]+$/;
@@ -94,6 +95,9 @@ const HostValuesSchema = z.object({
   cacheClock: z.enum(CACHE_CLOCKS).default("1h").catch("1h"),
   planHidden: z.array(z.string().max(200)).max(50).default([]),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
+  rosterOn: z.boolean().default(false),
+  rosterEdition: z.number().int().nonnegative().default(0),
+  teams: RosterTeamsSchema,
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
@@ -195,6 +199,9 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * empty says nothing. `cacheClock` is how long a prompt cache is taken to last after a turn, for
  * the steaming cup on a resting desk of the 3D floor; `off` draws none. `planHidden` are the
  * providers whose plan limits the office leaves out: a plan nobody pays for reads as used up.
+ * `rosterOn` has the office name teams and agents from `teams`, each a team with its teammates
+ * in the order they are handed out; `rosterEdition` goes up when that list grows or is switched
+ * on, so what was passed over is looked at again.
  * `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`
@@ -204,10 +211,11 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 6,
+  version: 7,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
+    .superRefine(({ teams }, context) => refuseBadTeams(teams, context))
     .superRefine(({ weatherUrl }, ctx) => {
       if (weatherUrl.trim() && !isTokenSafe(weatherUrl.trim()))
         ctx.addIssue({
@@ -220,6 +228,7 @@ export const officeHostSettings = defineSettings({
   // what a document has stays, and the rest take their defaults, but for the days. Before
   // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.
   // Version 5 adds Headquarters and weather. Older documents keep their floor plan and start with weather off.
+  // Version 7 adds the roster, off and empty.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

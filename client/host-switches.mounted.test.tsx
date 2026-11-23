@@ -153,6 +153,9 @@ beforeEach(() => {
     cacheClock: "1h",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
     ...NO_TRACKERS,
   };
   container = document.createElement("div");
@@ -216,6 +219,9 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         cacheClock: "1h",
         planHidden: [],
         stickyNotes: "",
+        rosterOn: false,
+        rosterEdition: 0,
+        teams: [],
         ...NO_TRACKERS,
       },
       revision: "r1",
@@ -278,6 +284,9 @@ test("the switch keeps the notes settings when it saves", async () => {
       cacheClock: "1h",
       planHidden: [],
       stickyNotes: "",
+      rosterOn: false,
+      rosterEdition: 0,
+      teams: [],
       ...NO_TRACKERS,
     },
   ]);

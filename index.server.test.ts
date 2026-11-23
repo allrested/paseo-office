@@ -95,6 +95,9 @@ const ON: SettingsState = {
     cacheClock: "1h",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 const OFF: SettingsState = {
@@ -112,6 +115,9 @@ const OFF: SettingsState = {
     cacheClock: "1h",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 const OWN_TOOL = defineAgentTool({
@@ -627,6 +633,9 @@ function notesSettings(
       cacheClock: "1h",
       planHidden: [],
       stickyNotes: "",
+      rosterOn: false,
+      rosterEdition: 0,
+      teams: [],
     },
   };
 }
@@ -1111,6 +1120,9 @@ const NOTES: SettingsState = {
     cacheClock: "1h",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
   },
 };
 
@@ -1165,6 +1177,9 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       cacheClock: "1h",
       planHidden: [],
       stickyNotes: "",
+      rosterOn: false,
+      rosterEdition: 0,
+      teams: [],
     },
   });
   let saved: SettingsState = NOTES;
@@ -1527,6 +1542,9 @@ const JIRA_ON: SettingsState = {
     cacheClock: "1h",
     planHidden: [],
     stickyNotes: "",
+    rosterOn: false,
+    rosterEdition: 0,
+    teams: [],
     jiraProjects: "OPS",
   },
 };
