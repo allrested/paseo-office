@@ -2,6 +2,15 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.3 (2026-11-23)
+
+- The stand-up writer's mode is a setting: the modes its provider offers, Codex's Full Access
+  among them. A mode that asks leaves the note unwritten, since nobody answers at 8:00 (#28).
+- A team can go by a name of the office's own, set under its room's title. The workspace keeps
+  its name in Paseo (#29).
+- A provider's own sub-agents (Claude's Agent tool) come in through the door on the 3D floor and
+  leave when their call ends (#30).
+
 ## 0.2.2 (2026-11-23)
 
 - Jira and Sentry connections are set in the office's settings, under Services: Jira address,
