@@ -135,6 +135,7 @@ export function createWorldBridge(
     setWeather: sender("setWeather"),
     setIncidents: sender("setIncidents"),
     setSound: sender("setSound"),
+    setLimits: sender("setLimits"),
   };
 
   return {

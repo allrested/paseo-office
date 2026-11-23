@@ -2,6 +2,7 @@ import { BrandingSchema } from "./branding.js";
 import { AppearanceSchema } from "./appearance.js";
 import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
+import { PlanUsageSchema } from "./plan-usage.js";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
 import { ACTIVITY_KINDS, TEST_RESULTS } from "./names.js";
@@ -775,6 +776,19 @@ export const teamRenameRpc = defineRpc({
   input: z.object({ workspaceId: z.string().min(1), name: z.string().max(200) }),
   output: z.union([
     z.object({ ok: z.literal(true), name: z.string() }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
+});
+
+/**
+ * The plans of the providers Paseo can read, with their limits. Read when asked, from Paseo's own
+ * usage sources: the office keeps none of it.
+ */
+export const planUsageRpc = defineRpc({
+  name: "office.plan.usage.request",
+  input: z.object({}),
+  output: z.union([
+    z.object({ ok: z.literal(true), providers: z.array(PlanUsageSchema) }),
     z.object({ ok: z.literal(false), problem: z.string() }),
   ]),
 });

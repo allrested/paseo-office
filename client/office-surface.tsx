@@ -2,6 +2,7 @@ import { useChatKeyboard } from "./office-keyboard.js";
 import { OfficeBrandContext } from "./office-brand-context.js";
 import {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useReducer,
@@ -111,6 +112,8 @@ import { useReviews } from "./use-reviews.js";
 import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
+import { PlanUsageContext, usePlanUsage } from "./use-plan-usage.js";
+import { planNote } from "../shared/plan-usage.js";
 import { useOffice, type OfficeState } from "./use-office.js";
 import { UNSAVED_SOUND, useSoundSwitch, type SoundSwitch } from "./use-sound.js";
 import { ViewSwitch } from "./view-switch.js";
@@ -888,6 +891,25 @@ function HostResourceButton({
   styles: OfficeStyles;
 }) {
   const percent = machine ? memoryPercent(machine) : null;
+  // A plan close to its limit takes the button's words: that is what stops the work first.
+  const plan = planNote(useContext(PlanUsageContext));
+  const planText = useMemo(
+    () => [styles.sidebarButtonText, plan && styles.stripNote[plan.tone]],
+    [styles, plan],
+  );
+  if (plan !== null) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Host resources. Plan limit: ${plan.text}`}
+        onPress={onOpen}
+        style={styles.sidebarButton}
+      >
+        <Icon name="Gauge" size={15} color={String(styles.stripNote[plan.tone].color)} />
+        <Text style={planText}>{plan.text}</Text>
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       accessibilityRole="button"
@@ -1830,6 +1852,7 @@ export function OfficeSurface(
     machine,
     live,
   );
+  const planUsage = usePlanUsage(live);
   const board = useBoardSheet(model, live);
   const dutyCard = useCardOpening(live);
   // Until the host sends its duty list (an older host has none) nothing offers the duty board.
@@ -2288,9 +2311,11 @@ export function OfficeSurface(
   );
   return (
     <OfficeBrandContext.Provider value={office.state.brand}>
-      <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
-        {surface}
-      </OfficeDialogs>
+      <PlanUsageContext.Provider value={planUsage}>
+        <OfficeDialogs fullscreen={full.integrated} theme={theme} styles={styles}>
+          {surface}
+        </OfficeDialogs>
+      </PlanUsageContext.Provider>
     </OfficeBrandContext.Provider>
   );
 }

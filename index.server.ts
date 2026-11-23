@@ -44,6 +44,7 @@ import {
 } from "./server/incidents-schedule.js";
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
+import { projectPlanUsage } from "./server/plan-usage.js";
 import { TEAM_NAME_KEY, teamNameOf, tidyTeamName } from "./shared/team-name.js";
 import {
   changeSavedTrackers,
@@ -110,6 +111,7 @@ import {
   dutyActedRpc,
   incidentsDismissRpc,
   notesModesRpc,
+  planUsageRpc,
   teamRenameRpc,
   trackersSaveRpc,
   trackersTestRpc,
@@ -653,6 +655,16 @@ export function createOfficePlugin(
       throw error;
     }
   }
+  server.handle(planUsageRpc, async (_input, context) => {
+    holder.remember(context.paseo);
+    try {
+      const listed = await context.paseo.providers.listUsage();
+      return { ok: true as const, providers: projectPlanUsage(listed.providers) };
+    } catch (error) {
+      // A host older than provider usage has no such call: the floor then shows no limit.
+      return { ok: false as const, problem: errorMessage(error) };
+    }
+  });
   server.handle(teamRenameRpc, async ({ workspaceId, name }, context) => {
     holder.remember(context.paseo);
     try {

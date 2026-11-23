@@ -13,6 +13,12 @@ import type { PluginTheme } from "@getpaseo/plugin";
 export type WorldWeather = import("../../shared/contracts.js").WeatherScene;
 
 /** A person in the office, in the shape the vendored scene reads. */
+/** A plan and how much of each of its limits is used; `resetsAt` is epoch ms, 0 when not known. */
+export interface WorldLimit {
+  name: string;
+  windows: { pct: number; resetsAt: number }[];
+}
+
 export interface WorldSession {
   appearance?: Appearance;
   shirt?: string;
@@ -24,6 +30,8 @@ export interface WorldSession {
   git: { repo: string; ci?: "red" | "green"; born?: string };
   /** At work, waiting for the user's answer, or resting. */
   status: "work" | "wait" | "rest";
+  /** The plan the person runs on, only while that plan is used up: named on their tag, and they take a break. */
+  acct?: string;
   /** Which mark the scene puts on the person's screen. */
   agent: "claude" | "codex" | "gemini";
   lastPrompt: string;
@@ -258,6 +266,8 @@ export interface WorldApi {
   setTenure?(data: WorldTenure): void;
   setLiftService?(info: WorldLiftService): void;
   setMachine(machine: WorldMachine | null): void;
+  /** The plans' limits; one at 100% puts the board up and its resting people on a break. */
+  setLimits?(limits: WorldLimit[]): void;
   /**
    * Rings the bell on the meeting table for a stand-up: everyone free walks there and says what
    * they are on. Nothing happens while another gathering is on, or when nobody is free.

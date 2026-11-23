@@ -1,3 +1,4 @@
+import type { PlanUsage } from "../../shared/plan-usage.js";
 import { shirtColor } from "../../shared/appearance.js";
 import type { OfficeBrand } from "../brand.js";
 import {
@@ -30,6 +31,7 @@ import type {
   WorldEvent,
   WorldEventType,
   WorldMachine,
+  WorldLimit,
   WorldSession,
 } from "./world-api.js";
 
@@ -70,11 +72,25 @@ function subId(parentId: string, callId: string): string {
   return `${parentId}:${callId}`;
 }
 
+const NOBODY_OUT: ReadonlyMap<string, string> = new Map();
+
+/** The plans as the scene reads them: a name and how much of each limit is used. */
+export function worldLimits(usage: readonly PlanUsage[]): WorldLimit[] {
+  return usage.map((provider) => ({
+    name: provider.name,
+    windows: provider.windows.map((window) => ({
+      pct: window.usedPct,
+      resetsAt: window.resetsAt ?? 0,
+    })),
+  }));
+}
+
 function toSession(
   row: OfficeRow,
   team: string,
   checks: WorkspacePullRequest["checks"] | undefined,
   born: Readonly<Record<string, string>>,
+  out: ReadonlyMap<string, string>,
 ): WorldSession {
   const { agent } = row;
   const title = agentTitle(agent);
@@ -97,6 +113,7 @@ function toSession(
     },
     status,
     agent: markOf(agent.provider),
+    ...(out.has(agent.provider) ? { acct: out.get(agent.provider) } : {}),
     lastPrompt: "",
     ...(status === "rest" && !stuck && Number.isFinite(idle)
       ? { doneAt: idle, idleSince: agent.idleSince }
@@ -124,11 +141,12 @@ export function worldPeople(
   model: OfficeModel,
   desks: number,
   born: Readonly<Record<string, string>> = {},
+  out: ReadonlyMap<string, string> = NOBODY_OUT,
 ): WorldPeople {
   const rows = model.rooms.flatMap((room) =>
     room.rows.map((row) => ({ row, team: room.name, checks: room.workspace?.pullRequest?.checks })),
   );
-  const all = rows.map(({ row, team, checks }) => toSession(row, team, checks, born));
+  const all = rows.map(({ row, team, checks }) => toSession(row, team, checks, born, out));
   const order = new Map(all.map((session, index) => [session.id, index]));
   const seated =
     all.length <= desks
