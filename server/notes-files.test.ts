@@ -51,6 +51,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       pinnedNotes: "",
       cacheClock: "1h",
       chatCulture: "international",
+      planHidden: [],
       stickyNotes: "",
       jiraProjects: "",
       sentryOrg: "",
@@ -59,6 +60,10 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       weatherManual: "season" as const,
       weatherUrl: "",
       sentryUrl: "https://sentry.io",
+      awsProfile: "",
+      awsRegion: "",
+      awsLogGroups: "",
+      awsLogPattern: "ERROR",
     },
   };
 }

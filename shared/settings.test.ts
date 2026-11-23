@@ -16,6 +16,10 @@ const INCIDENT_DEFAULTS = {
   sentryOrg: "",
   sentryProjects: "",
   sentryUrl: "https://sentry.io",
+  awsProfile: "",
+  awsRegion: "",
+  awsLogGroups: "",
+  awsLogPattern: "ERROR",
 };
 
 function hostIssues(values: Record<string, unknown>): string[] {
@@ -40,6 +44,11 @@ const COMPANY = {
   pinnedNotes: "",
   cacheClock: "1h",
   chatCulture: "international",
+  planHidden: [],
+  awsProfile: "",
+  awsRegion: "",
+  awsLogGroups: "",
+  awsLogPattern: "ERROR",
   stickyNotes: "",
   ...WEATHER_DEFAULTS,
 };
@@ -322,4 +331,19 @@ test("the team chat writes for any office until a host chooses, and an unknown c
   expect(officeHostSettings.schema.parse({ chatCulture: "martian" }).chatCulture).toBe(
     "international",
   );
+});
+
+test("AWS values that could not be CLI arguments are refused", () => {
+  const { schema } = officeHostSettings;
+  const good = {
+    awsProfile: "nprd",
+    awsRegion: "ap-southeast-1",
+    awsLogGroups: "/aws/lambda/pay, app.errors#1",
+  };
+  expect(schema.safeParse(good).success).toBe(true);
+  expect(schema.safeParse({ awsProfile: "--debug" }).success).toBe(false);
+  expect(schema.safeParse({ awsRegion: "singapore" }).success).toBe(false);
+  expect(schema.safeParse({ awsLogGroups: "ok, -bad" }).success).toBe(false);
+  const many = Array.from({ length: 11 }, (_, index) => `g${index}`).join(",");
+  expect(schema.safeParse({ awsLogGroups: many }).success).toBe(false);
 });

@@ -53,6 +53,10 @@ const NO_TRACKERS = {
   weatherManual: "season" as const,
   weatherUrl: "",
   sentryUrl: "https://sentry.io",
+  awsProfile: "",
+  awsRegion: "",
+  awsLogGroups: "",
+  awsLogPattern: "ERROR",
 };
 
 // Desk counts unlike the real table's, so a hint that copied the real numbers would not match.
@@ -148,6 +152,7 @@ beforeEach(() => {
     pinnedNotes: "",
     cacheClock: "1h",
     chatCulture: "international",
+    planHidden: [],
     stickyNotes: "",
     ...NO_TRACKERS,
   };
@@ -211,6 +216,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         pinnedNotes: "",
         cacheClock: "1h",
         chatCulture: "international",
+        planHidden: [],
         stickyNotes: "",
         ...NO_TRACKERS,
       },
@@ -273,6 +279,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       pinnedNotes: "",
       cacheClock: "1h",
       chatCulture: "international",
+      planHidden: [],
       stickyNotes: "",
       ...NO_TRACKERS,
     },

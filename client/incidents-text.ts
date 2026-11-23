@@ -1,10 +1,16 @@
-import type { Incident, IncidentSource, IncidentsState } from "../shared/contracts.js";
+import {
+  INCIDENT_SOURCES,
+  type Incident,
+  type IncidentSource,
+  type IncidentsState,
+} from "../shared/contracts.js";
 import type { StripCard } from "./attention-strip.js";
 
-const SOURCE_LABEL = { jira: "Jira", sentry: "Sentry" } as const satisfies Record<
-  IncidentSource,
-  string
->;
+const SOURCE_LABEL = {
+  jira: "Jira",
+  sentry: "Sentry",
+  cloudwatch: "CloudWatch",
+} as const satisfies Record<IncidentSource, string>;
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -29,7 +35,7 @@ export function incidentsEntry(
   onOpen: () => void,
 ): StripCard | null {
   if (state === undefined) return null;
-  const failed = state.problems.jira !== undefined || state.problems.sentry !== undefined;
+  const failed = incidentProblems(state).length > 0;
   if (state.open.length === 0 && !failed) return null;
   const count = `${state.open.length} open`;
   const text = failed ? `${count} · a check failed` : count;
@@ -73,9 +79,10 @@ export function incidentRows(state: IncidentsState | undefined, now: number): In
 /** Why each tracker's last check failed, a line each: "Jira: <problem>". */
 export function incidentProblems(state: IncidentsState | undefined): string[] {
   if (state === undefined) return [];
-  const { jira, sentry } = state.problems;
   const lines: string[] = [];
-  if (jira !== undefined) lines.push(`${SOURCE_LABEL.jira}: ${jira}`);
-  if (sentry !== undefined) lines.push(`${SOURCE_LABEL.sentry}: ${sentry}`);
+  for (const source of INCIDENT_SOURCES) {
+    const problem = state.problems[source];
+    if (problem !== undefined) lines.push(`${SOURCE_LABEL[source]}: ${problem}`);
+  }
   return lines;
 }

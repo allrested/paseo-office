@@ -52,13 +52,17 @@ type HostSetting =
   | "Sentry organisation"
   | "Sentry projects"
   | "Sentry address"
+  | "AWS profile"
+  | "AWS region"
+  | "CloudWatch log groups"
+  | "Error pattern"
   | WeatherSetting;
 
 /** What the incidents fields need to know from the host: never a token's value. */
 type TrackerState = Pick<
   IncidentsState,
   "jiraReady" | "sentryReady" | "scheduleError" | "connections"
->;
+> & { problems?: IncidentsState["problems"] };
 
 const JIRA_UNSET = "No Jira connection on this host: save one above";
 const SENTRY_UNSET = "No Sentry token on this host: save one above";
@@ -337,7 +341,83 @@ function storedMode(values: HostValues | null): string | null {
   return values === null ? null : values.notesMode;
 }
 
-type TrackerField = "jiraProjects" | "sentryOrg" | "sentryProjects" | "sentryUrl";
+type TrackerField =
+  | "jiraProjects"
+  | "sentryOrg"
+  | "sentryProjects"
+  | "sentryUrl"
+  | "awsProfile"
+  | "awsRegion"
+  | "awsLogGroups"
+  | "awsLogPattern";
+
+interface CloudWatchFieldsProps {
+  values: HostValues | null;
+  /** Why the last CloudWatch check failed, shown under the profile it signs in with. */
+  problem: string | undefined;
+  change(setting: HostSetting, patch: Partial<HostValues>): Promise<boolean>;
+  saveProblem(setting: HostSetting): string | null;
+  styles: OfficeStyles;
+}
+
+/**
+ * CloudWatch, read through a profile of the host's own AWS CLI: the office keeps no AWS key. A
+ * profile and a region turn it on.
+ */
+function CloudWatchFields({ values, problem, change, saveProblem, styles }: CloudWatchFieldsProps) {
+  const saveProfile = useCallback(
+    (next: string) => change("AWS profile", { awsProfile: next }),
+    [change],
+  );
+  const saveRegion = useCallback(
+    (next: string) => change("AWS region", { awsRegion: next }),
+    [change],
+  );
+  const saveGroups = useCallback(
+    (next: string) => change("CloudWatch log groups", { awsLogGroups: next }),
+    [change],
+  );
+  const savePattern = useCallback(
+    (next: string) => change("Error pattern", { awsLogPattern: next }),
+    [change],
+  );
+  return (
+    <>
+      <SettingField
+        label="AWS profile"
+        hint="A profile of the aws CLI on the host. With a region, alarms in ALARM ring the incident alarm."
+        value={storedText(values, "awsProfile")}
+        onSave={saveProfile}
+        problem={saveProblem("AWS profile") ?? problem ?? null}
+        styles={styles}
+      />
+      <SettingField
+        label="AWS region"
+        hint="The region of the alarms and log groups, such as ap-southeast-1."
+        value={storedText(values, "awsRegion")}
+        onSave={saveRegion}
+        problem={saveProblem("AWS region")}
+        styles={styles}
+      />
+      <SettingField
+        label="CloudWatch log groups"
+        hint="Log group names, comma separated. Lines that match the pattern ring once an hour for each group."
+        value={storedText(values, "awsLogGroups")}
+        onSave={saveGroups}
+        problem={saveProblem("CloudWatch log groups")}
+        styles={styles}
+      />
+      <SettingField
+        label="Error pattern"
+        hint="A CloudWatch Logs filter pattern. ERROR by default."
+        value={storedText(values, "awsLogPattern")}
+        onSave={savePattern}
+        problem={saveProblem("Error pattern")}
+        styles={styles}
+      />
+    </>
+  );
+}
 
 /** A tracker field's stored text; null while the settings are read or cannot be read. */
 function storedText(values: HostValues | null, field: TrackerField): string | null {
@@ -427,6 +507,13 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
           value={sentryUrl}
           onSave={saveSentryUrl}
           problem={sentryUrlProblem}
+          styles={styles}
+        />
+        <CloudWatchFields
+          values={values}
+          problem={incidents?.problems?.cloudwatch}
+          change={change}
+          saveProblem={saveProblem}
           styles={styles}
         />
       </View>

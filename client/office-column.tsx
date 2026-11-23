@@ -177,6 +177,8 @@ function SessionTab({
 }
 
 export interface ColumnTabsProps {
+  /** Leaves out Attention and Activity too: the fullscreen header has them as icons. */
+  hideFixed?: boolean;
   hideSessions?: boolean;
   /** What shows as chosen; null where none does (the rail, the phone's bar while closed). */
   view: ColumnView | null;
@@ -199,6 +201,7 @@ export interface ColumnTabsProps {
 /** The column's tabs: a row in the open column, a stack on its rail. */
 export function ColumnTabs({
   hideSessions = false,
+  hideFixed = false,
   view,
   badges,
   sessions,
@@ -224,6 +227,8 @@ export function ColumnTabs({
       {COLUMN_TABS.map((each) => {
         // In the desktop fullscreen layout Sessions has its own rail and Team chat its own toolbar button.
         if (hideSessions && (each.tab === "sessions" || each.tab === "chat")) return null;
+        // There the header has Attention and Activity as its own icons: the column lists sessions only.
+        if (hideFixed) return null;
         let count: string | null = null;
         let countNote = "new";
         if (each.tab === "attention") count = badges.attention;
@@ -417,6 +422,7 @@ export function OfficeColumn({
         <View style={styles.columnHead}>
           <ColumnTabs
             hideSessions={hideSessions}
+            hideFixed={hideSessions}
             view={view}
             badges={badges}
             sessions={sessions}

@@ -12,6 +12,7 @@ import type { Machine, MachineAgent } from "../shared/contracts.js";
 import { type SshDiscovery, type SshHost, type SshReading } from "../shared/ssh.js";
 import { useSshServers } from "./ssh-hosts.js";
 import { MachineCard } from "./machine-card.js";
+import { PlanPickerContext, PlanUsageContext } from "./use-plan-usage.js";
 import { useOfficeStyles } from "./styles.js";
 
 const rpc = vi.hoisted(() => ({
@@ -97,13 +98,26 @@ function Card({ machine }: { machine: Machine }) {
   return <MachineCard machine={machine} open cleanUp={cleanUp} styles={styles} onClose={onClose} />;
 }
 
+const SECTIONS = new Set(["Overview", "Plan", "Agents", "System"]);
+/** Shows one of the card's sections: its pill in the row under the title. */
+async function section(name: string): Promise<void> {
+  const pill = container.querySelector<HTMLElement>(`[aria-label="${name}"]`);
+  if (!pill) throw new Error(`No ${name} section`);
+  await act(async () => pill.click());
+}
+/** The actions the card offers: what was left running is on Overview, the agents on Agents. */
 async function labels(machine: Machine): Promise<string[]> {
   await act(async () => root.render(<Card machine={machine} />));
-  return [
-    ...container.querySelectorAll<HTMLElement>(
-      'button[aria-label]:not([aria-label="Details"]):not([aria-label="Check for forgotten work"])',
-    ),
-  ].map((button) => button.getAttribute("aria-label")!);
+  const found: string[] = [];
+  for (const name of ["Overview", "Agents"]) {
+    await section(name);
+    for (const button of container.querySelectorAll<HTMLElement>("button[aria-label]")) {
+      const label = button.getAttribute("aria-label")!;
+      if (!SECTIONS.has(label) && label !== "Check for forgotten work") found.push(label);
+    }
+  }
+  await section("Overview");
+  return found;
 }
 
 test("a host that can close offers Close runtime on an idle agent and Clean up on a forgotten one", async () => {
@@ -163,6 +177,7 @@ test("a zero memory capacity does not produce a percentage", async () => {
 test("Close runtime targets only the selected idle agent", async () => {
   const running = agent({ agentId: "busy", status: "running", idleSince: null });
   expect(await labels(reading([running, IDLE], true))).toEqual(["Close runtime"]);
+  await section("Agents");
   const close = container.querySelector<HTMLElement>('button[aria-label="Close runtime"]');
   if (!close) throw new Error("No Close runtime button");
   await act(async () => close.click());
@@ -222,6 +237,7 @@ async function press(label: string) {
 test("the local card stays available without SSH configuration", async () => {
   await mountCard(reading([]));
   expect(container.querySelector('[role="tablist"]')).toBeNull();
+  await section("Agents");
   expect(container.textContent).toContain("Memory by agent");
   expect(rpc.read).not.toHaveBeenCalled();
 });
@@ -284,6 +300,7 @@ test("a failed SSH read shows an error and keeps This instance usable", async ()
   await press("SSH");
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to read");
   await press("This instance");
+  await section("Agents");
   expect(container.textContent).toContain("Memory by agent");
 });
 
@@ -317,7 +334,7 @@ test("partial metrics stay unavailable and expanded hosts disclose their known r
   expect(container.textContent).toContain("CPU cores · 2");
 });
 
-test("Details reads local diagnostics on demand, refreshes and returns to the summary", async () => {
+test("System reads local diagnostics when it is opened, refreshes and leaves with its tab", async () => {
   rpc.details.mockResolvedValue({
     hostname: "test-machine",
     readAt: Date.now(),
@@ -336,11 +353,68 @@ test("Details reads local diagnostics on demand, refreshes and returns to the su
     expect(b).not.toBeNull();
     await act(async () => b!.click());
   };
-  await click("Details");
+  await section("System");
   expect(container.textContent).toContain("test-machine");
   expect(container.textContent).toContain("node");
   await click("Refresh");
   expect(rpc.details).toHaveBeenCalledTimes(2);
-  await click("Hide details");
+  await section("Overview");
   expect(container.textContent).not.toContain("test-machine");
+});
+
+const PLANS = [
+  {
+    provider: "claude",
+    name: "Claude",
+    plan: "Max",
+    windows: [{ id: "5h", label: "5 hours", usedPct: 46, resetsAt: null }],
+  },
+  {
+    provider: "copilot",
+    name: "GitHub Copilot",
+    plan: null,
+    windows: [{ id: "m", label: "Premium requests", usedPct: 100, resetsAt: null }],
+  },
+];
+const setCounted = vi.fn(async (_provider: string, _counted: boolean) => undefined);
+const PICKER = { all: PLANS, hidden: new Set(["copilot"]), setCounted };
+const COUNTED = PLANS.slice(0, 1);
+
+function PlanCard() {
+  const styles = useOfficeStyles(THEME, false, false);
+  return (
+    <PlanUsageContext.Provider value={COUNTED}>
+      <PlanPickerContext.Provider value={PICKER}>
+        <MachineCard
+          machine={PLAN_MACHINE}
+          open
+          cleanUp={cleanUp}
+          styles={styles}
+          onClose={onClose}
+        />
+      </PlanPickerContext.Provider>
+    </PlanUsageContext.Provider>
+  );
+}
+const PLAN_MACHINE = reading([]);
+
+test("Overview has only the closest limit that counts, and Plan lists every provider with its switch", async () => {
+  setCounted.mockClear();
+  await act(async () => root.render(<PlanCard />));
+  // The provider left out is at 100%, and is not the closest limit.
+  expect(container.querySelector('[aria-label^="Claude 5 hours"]')).not.toBeNull();
+  expect(container.textContent).not.toContain("GitHub Copilot");
+
+  await section("Plan");
+  expect(container.textContent).toContain("GitHub Copilot");
+  // Left out: named with its switch, without its meters.
+  expect(container.querySelector('[aria-label^="Premium requests"]')).toBeNull();
+  expect(container.querySelector('[aria-label^="5 hours"]')).not.toBeNull();
+  const off = container.querySelector<HTMLElement>('[role="switch"][aria-label^="GitHub Copilot"]');
+  expect(off?.getAttribute("aria-checked")).toBe("false");
+  await act(async () => off!.click());
+  expect(setCounted).toHaveBeenCalledWith("copilot", true);
+  const on = container.querySelector<HTMLElement>('[role="switch"][aria-label^="Claude"]');
+  await act(async () => on!.click());
+  expect(setCounted).toHaveBeenLastCalledWith("claude", false);
 });

@@ -18,7 +18,11 @@ export const OPEN_FOR_MS = 86_400_000;
 export const MAX_NEW_PER_CHECK = 20;
 const TITLE_MAX = 200;
 
-const TRACKER_NAMES: Record<IncidentSource, string> = { jira: "Jira", sentry: "Sentry" };
+const TRACKER_NAMES: Record<IncidentSource, string> = {
+  jira: "Jira",
+  sentry: "Sentry",
+  cloudwatch: "CloudWatch",
+};
 
 /** The check's part of the incidents state; the office adds the rest beside it. */
 export type IncidentsCheckState = Pick<IncidentsState, "open" | "problems">;
