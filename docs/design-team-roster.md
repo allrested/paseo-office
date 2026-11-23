@@ -108,22 +108,24 @@ id on an agent now in a workspace of another team, so the mark says what it read
 
 ## Parts
 
-- `shared/roster.ts` (new): the keys, the limits, the zod shape of a team, and the readers
-  `storedRosterTeam(metadata)` and `storedRosterMember(metadata)`.
+- `shared/roster.ts` (new): the keys, the limits, the zod shape of a team, the reader of a stored
+  mark (`storedRosterMark`), and `teamOf` and `memberOf`, which turn a mark into a name.
 - `server/roster.ts` (new): `planRoster(teams, workspaces, agents)`, a pure function that returns
   the metadata writes rules 1, 2 and 4 call for, in the manner of `planNumbers` in
   `server/subagent-names.ts`. It takes only what it reads: ids, creation times, the workspace of
   each agent, and the stored roster values. It plans nothing when the roster is off.
 - `server/hub.ts`: runs the planner where it runs `planNumbers`, on every directory change and
-  when the settings change, and writes the result through the same metadata port. A write that
-  fails is planned again on the next change; a name is never shown before its write is stored, so
-  two agents cannot show the same teammate.
-- `server/directory.ts`: resolves the two names by the order above. It needs the settings' teams
-  to turn an id into a name, so the directory is given the roster as it is given its other
-  inputs.
+  when the settings change, and writes the result through the same metadata port. An agent's
+  write waits for its workspace's write of the same plan, and is not sent if that one fails. A
+  write that fails is not sent again until the roster changes or the office is opened again; a
+  name is never shown before its write is stored, so two agents cannot show the same teammate.
+  The hub also resolves the names by the order above (`teamed` for a workspace, `named` for an
+  agent), since it holds the settings' teams that turn an id into a name.
+- `server/directory.ts`: carries each workspace's and agent's stored mark as `roster`, and a
+  workspace's creation time; it resolves no name.
 - `server/subagent-names.ts` (`officeNames`): a parent's roster name counts as its office name.
-- `client/teams-settings.tsx` (new) and `client/settings-sections.tsx`: a fourth settings section,
-  **Teams**, after Appearance, Automation and Services.
+- `client/teams-settings.tsx` (new) and `client/settings-sections.tsx`: a settings section,
+  **Teams**, the second, after Appearance.
 - `docs/office.md` and `CHANGELOG.md`.
 
 ## The Teams section
@@ -151,13 +153,22 @@ id on an agent now in a workspace of another team, so the mark says what it read
   over; archive then a new agent reuses the freed teammate; archive a workspace then a new one
   reuses the team; a passed-over agent is not promoted; sub-agents draw from the list; switching
   on names what is open, oldest first; a team or teammate added later reaches what was passed
-  over, and an archive alone does not; a deleted id reads as passed over; nothing is planned when
-  off; a workspace without a creation time is ordered by its oldest agent.
-- `server/directory.test.ts`: the order of names for a workspace and for an agent, the roster off,
-  and a passed-over sub-agent named after its parent's teammate.
-- `shared/settings.test.ts`: the limits and the refused duplicates.
+  over, and an archive alone does not; a deleted id reads as passed over and is written over with
+  the edition, and a longer roster reaches it; a moved agent does not show a teammate handed on
+  meanwhile; marks kept through off and on; nothing is planned when off; a workspace without a
+  creation time is ordered by its oldest agent.
+- `server/directory.test.ts`: a workspace and an agent carry their stored mark.
+- `server/hub.test.ts`: the workspace's write before its agents', and a teammate that waits for its
+  team; a name shown only once stored; a hand-typed team name over the roster's; today's names,
+  the workspace's own among them, with the roster off; a failed write not sent again until the
+  roster changes or the office opens again.
+- `server/subagent-names.test.ts`: a roster name as an office name, and a passed-over sub-agent
+  named after its parent's teammate.
+- `server/life-feed.test.ts`: a workspace that takes back a team's name leaves no intern behind.
+- `shared/roster.test.ts` and `shared/settings.test.ts`: the limits, the refused duplicates, the
+  edition, and the order of a workspace's names.
 - `client/teams-settings.mounted.test.tsx`: add, edit, remove and move a team and a teammate; the
-  holder marks; a refused save.
+  holder marks; a refused save; edits made while a save is out; an edit that changes nothing.
 - `index.server.test.ts`: a settings save re-plans.
 - By hand on the development daemon: the PR-DEV and PR-QA example with real workspaces, then
   archive and reuse, on a phone-width browser.

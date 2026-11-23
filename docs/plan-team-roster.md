@@ -45,12 +45,14 @@
 ### Task 1: The roster's shape and settings
 
 **Files:**
+
 - Create: `shared/roster.ts`
 - Create: `shared/roster.test.ts`
 - Modify: `shared/settings.ts` (`HostValuesSchema`, the doc comment above `officeHostSettings`, `version`, the `superRefine` chain)
 - Test: `shared/settings.test.ts`
 
 **Interfaces:**
+
 - Consumes: `tidyTeamName`, `storedTeamName`, `TEAM_NAME_MAX` from `shared/team-name.ts`.
 - Produces (all from `shared/roster.ts`):
   - `ROSTER_TEAM_KEY = "office.roster.team"`, `ROSTER_MEMBER_KEY = "office.roster.member"`
@@ -325,9 +327,7 @@ export type RosterMark = string | number;
 
 export function storedRosterMark(value: unknown): RosterMark | undefined {
   if (typeof value === "string") return value === "" ? undefined : value;
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 /** The team a mark names; null for a passed-over mark, a deleted team and a roster that is off. */
@@ -429,10 +429,12 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 ### Task 2: The planner
 
 **Files:**
+
 - Create: `server/roster.ts`
 - Create: `server/roster.test.ts`
 
 **Interfaces:**
+
 - Consumes from `shared/roster.ts`: `Roster`, `RosterMark`, `RosterTeam`, `teamOf`, `memberOf`.
 - Produces (from `server/roster.ts`):
   - `interface RosterWorkspace { id: string; createdAt?: string; roster?: RosterMark }`
@@ -596,10 +598,7 @@ test("a longer roster reaches what was passed over, oldest first", () => {
   const grown: Roster = {
     on: true,
     edition: 2,
-    teams: [
-      ...ROSTER.teams,
-      { id: "ops", name: "PR-OPS", members: [{ id: "ali", name: "Ali" }] },
-    ],
+    teams: [...ROSTER.teams, { id: "ops", name: "PR-OPS", members: [{ id: "ali", name: "Ali" }] }],
   };
   const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, 1), ws("w4", 3, 1)];
   const agents = [agent("c1", "w3", 4), agent("c2", "w3", 5)];
@@ -831,12 +830,14 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 ### Task 3: The directory carries the marks, and a sub-agent is named after a roster parent
 
 **Files:**
+
 - Modify: `shared/contracts.ts` (`OfficeAgentSchema`, `OfficeWorkspaceSchema`)
 - Modify: `server/directory.ts` (`DirectoryWorkspaceInput`, `projectAgent`, `projectWorkspace`)
 - Modify: `server/subagent-names.ts` (`officeNames`)
 - Test: `server/directory.test.ts`, `server/subagent-names.test.ts`
 
 **Interfaces:**
+
 - Consumes from `shared/roster.ts`: `ROSTER_TEAM_KEY`, `ROSTER_MEMBER_KEY`, `storedRosterMark`, `RosterMark`.
 - Produces:
   - `OfficeAgent.roster?: string | number`, `OfficeWorkspace.roster?: string | number`, `OfficeWorkspace.createdAt?: string`. An `OfficeAgent` satisfies `RosterAgent` and an `OfficeWorkspace` satisfies `RosterWorkspace` of Task 2.
@@ -944,7 +945,7 @@ In `DirectoryWorkspaceInput`, after `name: string;`:
 In `projectAgent`, after the `const next = ...` line:
 
 ```ts
-  const roster = storedRosterMark(agent.metadata?.[ROSTER_MEMBER_KEY]);
+const roster = storedRosterMark(agent.metadata?.[ROSTER_MEMBER_KEY]);
 ```
 
 and in its returned object after the `next` spread:
@@ -956,7 +957,7 @@ and in its returned object after the `next` spread:
 In `projectWorkspace`, after the `const teamName = ...` line:
 
 ```ts
-  const roster = storedRosterMark(workspace.metadata?.[ROSTER_TEAM_KEY]);
+const roster = storedRosterMark(workspace.metadata?.[ROSTER_TEAM_KEY]);
 ```
 
 and in its returned object after the `workspaceName` spread:
@@ -1014,12 +1015,14 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 ### Task 4: The hub hands names out and shows them
 
 **Files:**
+
 - Modify: `server/hub.ts` (`HubPorts`, `Hub`, `createHub`: beside `writeNumbers`, `named`, `onDirectory`)
 - Modify: `server/live-ports.ts` (`liveHubPorts`)
 - Modify: `index.server.ts` (`followSettings`, the `teamRenameRpc` handler near line 811, the `agent.turn.after` hook near line 951)
 - Test: `server/hub.test.ts`, `index.server.test.ts`
 
 **Interfaces:**
+
 - Consumes: `planRoster`, `rosterNames`, `RosterWrite` (Task 2); `officeNames(agents, given)` and the `roster`/`createdAt` fields (Task 3); `NO_ROSTER`, `Roster`, `RosterMark`, `ROSTER_TEAM_KEY`, `ROSTER_MEMBER_KEY`, `rosterOf`, `shownTeamName` (Task 1); `sortWorkspaces` from `server/directory.ts`.
 - Produces:
   - `HubPorts.setAgentMetadata?(agentId: string, patch: Record<string, string | number>): Promise<void>` (widened from `number`)
@@ -1243,93 +1246,90 @@ In `writeNumbers`, the `send` helper's `patch` parameter stays `Record<string, n
 Below `writeNumbers`, add:
 
 ```ts
-  let roster: Roster = NO_ROSTER;
-  // Marks sent and not yet reported back, by `workspace:<id>` or `agent:<id>`. They are planned
-  // as if stored, so a team or teammate in flight is never handed out twice; names come from
-  // what the directory reports, so none shows before its mark is stored.
-  const pendingRoster = new Map<string, RosterMark>();
+let roster: Roster = NO_ROSTER;
+// Marks sent and not yet reported back, by `workspace:<id>` or `agent:<id>`. They are planned
+// as if stored, so a team or teammate in flight is never handed out twice; names come from
+// what the directory reports, so none shows before its mark is stored.
+const pendingRoster = new Map<string, RosterMark>();
 
-  function withPendingRoster<Entry extends { id: string; roster?: RosterMark }>(
-    kind: RosterWrite["kind"],
-    entries: readonly Entry[],
-  ): Entry[] {
-    return entries.map((entry) => {
-      const key = `${kind}:${entry.id}`;
-      const mark = pendingRoster.get(key);
-      if (mark === undefined) return entry;
-      if (entry.roster === mark) {
-        pendingRoster.delete(key);
-        return entry;
-      }
-      return { ...entry, roster: mark };
+function withPendingRoster<Entry extends { id: string; roster?: RosterMark }>(
+  kind: RosterWrite["kind"],
+  entries: readonly Entry[],
+): Entry[] {
+  return entries.map((entry) => {
+    const key = `${kind}:${entry.id}`;
+    const mark = pendingRoster.get(key);
+    if (mark === undefined) return entry;
+    if (entry.roster === mark) {
+      pendingRoster.delete(key);
+      return entry;
+    }
+    return { ...entry, roster: mark };
+  });
+}
+
+function writeRoster(next: DirectoryView): void {
+  const toWorkspace = ports.setWorkspaceMetadata;
+  const toAgent = ports.setAgentMetadata;
+  if (toWorkspace === undefined || toAgent === undefined) return;
+  const planned = planRoster(
+    roster,
+    withPendingRoster("workspace", next.workspaces),
+    withPendingRoster("agent", next.agents),
+  );
+  for (const { kind, id, mark } of planned) {
+    const key = `${kind}:${id}`;
+    pendingRoster.set(key, mark);
+    const sent =
+      kind === "workspace"
+        ? toWorkspace(id, { [ROSTER_TEAM_KEY]: mark })
+        : toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
+    sent.catch((error: unknown) => {
+      // Planned again at the next change.
+      pendingRoster.delete(key);
+      ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
     });
   }
+}
 
-  function writeRoster(next: DirectoryView): void {
-    const toWorkspace = ports.setWorkspaceMetadata;
-    const toAgent = ports.setAgentMetadata;
-    if (toWorkspace === undefined || toAgent === undefined) return;
-    const planned = planRoster(
-      roster,
-      withPendingRoster("workspace", next.workspaces),
-      withPendingRoster("agent", next.agents),
-    );
-    for (const { kind, id, mark } of planned) {
-      const key = `${kind}:${id}`;
-      pendingRoster.set(key, mark);
-      const sent =
-        kind === "workspace"
-          ? toWorkspace(id, { [ROSTER_TEAM_KEY]: mark })
-          : toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
-      sent.catch((error: unknown) => {
-        // Planned again at the next change.
-        pendingRoster.delete(key);
-        ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
-      });
-    }
-  }
-
-  /** The workspaces under their roster team's name, where the owner typed none. */
-  function teamed(
-    workspaces: readonly OfficeWorkspace[],
-    teams: ReadonlyMap<string, string>,
-  ): readonly OfficeWorkspace[] {
-    if (teams.size === 0) return workspaces;
-    return sortWorkspaces(
-      workspaces.map((workspace) => {
-        const team = teams.get(workspace.id);
-        // A workspaceName says the owner typed a team name: it stays.
-        if (team === undefined || workspace.workspaceName !== undefined) return workspace;
-        return { ...workspace, name: team, workspaceName: workspace.name };
-      }),
-    );
-  }
+/** The workspaces under their roster team's name, where the owner typed none. */
+function teamed(
+  workspaces: readonly OfficeWorkspace[],
+  teams: ReadonlyMap<string, string>,
+): readonly OfficeWorkspace[] {
+  if (teams.size === 0) return workspaces;
+  return sortWorkspaces(
+    workspaces.map((workspace) => {
+      const team = teams.get(workspace.id);
+      // A workspaceName says the owner typed a team name: it stays.
+      if (team === undefined || workspace.workspaceName !== undefined) return workspace;
+      return { ...workspace, name: team, workspaceName: workspace.name };
+    }),
+  );
+}
 ```
 
 Change `named` to take the roster's names:
 
 ```ts
-  function named(
-    agents: readonly OfficeAgent[],
-    given: ReadonlyMap<string, string>,
-  ): OfficeAgent[] {
-    const names = officeNames(agents, given);
-    return agents.map((agent) => {
-      const name = names.get(agent.id);
-      return name === undefined ? agent : { ...agent, name };
-    });
-  }
+function named(agents: readonly OfficeAgent[], given: ReadonlyMap<string, string>): OfficeAgent[] {
+  const names = officeNames(agents, given);
+  return agents.map((agent) => {
+    const name = names.get(agent.id);
+    return name === undefined ? agent : { ...agent, name };
+  });
+}
 ```
 
 In `onDirectory`, after `writeNumbers(next.agents);` add `writeRoster(next);`, and replace the `view = { ... }` assignment with:
 
 ```ts
-    const names = rosterNames(roster, next.workspaces, next.agents);
-    view = {
-      agents: named(resets.size === 0 ? next.agents : settled.agents, names.members),
-      workspaces: teamed(next.workspaces, names.teams),
-      folders: next.folders,
-    };
+const names = rosterNames(roster, next.workspaces, next.agents);
+view = {
+  agents: named(resets.size === 0 ? next.agents : settled.agents, names.members),
+  workspaces: teamed(next.workspaces, names.teams),
+  folders: next.folders,
+};
 ```
 
 In the returned hub object, after `setBrand`:
@@ -1408,27 +1408,27 @@ Imports: change line 66 to `import { TEAM_NAME_KEY, tidyTeamName } from "./share
 Beside the other values `followSettings` keeps (`agentToolsOn`, `stepsNamed`, `pinnedNotes`), declare:
 
 ```ts
-  // The roster the names follow; off until the settings are read.
-  let roster: Roster = NO_ROSTER;
+// The roster the names follow; off until the settings are read.
+let roster: Roster = NO_ROSTER;
 ```
 
 In `followSettings`, after `hub.setBrand(...)`:
 
 ```ts
-    roster = rosterOf(state.values);
-    hub.setRoster(roster);
+roster = rosterOf(state.values);
+hub.setRoster(roster);
 ```
 
 In the `teamRenameRpc` handler, replace the two lines that compute `shown` and call `renamed` with:
 
 ```ts
-      // Cleared, the team goes by its roster name where it has one, else by the workspace's.
-      const shown = shownTeamName(
-        { name: current.name, metadata: { ...current.metadata, [TEAM_NAME_KEY]: next } },
-        roster,
-      );
-      // The directory's next view would carry the tenure over too; a restart before it would not.
-      (await lifeReady)?.renamed(shownTeamName(current, roster), shown);
+// Cleared, the team goes by its roster name where it has one, else by the workspace's.
+const shown = shownTeamName(
+  { name: current.name, metadata: { ...current.metadata, [TEAM_NAME_KEY]: next } },
+  roster,
+);
+// The directory's next view would carry the tenure over too; a restart before it would not.
+(await lifeReady)?.renamed(shownTeamName(current, roster), shown);
 ```
 
 (`storedTeamName` reads an empty string as no name, so `next === ""` needs no special case here.)
@@ -1457,6 +1457,7 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 ### Task 5: The Teams section
 
 **Files:**
+
 - Create: `client/teams-text.ts`, `client/teams-text.test.ts`
 - Create: `client/teams-settings.tsx`, `client/teams-settings.mounted.test.tsx`
 - Modify: `client/settings-sections.tsx` (`sections`, `icons`, `SettingsSections` props and `pages`)
@@ -1464,6 +1465,7 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 - Modify: `client/office-settings.tsx` (`OfficeSettingsFields`)
 
 **Interfaces:**
+
 - Consumes: `RosterTeam`, `Roster`, `RosterMark`, `nextEdition`, `rosterOf`, `tidyMemberName`, `MEMBER_NAME_MAX`, `ROSTER_TEAMS_MAX`, `ROSTER_MEMBERS_MAX` (Task 1); `tidyTeamName`, `TEAM_NAME_MAX`; `OfficeAgent.roster`, `OfficeWorkspace.roster`, `OfficeWorkspace.workspaceName` (Task 3); `HostValues` and the `change(setting, patch): Promise<boolean>` and `saveProblem(setting): string | null` callbacks of `client/host-switches.tsx`.
 - Produces:
   - `client/teams-text.ts`: `newId(prefix: "t" | "m"): string`, `addTeam(teams, id): RosterTeam[]`, `addMember(teams, teamId, id): RosterTeam[]`, `renameTeam(teams, teamId, name): RosterTeam[]`, `renameMember(teams, teamId, memberId, name): RosterTeam[]`, `removeTeam(teams, teamId): RosterTeam[]`, `removeMember(teams, teamId, memberId): RosterTeam[]`, `moved<Entry>(list: readonly Entry[], index: number, by: -1 | 1): Entry[]`, `interface RosterHolders { teams: ReadonlyMap<string, string>; members: ReadonlySet<string> }`, `holdersOf(workspaces, agents): RosterHolders`, `TEAMS_LABEL = "Teams"`.
@@ -1824,9 +1826,7 @@ test("a team and its teammates are added, renamed, moved and removed", async () 
     "Tze Jun Tan",
   ]);
   await press("Remove Tze Jun Tan");
-  expect(values.teams[0].members.map((member) => member.name)).toEqual([
-    "Kharisma Muzaki Ghufron",
-  ]);
+  expect(values.teams[0].members.map((member) => member.name)).toEqual(["Kharisma Muzaki Ghufron"]);
   await press("Add team");
   await press("Move Team 2 up");
   expect(values.teams.map((team) => team.name)).toEqual(["Team 2", "PR-DEV"]);
@@ -2256,10 +2256,10 @@ In `client/host-switches.tsx`:
 In `client/office-settings.tsx`, in `OfficeSettingsFields`, add above the `return`:
 
 ```tsx
-  const rosterHolders = useMemo(
-    () => holdersOf(office.state.workspaces, office.state.agents),
-    [office.state.workspaces, office.state.agents],
-  );
+const rosterHolders = useMemo(
+  () => holdersOf(office.state.workspaces, office.state.agents),
+  [office.state.workspaces, office.state.agents],
+);
 ```
 
 pass `rosterHolders={rosterHolders}` to `HostSwitches`, and import `holdersOf` from `./teams-text.js`. Check `office.state` before the office has loaded: if `workspaces` or `agents` can be undefined there (read `client/use-office.ts`), default each to `[]` in the two `holdersOf` arguments.
@@ -2304,10 +2304,12 @@ env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTE
 ### Task 6: Docs, the whole suite, and a look on a real daemon
 
 **Files:**
+
 - Modify: `docs/office.md`, `CHANGELOG.md`
 - Modify: `docs/design-team-roster.md` (status line only)
 
 **Interfaces:**
+
 - Consumes: everything above. Produces nothing later tasks use.
 
 - [ ] **Step 1: Document it**

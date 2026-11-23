@@ -123,8 +123,9 @@ offers the longer list to what was passed over before.
 The names are the office's own: Paseo's sidebar, tabs and CLI show the workspace and session
 names they always did. A name you type on a team or an agent wins over the roster. Renaming a
 team or teammate in the settings renames whoever holds it; removing one leaves its holder with
-today's name. Switching the roster off shows today's names everywhere, and on again brings the
-same assignments back.
+today's name until the roster next grows, when it is offered a name again. Switching the roster
+off shows today's names everywhere, and on again brings the same assignments back and looks once
+more at what was passed over.
 
 What is stored: `office.roster.team` on a workspace and `office.roster.member` on an agent, each
 the id of the team or teammate held, or a number when the roster had nothing left for it.
