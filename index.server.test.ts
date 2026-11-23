@@ -86,6 +86,7 @@ const ON: SettingsState = {
     ...NO_TRACKERS,
     floorPlan: "pro",
     streamerMode: true,
+    historyVault: false,
     stickyNotes: "",
   },
 };
@@ -99,6 +100,7 @@ const OFF: SettingsState = {
     ...NO_TRACKERS,
     floorPlan: "pro",
     streamerMode: true,
+    historyVault: false,
     stickyNotes: "",
   },
 };
@@ -610,6 +612,7 @@ function notesSettings(
       ...NO_TRACKERS,
       floorPlan: "pro",
       streamerMode: true,
+      historyVault: false,
       stickyNotes: "",
     },
   };
@@ -843,6 +846,9 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.notes.write.request",
     "office.incidents.dismiss.request",
     "office.timeline.request",
+    "office.vault.search.request",
+    "office.vault.talk.request",
+    "office.vault.report.request",
     "office.plan.usage.request",
     "office.team.rename.request",
     "office.notes.modes.request",
@@ -1084,6 +1090,7 @@ const NOTES: SettingsState = {
     ...NO_TRACKERS,
     floorPlan: "pro",
     streamerMode: true,
+    historyVault: false,
     stickyNotes: "",
   },
 };
@@ -1134,6 +1141,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       agentTools: true,
       floorPlan: "pro",
       streamerMode: true,
+      historyVault: false,
       stickyNotes: "",
     },
   });
@@ -1492,6 +1500,7 @@ const JIRA_ON: SettingsState = {
     ...NO_TRACKERS,
     floorPlan: "pro",
     streamerMode: true,
+    historyVault: false,
     stickyNotes: "",
     jiraProjects: "OPS",
   },

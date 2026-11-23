@@ -4,6 +4,7 @@ import { WORDS_LANGUAGES } from "./scene-language.js";
 import { defineRpc, defineSubscription } from "@getpaseo/plugin";
 import { PlanUsageSchema } from "./plan-usage.js";
 import { TimelineSchema } from "./timeline.js";
+import { PromptReportSchema, VaultHitSchema, VaultTalkSchema } from "./vault.js";
 import { z } from "zod";
 // In their own file, so code that needs only a name does not load the schemas.
 import { ACTIVITY_KINDS, TEST_RESULTS } from "./names.js";
@@ -809,6 +810,30 @@ export const timelineRpc = defineRpc({
     z.object({ ok: z.literal(true), timeline: TimelineSchema }),
     z.object({ ok: z.literal(false), problem: z.string() }),
   ]),
+});
+
+/**
+ * The history vault. `on` false means the owner has it off: nothing is kept and nothing found.
+ * A search answers with the newest messages that hold every word of the query.
+ */
+export const vaultSearchRpc = defineRpc({
+  name: "office.vault.search.request",
+  input: z.object({ query: z.string().max(200) }),
+  output: z.object({ on: z.boolean(), hits: z.array(VaultHitSchema) }),
+});
+
+/** One kept conversation; null when the vault has none for this agent. */
+export const vaultTalkRpc = defineRpc({
+  name: "office.vault.talk.request",
+  input: z.object({ agentId: z.string() }),
+  output: z.object({ talk: VaultTalkSchema.nullable() }),
+});
+
+/** The last seven days' prompts against the prompt helper's rules, worked out on the host. */
+export const vaultReportRpc = defineRpc({
+  name: "office.vault.report.request",
+  input: z.object({}),
+  output: z.object({ on: z.boolean(), report: PromptReportSchema }),
 });
 
 export const WriterModesSchema = z.object({

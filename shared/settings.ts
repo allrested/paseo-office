@@ -77,6 +77,7 @@ const HostValuesSchema = z.object({
   // A plan this build does not know (a later build's, or a hand edit) reads as the company floor.
   floorPlan: z.enum(FLOOR_PLANS).default("pro").catch("pro"),
   streamerMode: z.boolean().default(true),
+  historyVault: z.boolean().default(false),
   stickyNotes: z.string().max(STICKY_NOTES_TEXT_MAX).default(""),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
@@ -143,7 +144,9 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * the 3D floor's plan: `pro` the company floor, `cozy` one open room, or `hq` headquarters.
  * `streamerMode` on (the default) keeps file names, commands and sites out of what the office
  * sends to the floor; off, a person's bubble names what they are at. `stickyNotes` are the
- * owner's notes on the 3D whiteboard, with `;` between them. `jiraProjects`
+ * owner's notes on the 3D whiteboard, with `;` between them. `historyVault` on has the office
+ * keep what is said in each conversation in a file on the host; it is off until the owner turns
+ * it on. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to.
  */
