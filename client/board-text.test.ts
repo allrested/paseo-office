@@ -1,18 +1,23 @@
 import { expect, test } from "vitest";
-import type { OfficeAgent, Post } from "../shared/contracts.js";
+import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
+import { buildOfficeModel, type OfficeModel, type OfficeRow } from "../shared/model.js";
 import {
   authorName,
   boardPreview,
   clearQuestion,
+  officeWork,
   orderBoardPosts,
   postMeta,
   postStateLabel,
   queuedWakes,
+  roomAgents,
   stepMark,
   todoMeta,
   todoPreview,
   wakeSummary,
+  workText,
 } from "./board-text.js";
+import { PLAN_DESKS, worldBoardRows, worldPeople } from "./world/adapter.js";
 
 const AGENTS = new Map<string, OfficeAgent>([
   [
@@ -167,4 +172,117 @@ test("the lobby card counts open and claimed to-dos only", () => {
 test("a checklist step is marked in progress or waiting", () => {
   expect(stepMark("in_progress")).toBe("◐");
   expect(stepMark("pending")).toBe("○");
+});
+
+function worker(id: string, fields: Partial<OfficeAgent> = {}): OfficeAgent {
+  return {
+    id,
+    title: `Agent ${id}`,
+    provider: "claude",
+    model: null,
+    status: "idle",
+    workspaceId: "w1",
+    parentAgentId: null,
+    permissions: [],
+    createdAt: `2026-11-11T08:00:0${id.length}.000Z`,
+    ...fields,
+  };
+}
+
+/** An office of two rooms and the lobby, with these agents and what the host reads of them. */
+function office(agents: OfficeAgent[], fields: Partial<OfficeSnapshot> = {}): OfficeModel {
+  return buildOfficeModel({
+    agents,
+    workspaces: [
+      { id: "w1", name: "shop-api", projectName: "shop" },
+      { id: "w2", name: "landing", projectName: "site" },
+    ],
+    activity: {},
+    boards: {},
+    wake: { paused: false, queued: {} },
+    ...fields,
+  });
+}
+
+const ASKING = { id: "q1", kind: "tool" as const, title: "Run a command" };
+/** One agent in each state a board tells apart, the last two in the second room and the lobby. */
+const EVERYONE = [
+  worker("ask", { status: "running", permissions: [ASKING] }),
+  worker("stuck", { status: "error" }),
+  worker("lead"),
+  worker("sub", { status: "running", parentAgentId: "lead" }),
+  worker("busy", { status: "running" }),
+  worker("quiet", { status: "running" }),
+  worker("new", { status: "initializing", workspaceId: "w2" }),
+  worker("rest", { workspaceId: null }),
+];
+const READ = { activity: { busy: "Running Bash", sub: "Thinking" } };
+
+function rowOf(model: OfficeModel, agentId: string): OfficeRow {
+  const row = model.rooms.flatMap((room) => room.rows).find((each) => each.agent.id === agentId);
+  if (row === undefined) throw new Error(`no row for ${agentId}`);
+  return row;
+}
+
+test("a board says what each agent is at, who needs you first", () => {
+  const model = office(EVERYONE, READ);
+  const text = (agentId: string) => workText(rowOf(model, agentId));
+  expect(text("ask")).toBe("Waiting for your answer");
+  expect(text("stuck")).toBe("Stopped on an error");
+  expect(text("lead")).toBe("Waiting on 1 sub-agent");
+  expect(text("busy")).toBe("Running Bash");
+  // No line has been read yet of a turn that has just begun, or of an agent that is starting.
+  expect(text("quiet")).toBe("Working");
+  expect(text("new")).toBe("Working");
+  expect(text("rest")).toBe("Resting");
+});
+
+test("a board says of an agent what the 3D whiteboard says of the person at its desk", () => {
+  const model = office(EVERYONE, READ);
+  const whiteboard = worldBoardRows(model, worldPeople(model, PLAN_DESKS.hq).sessions);
+  expect(whiteboard).toHaveLength(EVERYONE.length);
+  for (const line of whiteboard) expect(workText(rowOf(model, line.id))).toBe(line.text);
+});
+
+const STEPS = [
+  { text: "Run typecheck", status: "in_progress" as const },
+  { text: "Commit", status: "pending" as const },
+];
+
+test("a room's board lists every agent of the room, each with its unfinished steps", () => {
+  const model = office(EVERYONE, { ...READ, checklists: { busy: STEPS, rest: STEPS } });
+  const room = model.rooms.find((each) => each.id === "w1");
+  if (room === undefined) throw new Error("no room w1");
+  const agents = roomAgents(room, model.agentTasks);
+  // The room's own order: a sub-agent under the agent that started it.
+  expect(agents.map((entry) => entry.row.agent.id)).toEqual(room.rows.map((row) => row.agent.id));
+  expect(agents.map((entry) => [entry.row.agent.id, entry.steps])).toEqual([
+    ["ask", []],
+    ["busy", STEPS],
+    ["lead", []],
+    ["sub", []],
+    ["quiet", []],
+    ["stuck", []],
+  ]);
+});
+
+test("the lobby's board lists who is at work in every room, and who has steps left", () => {
+  const model = office(EVERYONE, { ...READ, checklists: { rest: STEPS } });
+  const teams = officeWork(model.rooms, model.agentTasks);
+  expect(
+    teams.map((team) => [team.room.name, team.agents.map((entry) => entry.row.agent.id)]),
+  ).toEqual([
+    // A resting agent stays on the list while its checklist has steps left.
+    ["Lobby", ["rest"]],
+    ["shop-api", ["ask", "busy", "lead", "sub", "quiet", "stuck"]],
+    ["landing", ["new"]],
+  ]);
+  expect(teams[0]?.agents[0]?.steps).toEqual(STEPS);
+});
+
+test("the lobby's board leaves out who rests with nothing left, and a room of only those", () => {
+  const model = office([worker("rest"), worker("busy", { status: "running", workspaceId: "w2" })]);
+  const teams = officeWork(model.rooms, model.agentTasks);
+  expect(teams.map((team) => team.room.name)).toEqual(["landing"]);
+  expect(officeWork(office([worker("rest")]).rooms, [])).toEqual([]);
 });

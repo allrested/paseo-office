@@ -14,7 +14,8 @@ import {
   keptChoice,
   recipientLabels,
 } from "./agent-picker-text.js";
-import { orderBoardPosts } from "./board-text.js";
+import { BoardAgents } from "./board-agents.js";
+import { orderBoardPosts, roomAgents } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
@@ -236,23 +237,29 @@ export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }
 export interface SheetBodyProps {
   room: OfficeRoom;
   rooms: readonly OfficeRoom[];
+  /** Every agent's unfinished checklist steps: a board shows them under its agents. */
+  agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
   actions: BoardActions;
   wakesPaused: boolean;
   /** The page that chooses the agent shows, not the form. */
   picking: boolean;
   onPicking(picking: boolean): void;
+  /** An agent of the board was chosen: it opens as it does from its desk. */
+  onSelectAgent(agentId: string): void;
   styles: OfficeStyles;
 }
 
 function SheetBody({
   room,
   rooms,
+  agentTasks,
   name,
   actions,
   wakesPaused,
   picking,
   onPicking,
+  onSelectAgent,
   styles,
 }: SheetBodyProps) {
   const [kind, setKind] = useState<PostKind>("task");
@@ -270,6 +277,7 @@ function SheetBody({
     [],
   );
   const posts = useMemo(() => orderBoardPosts(room.posts), [room.posts]);
+  const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
   const submit = useCallback(async () => {
     const sent = text.trim();
     await actions.post({ board: room.id, kind, text: sent, ...(to === NOBODY ? {} : { to }) });
@@ -335,6 +343,17 @@ function SheetBody({
         styles={styles}
         primary
       />
+      {/* Who sits in the room and what each is at: the board is the room's, not only its posts'. */}
+      <View style={styles.sheetField}>
+        {agents.length === 0 ? (
+          <Text style={styles.muted}>No agents</Text>
+        ) : (
+          <>
+            <Text style={styles.sheetLabel}>Agents</Text>
+            <BoardAgents agents={agents} styles={styles} onSelectAgent={onSelectAgent} />
+          </>
+        )}
+      </View>
       <View style={styles.boardPosts}>
         {posts.length === 0 ? (
           <Text style={styles.muted}>No posts</Text>
@@ -359,7 +378,7 @@ export interface BoardSheetProps {
   room: OfficeRoom | null;
   /** Every room of the office: the agents a post can wake, and where each one sits. */
   rooms: readonly OfficeRoom[];
-  /** Every agent's unfinished checklist steps: the lobby's board shows them. */
+  /** Every agent's unfinished checklist steps: a board shows them under its agents. */
   agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
   actions: BoardActions;
@@ -371,12 +390,17 @@ export interface BoardSheetProps {
    */
   sheetLeavesFirst: boolean;
   styles: OfficeStyles;
+  /** An agent of the board was chosen: the surface closes the board and opens the agent. */
+  onSelectAgent(agentId: string): void;
+  /** A room was chosen on the lobby's board: its board takes the sheet. */
+  onOpenBoard(roomId: string): void;
   onClose(): void;
 }
 
 /**
- * Post a task or note, optionally waking an agent; mark a task done or delete a post. The lobby's
- * board is a to-do list instead, with the agents' tasks under it.
+ * Post a task or note, optionally waking an agent; mark a task done or delete a post. Under the
+ * form are the room's agents with what each is at. The lobby's board is a to-do list instead, with
+ * the agents at work in every room under it.
  */
 export function BoardSheet({
   room,
@@ -387,6 +411,8 @@ export function BoardSheet({
   wakesPaused,
   sheetLeavesFirst,
   styles,
+  onSelectAgent,
+  onOpenBoard,
   onClose,
 }: BoardSheetProps) {
   const [picking, setPicking] = useState(false);
@@ -430,6 +456,8 @@ export function BoardSheet({
             wakesPaused={wakesPaused}
             picking={picking}
             onPicking={setPicking}
+            onSelectAgent={onSelectAgent}
+            onOpenBoard={onOpenBoard}
             styles={styles}
           />
         ) : null}
@@ -442,11 +470,13 @@ export function BoardSheet({
             key={room.id}
             room={room}
             rooms={rooms}
+            agentTasks={agentTasks}
             name={name}
             actions={actions}
             wakesPaused={wakesPaused}
             picking={picking}
             onPicking={setPicking}
+            onSelectAgent={onSelectAgent}
             styles={styles}
           />
         ) : null}
