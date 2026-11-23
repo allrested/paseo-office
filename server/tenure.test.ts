@@ -38,6 +38,23 @@ test("a team new to the office is an intern until 20 turns on two days", () => {
   expect(isIntern({ ...p, official: 1 })).toBe(false);
 });
 
+test("a renamed team keeps its entry, and never takes another team's", () => {
+  const now = 10 * DAY;
+  const store = memory();
+  const t = createTenure({ store, now: () => now });
+  t.touch("api", { at: now, turn: true });
+  t.touch("web", { at: now });
+  expect(t.rename("api", "Payments")).toBe(true);
+  expect(t.get("api")).toBeNull();
+  expect(t.get("Payments")?.turns).toBe(1);
+  // Taken, unknown, empty or unchanged: nothing moves.
+  expect(t.rename("Payments", "web")).toBe(false);
+  expect(t.rename("gone", "new")).toBe(false);
+  expect(t.rename("web", "")).toBe(false);
+  expect(t.rename("web", "web")).toBe(false);
+  expect(t.get("web")?.turns).toBe(0);
+});
+
 test("the teams present on the first start are permanent", () => {
   let now = 10 * DAY;
   const t = createTenure({ store: memory(), now: () => now });

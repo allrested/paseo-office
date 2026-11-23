@@ -122,7 +122,10 @@ export type WorkspacePullRequest = z.output<typeof WorkspacePullRequestSchema>;
 
 export const OfficeWorkspaceSchema = z.object({
   id: z.string(),
+  /** The name its team goes by: the office's own when the owner gave one, else the workspace's. */
   name: z.string(),
+  /** The workspace's own name in Paseo; present only while the team goes by another. */
+  workspaceName: z.string().optional(),
   projectName: z.string(),
   branch: z.string().optional(),
   ticket: WorkspaceTicketSchema.optional(),
@@ -748,6 +751,19 @@ export const notesWriteRpc = defineRpc({
   name: "office.notes.write.request",
   input: z.object({}),
   output: z.object({ started: z.boolean() }),
+});
+
+/**
+ * Gives a workspace's team a name of the office's own, kept on the workspace; an empty name goes
+ * back to the workspace's. The team's tenure follows the name.
+ */
+export const teamRenameRpc = defineRpc({
+  name: "office.team.rename.request",
+  input: z.object({ workspaceId: z.string().min(1), name: z.string().max(200) }),
+  output: z.union([
+    z.object({ ok: z.literal(true), name: z.string() }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
 });
 
 export const WriterModesSchema = z.object({

@@ -29,6 +29,7 @@ const deps = (extra = {}) => ({
     markFarewell: vi.fn(() => true),
     markOfficial: vi.fn(() => true),
     get: () => null,
+    rename: vi.fn(() => true),
   },
   age: vi.fn(async (_folder: string): Promise<string | null> => "2020-02-03"),
   lift: { pub: () => ({ left: 1, total: 2, newBuild: false, sticker: null }) },
@@ -55,6 +56,20 @@ test("a repository's age is read once per folder and sent by team name", async (
   await feed.settled();
   expect(d.age).toHaveBeenCalledTimes(1);
   expect(feed.snapshot().born).toEqual({ api: "2020-02-03" });
+});
+
+test("a workspace that goes by another name keeps its team's tenure", () => {
+  const d = deps();
+  const feed = createLifeFeed(d);
+  feed.view(view());
+  feed.view(view({ workspaces: [{ id: "w1", name: "Payments", projectName: "p" } as never] }));
+  expect(d.tenure.rename).toHaveBeenCalledTimes(1);
+  expect(d.tenure.rename).toHaveBeenCalledWith("api", "Payments");
+  // The same name again is no rename, and neither is a workspace seen for the first time.
+  feed.view(view({ workspaces: [{ id: "w1", name: "Payments", projectName: "p" } as never] }));
+  expect(d.tenure.rename).toHaveBeenCalledTimes(1);
+  feed.renamed("Payments", "Checkout");
+  expect(d.tenure.rename).toHaveBeenLastCalledWith("Payments", "Checkout");
 });
 
 test("a turn that ends touches its team", () => {

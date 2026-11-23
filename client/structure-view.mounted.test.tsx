@@ -18,6 +18,19 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
   return { ScrollView, TextInput };
 });
 
+// The team name's call: what was sent is recorded, and `renameAnswer` is the host's reply.
+let renames: unknown[] = [];
+let renameAnswer: { ok: true; name: string } | { ok: false; problem: string } = {
+  ok: true,
+  name: "",
+};
+vi.mock("@getpaseo/plugin/client", () => ({
+  useRpc: () => async (input: unknown) => {
+    renames.push(input);
+    return renameAnswer;
+  },
+}));
+
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
@@ -259,6 +272,7 @@ test("a row shows its context, time and cost, and says them in its label", async
     "0",
     "shop-api",
     "Shop",
+    "Rename team",
     "Ali",
     "Running",
     "claude · feat/cart",
@@ -278,4 +292,54 @@ test("a running row with no prompt time shows no time and starts no clock", asyn
 
   await mount([shop([ALI])]);
   expect(vi.getTimerCount()).toBe(1);
+});
+
+async function pressNamed(name: string): Promise<void> {
+  const button = container.querySelector<HTMLElement>(`[role="button"][aria-label="${name}"]`);
+  if (!button) throw new Error(`No button is named "${name}"`);
+  await act(async () => button.click());
+}
+
+async function typeTeamName(text: string): Promise<void> {
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Team name"]');
+  if (!input) throw new Error("No team name field");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, text);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+test("a workspace's team can be renamed from its card, and the lobby's cannot", async () => {
+  renames = [];
+  renameAnswer = { ok: true, name: "Payments" };
+  await mount(OFFICE);
+  expect(container.querySelector('[aria-label="Rename team Lobby"]')).toBeNull();
+  await pressNamed("Rename team shop-api");
+  await typeTeamName("Payments");
+  await pressNamed("Save team name");
+  expect(renames).toEqual([{ workspaceId: "w1", name: "Payments" }]);
+  // Saved: the field is gone again.
+  expect(container.querySelector('input[aria-label="Team name"]')).toBeNull();
+});
+
+test("a team that goes by its own name says which workspace it is, and a refused rename stays open", async () => {
+  renames = [];
+  renameAnswer = { ok: false, problem: "This host does not keep plugin data on workspaces" };
+  const room = shop([ALI]);
+  const named: OfficeRoom = {
+    ...room,
+    name: "Payments",
+    workspace: room.workspace && { ...room.workspace, name: "Payments", workspaceName: "shop-api" },
+  };
+  await mount([named]);
+  expect(container.textContent).toContain("Workspace shop-api · Rename team");
+  await pressNamed("Rename team Payments");
+  expect(container.querySelector<HTMLInputElement>('input[aria-label="Team name"]')?.value).toBe(
+    "Payments",
+  );
+  await pressNamed("Save team name");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+    "Unable to save team name: This host does not keep plugin data on workspaces",
+  );
+  expect(container.querySelector('input[aria-label="Team name"]')).not.toBeNull();
 });

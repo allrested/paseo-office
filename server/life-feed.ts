@@ -17,6 +17,8 @@ export function createLifeFeed(deps: {
   const pending = new Map<string, Promise<void>>();
   const folderTeams = new Map<string, Set<string>>();
   let connected = false;
+  /** The name each workspace went by at the last view, to tell a rename. */
+  const shown = new Map<string, string>();
   let queuedAge = Promise.resolve();
   function snapshot(): Snapshot {
     const born = new Map<string, string>();
@@ -84,6 +86,13 @@ export function createLifeFeed(deps: {
         return;
       }
       const names = new Map(view.workspaces.map((w) => [w.id, w.name]));
+      // A workspace that goes by another name since the last view is the same team: its tenure
+      // goes with it, so a rename makes nobody an intern again.
+      for (const [id, name] of names) {
+        const before = shown.get(id);
+        if (before !== undefined && before !== name) deps.tenure.rename(before, name);
+        shown.set(id, name);
+      }
       const at = deps.now();
       const today = new Date(at).toDateString();
       const seeds = new Map(
@@ -122,6 +131,10 @@ export function createLifeFeed(deps: {
       for (const name of active) deps.tenure.touch(name, { at });
       readFolders(view, names);
       changed();
+    },
+    /** A team now goes by `to`: its tenure goes with it, before the directory says so. */
+    renamed(from: string, to: string) {
+      if (deps.tenure.rename(from, to)) changed();
     },
     async turnEnded(id: string, lookup?: () => Promise<string | null>) {
       const name = teams.get(id) ?? (await lookup?.());

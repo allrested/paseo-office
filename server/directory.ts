@@ -13,6 +13,7 @@ import {
   type WorkspaceTicket,
 } from "../shared/contracts.js";
 import { APPEARANCE_KEY, AppearanceSchema } from "../shared/appearance.js";
+import { storedTeamName } from "../shared/team-name.js";
 import { NEXT_KEY, NUMBER_KEY, storedNumber } from "./subagent-names.js";
 
 // PARENT_AGENT_ID_LABEL in packages/protocol/src/agent-labels.ts. Server code may import the
@@ -352,9 +353,12 @@ export function projectWorkspace(workspace: DirectoryWorkspaceInput): OfficeWork
   const pullRequest = pullRequestOf(workspace);
   const { additions = 0, deletions = 0 } = workspace.diffStat ?? {};
   const scripts = (workspace.scripts ?? []).map(scriptOf);
+  const teamName = storedTeamName(workspace.metadata);
   return {
     id: workspace.id,
-    name: workspace.name,
+    // The team's name is the workspace's everywhere in the office once the owner has given one.
+    name: teamName ?? workspace.name,
+    ...(teamName === null ? {} : { workspaceName: workspace.name }),
     projectName: workspace.projectDisplayName,
     ...(branch ? { branch } : {}),
     ...(ticket ? { ticket } : {}),

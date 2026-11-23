@@ -55,6 +55,8 @@ export interface Tenure {
   list(live: ReadonlySet<string>): TenureProject[];
   seed(teams: readonly SeedTeam[]): void;
   get(team: string): TenureEntry | null;
+  /** A team that goes by another name keeps its entry; false when it has none or `to` is taken. */
+  rename(from: string, to: string): boolean;
   /** True once seed() has run on this ledger, now or on an earlier start. */
   seeded(): boolean;
 }
@@ -94,6 +96,14 @@ export function createTenure(deps: { store: TenureStore; now?: () => number }): 
   return {
     seeded: () => ledger.seeded,
     get: (team) => projects[team] ?? null,
+    rename(from, to) {
+      const entry = projects[from];
+      if (!entry || !to || from === to || projects[to]) return false;
+      projects[to] = entry;
+      delete projects[from];
+      save();
+      return true;
+    },
     seed(teams) {
       if (ledger.seeded) return;
       const at = now();
