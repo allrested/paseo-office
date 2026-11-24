@@ -1,10 +1,18 @@
 name: Publish
 
 # A pushed tag `vX.Y.Z` publishes that version to npm. The tag must match package.json, and the
-# same checks as CI run first.
+# same checks as CI run first. A run started by hand publishes a tag that is already there, for
+# one whose own run failed. npm takes the publish from this workflow as a trusted publisher
+# (npmjs.com, the package's settings): no token and no one-time password.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to publish, such as v0.2.12
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -21,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -29,7 +38,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: The tag is the package's version
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: test "$TAG" = "v$(node -p 'require("./package.json").version')"
       - run: npm ci
       - run: npm run typecheck
@@ -38,6 +47,7 @@ jobs:
       - run: npm run check:world
       - run: npm test
       - run: npm run test:scripts
-      - run: npm publish --provenance --access public --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships an older one. The provenance
+      # statement comes with it.
+      - run: npm install -g npm@^11.5.1
+      - run: npm publish --access public --ignore-scripts
