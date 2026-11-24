@@ -50,4 +50,5 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships an older one. The provenance
       # statement comes with it.
       - run: npm install -g npm@^11.5.1
-      - run: npm publish --access public --ignore-scripts
+      # Verbose, so a refused trusted publish says why: npm is otherwise silent about it.
+      - run: npm publish --access public --ignore-scripts --loglevel verbose
