@@ -2,6 +2,11 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## 0.2.12 (2026-11-24)
+
+- The plugin overview says what the History vault keeps on the host and for how long, and which
+  AWS CLI profile the CloudWatch alerts use and what they read. No change in behaviour.
+
 ## 0.2.11 (2026-11-24)
 
 - Team roster: a **Teams** section in the settings holds teams and their teammates, and the
