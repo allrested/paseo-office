@@ -18,6 +18,8 @@ The settings gear controls the floor plan, backdrop, lighting and sound. Under *
 
 **Archive idle sessions** is off by default. Enable it under **Office settings → Automation** if you want an open 3D floor to archive a session when its worker goes home. Workers can go home after resting for at least 30 minutes at night or after evening drinks. The session must still be idle, with no pending approval or working subagent. Archiving removes it from the active list and keeps its conversation history.
 
+**Gen-UI cards** is off by default. Turn it on under **Office settings** when the Generative UI plugin is installed: where a reply holds one of that plugin’s `ui` or `app` blocks, a session’s chat in the office shows a card with the block’s title instead of the block’s source. The live card is drawn in the workspace chat. The setting changes only how a reply is shown; it reads and stores nothing more.
+
 Stand-up notes need a host folder. Jira and Sentry alerts need project settings and a connection: a Jira address, email and API token, and a Sentry auth token, entered in the settings or set in the host environment. Entered tokens are stored unencrypted on the host in a file only its user can read. CloudWatch alerts need no token in Office: with an AWS profile and region in the settings, Office runs the host’s `aws` CLI with that profile. It lists the alarms in ALARM and, for the log groups you name, counts the lines that match your error pattern. It copies no log line and writes nothing to AWS, and the profile needs only `cloudwatch:DescribeAlarms` and `logs:FilterLogEvents`. Weather from a service needs a configured URL. Linux hosts can also show CPU, memory and processes.
 
 ## Data access
