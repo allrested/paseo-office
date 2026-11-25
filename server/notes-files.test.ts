@@ -55,6 +55,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       stickyNotes: "",
       rosterOn: false,
       rosterEdition: 0,
+      uiCards: false,
       teams: [],
       jiraProjects: "",
       sentryOrg: "",

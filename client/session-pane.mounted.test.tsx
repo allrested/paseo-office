@@ -15,6 +15,8 @@ import { useOfficeStyles } from "./styles.js";
 
 let draws: number;
 
+vi.mock("./use-ui-cards.js", () => ({ useUiCards: () => false }));
+
 vi.mock("./use-conversation.js", () => ({
   useConversation: () => {
     draws += 1;

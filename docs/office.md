@@ -110,25 +110,32 @@ The 3D floor remembers where a team sat by its name, so a renamed team is seated
 Settings > Office 3D > **Teams** holds a roster: teams, in the order they
 are handed out, each with its teammates. With "Name teams and agents from the roster" on, the office names by itself:
 
-- each workspace takes the first team no open workspace holds, oldest workspace first;
+- each workspace takes the first team no open workspace holds, oldest workspace first. Once
+  every team is held the teams are shared: the next workspace takes the team the fewest
+  workspaces hold, the first in the list among equals, so no workspace goes without a team;
 - each agent in that workspace, sub-agents too, takes one of the team's teammates no agent there
   holds, picked by chance, oldest agent first;
-- when the roster has nothing left, the workspace or agent keeps the name it has today. A
+- an agent whose team has no teammate left keeps the name it has today. A
   sub-agent is then `<parent's name>-<number>`, and the parent's name can be a teammate's.
 
-A name sticks until its workspace or agent is archived. A freed name goes to the next new one;
-nothing that already runs is renamed. Adding a team or a teammate, or switching the roster on,
-offers the longer list to what was passed over before.
+Workspaces that share a team each hand its teammates out on their own, so the same teammate can
+sit in two of them. A name sticks until its workspace or agent is archived. A freed teammate
+goes to the next new agent; nothing that already runs is renamed, and a team added later is
+taken by the next new workspace, not from one that holds another. Adding a teammate, or
+switching the roster on, offers the longer list to the agents that were passed over before.
 
 The names are the office's own: Paseo's sidebar, tabs and CLI show the workspace and session
 names they always did. A name you type on a team or an agent wins over the roster. Renaming a
-team or teammate in the settings renames whoever holds it; removing one leaves its holder with
-today's name until the roster next grows, when it is offered a name again. Switching the roster
+team or teammate in the settings renames whoever holds it. A workspace whose team is removed
+takes another at once; an agent whose teammate is removed keeps today's name until the roster
+next grows, when it is offered a name again. Switching the roster
 off shows today's names everywhere, and on again brings the same assignments back and looks once
 more at what was passed over.
 
 What is stored: `office.roster.team` on a workspace and `office.roster.member` on an agent, each
-the id of the team or teammate held, or a number when the roster had nothing left for it.
+the id of the team or teammate held, or a number when the roster had nothing left for it. A
+workspace has that number only while the roster has no team, or from 0.2.12 and earlier, which
+shared no team: it takes a team the next time the office is open.
 
 ## Views
 
@@ -634,6 +641,14 @@ and sites out of what the office sends to the floor: a bubble says "a file" or "
 off, a step carries one cut line of what it is at (a file's name without its folder, a command's
 first line, a query, a site's host name, 80 characters at most) and the 3D floor shows it over the
 person, to everyone who opens this office. Prompts and replies are never sent either way.
+
+**Gen-UI cards** (Settings, host-wide, off by default) is for a host that has the Generative UI
+plugin (`genui`), whose agents write `ui` and `app` code blocks that Paseo's chat draws as
+live cards. The office's own session chat cannot draw them. With the setting on it shows, in
+place of a block's source, a card with the block's title (the first `Card("...")` of a `ui`
+block, the page title of an `app` block) and where the live card is: the workspace chat, one
+press away with **Open in workspace**. A block inside another code block stays source. The
+office cannot tell whether the plugin is installed, so the switch is always listed.
 
 **Graphics** (Settings → the scene picker, per device) is Auto, Low, Medium or High. Auto picks for
 the device and steps down when frames keep coming late; Low draws no shadows and no post effects at

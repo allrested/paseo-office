@@ -3,8 +3,15 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
 import { readLobbyAssignment } from "../shared/lobby-assignment.js";
+import { splitUiBlocks, type UiPiece } from "../shared/ui-blocks.js";
 import type { ConversationRow } from "./conversation-model.js";
-import { NOTHING_SAID, rowLabel } from "./session-text.js";
+import {
+  NOTHING_SAID,
+  UI_CARD_HINT,
+  UI_CARD_WRITING,
+  rowLabel,
+  uiCardTitle,
+} from "./session-text.js";
 import { avatarInitials } from "./sessions-text.js";
 import type { OfficeStyles } from "./styles.js";
 
@@ -13,7 +20,63 @@ interface RowProps {
   appearance?: Appearance;
   row: ConversationRow;
   name: string;
+  /** A `ui` or `app` block of a reply is a card, not its source. */
+  uiCards?: boolean;
   styles: OfficeStyles;
+}
+
+/** Where a reply holds a block the Generative UI plugin draws in Paseo's own chat. */
+function UiCard({
+  piece,
+  styles,
+}: {
+  piece: Extract<UiPiece, { kind: "block" }>;
+  styles: OfficeStyles;
+}) {
+  const s = styles.transcript;
+  return (
+    <View style={s.uiCard}>
+      <Icon
+        name={piece.language === "app" ? "AppWindow" : "LayoutGrid"}
+        size={16}
+        color={styles.brandIcon.color}
+      />
+      <View style={s.uiCardText}>
+        <Text numberOfLines={2} style={s.stepTitle}>
+          {uiCardTitle(piece)}
+        </Text>
+        <Text style={s.uiCardHint}>{piece.complete ? UI_CARD_HINT : UI_CARD_WRITING}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** A reply's text; with `uiCards`, its `ui` and `app` blocks as cards between the prose. */
+function Reply({
+  text,
+  uiCards,
+  styles,
+}: {
+  text: string;
+  uiCards: boolean;
+  styles: OfficeStyles;
+}) {
+  const pieces = useMemo(() => (uiCards ? splitUiBlocks(text) : null), [text, uiCards]);
+  if (pieces === null) return <Markdown>{text}</Markdown>;
+  return (
+    <>
+      {pieces.map((piece, index) =>
+        piece.kind === "text" ? (
+          // Pieces keep their order while a reply streams: the index names one.
+          // eslint-disable-next-line react/no-array-index-key
+          <Markdown key={index}>{piece.text}</Markdown>
+        ) : (
+          // eslint-disable-next-line react/no-array-index-key
+          <UiCard key={index} piece={piece} styles={styles} />
+        ),
+      )}
+    </>
+  );
 }
 
 function Assignment({
@@ -72,6 +135,7 @@ function sameRow(before: RowProps, after: RowProps): boolean {
     before.appearance?.avatar === after.appearance?.avatar &&
     before.appearance?.color === after.appearance?.color &&
     before.styles === after.styles &&
+    before.uiCards === after.uiCards &&
     a.kind === b.kind &&
     a.key === b.key &&
     a.text === b.text &&
@@ -82,7 +146,7 @@ function sameRow(before: RowProps, after: RowProps): boolean {
 }
 
 /** Streamed messages update only their own row. Tool lines retain their accessibility labels. */
-const Row = memo(function Row({ row, name, appearance, styles }: RowProps) {
+const Row = memo(function Row({ row, name, appearance, uiCards, styles }: RowProps) {
   const s = styles.transcript;
   const label = rowLabel(row, name);
   const borderColor = shirtColor(appearance);
@@ -146,7 +210,7 @@ const Row = memo(function Row({ row, name, appearance, styles }: RowProps) {
             </View>
             <Text style={s.name}>{name}</Text>
           </View>
-          <Markdown>{row.text}</Markdown>
+          <Reply text={row.text} uiCards={uiCards === true} styles={styles} />
         </View>
       );
   }
@@ -217,12 +281,14 @@ export function SessionTranscript({
   rows,
   steps,
   name,
+  uiCards,
   styles,
 }: {
   rows: readonly ConversationRow[];
   appearance?: Appearance;
   steps: boolean;
   name: string;
+  uiCards?: boolean;
   styles: OfficeStyles;
 }) {
   const entries = useMemo(() => displayRows(rows, steps), [rows, steps]);
@@ -236,7 +302,16 @@ export function SessionTranscript({
         if (Array.isArray(entry) && entry.length > 1)
           return <ToolRun key={entry[0].key} rows={entry} name={name} styles={styles} />;
         const row = Array.isArray(entry) ? entry[0] : entry;
-        return <Row appearance={appearance} key={row.key} row={row} name={name} styles={styles} />;
+        return (
+          <Row
+            appearance={appearance}
+            key={row.key}
+            row={row}
+            name={name}
+            uiCards={uiCards}
+            styles={styles}
+          />
+        );
       })}
     </View>
   );
