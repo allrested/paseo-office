@@ -1444,7 +1444,11 @@ test("a roster write that fails is not sent again until the office is opened aga
   const { host, ports } = refusingPorts(writes, logs);
   const view = { agents: [], workspaces: [room("w1")] };
   const { hub, directory } = startHarness(view, ports);
-  hub.setRoster(ROSTER);
+  // Two teams: with one, a second workspace would share it whatever the first one's write did.
+  hub.setRoster({
+    ...ROSTER,
+    teams: [...ROSTER.teams, { id: "qa", name: "PR-QA", members: [] }],
+  });
   const watcher = subscribe(hub);
   await settle();
   expect(host.tries).toBe(1);
@@ -1458,14 +1462,14 @@ test("a roster write that fails is not sent again until the office is opened aga
   host.refusing = false;
   directory.emit({ agents: [], workspaces: [room("w1"), room("w2")] });
   await settle();
-  expect(writes.workspaces).toEqual([["w2", { [ROSTER_TEAM_KEY]: 1 }]]);
+  expect(writes.workspaces).toEqual([["w2", { [ROSTER_TEAM_KEY]: "qa" }]]);
   watcher.controller.abort();
   await watcher.done;
   await settle();
   const again = subscribe(hub);
   await settle();
   expect(writes.workspaces).toEqual([
-    ["w2", { [ROSTER_TEAM_KEY]: 1 }],
+    ["w2", { [ROSTER_TEAM_KEY]: "qa" }],
     ["w1", { [ROSTER_TEAM_KEY]: "dev" }],
   ]);
   again.controller.abort();

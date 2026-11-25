@@ -93,3 +93,12 @@ test("the holders are the workspaces and agents whose mark is an id", () => {
   ]);
   expect([...holders.members]).toEqual(["m1"]);
 });
+
+test("a team that workspaces share names the first and counts the rest", () => {
+  const workspaces = [
+    { id: "w1", name: "PR-DEV", workspaceName: "paseo-7f3a", roster: "t1" },
+    { id: "w2", name: "PR-DEV", workspaceName: "paseo-91bc", roster: "t1" },
+    { id: "w3", name: "PR-DEV", workspaceName: "paseo-aa", roster: "t1" },
+  ] as OfficeWorkspace[];
+  expect([...holdersOf(workspaces, []).teams]).toEqual([["t1", "paseo-7f3a and 2 more"]]);
+});
