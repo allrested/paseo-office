@@ -2,7 +2,7 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
-## Unreleased
+## 0.2.13 (2026-11-25)
 
 - Team roster: once every team is held, the teams are shared. A workspace takes the team the
   fewest workspaces hold, so with two teams and ten workspaces every workspace shows a team name
