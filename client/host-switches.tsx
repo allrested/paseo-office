@@ -44,6 +44,7 @@ type HostSetting =
   | "Pinned notes"
   | "Cache clock"
   | "Team chat"
+  | "Gen-UI cards"
   | "Sticky notes"
   | "Notes folder"
   | "Time zone"
@@ -591,6 +592,11 @@ function FloorSettings({
     [change],
   );
   const cultureProblem = saveProblem("Team chat");
+  const toggleUiCards = useCallback(
+    (next: boolean) => void change("Gen-UI cards", { uiCards: next }),
+    [change],
+  );
+  const uiCardsProblem = saveProblem("Gen-UI cards");
   return (
     <View style={settingsLayout.block}>
       {stored && (
@@ -626,6 +632,24 @@ function FloorSettings({
       {vaultProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {vaultProblem}
+        </Text>
+      )}
+      {stored && (
+        <LabeledSwitch
+          label="Gen-UI cards"
+          value={stored.uiCards}
+          onChange={toggleUiCards}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default. Turn it on when the Generative UI plugin is installed: where a reply holds
+        one of its ui or app blocks, the chat of a session here shows a card with the title of the
+        block, not its source. The live card is drawn in the workspace chat.
+      </Text>
+      {uiCardsProblem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {uiCardsProblem}
         </Text>
       )}
       <View style={styles.headerField}>

@@ -39,6 +39,10 @@ vi.mock("./session-text.js", async (importOriginal) => {
   };
 });
 
+/** The host's "Gen-UI cards" setting, as the panel reads it. */
+let uiCards: boolean;
+vi.mock("./use-ui-cards.js", () => ({ useUiCards: () => uiCards }));
+
 vi.mock("./use-conversation.js", () => ({
   useConversation: (agentId: string) => {
     asked.push(agentId);
@@ -129,6 +133,7 @@ const draw = (props: Partial<SessionPanelProps> = {}) =>
 beforeEach(() => {
   asked = [];
   drawn = [];
+  uiCards = false;
   conversation = ready([]);
   send = vi.fn(async () => undefined);
   respond = vi.fn(async () => undefined);
@@ -250,6 +255,37 @@ test("rows draw in order; the two voices are told apart by name; a tool is one l
   expect(follows(you, agent) && follows(agent, tool) && follows(tool, notice)).toBe(true);
   expect(tool.textContent).toBe("Ran npm test");
   expect(getComputedStyle(tool.querySelector("div,span") ?? tool).whiteSpace).toBe("nowrap");
+});
+
+const UI_REPLY = [
+  "Three threads are open.",
+  "",
+  "```ui",
+  'Card("Review threads", [Table(["MR"], [["payme !27"]])])',
+  "```",
+  "",
+  "```ui",
+  'Card("Still coming", [',
+].join("\n");
+
+test("a reply's ui block is its source until Gen-UI cards is on, then a card with its title", async () => {
+  conversation = ready([{ kind: "agent", key: "1", text: UI_REPLY }]);
+  await draw();
+  const markdown = () =>
+    [...container.querySelectorAll("[data-markdown]")].map((element) => element.textContent);
+  expect(markdown()).toEqual([UI_REPLY]);
+  expect(container.textContent).not.toContain("Drawn in the workspace chat.");
+  uiCards = true;
+  await draw();
+  // The prose stays Markdown; neither block's source is drawn.
+  expect(markdown()).toEqual(["Three threads are open."]);
+  const reply = container.textContent ?? "";
+  expect(reply).toContain("Review threads");
+  expect(reply).toContain("Drawn in the workspace chat.");
+  // The second block is still streaming.
+  expect(reply).toContain("Still coming");
+  expect(reply).toContain("Being written...");
+  expect(reply).not.toContain("Table(");
 });
 
 test("chat folds consecutive tool steps, leaves a failed call visible, and keeps the run open during updates", async () => {

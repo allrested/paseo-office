@@ -38,6 +38,7 @@ import { SessionTranscript } from "./session-transcript.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
 import { useConversation, type Conversation } from "./use-conversation.js";
+import { useUiCards } from "./use-ui-cards.js";
 
 /** What is typed in the reply box, kept by the surface. */
 export interface ReplyDraft {
@@ -180,11 +181,12 @@ interface RowsProps {
   conversation: Conversation;
   steps: boolean;
   name: string;
+  uiCards: boolean;
   styles: OfficeStyles;
 }
 
 /** What the list holds: its state while it has none, else Show earlier and the rows. */
-function Rows({ conversation, steps, name, appearance, styles }: RowsProps): ReactNode {
+function Rows({ conversation, steps, name, appearance, uiCards, styles }: RowsProps): ReactNode {
   const { status, rows } = conversation;
   if (status === "loading") return <Text style={styles.muted}>{LOADING}</Text>;
   if (status === "error") {
@@ -219,6 +221,7 @@ function Rows({ conversation, steps, name, appearance, styles }: RowsProps): Rea
         rows={rows}
         steps={steps}
         name={name}
+        uiCards={uiCards}
         styles={styles}
       />
     </>
@@ -373,6 +376,7 @@ export function SessionPanel({
   onOpenSubagent,
 }: SessionPanelProps) {
   const conversation = useConversation(agentId);
+  const uiCards = useUiCards();
   const [tab, setTab] = useState<SessionDetailTab>("chat");
   const { scroller, onScroll, followEnd } = useFollowEnd();
   const touchScreen = useMemo(
@@ -438,6 +442,7 @@ export function SessionPanel({
             conversation={conversation}
             steps={tab === "steps"}
             name={name}
+            uiCards={uiCards}
             styles={styles}
           />
         )}

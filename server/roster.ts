@@ -72,11 +72,13 @@ function agentsByWorkspace(agents: readonly RosterAgent[]): Map<string, RosterAg
 
 /**
  * The metadata to write so every workspace and agent the roster can name has a mark. Workspaces
- * not looked at yet, oldest first, take the first team no listed workspace holds; agents of a
- * workspace with a team, oldest first, take one of its teammates no listed agent there holds:
- * the one `pick` chooses among them, the first in order unless told otherwise. One
- * the roster has nothing left for gets the edition, so a name freed later goes to a new one and
- * never to it. An id that no longer names a team, or a teammate of the workspace's team, is
+ * that hold no team, oldest first, take the team the fewest listed workspaces hold, the first in
+ * the settings' order among equals: a team is shared once every team is held, so no workspace
+ * goes without one while the roster has a team. Agents of a workspace with a team, oldest first,
+ * take one of its teammates no listed agent there holds: the one `pick` chooses among them, the
+ * first in order unless told otherwise. An agent the team has nobody left for gets the edition,
+ * so a name freed later goes to a new one and never to it, and so does a workspace when the
+ * roster has no team at all. An id that no longer names a teammate of the workspace's team is
  * written over with the edition: its holder is passed over, and only a longer roster reaches it.
  * Every workspace's write comes before any agent's. Nothing when the roster is off.
  */
@@ -96,24 +98,33 @@ export function planRoster(
   );
   const writes: RosterWrite[] = [];
   const teams = new Map<string, RosterTeam>();
-  const held = new Set<string>();
+  const holders = new Map<string, number>(roster.teams.map((team) => [team.id, 0]));
+  const take = (workspace: RosterWorkspace, team: RosterTeam) => {
+    teams.set(workspace.id, team);
+    holders.set(team.id, (holders.get(team.id) ?? 0) + 1);
+  };
   for (const workspace of ordered) {
     const team = teamOf(roster, workspace.roster);
-    if (team === null) continue;
-    teams.set(workspace.id, team);
-    held.add(team.id);
+    if (team !== null) take(workspace, team);
   }
   for (const workspace of ordered) {
-    if (lost(workspace.roster, teamOf(roster, workspace.roster))) {
-      writes.push({ kind: "workspace", id: workspace.id, mark: roster.edition });
+    if (teams.has(workspace.id)) continue;
+    // The first of the least held: reduce keeps the earlier team on a tie.
+    const team = roster.teams.reduce<RosterTeam | undefined>(
+      (least, candidate) =>
+        least === undefined || holders.get(candidate.id)! < holders.get(least.id)!
+          ? candidate
+          : least,
+      undefined,
+    );
+    if (team === undefined) {
+      // No team at all: the mark says it was looked at, and the first team reaches it.
+      if (open(workspace.roster, roster.edition) || typeof workspace.roster === "string")
+        writes.push({ kind: "workspace", id: workspace.id, mark: roster.edition });
       continue;
     }
-    if (!open(workspace.roster, roster.edition)) continue;
-    const team = roster.teams.find((candidate) => !held.has(candidate.id));
-    writes.push({ kind: "workspace", id: workspace.id, mark: team?.id ?? roster.edition });
-    if (team === undefined) continue;
-    teams.set(workspace.id, team);
-    held.add(team.id);
+    writes.push({ kind: "workspace", id: workspace.id, mark: team.id });
+    take(workspace, team);
   }
   for (const workspace of ordered) {
     const team = teams.get(workspace.id);

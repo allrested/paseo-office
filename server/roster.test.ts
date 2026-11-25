@@ -101,14 +101,30 @@ test("a later agent takes the next teammate, and the fifth is passed over", () =
   ]);
 });
 
-test("the second workspace is PR-QA and the third is passed over with its agents untouched", () => {
+test("the second workspace is PR-QA, and the third shares PR-DEV with its own teammates", () => {
   const workspaces = [ws("w1", 0, "dev"), ws("w2", 1), ws("w3", 2)];
-  const agents = [agent("b1", "w2", 3), agent("c1", "w3", 4)];
+  const agents = [agent("a1", "w1", 3, "tj"), agent("b1", "w2", 4), agent("c1", "w3", 5)];
   expect(planRoster(ROSTER, workspaces, agents)).toEqual([
     team("w2", "qa"),
-    team("w3", 1),
+    team("w3", "dev"),
     member("b1", "rosalyn"),
+    // tj is held in w1 only: w3 hands the team's teammates out on its own.
+    member("c1", "tj"),
   ]);
+});
+
+test("a shared team is the one the fewest workspaces hold, the first in order among equals", () => {
+  const workspaces = [ws("w1", 0), ws("w2", 1), ws("w3", 2), ws("w4", 3), ws("w5", 4)];
+  expect(planRoster(ROSTER, workspaces, [])).toEqual([
+    team("w1", "dev"),
+    team("w2", "qa"),
+    team("w3", "dev"),
+    team("w4", "qa"),
+    team("w5", "dev"),
+  ]);
+  // PR-DEV is held twice and PR-QA once: the new workspace evens them out.
+  const uneven = [ws("w1", 0, "dev"), ws("w2", 1, "dev"), ws("w3", 2, "qa"), ws("w4", 3)];
+  expect(planRoster(ROSTER, uneven, [])).toEqual([team("w4", "qa")]);
 });
 
 test("workspaces are served oldest first whatever order they are listed in", () => {
@@ -122,7 +138,7 @@ test("a workspace without a creation time goes by its oldest agent, then by id",
   // wc's oldest agent is the oldest; wa's is next; wb has none and comes last.
   expect(
     planRoster(ROSTER, workspaces, agents).filter((write) => write.kind === "workspace"),
-  ).toEqual([team("wc", "dev"), team("wa", "qa"), team("wb", 1)]);
+  ).toEqual([team("wc", "dev"), team("wa", "qa"), team("wb", "dev")]);
 });
 
 test("a teammate freed by an archive goes to the next new agent, not to one passed over", () => {
@@ -140,26 +156,34 @@ test("a teammate freed by an archive goes to the next new agent, not to one pass
   ]);
 });
 
-test("a team freed by an archive goes to the next new workspace, not to one passed over", () => {
-  // w1 (PR-DEV) was archived. w3 was passed over at this edition.
-  const workspaces = [ws("w2", 1, "qa"), ws("w3", 2, 1)];
-  expect(planRoster(ROSTER, workspaces, [])).toEqual([]);
-  expect(planRoster(ROSTER, [...workspaces, ws("w4", 3)], [])).toEqual([team("w4", "dev")]);
+test("a workspace passed over before teams were shared takes a team at once", () => {
+  // 0.2.12 and earlier marked w3 and w4 as passed over at this edition.
+  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, 1), ws("w4", 3, 1)];
+  const agents = [agent("c1", "w3", 4), agent("c2", "w3", 5)];
+  const planned = planRoster(ROSTER, workspaces, agents);
+  expect(planned).toEqual([
+    team("w3", "dev"),
+    team("w4", "qa"),
+    member("c1", "tj"),
+    member("c2", "zaki"),
+  ]);
+  const after = stored(workspaces, agents, planned);
+  expect(planRoster(ROSTER, after.workspaces, after.agents)).toEqual([]);
 });
 
-test("a longer roster reaches what was passed over, oldest first", () => {
+test("a new team is not taken from who holds another: the next new workspace takes it", () => {
   const grown: Roster = {
     on: true,
     edition: 2,
     teams: [...ROSTER.teams, { id: "ops", name: "PR-OPS", members: [{ id: "ali", name: "Ali" }] }],
   };
-  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, 1), ws("w4", 3, 1)];
-  const agents = [agent("c1", "w3", 4), agent("c2", "w3", 5)];
-  expect(planRoster(grown, workspaces, agents)).toEqual([
-    team("w3", "ops"),
-    team("w4", 2),
-    member("c1", "ali"),
-    member("c2", 2),
+  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, "dev")];
+  expect(planRoster(grown, workspaces, [])).toEqual([]);
+  const agents = [agent("d1", "w4", 4), agent("d2", "w4", 5)];
+  expect(planRoster(grown, [...workspaces, ws("w4", 3)], agents)).toEqual([
+    team("w4", "ops"),
+    member("d1", "ali"),
+    member("d2", 2),
   ]);
 });
 
@@ -177,20 +201,29 @@ test("switching on with no team marks everything, and the first team then reache
   ]);
 });
 
-test("a deleted team or teammate gives its holder no other, and it is marked passed over", () => {
+test("a deleted team's workspace takes another, and a deleted teammate's holder is passed over", () => {
   const workspaces = [ws("w1", 0, "gone-team"), ws("w2", 1, "dev")];
   const agents = [
     agent("a0", "w1", 1, "gone-member"),
     agent("a1", "w2", 2, "gone-member"),
     agent("a2", "w2", 3),
   ];
-  // w1 is not offered PR-QA; a1 is not offered a teammate; a2 is new and takes the first. a0 is
-  // in a workspace without a team: nothing names it either way.
+  // w1 takes PR-QA, the team nobody holds, and its a0 is passed over like any holder of a
+  // teammate that is gone; a1 is not offered a teammate; a2 is new and takes the first.
   expect(planRoster(ROSTER, workspaces, agents)).toEqual([
-    team("w1", 1),
+    team("w1", "qa"),
+    member("a0", 1),
     member("a1", 1),
     member("a2", "tj"),
   ]);
+});
+
+test("with no team left in the roster a deleted team's workspace is marked, once", () => {
+  const empty: Roster = { on: true, edition: 3, teams: [] };
+  const workspaces = [ws("w1", 0, "gone-team")];
+  const planned = planRoster(empty, workspaces, []);
+  expect(planned).toEqual([team("w1", 3)]);
+  expect(planRoster(empty, stored(workspaces, [], planned).workspaces, [])).toEqual([]);
 });
 
 test("a deleted teammate's holder is offered a name again once the roster grows", () => {
@@ -229,7 +262,7 @@ test("an agent that moves away and back does not show the teammate handed on mea
 });
 
 test("the marks are kept through off and on again", () => {
-  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, 1)];
+  const workspaces = [ws("w1", 0, "dev"), ws("w2", 1, "qa"), ws("w3", 2, "dev")];
   const agents = [
     agent("a1", "w1", 1, "tj"),
     agent("a2", "w1", 2, "zaki"),

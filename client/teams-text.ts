@@ -117,7 +117,10 @@ export function moveMember(
   });
 }
 
-/** Who holds what: each held team's workspace, by its own name in Paseo, and the held teammates. */
+/**
+ * Who holds what: each held team's workspace, by its own name in Paseo, with how many more share
+ * the team, and the held teammates.
+ */
 export interface RosterHolders {
   teams: ReadonlyMap<string, string>;
   members: ReadonlySet<string>;
@@ -129,10 +132,20 @@ export function holdersOf(
   workspaces: readonly OfficeWorkspace[],
   agents: readonly OfficeAgent[],
 ): RosterHolders {
-  const teams = new Map<string, string>();
-  for (const workspace of workspaces)
-    if (typeof workspace.roster === "string")
-      teams.set(workspace.roster, workspace.workspaceName ?? workspace.name);
+  const first = new Map<string, string>();
+  const more = new Map<string, number>();
+  for (const workspace of workspaces) {
+    if (typeof workspace.roster !== "string") continue;
+    if (first.has(workspace.roster))
+      more.set(workspace.roster, (more.get(workspace.roster) ?? 0) + 1);
+    else first.set(workspace.roster, workspace.workspaceName ?? workspace.name);
+  }
+  const teams = new Map(
+    [...first].map(([team, name]) => [
+      team,
+      more.has(team) ? `${name} and ${more.get(team)} more` : name,
+    ]),
+  );
   const members = new Set<string>();
   for (const agent of agents) if (typeof agent.roster === "string") members.add(agent.roster);
   return { teams, members };

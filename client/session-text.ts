@@ -31,6 +31,13 @@ export function rowLabel(row: ConversationRow, agentName: string): string {
   return row.text;
 }
 
+/** A `ui` or `app` block's card: its name when the block has none, and where it is drawn. */
+export function uiCardTitle(piece: { language: "ui" | "app"; title: string | null }): string {
+  return piece.title ?? (piece.language === "app" ? "Interactive app" : "Interactive card");
+}
+export const UI_CARD_HINT = "Drawn in the workspace chat.";
+export const UI_CARD_WRITING = "Being written...";
+
 export const LOADING = "Loading...";
 export const NOTHING_SAID = "Nothing said yet.";
 export const EARLIER_FAILED = "Unable to read earlier messages. Try again.";

@@ -86,5 +86,19 @@ export function transcriptStyles(colors: PluginTheme["colors"], touch: boolean) 
       paddingVertical: 3,
     },
     errorNotice: { borderLeftColor: colors.statusDanger },
+    uiCard: {
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface1,
+    },
+    uiCardText: { flex: 1, minWidth: 0, gap: 2 },
+    uiCardHint: { color: colors.foregroundMuted, fontSize: 12, lineHeight: 17 },
   });
 }

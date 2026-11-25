@@ -2,6 +2,16 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## Unreleased
+
+- Team roster: once every team is held, the teams are shared. A workspace takes the team the
+  fewest workspaces hold, so with two teams and ten workspaces every workspace shows a team name
+  and none keeps Paseo's. Workspaces that 0.2.12 passed over take a team when the office is next
+  open. Agents are named as before, per workspace.
+- **Gen-UI cards**, a host setting, off by default: where a reply holds a `ui` or `app` block
+  of the Generative UI plugin, a session's chat in the office shows a card with the block's
+  title, not the block's source. The live card is drawn in Paseo's workspace chat.
+
 ## 0.2.12 (2026-11-24)
 
 - The plugin overview says what the History vault keeps on the host and for how long, and which

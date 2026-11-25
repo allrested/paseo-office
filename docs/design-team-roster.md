@@ -2,6 +2,15 @@
 
 Status: built on branch feat/team-roster; plan in docs/plan-team-roster.md.
 
+**Changed on 2026-11-25 (the owner's answer): teams are shared.** Rule 1 no longer passes a
+workspace over when every team is held: it takes the team the fewest open workspaces hold, the
+first in the configured order among equals. A workspace is passed over only while the roster has
+no team, a mark from before the change is taken up at once, and a workspace whose team is
+deleted takes another at once. Rules 4 and 8 now hold for teammates only: a team added later
+goes to the next new workspace and is not taken from one that holds another. Each workspace
+hands its team's teammates out on its own, so a teammate can be held once per workspace. The
+text below is the design as first built.
+
 ## Problem
 
 The office shows a workspace under Paseo's generated name and an agent under its session title,

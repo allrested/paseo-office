@@ -98,6 +98,7 @@ const ON: SettingsState = {
     stickyNotes: "",
     rosterOn: false,
     rosterEdition: 0,
+    uiCards: false,
     teams: [],
   },
 };
@@ -119,6 +120,7 @@ const OFF: SettingsState = {
     stickyNotes: "",
     rosterOn: false,
     rosterEdition: 0,
+    uiCards: false,
     teams: [],
   },
 };
@@ -640,6 +642,7 @@ function notesSettings(
       stickyNotes: "",
       rosterOn: false,
       rosterEdition: 0,
+      uiCards: false,
       teams: [],
     },
   };
@@ -1128,6 +1131,7 @@ const NOTES: SettingsState = {
     stickyNotes: "",
     rosterOn: false,
     rosterEdition: 0,
+    uiCards: false,
     teams: [],
   },
 };
@@ -1240,6 +1244,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       stickyNotes: "",
       rosterOn: false,
       rosterEdition: 0,
+      uiCards: false,
       teams: [],
     },
   });
@@ -1606,6 +1611,7 @@ const JIRA_ON: SettingsState = {
     stickyNotes: "",
     rosterOn: false,
     rosterEdition: 0,
+    uiCards: false,
     teams: [],
     jiraProjects: "OPS",
   },
