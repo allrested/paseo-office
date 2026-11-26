@@ -17,6 +17,8 @@ import type { DirectoryView } from "./hub.js";
 /** How long the office remembers, and the most marks it keeps: the oldest go first. */
 export const TIMELINE_KEEP_MS = 8 * DAY_MS;
 export const TIMELINE_MARKS_MAX = 40_000;
+/** How far past the most the log may grow before it is cut back and its file written anew. */
+export const TIMELINE_MARKS_SLACK = 2_000;
 
 const STATES = [...TIMELINE_STATES, "off"] as const;
 type Seen = (typeof STATES)[number];
@@ -25,7 +27,7 @@ type Seen = (typeof STATES)[number];
  * One thing seen of an agent at a time: its state changed (`s`, "off" when the office stopped
  * watching it), it started a tool call (`k`), or its turns cost more (`c`, the US dollars added).
  */
-const MarkSchema = z.object({
+export const MarkSchema = z.object({
   t: z.number(),
   a: z.string(),
   s: z.enum(STATES).optional(),
@@ -34,7 +36,11 @@ const MarkSchema = z.object({
 });
 type Mark = z.output<typeof MarkSchema>;
 
-const WhoSchema = z.object({ name: z.string(), team: z.string(), provider: z.string() });
+export const WhoSchema = z.object({ name: z.string(), team: z.string(), provider: z.string() });
+type Who = z.output<typeof WhoSchema>;
+
+/** One line of the log's file: a mark, or who an agent is (`w` is its id; the newest line holds). */
+export type TimelineLine = Mark | ({ w: string } & Who);
 
 export const TimelineFileSchema = z.object({
   version: z.literal(1),
@@ -45,8 +51,10 @@ export type TimelineFile = z.output<typeof TimelineFileSchema>;
 
 export interface TimelinePorts {
   now(): number;
-  /** Called with the whole log after each change; the caller writes it when it sees fit. */
-  save(file: TimelineFile): void;
+  /** What was added since the last call; the caller adds it to the file when it sees fit. */
+  append(lines: readonly TimelineLine[]): void;
+  /** The whole log, in place of the file: at the start, and when old marks were cut off. */
+  rewrite(file: TimelineFile): void;
 }
 
 export interface TimelineLog {
@@ -86,12 +94,30 @@ export function createTimelineLog(ports: TimelinePorts, kept: TimelineFile | nul
   const last = marks.at(-1)?.t ?? 0;
   for (const [id, state] of states) if (state !== "off") marks.push({ t: last, a: id, s: "off" });
   states.clear();
+  let pending: TimelineLine[] = [];
 
-  function saved(): void {
+  function rewrite(): void {
     if (marks.length > TIMELINE_MARKS_MAX) marks = marks.slice(-TIMELINE_MARKS_MAX);
     const listed = new Set(marks.map((mark) => mark.a));
     for (const id of Object.keys(who)) if (!listed.has(id)) delete who[id];
-    ports.save({ version: 1, who, marks });
+    pending = [];
+    ports.rewrite({ version: 1, who, marks });
+  }
+  // The kept file loses its old marks and gains the closing ones: written once, whole.
+  if (kept !== null) rewrite();
+
+  function add(entry: Mark): void {
+    marks.push(entry);
+    pending.push(entry);
+  }
+
+  function saved(): void {
+    if (marks.length > TIMELINE_MARKS_MAX + TIMELINE_MARKS_SLACK) {
+      rewrite();
+      return;
+    }
+    ports.append(pending);
+    pending = [];
   }
 
   function seeAgent(agent: OfficeAgent, team: string, t: number): boolean {
@@ -99,11 +125,22 @@ export function createTimelineLog(ports: TimelinePorts, kept: TimelineFile | nul
     const state = seenOf(agent);
     if ((states.get(agent.id) ?? "off") !== state) {
       states.set(agent.id, state);
-      marks.push({ t, a: agent.id, s: state });
+      add({ t, a: agent.id, s: state });
       changed = true;
     }
     if (state !== "off" || changed) {
-      who[agent.id] = { name: agentTitle(agent), team, provider: agent.provider };
+      const now = { name: agentTitle(agent), team, provider: agent.provider };
+      const before = who[agent.id];
+      if (
+        before === undefined ||
+        before.name !== now.name ||
+        before.team !== now.team ||
+        before.provider !== now.provider
+      ) {
+        who[agent.id] = now;
+        // Goes out with the next mark: a new name alone is not worth a write.
+        pending.push({ w: agent.id, ...now });
+      }
     }
     const cost = agent.costUsd;
     if (cost === undefined) return changed;
@@ -111,7 +148,7 @@ export function createTimelineLog(ports: TimelinePorts, kept: TimelineFile | nul
     costs.set(agent.id, cost);
     // The first reading is what the agent cost before the office looked: not this range's.
     if (before === undefined || cost <= before) return changed;
-    marks.push({ t, a: agent.id, c: cost - before });
+    add({ t, a: agent.id, c: cost - before });
     return true;
   }
 
@@ -121,7 +158,7 @@ export function createTimelineLog(ports: TimelinePorts, kept: TimelineFile | nul
       if ((states.get(id) ?? "off") === "off") continue;
       states.set(id, "off");
       calls.delete(id);
-      marks.push({ t, a: id, s: "off" });
+      add({ t, a: id, s: "off" });
       changed = true;
     }
     return changed;
@@ -153,7 +190,7 @@ export function createTimelineLog(ports: TimelinePorts, kept: TimelineFile | nul
       for (const [id, step] of Object.entries(doing)) {
         if (calls.get(id) === step.key || states.get(id) === undefined) continue;
         calls.set(id, step.key);
-        marks.push({ t, a: id, k: step.kind });
+        add({ t, a: id, k: step.kind });
         changed = true;
       }
       if (changed) saved();

@@ -78,11 +78,21 @@ export function liftFile(env: NodeJS.ProcessEnv, home: string) {
 
 /** What the office saw each agent do, for the timeline and the week's recap. */
 export function timelineFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "timeline.jsonl");
+}
+
+/** The timeline as versions up to 0.2.14 kept it: read once, then replaced by the file above. */
+export function timelineLegacyFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "timeline.json");
 }
 
-/** What was said in each conversation, while the owner has the history vault on. */
-export function vaultFile(env: NodeJS.ProcessEnv, home: string) {
+/** What was said in each conversation, while the owner has the history vault on: a file each. */
+export function vaultDir(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "vault");
+}
+
+/** The vault as versions up to 0.2.14 kept it: moved into the folder above when first read. */
+export function vaultLegacyFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "vault.json");
 }
 

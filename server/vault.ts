@@ -21,14 +21,14 @@ import type { DirectoryView } from "./hub.js";
 /** How many of an agent's newest timeline items are read after each of its turns. */
 export const VAULT_TAIL_LIMIT = 80;
 
-const TalkSchema = z.object({
+export const TalkSchema = z.object({
   name: z.string(),
   team: z.string(),
   /** The last timeline sequence number read: what comes after is new. */
   seq: z.number(),
   messages: z.array(VaultMessageSchema),
 });
-type Talk = z.output<typeof TalkSchema>;
+export type Talk = z.output<typeof TalkSchema>;
 
 export const VaultFileSchema = z.object({
   version: z.literal(1),
@@ -48,7 +48,10 @@ export interface VaultPorts {
   tail(agentId: string): Promise<readonly VaultEntry[]>;
   /** Whether the owner has turned the vault on; off, nothing is read or kept. */
   on(): boolean;
-  save(file: VaultFile): void;
+  /** One conversation as it is now; the caller writes it when it sees fit. */
+  save(agentId: string, talk: Talk): void;
+  /** A conversation the vault no longer keeps. */
+  drop(agentId: string): void;
   log(message: string): void;
 }
 
@@ -81,12 +84,14 @@ export function createVault(ports: VaultPorts, kept: VaultFile | null): Vault {
   const resting = new Map<string, boolean>();
   let chain: Promise<void> = Promise.resolve();
 
-  function saved(): void {
-    if (talks.size > VAULT_TALKS_MAX) {
-      const oldest = [...talks].sort((a, b) => lastAt(a[1]) - lastAt(b[1]));
-      for (const [id] of oldest.slice(0, talks.size - VAULT_TALKS_MAX)) talks.delete(id);
+  function saved(agentId: string, talk: Talk): void {
+    ports.save(agentId, talk);
+    if (talks.size <= VAULT_TALKS_MAX) return;
+    const oldest = [...talks].sort((a, b) => lastAt(a[1]) - lastAt(b[1]));
+    for (const [id] of oldest.slice(0, talks.size - VAULT_TALKS_MAX)) {
+      talks.delete(id);
+      ports.drop(id);
     }
-    ports.save({ version: 1, talks: Object.fromEntries(talks) });
   }
 
   async function read(agent: OfficeAgent, team: string): Promise<void> {
@@ -112,7 +117,7 @@ export function createVault(ports: VaultPorts, kept: VaultFile | null): Vault {
       talk.messages = talk.messages.slice(-VAULT_MESSAGES_MAX);
     }
     talks.set(agent.id, talk);
-    saved();
+    saved(agent.id, talk);
   }
 
   return {

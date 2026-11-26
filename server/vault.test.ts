@@ -29,7 +29,8 @@ function setup(kept: VaultFile | null = null) {
   const reads: string[] = [];
   const logs: string[] = [];
   let on = true;
-  let saved: VaultFile | null = null;
+  const files = new Map<string, VaultFile["talks"][string]>(Object.entries(kept?.talks ?? {}));
+  let saves = 0;
   const vault = createVault(
     {
       tail: async (agentId) => {
@@ -39,8 +40,12 @@ function setup(kept: VaultFile | null = null) {
         return entries;
       },
       on: () => on,
-      save: (file) => {
-        saved = structuredClone(file);
+      save: (agentId, talk) => {
+        saves += 1;
+        files.set(agentId, structuredClone(talk));
+      },
+      drop: (agentId) => {
+        files.delete(agentId);
       },
       log: (message) => logs.push(message),
     },
@@ -51,7 +56,8 @@ function setup(kept: VaultFile | null = null) {
     timelines,
     reads,
     logs,
-    saved: () => saved,
+    saved: (): VaultFile | null =>
+      saves === 0 ? null : { version: 1, talks: Object.fromEntries(files) },
     turn(value: boolean) {
       on = value;
     },

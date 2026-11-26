@@ -1,7 +1,12 @@
 import { expect, test } from "vitest";
 import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
 import { doingAt, durationText, weekRecap, DAY_MS } from "../shared/timeline.js";
-import { createTimelineLog, type TimelineFile } from "./timeline.js";
+import {
+  TIMELINE_MARKS_MAX,
+  TIMELINE_MARKS_SLACK,
+  createTimelineLog,
+  type TimelineFile,
+} from "./timeline.js";
 
 const MIN = 60_000;
 
@@ -25,10 +30,23 @@ const PERMISSION = { id: "p1", kind: "tool" as const, title: "Run a command" };
 function setup(kept: TimelineFile | null = null, start = 0) {
   let now = start;
   let saved: TimelineFile | null = null;
+  const writes: string[] = [];
   const log = createTimelineLog(
     {
       now: () => now,
-      save: (file) => {
+      // What a file fed by these two calls would hold.
+      append: (lines) => {
+        writes.push(`append ${lines.length}`);
+        saved ??= { version: 1, who: {}, marks: [] };
+        for (const line of structuredClone(lines)) {
+          if ("w" in line) {
+            const { w, ...who } = line;
+            saved.who[w] = who;
+          } else saved.marks.push(line);
+        }
+      },
+      rewrite: (file) => {
+        writes.push(`rewrite ${file.marks.length}`);
         saved = structuredClone(file);
       },
     },
@@ -44,6 +62,7 @@ function setup(kept: TimelineFile | null = null, start = 0) {
       now = start + minutes * MIN;
     },
     saved: () => saved,
+    writes,
   };
 }
 
@@ -220,4 +239,31 @@ test("a duration reads in hours and minutes", () => {
     "2 h",
     "3 h 20 min",
   ]);
+});
+
+test("a change adds its lines to the file, and the whole log is written only when it is cut", () => {
+  const { log, at, clock, saved, writes } = setup();
+  at(0, agent("a", { status: "running" }));
+  // The agent's first mark and who it is.
+  expect(writes).toEqual(["append 2"]);
+  clock(1);
+  log.steps({ a: { kind: "edit", key: "c0" } });
+  expect(writes).toEqual(["append 2", "append 1"]);
+  expect(saved()?.who).toEqual({ a: { name: "Agent a", team: "shop-api", provider: "claude" } });
+
+  for (let call = 1; call <= TIMELINE_MARKS_MAX + TIMELINE_MARKS_SLACK; call += 1) {
+    log.steps({ a: { kind: "edit", key: `c${call}` } });
+  }
+  expect(writes.filter((write) => write.startsWith("rewrite"))).toEqual([
+    `rewrite ${TIMELINE_MARKS_MAX}`,
+  ]);
+  expect(saved()?.marks).toHaveLength(TIMELINE_MARKS_MAX + 1);
+});
+
+test("a kept file is written whole once at the start, without its old marks", () => {
+  const first = setup(null, 0);
+  first.at(0, agent("a", { status: "running" }));
+  const second = setup(first.saved(), 9 * DAY_MS);
+  expect(second.writes).toEqual(["rewrite 0"]);
+  expect(second.saved()).toEqual({ version: 1, who: {}, marks: [] });
 });
