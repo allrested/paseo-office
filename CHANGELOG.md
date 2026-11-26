@@ -2,7 +2,7 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
-## Unreleased
+## 0.2.14 (2026-11-26)
 
 - Team roster: a team is its teammates, whatever workspace each agent works in. Agents fill the
   first team, then the next, and the 3D floor shows one desk area per roster team: with PR-DEV
