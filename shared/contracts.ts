@@ -956,6 +956,13 @@ export const chatRpc = defineRpc({
   output: ChatResultSchema,
 });
 
+/** The daemon's copy of an image sent with a message, as a data URL; null when it cannot be read. */
+export const sentImageRpc = defineRpc({
+  name: "office.session.image",
+  input: z.object({ url: z.string().max(600) }),
+  output: z.object({ data: z.string().nullable() }),
+});
+
 export const worldLogoRpc = defineRpc({
   name: "office.world.logo",
   input: z.object({}),
