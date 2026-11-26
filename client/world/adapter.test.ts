@@ -55,6 +55,24 @@ function office(
 const permission = { id: "p1", kind: "tool" as const, title: "Run a command" };
 
 describe("the office's agents as the scene's people", () => {
+  it("seats a roster teammate with its team whatever its workspace, and the rest with their room", () => {
+    const model = buildOfficeModel(
+      office([
+        agent("1", { team: "PR-DEV" }),
+        agent("2", { workspaceId: "w2", team: "PR-DEV" }),
+        agent("3", { workspaceId: "w2", team: "PR-QA" }),
+        agent("4", { workspaceId: "w2" }),
+      ]),
+    );
+    const { sessions } = worldPeople(model, PLAN_DESKS.pro);
+    expect(sessions.map((s) => [s.id, s.git.repo])).toEqual([
+      ["1", "PR-DEV"],
+      ["2", "PR-DEV"],
+      ["3", "PR-QA"],
+      ["4", "landing"],
+    ]);
+  });
+
   it("seats a workspace's agents as one team and says what each is doing", () => {
     const model = buildOfficeModel(
       office([

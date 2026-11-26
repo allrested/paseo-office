@@ -63,7 +63,13 @@ import {
   type TimelineFile,
   type TimelineLog,
 } from "./server/timeline.js";
-import { NO_ROSTER, rosterOf, shownTeamName, type Roster } from "./shared/roster.js";
+import {
+  NO_ROSTER,
+  ROSTER_MEMBER_KEY,
+  rosterOf,
+  shownTeamName,
+  type Roster,
+} from "./shared/roster.js";
 import { TEAM_NAME_KEY, tidyTeamName } from "./shared/team-name.js";
 import {
   changeSavedTrackers,
@@ -831,7 +837,7 @@ export function createOfficePlugin(
       const next = tidyTeamName(name);
       // Null removes the key, and the team goes by the workspace's name again.
       await workspace.setMetadata({ [TEAM_NAME_KEY]: next === "" ? null : next });
-      // Cleared, the team goes by its roster name where it has one, else by the workspace's.
+      // Cleared, the team goes by the workspace's name again.
       const shown = shownTeamName(
         { name: current.name, metadata: { ...current.metadata, [TEAM_NAME_KEY]: next } },
         roster,
@@ -966,7 +972,9 @@ export function createOfficePlugin(
               : null);
           if (!workspaceId) return null;
           const workspace = await context.paseo.workspaces.ref(workspaceId).refresh();
-          return workspace ? shownTeamName(workspace, roster) : null;
+          return workspace
+            ? shownTeamName(workspace, roster, agent.metadata?.[ROSTER_MEMBER_KEY])
+            : null;
         });
       } catch (error) {
         log(`[office] agent.turn.after failed: ${errorMessage(error)}`);

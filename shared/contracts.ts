@@ -63,6 +63,8 @@ export const OfficeAgentSchema = z.object({
   next: z.number().int().positive().optional(),
   /** The roster teammate it holds, by id, or the edition it was passed over at; absent before either. */
   roster: z.union([z.string(), z.number()]).optional(),
+  /** The roster team its teammate is of; absent where the workspace has a team name typed by hand. */
+  team: z.string().optional(),
   /** The office's name for a numbered sub-agent: `<parent's name>-<number>`. */
   name: z.string().optional(),
   /**
@@ -143,8 +145,6 @@ export const OfficeWorkspaceSchema = z.object({
   name: z.string(),
   /** The workspace's own name in Paseo; present only while the team goes by another. */
   workspaceName: z.string().optional(),
-  /** The roster team it holds, by id, or the edition it was passed over at; absent before either. */
-  roster: z.union([z.string(), z.number()]).optional(),
   /** When it was made; absent on a host that does not say. */
   createdAt: z.string().optional(),
   projectName: z.string(),

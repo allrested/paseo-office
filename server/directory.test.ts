@@ -548,19 +548,16 @@ test("an agent carries its roster mark, an id or the edition it was passed over 
   expect(projectAgent(agentInput({}))).not.toHaveProperty("roster");
 });
 
-test("a workspace carries its roster mark and when it was made", () => {
+test("a workspace carries when it was made, and no team mark of 0.2.13", () => {
   const made = projectWorkspace(
     workspaceInput({
       createdAt: "2026-11-23T08:00:00.000Z",
       metadata: { [ROSTER_TEAM_KEY]: "dev" },
     }),
   );
-  expect(made?.roster).toBe("dev");
+  expect(made).not.toHaveProperty("roster");
   expect(made?.createdAt).toBe("2026-11-23T08:00:00.000Z");
-  // The name is still the workspace's here: the hub turns the mark into a name.
   expect(made?.name).toBe("main");
   expect(made).not.toHaveProperty("workspaceName");
-  const bare = projectWorkspace(workspaceInput({ createdAt: null }));
-  expect(bare).not.toHaveProperty("roster");
-  expect(bare).not.toHaveProperty("createdAt");
+  expect(projectWorkspace(workspaceInput({ createdAt: null }))).not.toHaveProperty("createdAt");
 });

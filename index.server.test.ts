@@ -208,6 +208,8 @@ interface FakeDirectory {
   timelines: Map<string, { turnId: string; item: object }[]>;
   /** What plugins keep on the workspace w1; a null value is a removed key. */
   workspaceMetadata?: Record<string, unknown>;
+  /** What the office stored on each agent, by its id. */
+  agentMetadata?: Record<string, Record<string, unknown>>;
   /** Thrown by a metadata write, as a host without entity metadata does. */
   metadataFailure?: Error;
   /** The workspaces the daemon lists; none by default. */
@@ -314,6 +316,12 @@ function fakeContext(
           }),
           send: async (text: string, options?: unknown) => {
             sent.push({ agentId, text, options });
+          },
+          setMetadata: async (patch: Record<string, unknown>) => {
+            directory.agentMetadata = {
+              ...directory.agentMetadata,
+              [agentId]: { ...directory.agentMetadata?.[agentId], ...patch },
+            };
           },
           commands: async () => ({
             agentId,
@@ -1169,7 +1177,7 @@ test("a team is given a name of the office's own, kept on its workspace, and an 
   await stop();
 });
 
-test("a team whose typed name is cleared goes back to its roster name", async () => {
+test("a team whose typed name is cleared goes back to the workspace's name, roster or not", async () => {
   if (ON.status !== "ready") throw new Error("ON is the ready state");
   const rostered: SettingsState = {
     ...ON,
@@ -1177,17 +1185,18 @@ test("a team whose typed name is cleared goes back to its roster name", async ()
       ...ON.values,
       rosterOn: true,
       rosterEdition: 1,
-      teams: [{ id: "dev", name: "PR-DEV", members: [] }],
+      teams: [{ id: "dev", name: "PR-DEV", members: [{ id: "tj", name: "TJ" }] }],
     },
   };
   const { recorded, directory, context, stop } = setup(async () => rostered);
   // The server follows the settings it read at its start.
   for (const listener of recorded.listeners) await listener(rostered);
+  // A team mark of 0.2.13 is still stored: a team is its teammates' now, and it names nothing.
   directory.workspaceMetadata = { "office.roster.team": "dev", "office.team.name": "Payments" };
   const rename = recorded.handlers.get("office.team.rename.request");
   expect(await rename?.({ workspaceId: "w1", name: "" }, context)).toEqual({
     ok: true,
-    name: "PR-DEV",
+    name: "api",
   });
   expect(directory.workspaceMetadata).toEqual({
     "office.roster.team": "dev",
@@ -1196,16 +1205,17 @@ test("a team whose typed name is cleared goes back to its roster name", async ()
   await stop();
 });
 
-test("a settings save that switches the roster on hands the open office's workspace its team", async () => {
+test("a settings save that switches the roster on hands the open office's agent a teammate", async () => {
   if (ON.status !== "ready") throw new Error("ON is the ready state");
   const { recorded, directory, context, stop } = setup(async () => ON);
   directory.workspaces = [
     { id: "w1", name: "api", projectDisplayName: "shop", createdAt: "2026-11-11T08:00:00.000Z" },
   ];
+  directory.agents.push(listedAgent("a1", "Mjd"));
   await settle();
   const office = openOffice(recorded, context);
   await settle();
-  expect(directory.workspaceMetadata).toBeUndefined();
+  expect(directory.agentMetadata).toBeUndefined();
   const rostered: SettingsState = {
     ...ON,
     revision: "roster",
@@ -1213,12 +1223,14 @@ test("a settings save that switches the roster on hands the open office's worksp
       ...ON.values,
       rosterOn: true,
       rosterEdition: 1,
-      teams: [{ id: "dev", name: "PR-DEV", members: [] }],
+      teams: [{ id: "dev", name: "PR-DEV", members: [{ id: "tj", name: "TJ" }] }],
     },
   };
   for (const listener of recorded.listeners) await listener(rostered);
   await settle();
-  expect(directory.workspaceMetadata).toEqual({ "office.roster.team": "dev" });
+  expect(directory.agentMetadata).toEqual({ a1: { "office.roster.member": "tj" } });
+  // The workspace is not written to: a team is its teammates'.
+  expect(directory.workspaceMetadata).toBeUndefined();
   await office.leave();
   await stop();
 });

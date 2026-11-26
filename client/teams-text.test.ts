@@ -1,10 +1,11 @@
 import { expect, test } from "vitest";
-import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
+import type { OfficeAgent } from "../shared/contracts.js";
 import type { RosterTeam } from "../shared/roster.js";
 import {
   addMember,
   addTeam,
   holdersOf,
+  seatedLine,
   moveMember,
   moved,
   moveTeam,
@@ -74,31 +75,23 @@ test("ids are short and differ", () => {
   expect(newId("t")).not.toBe(first);
 });
 
-test("the holders are the workspaces and agents whose mark is an id", () => {
-  const workspaces = [
-    { id: "w1", name: "PR-DEV", workspaceName: "paseo-7f3a", roster: "t1" },
-    { id: "w2", name: "Payments", workspaceName: "paseo-91bc", roster: "t2" },
-    { id: "w3", name: "paseo-aa", roster: 1 },
-  ] as OfficeWorkspace[];
+test("the holders are the agents whose mark is an id, and a team says how many sit", () => {
   const agents = [
     { id: "a1", roster: "m1" },
     { id: "a2", roster: 1 },
     { id: "a3" },
   ] as OfficeAgent[];
-  const holders = holdersOf(workspaces, agents);
-  // The workspace's own name in Paseo, whatever the team is shown as.
-  expect([...holders.teams]).toEqual([
-    ["t1", "paseo-7f3a"],
-    ["t2", "paseo-91bc"],
-  ]);
+  const holders = holdersOf(agents);
   expect([...holders.members]).toEqual(["m1"]);
-});
-
-test("a team that workspaces share names the first and counts the rest", () => {
-  const workspaces = [
-    { id: "w1", name: "PR-DEV", workspaceName: "paseo-7f3a", roster: "t1" },
-    { id: "w2", name: "PR-DEV", workspaceName: "paseo-91bc", roster: "t1" },
-    { id: "w3", name: "PR-DEV", workspaceName: "paseo-aa", roster: "t1" },
-  ] as OfficeWorkspace[];
-  expect([...holdersOf(workspaces, []).teams]).toEqual([["t1", "paseo-7f3a and 2 more"]]);
+  const team = {
+    id: "t1",
+    name: "PR-DEV",
+    members: [
+      { id: "m1", name: "TJ" },
+      { id: "m2", name: "Zaki" },
+    ],
+  };
+  expect(seatedLine(team, holders)).toBe("1 of 2 at a desk");
+  expect(seatedLine(team, holdersOf([]))).toBe("Nobody at a desk");
+  expect(seatedLine({ ...team, members: [] }, holders)).toBe("No teammates yet");
 });

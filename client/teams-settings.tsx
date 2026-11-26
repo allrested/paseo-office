@@ -25,12 +25,15 @@ import {
   renameMember,
   renameTeam,
   type RosterHolders,
+  seatedLine,
 } from "./teams-text.js";
 
 const SWITCH_LABEL = "Name teams and agents from the roster";
 const INTRO =
-  "Each workspace takes the first free team, oldest first, and each agent in it a free " +
-  "teammate, by chance. Paseo's own names stay. A name you type on a team or an agent wins.";
+  "Agents fill the first team, then the next: each takes a free teammate, by chance, and sits " +
+  "with that team on the 3D floor whatever its workspace. An agent the roster has nobody left " +
+  "for keeps its own name and its workspace's team. Paseo's own names stay. A name you type " +
+  "on a team or an agent wins.";
 
 const layout = StyleSheet.create({
   // One column the width of the page: each row then shrinks its name to make room for its buttons.
@@ -224,7 +227,6 @@ function TeamBlock({ team, edit, holders, styles }: TeamBlockProps) {
     const id = newId("m");
     void edit((draft) => ({ ...draft, teams: addMember(draft.teams, team.id, id) }));
   }, [edit, team.id]);
-  const workspace = holders.teams.get(team.id);
   return (
     <View
       style={StyleSheet.compose(layout.team, {
@@ -253,9 +255,7 @@ function TeamBlock({ team, edit, holders, styles }: TeamBlockProps) {
           styles={styles}
         />
       </View>
-      <Text style={styles.fieldHint}>
-        {workspace === undefined ? "No workspace has this team" : `Workspace ${workspace}`}
-      </Text>
+      <Text style={styles.fieldHint}>{seatedLine(team, holders)}</Text>
       {team.members.map((member, at) => (
         <MemberRow
           key={member.id}

@@ -2,14 +2,18 @@
 
 Status: built on branch feat/team-roster; plan in docs/plan-team-roster.md.
 
-**Changed on 2026-11-25 (the owner's answer): teams are shared.** Rule 1 no longer passes a
-workspace over when every team is held: it takes the team the fewest open workspaces hold, the
-first in the configured order among equals. A workspace is passed over only while the roster has
-no team, a mark from before the change is taken up at once, and a workspace whose team is
-deleted takes another at once. Rules 4 and 8 now hold for teammates only: a team added later
-goes to the next new workspace and is not taken from one that holds another. Each workspace
-hands its team's teammates out on its own, so a teammate can be held once per workspace. The
-text below is the design as first built.
+**Changed on 2026-11-26 (the owner's answer): a team is its teammates, not a workspace.** The
+owner wants the floor to show the teams as written in the settings: with PR-DEV (four teammates)
+and QA-PR (two), the first four agents are PR-DEV whatever their workspaces, the next two QA-PR,
+and a seventh keeps Paseo's names. So rule 1 is gone: no workspace holds a team, and
+`office.roster.team` is neither read nor written. Rule 2 hands teammates out office-wide:
+agents, sub-agents too, oldest first, each take a teammate of the first team in the configured
+order that has one free, by chance among that team's free ones. A closed agent is handed
+nothing. The 3D floor seats an agent with its roster team (`team` on the agent, absent where a
+team name was typed on its workspace); lists and boards stay per workspace under their own
+names. Tenure counts a teammate's turns for its team. This replaces the shared teams of
+0.2.13 (2026-11-25), where a team repeated across workspaces. The text below is the design as
+first built.
 
 ## Problem
 
