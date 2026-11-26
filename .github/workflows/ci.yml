@@ -25,7 +25,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - name: Typecheck against the published plugin SDK
+      - name: Typecheck against the newest plugin SDK
         run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -34,3 +34,7 @@ jobs:
       - run: npm test
       - name: The upstream report's tests
         run: npm run test:scripts
+      - name: Typecheck against the oldest supported plugin SDK
+        run: |
+          npm install --no-save --no-audit --no-fund @getpaseo/plugin@0.16.2 @getpaseo/client@0.16.2 @getpaseo/protocol@0.16.2
+          npm run typecheck
