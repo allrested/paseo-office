@@ -108,34 +108,35 @@ The 3D floor remembers where a team sat by its name, so a renamed team is seated
 ## Team roster
 
 Settings > Office 3D > **Teams** holds a roster: teams, in the order they
-are handed out, each with its teammates. With "Name teams and agents from the roster" on, the office names by itself:
+are filled, each with its teammates. With "Name teams and agents from the roster" on, the office names by itself:
 
-- each workspace takes the first team no open workspace holds, oldest workspace first. Once
-  every team is held the teams are shared: the next workspace takes the team the fewest
-  workspaces hold, the first in the list among equals, so no workspace goes without a team;
-- each agent in that workspace, sub-agents too, takes one of the team's teammates no agent there
-  holds, picked by chance, oldest agent first;
-- an agent whose team has no teammate left keeps the name it has today. A
-  sub-agent is then `<parent's name>-<number>`, and the parent's name can be a teammate's.
+- a team is its teammates, whatever workspace each agent works in. Agents, sub-agents too,
+  oldest first, each take a teammate of the first team that has one free, picked by chance
+  among that team's free ones. So the first team fills before the second;
+- on the 3D floor a teammate sits with its team: one desk area per roster team, not one per
+  workspace;
+- an agent the roster has nobody left for keeps the name it has today and sits with its
+  workspace's team. A sub-agent is then `<parent's name>-<number>`, and the parent's name can
+  be a teammate's;
+- a closed agent is handed nothing. One that holds a teammate keeps it until it is archived.
 
-Workspaces that share a team each hand its teammates out on their own, so the same teammate can
-sit in two of them. A name sticks until its workspace or agent is archived. A freed teammate
-goes to the next new agent; nothing that already runs is renamed, and a team added later is
-taken by the next new workspace, not from one that holds another. Adding a teammate, or
-switching the roster on, offers the longer list to the agents that were passed over before.
+A name sticks until its agent is archived. A freed teammate goes to the next new agent; nothing
+that already runs is renamed. Adding a team or a teammate, or switching the roster on, offers
+the longer list to the agents that were passed over before.
 
 The names are the office's own: Paseo's sidebar, tabs and CLI show the workspace and session
-names they always did. A name you type on a team or an agent wins over the roster. Renaming a
-team or teammate in the settings renames whoever holds it. A workspace whose team is removed
-takes another at once; an agent whose teammate is removed keeps today's name until the roster
-next grows, when it is offered a name again. Switching the roster
+names they always did, and so do the office's lists and boards, which stay one room per
+workspace. A name you type on an agent wins over the roster, and a team name you type on a
+workspace keeps that workspace's agents together under it on the floor. Renaming a team or
+teammate in the settings renames whoever holds it; removing a teammate leaves its holder with
+today's name until the roster next grows, when it is offered a name again. Switching the roster
 off shows today's names everywhere, and on again brings the same assignments back and looks once
 more at what was passed over.
 
-What is stored: `office.roster.team` on a workspace and `office.roster.member` on an agent, each
-the id of the team or teammate held, or a number when the roster had nothing left for it. A
-workspace has that number only while the roster has no team, or from 0.2.12 and earlier, which
-shared no team: it takes a team the next time the office is open.
+What is stored: `office.roster.member` on an agent, the id of the teammate held, or a number
+when the roster had nobody left for it. Up to 0.2.13 a team went to a workspace and
+`office.roster.team` was stored there; it is no longer read or written. Where 0.2.13 gave one
+teammate to agents of two workspaces, the oldest keeps it and the other is named again.
 
 ## Views
 

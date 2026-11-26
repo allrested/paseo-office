@@ -1,4 +1,4 @@
-import type { OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";
+import type { OfficeAgent } from "../shared/contracts.js";
 import { tidyMemberName, type RosterTeam } from "../shared/roster.js";
 import { tidyTeamName } from "../shared/team-name.js";
 
@@ -117,36 +117,22 @@ export function moveMember(
   });
 }
 
-/**
- * Who holds what: each held team's workspace, by its own name in Paseo, with how many more share
- * the team, and the held teammates.
- */
+/** The teammates an agent holds, by id. */
 export interface RosterHolders {
-  teams: ReadonlyMap<string, string>;
   members: ReadonlySet<string>;
 }
 
-export const NO_HOLDERS: RosterHolders = { teams: new Map(), members: new Set() };
+export const NO_HOLDERS: RosterHolders = { members: new Set() };
 
-export function holdersOf(
-  workspaces: readonly OfficeWorkspace[],
-  agents: readonly OfficeAgent[],
-): RosterHolders {
-  const first = new Map<string, string>();
-  const more = new Map<string, number>();
-  for (const workspace of workspaces) {
-    if (typeof workspace.roster !== "string") continue;
-    if (first.has(workspace.roster))
-      more.set(workspace.roster, (more.get(workspace.roster) ?? 0) + 1);
-    else first.set(workspace.roster, workspace.workspaceName ?? workspace.name);
-  }
-  const teams = new Map(
-    [...first].map(([team, name]) => [
-      team,
-      more.has(team) ? `${name} and ${more.get(team)} more` : name,
-    ]),
-  );
+export function holdersOf(agents: readonly OfficeAgent[]): RosterHolders {
   const members = new Set<string>();
   for (const agent of agents) if (typeof agent.roster === "string") members.add(agent.roster);
-  return { teams, members };
+  return { members };
+}
+
+/** How many of a team's teammates an agent holds, as the Teams section says it under the team. */
+export function seatedLine(team: RosterTeam, holders: RosterHolders): string {
+  const seated = team.members.filter((member) => holders.members.has(member.id)).length;
+  if (team.members.length === 0) return "No teammates yet";
+  return seated === 0 ? "Nobody at a desk" : `${seated} of ${team.members.length} at a desk`;
 }

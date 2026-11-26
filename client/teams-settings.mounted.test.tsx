@@ -106,7 +106,7 @@ beforeEach(() => {
   gate = Promise.resolve();
   saves = [];
   problem = null;
-  holders = { teams: new Map(), members: new Set() };
+  holders = { members: new Set() };
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -217,7 +217,7 @@ test("a name the settings refuse is reported and not kept", async () => {
   expect(byLabel<HTMLInputElement>("PR-QA name").value).toBe("PR-QA");
 });
 
-test("a held team says which workspace has it, and a held teammate is marked", async () => {
+test("a team says how many of its teammates sit, and a held teammate is marked", async () => {
   values = {
     ...DEFAULTS,
     rosterOn: true,
@@ -232,9 +232,9 @@ test("a held team says which workspace has it, and a held teammate is marked", a
       },
     ],
   };
-  holders = { teams: new Map([["t1", "paseo-7f3a"]]), members: new Set(["m1"]) };
+  holders = { members: new Set(["m1"]) };
   await mount();
-  expect(container.textContent).toContain("Workspace paseo-7f3a");
+  expect(container.textContent).toContain("1 of 2 at a desk");
   expect(byLabel("TJ, at a desk")).toBeTruthy();
   expect(container.querySelector('[aria-label="Zaki, at a desk"]')).toBeNull();
 });

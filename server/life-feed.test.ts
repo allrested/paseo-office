@@ -74,6 +74,32 @@ test("a workspace that goes by another name keeps its team's tenure", () => {
   expect(d.tenure.rename).toHaveBeenLastCalledWith("Payments", "Checkout");
 });
 
+test("a roster teammate's turns and days count for its team, whatever its workspace", () => {
+  const d = deps();
+  const feed = createLifeFeed(d);
+  feed.view(
+    view({
+      agents: [
+        {
+          id: "a1",
+          workspaceId: "w1",
+          status: "idle",
+          createdAt: "2026-10-01T00:00:00Z",
+          parentAgentId: null,
+          team: "PR-DEV",
+        } as never,
+      ],
+    }),
+  );
+  // The workspace's own name is seeded as before, and the roster team beside it.
+  expect(d.tenure.seed).toHaveBeenCalledWith([
+    { name: "api", first: Date.parse("2026-11-19T00:00:00Z"), daysSeen: 1 },
+    { name: "PR-DEV", first: Date.parse("2026-10-01T00:00:00Z"), daysSeen: 2 },
+  ]);
+  feed.turnEnded("a1");
+  expect(d.tenure.touch).toHaveBeenCalledWith("PR-DEV", expect.objectContaining({ turn: true }));
+});
+
 test("a turn that ends touches its team", () => {
   const d = deps();
   const feed = createLifeFeed(d);

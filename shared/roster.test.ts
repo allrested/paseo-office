@@ -2,15 +2,14 @@ import { expect, test } from "vitest";
 import { z } from "zod";
 import {
   NO_ROSTER,
-  ROSTER_TEAM_KEY,
+  ROSTER_MEMBER_KEY,
   RosterTeamsSchema,
-  memberOf,
   nextEdition,
   refuseBadTeams,
   rosterOf,
   shownTeamName,
   storedRosterMark,
-  teamOf,
+  seatOf,
   tidyMemberName,
   type Roster,
   type RosterTeam,
@@ -41,15 +40,16 @@ test("a stored mark is an id or a whole edition, else nothing", () => {
   expect(storedRosterMark(null)).toBeUndefined();
 });
 
-test("a team and a teammate are found by id, and only while the roster is on", () => {
-  expect(teamOf(ON, "t2")).toBe(QA);
-  expect(teamOf(ON, "gone")).toBeNull();
-  expect(teamOf(ON, 1)).toBeNull();
-  expect(teamOf(ON, undefined)).toBeNull();
-  expect(teamOf({ ...ON, on: false }, "t2")).toBeNull();
-  expect(memberOf(DEV, "m2")?.name).toBe("Kharisma Muzaki Ghufron");
-  expect(memberOf(DEV, "m3")).toBeNull();
-  expect(memberOf(null, "m1")).toBeNull();
+test("a teammate is found by id with its team, and only while the roster is on", () => {
+  expect(seatOf(ON, "m3")).toEqual({ team: QA, member: QA.members[0] });
+  expect(seatOf(ON, "m2")?.team).toBe(DEV);
+  expect(seatOf(ON, "m2")?.member.name).toBe("Kharisma Muzaki Ghufron");
+  // A team's id names no teammate, nor does one that is gone or a passed-over mark.
+  expect(seatOf(ON, "t2")).toBeNull();
+  expect(seatOf(ON, "gone")).toBeNull();
+  expect(seatOf(ON, 1)).toBeNull();
+  expect(seatOf(ON, undefined)).toBeNull();
+  expect(seatOf({ ...ON, on: false }, "m3")).toBeNull();
 });
 
 test("the settings' three values read as one roster", () => {
@@ -130,16 +130,16 @@ test("the edition goes up when a team or a teammate is added or the roster is sw
   expect(nextEdition(before, { on: false, teams: [DEV, QA] })).toBe(3);
 });
 
-test("a team goes by its hand-typed name, then the roster's, then the workspace's", () => {
+test("an agent's team is the name typed on its workspace, then its teammate's team, then the workspace's", () => {
   const plain = { name: "paseo-7f3a", metadata: {} };
-  const rostered = { name: "paseo-7f3a", metadata: { [ROSTER_TEAM_KEY]: "t1" } };
-  const typed = {
-    name: "paseo-7f3a",
-    metadata: { [ROSTER_TEAM_KEY]: "t1", [TEAM_NAME_KEY]: "Payments" },
-  };
+  const typed = { name: "paseo-7f3a", metadata: { [TEAM_NAME_KEY]: "Payments" } };
   expect(shownTeamName(plain, ON)).toBe("paseo-7f3a");
-  expect(shownTeamName(rostered, ON)).toBe("PR-DEV");
-  expect(shownTeamName(typed, ON)).toBe("Payments");
-  expect(shownTeamName(rostered, { ...ON, on: false })).toBe("paseo-7f3a");
-  expect(shownTeamName({ name: "x", metadata: { [ROSTER_TEAM_KEY]: 1 } }, ON)).toBe("x");
+  expect(shownTeamName(plain, ON, "m3")).toBe("PR-QA");
+  expect(shownTeamName(typed, ON, "m3")).toBe("Payments");
+  expect(shownTeamName(plain, { ...ON, on: false }, "m3")).toBe("paseo-7f3a");
+  // Passed over, a teammate that is gone, and what is no mark at all.
+  expect(shownTeamName(plain, ON, 1)).toBe("paseo-7f3a");
+  expect(shownTeamName(plain, ON, "gone")).toBe("paseo-7f3a");
+  expect(shownTeamName(plain, ON, { id: "m3" })).toBe("paseo-7f3a");
+  expect(ROSTER_MEMBER_KEY).toBe("office.roster.member");
 });

@@ -9,7 +9,7 @@ import type {
   OfficeWorkspace,
   Post,
 } from "../shared/contracts.js";
-import { ROSTER_MEMBER_KEY, ROSTER_TEAM_KEY, type Roster } from "../shared/roster.js";
+import { ROSTER_MEMBER_KEY, type Roster } from "../shared/roster.js";
 import type { ActivityLines, ActivitySteps } from "./activity.js";
 import { createFakeClock, settle, type FakeClock } from "./fake-clock.js";
 import { newestAgents } from "./paseo-directory.js";
@@ -1306,20 +1306,14 @@ function member(id: string, minute: number, extra: Partial<OfficeAgent> = {}): O
   };
 }
 
-interface RosterWrites {
-  workspaces: [string, Record<string, string | number>][];
-  agents: [string, Record<string, string | number>][];
-}
+type RosterWrites = [string, Record<string, string | number>][];
 
 function rosterPorts(writes: RosterWrites, random: () => number = () => 0): Partial<HubPorts> {
   return {
     // The first free teammate unless a test says another: a pick by chance, with the chance fixed.
     random,
-    setWorkspaceMetadata: async (id, patch) => {
-      writes.workspaces.push([id, patch]);
-    },
     setAgentMetadata: async (id, patch) => {
-      writes.agents.push([id, patch]);
+      writes.push([id, patch]);
     },
   };
 }
@@ -1336,102 +1330,105 @@ function lastView(events: OfficeEvent[]): { agents: OfficeAgent[]; workspaces: O
   return { agents, workspaces };
 }
 
-test("the roster's team and teammates are stored once, the workspace first", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
-  const view = { agents: [member("a1", 1), member("a2", 2)], workspaces: [room("w1")] };
+test("the roster's teammates are stored once, across workspaces", async () => {
+  const writes: RosterWrites = [];
+  const view = {
+    agents: [member("a1", 1), member("a2", 2, { workspaceId: "w2" })],
+    workspaces: [room("w1"), room("w2")],
+  };
   const { hub, directory } = startHarness(view, rosterPorts(writes));
   hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
   await settle();
-  expect(writes.workspaces).toEqual([["w1", { [ROSTER_TEAM_KEY]: "dev" }]]);
-  expect(writes.agents).toEqual([
+  expect(writes).toEqual([
     ["a1", { [ROSTER_MEMBER_KEY]: "tj" }],
     ["a2", { [ROSTER_MEMBER_KEY]: "zaki" }],
   ]);
   // The same view again, the echoes not yet back: nothing is sent twice.
   directory.emit(view);
   await settle();
-  expect(writes.workspaces).toHaveLength(1);
-  expect(writes.agents).toHaveLength(2);
+  expect(writes).toHaveLength(2);
   watcher.controller.abort();
   await watcher.done;
 });
 
-test("a name shows once its mark is stored, and never before", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
+test("a name and its team show once the mark is stored, and never before; the workspace keeps its name", async () => {
   const { hub, directory, clock } = startHarness(
     { agents: [member("a1", 1)], workspaces: [room("w1")] },
-    rosterPorts(writes),
+    rosterPorts([]),
   );
   hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
   await settle();
   const before = lastView(watcher.events);
-  expect(before.workspaces[0].name).toBe("w1");
   expect(before.agents[0].name).toBeUndefined();
-  directory.emit({
-    agents: [member("a1", 1, { roster: "tj" })],
-    workspaces: [room("w1", { roster: "dev" })],
-  });
+  expect(before.agents[0].team).toBeUndefined();
+  directory.emit({ agents: [member("a1", 1, { roster: "tj" })], workspaces: [room("w1")] });
   clock.advance(DIRECTORY_FLUSH_MS);
   await settle();
   const after = lastView(watcher.events);
-  expect(after.workspaces[0]).toMatchObject({ name: "PR-DEV", workspaceName: "w1" });
-  expect(after.agents[0].name).toBe("Tze Jun Tan");
+  expect(after.agents[0]).toMatchObject({ name: "Tze Jun Tan", team: "PR-DEV" });
+  // A team is its teammates': the workspace is not renamed.
+  expect(after.workspaces[0].name).toBe("w1");
+  expect(after.workspaces[0].workspaceName).toBeUndefined();
   watcher.controller.abort();
   await watcher.done;
 });
 
-test("a hand-typed team name stays over the roster's, and the roster off shows today's names", async () => {
+test("a hand-typed team name keeps its agents in that team, and the roster off shows today's names", async () => {
   const stored = {
-    agents: [member("a1", 1, { roster: "tj" })],
-    workspaces: [room("w1", { roster: "dev", name: "Payments", workspaceName: "w1" })],
+    agents: [
+      member("a1", 1, { roster: "tj" }),
+      member("a2", 2, { roster: "zaki", workspaceId: "w2" }),
+    ],
+    workspaces: [room("w1", { name: "Payments", workspaceName: "w1" }), room("w2")],
   };
-  const { hub, clock } = startHarness(stored, rosterPorts({ workspaces: [], agents: [] }));
+  const { hub, clock } = startHarness(stored, rosterPorts([]));
   hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
   await settle();
-  expect(lastView(watcher.events).workspaces[0]).toMatchObject({
-    name: "Payments",
-    workspaceName: "w1",
-  });
-  expect(lastView(watcher.events).agents[0].name).toBe("Tze Jun Tan");
+  const [typed, plain] = lastView(watcher.events).agents;
+  // The teammate's name shows either way; the team does only where none was typed.
+  expect(typed.name).toBe("Tze Jun Tan");
+  expect(typed.team).toBeUndefined();
+  expect(plain).toMatchObject({ name: "Kharisma Muzaki Ghufron", team: "PR-DEV" });
   hub.setRoster({ ...ROSTER, on: false });
   // The change goes out with the next flush, as a directory change does.
   clock.advance(DIRECTORY_FLUSH_MS);
   await settle();
-  expect(lastView(watcher.events).agents[0].name).toBeUndefined();
+  for (const shown of lastView(watcher.events).agents) {
+    expect(shown.name).toBeUndefined();
+    expect(shown.team).toBeUndefined();
+  }
   watcher.controller.abort();
   await watcher.done;
 });
 
 test("a roster set while the office is open is planned at once", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
+  const writes: RosterWrites = [];
   const { hub } = startHarness(
     { agents: [member("a1", 1)], workspaces: [room("w1")] },
     rosterPorts(writes),
   );
   const watcher = subscribe(hub);
   await settle();
-  expect(writes.workspaces).toEqual([]);
+  expect(writes).toEqual([]);
   hub.setRoster(ROSTER);
   await settle();
-  expect(writes.workspaces).toEqual([["w1", { [ROSTER_TEAM_KEY]: "dev" }]]);
+  expect(writes).toEqual([["a1", { [ROSTER_MEMBER_KEY]: "tj" }]]);
   watcher.controller.abort();
   await watcher.done;
 });
 
-/** A host that refuses workspace writes while `refusing` holds; every try is counted. */
+/** A host that refuses agent writes while `refusing` holds; every try is counted. */
 function refusingPorts(writes: RosterWrites, logs: string[]) {
   const host = { refusing: true, tries: 0 };
   const ports: Partial<HubPorts> = {
-    setWorkspaceMetadata: async (id, patch) => {
+    random: () => 0,
+    setAgentMetadata: async (id, patch) => {
       host.tries += 1;
       if (host.refusing) throw new Error("offline");
-      writes.workspaces.push([id, patch]);
-    },
-    setAgentMetadata: async (id, patch) => {
-      writes.agents.push([id, patch]);
+      writes.push([id, patch]);
     },
     log: (line) => logs.push(line),
   };
@@ -1439,16 +1436,12 @@ function refusingPorts(writes: RosterWrites, logs: string[]) {
 }
 
 test("a roster write that fails is not sent again until the office is opened again", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
+  const writes: RosterWrites = [];
   const logs: string[] = [];
   const { host, ports } = refusingPorts(writes, logs);
-  const view = { agents: [], workspaces: [room("w1")] };
+  const view = { agents: [member("a1", 1)], workspaces: [room("w1")] };
   const { hub, directory } = startHarness(view, ports);
-  // Two teams: with one, a second workspace would share it whatever the first one's write did.
-  hub.setRoster({
-    ...ROSTER,
-    teams: [...ROSTER.teams, { id: "qa", name: "PR-QA", members: [] }],
-  });
+  hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
   await settle();
   expect(host.tries).toBe(1);
@@ -1458,28 +1451,28 @@ test("a roster write that fails is not sent again until the office is opened aga
   await settle();
   expect(host.tries).toBe(1);
   expect(logs.filter((line) => line.includes("roster mark failed"))).toHaveLength(1);
-  // The team the failed write carried is not handed to another workspace meanwhile.
+  // The teammate the failed write carried is not handed to another agent meanwhile.
   host.refusing = false;
-  directory.emit({ agents: [], workspaces: [room("w1"), room("w2")] });
+  directory.emit({ agents: [member("a1", 1), member("a2", 2)], workspaces: [room("w1")] });
   await settle();
-  expect(writes.workspaces).toEqual([["w2", { [ROSTER_TEAM_KEY]: "qa" }]]);
+  expect(writes).toEqual([["a2", { [ROSTER_MEMBER_KEY]: "zaki" }]]);
   watcher.controller.abort();
   await watcher.done;
   await settle();
   const again = subscribe(hub);
   await settle();
-  expect(writes.workspaces).toEqual([
-    ["w2", { [ROSTER_TEAM_KEY]: "qa" }],
-    ["w1", { [ROSTER_TEAM_KEY]: "dev" }],
+  expect(writes).toEqual([
+    ["a2", { [ROSTER_MEMBER_KEY]: "zaki" }],
+    ["a1", { [ROSTER_MEMBER_KEY]: "tj" }],
   ]);
   again.controller.abort();
   await again.done;
 });
 
 test("a roster write that fails is sent again once the roster is set again", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
+  const writes: RosterWrites = [];
   const { host, ports } = refusingPorts(writes, []);
-  const view = { agents: [], workspaces: [room("w1")] };
+  const view = { agents: [member("a1", 1)], workspaces: [room("w1")] };
   const { hub, directory } = startHarness(view, ports);
   hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
@@ -1494,150 +1487,67 @@ test("a roster write that fails is sent again once the roster is set again", asy
   expect(host.tries).toBe(1);
   hub.setRoster({ ...ROSTER, edition: 2 });
   await settle();
-  expect(writes.workspaces).toEqual([["w1", { [ROSTER_TEAM_KEY]: "dev" }]]);
+  expect(writes).toEqual([["a1", { [ROSTER_MEMBER_KEY]: "tj" }]]);
   watcher.controller.abort();
   await watcher.done;
 });
 
-test("an agent's teammate waits for its workspace's team to be stored", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
-  const { host, ports } = refusingPorts(writes, []);
-  const view = { agents: [member("a1", 1)], workspaces: [room("w1")] };
-  const { hub, directory } = startHarness(view, ports);
-  hub.setRoster(ROSTER);
-  const watcher = subscribe(hub);
-  await settle();
-  expect(host.tries).toBe(1);
-  expect(writes.agents).toEqual([]);
-  directory.emit(view);
-  await settle();
-  expect(writes.agents).toEqual([]);
-  host.refusing = false;
-  watcher.controller.abort();
-  await watcher.done;
-  await settle();
-  const again = subscribe(hub);
-  await settle();
-  expect(writes.workspaces).toEqual([["w1", { [ROSTER_TEAM_KEY]: "dev" }]]);
-  expect(writes.agents).toEqual([["a1", { [ROSTER_MEMBER_KEY]: "tj" }]]);
-  again.controller.abort();
-  await again.done;
-});
-
-test("a failed write does not drop a later mark planned for the same workspace", async () => {
-  const sent: [string, Record<string, string | number>][] = [];
-  const answers: { resolve(): void; reject(error: Error): void }[] = [];
-  const view = { agents: [], workspaces: [room("w1")] };
-  const { hub, directory } = startHarness(view, {
-    setWorkspaceMetadata: (id, patch) => {
-      sent.push([id, patch]);
-      return new Promise<void>((resolve, reject) => answers.push({ resolve, reject }));
-    },
-    setAgentMetadata: async () => undefined,
-  });
-  hub.setRoster(ROSTER);
-  const watcher = subscribe(hub);
-  await settle();
-  expect(sent).toEqual([["w1", { [ROSTER_TEAM_KEY]: "dev" }]]);
-  // PR-DEV is deleted while its write is out: the workspace is marked passed over instead.
-  hub.setRoster({ ...ROSTER, teams: [] });
-  await settle();
-  expect(sent.at(-1)).toEqual(["w1", { [ROSTER_TEAM_KEY]: 1 }]);
-  answers[0].reject(new Error("offline"));
-  await settle();
-  // The later mark is still out: the next change plans nothing new for w1.
-  directory.emit(view);
-  await settle();
-  expect(sent).toHaveLength(2);
-  answers[1].resolve();
-  watcher.controller.abort();
-  await watcher.done;
-});
-
-test("a held teammate mark is not sent once a newer mark is planned for the agent", async () => {
-  const agents: [string, Record<string, string | number>][] = [];
-  const answers: (() => void)[] = [];
-  const roster: Roster = {
-    ...ROSTER,
-    teams: [...ROSTER.teams, { id: "qa", name: "PR-QA", members: [{ id: "mo", name: "Mo" }] }],
-  };
-  const { hub, directory } = startHarness(
-    { agents: [member("a1", 1)], workspaces: [room("w1"), room("w2", { roster: "qa" })] },
+test("a failed write does not drop a later mark planned for the same agent", async () => {
+  const writes: RosterWrites = [];
+  const fails: ((error: Error) => void)[] = [];
+  const { hub } = startHarness(
+    { agents: [member("a1", 1)], workspaces: [room("w1")] },
     {
-      setWorkspaceMetadata: () => new Promise<void>((resolve) => answers.push(resolve)),
-      setAgentMetadata: async (id, patch) => {
-        agents.push([id, patch]);
+      random: () => 0,
+      setAgentMetadata: (id, patch) => {
+        // The first write hangs, to fail later; the ones after it are stored.
+        if (fails.length === 0) return new Promise<void>((_, reject) => fails.push(reject));
+        writes.push([id, patch]);
+        return Promise.resolve();
       },
+      log: () => undefined,
     },
   );
-  hub.setRoster(roster);
+  hub.setRoster({ on: true, edition: 1, teams: [] });
   const watcher = subscribe(hub);
   await settle();
-  // w1's team is out and a1's teammate waits on it.
-  expect(answers).toHaveLength(1);
-  expect(agents).toEqual([]);
-  // a1 now reports in w2, whose team has no tj: it is passed over there.
-  directory.emit({
-    agents: [member("a1", 1, { workspaceId: "w2" })],
-    workspaces: [room("w1"), room("w2", { roster: "qa" })],
-  });
+  // Passed over at edition 1 is out and hangs. A team arrives: tj is planned over it.
+  hub.setRoster({ ...ROSTER, edition: 2 });
   await settle();
-  expect(agents).toEqual([["a1", { [ROSTER_MEMBER_KEY]: 1 }]]);
-  answers[0]();
+  expect(writes).toEqual([["a1", { [ROSTER_MEMBER_KEY]: "tj" }]]);
+  fails[0](new Error("offline"));
   await settle();
-  expect(agents).toEqual([["a1", { [ROSTER_MEMBER_KEY]: 1 }]]);
+  // The old write's failure does not mark the newer one as refused: nothing is planned again.
+  hub.setRoster({ ...ROSTER, edition: 3 });
+  await settle();
+  expect(writes).toHaveLength(1);
   watcher.controller.abort();
   await watcher.done;
 });
 
 test("a mark reported back is no longer held, and a longer roster can reach its holder", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
+  const writes: RosterWrites = [];
   const { hub, directory } = startHarness(
-    { agents: [], workspaces: [room("w1")] },
+    { agents: [member("a1", 1)], workspaces: [room("w1")] },
     rosterPorts(writes),
   );
   hub.setRoster({ on: true, edition: 1, teams: [] });
   const watcher = subscribe(hub);
   await settle();
-  expect(writes.workspaces).toEqual([["w1", { [ROSTER_TEAM_KEY]: 1 }]]);
-  directory.emit({ agents: [], workspaces: [room("w1", { roster: 1 })] });
+  expect(writes).toEqual([["a1", { [ROSTER_MEMBER_KEY]: 1 }]]);
+  directory.emit({ agents: [member("a1", 1, { roster: 1 })], workspaces: [room("w1")] });
   await settle();
-  expect(writes.workspaces).toHaveLength(1);
+  expect(writes).toHaveLength(1);
   hub.setRoster({ ...ROSTER, edition: 2 });
   await settle();
-  expect(writes.workspaces.at(-1)).toEqual(["w1", { [ROSTER_TEAM_KEY]: "dev" }]);
+  expect(writes.at(-1)).toEqual(["a1", { [ROSTER_MEMBER_KEY]: "tj" }]);
   watcher.controller.abort();
   await watcher.done;
 });
 
-test("a workspace named by the roster goes back to its own name when the roster is off", async () => {
-  const { hub, clock } = startHarness(
-    { agents: [], workspaces: [room("w1", { roster: "dev" })] },
-    rosterPorts({ workspaces: [], agents: [] }),
-  );
-  hub.setRoster(ROSTER);
-  const watcher = subscribe(hub);
-  await settle();
-  expect(lastView(watcher.events).workspaces[0]).toMatchObject({
-    name: "PR-DEV",
-    workspaceName: "w1",
-  });
-  hub.setRoster({ ...ROSTER, on: false });
-  clock.advance(DIRECTORY_FLUSH_MS);
-  await settle();
-  const after = lastView(watcher.events).workspaces[0];
-  expect(after.name).toBe("w1");
-  expect(after.workspaceName).toBeUndefined();
-  watcher.controller.abort();
-  await watcher.done;
-});
-
-test("an agent takes one of its team's free teammates by chance, and keeps it", async () => {
-  const writes: RosterWrites = { workspaces: [], agents: [] };
-  const view = {
-    agents: [member("a1", 1), member("a2", 2)],
-    workspaces: [room("w1", { roster: "dev" })],
-  };
+test("an agent takes one of the first team's free teammates by chance, and keeps it", async () => {
+  const writes: RosterWrites = [];
+  const view = { agents: [member("a1", 1), member("a2", 2)], workspaces: [room("w1")] };
   // The chance falls on the last free teammate each time it is asked.
   const { hub, directory } = startHarness(
     view,
@@ -1646,14 +1556,14 @@ test("an agent takes one of its team's free teammates by chance, and keeps it", 
   hub.setRoster(ROSTER);
   const watcher = subscribe(hub);
   await settle();
-  expect(writes.agents).toEqual([
+  expect(writes).toEqual([
     ["a1", { [ROSTER_MEMBER_KEY]: "zaki" }],
     ["a2", { [ROSTER_MEMBER_KEY]: "tj" }],
   ]);
   // The echoes not yet back: the chance is not asked again for what is already in flight.
   directory.emit(view);
   await settle();
-  expect(writes.agents).toHaveLength(2);
+  expect(writes).toHaveLength(2);
   watcher.controller.abort();
   await watcher.done;
 });

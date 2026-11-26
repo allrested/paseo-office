@@ -53,10 +53,7 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
   const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
-  const rosterHolders = useMemo(
-    () => holdersOf(office.state.workspaces, office.state.agents),
-    [office.state.workspaces, office.state.agents],
-  );
+  const rosterHolders = useMemo(() => holdersOf(office.state.agents), [office.state.agents]);
   return (
     <OfficeBrandContext.Provider value={office.state.brand}>
       <HostSwitches

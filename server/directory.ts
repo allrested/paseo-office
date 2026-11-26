@@ -12,7 +12,7 @@ import {
   type WorkspaceScript,
   type WorkspaceTicket,
 } from "../shared/contracts.js";
-import { ROSTER_MEMBER_KEY, ROSTER_TEAM_KEY, storedRosterMark } from "../shared/roster.js";
+import { ROSTER_MEMBER_KEY, storedRosterMark } from "../shared/roster.js";
 import { APPEARANCE_KEY, AppearanceSchema } from "../shared/appearance.js";
 import { storedTeamName } from "../shared/team-name.js";
 import { NEXT_KEY, NUMBER_KEY, storedNumber } from "./subagent-names.js";
@@ -369,7 +369,6 @@ export function projectWorkspace(workspace: DirectoryWorkspaceInput): OfficeWork
     // The team's name is the workspace's everywhere in the office once the owner has given one.
     name: teamName ?? workspace.name,
     ...(teamName === null ? {} : { workspaceName: workspace.name }),
-    ...rosterField(workspace.metadata?.[ROSTER_TEAM_KEY]),
     ...(workspace.createdAt ? { createdAt: workspace.createdAt } : {}),
     projectName: workspace.projectDisplayName,
     ...(branch ? { branch } : {}),

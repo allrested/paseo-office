@@ -171,7 +171,12 @@ export function worldPeople(
   cacheClock: CacheClock = "off",
 ): WorldPeople {
   const rows = model.rooms.flatMap((room) =>
-    room.rows.map((row) => ({ row, team: room.name, checks: room.workspace?.pullRequest?.checks })),
+    room.rows.map((row) => ({
+      row,
+      // A roster teammate sits with its team, whatever its workspace; anyone else with the room's.
+      team: row.agent.team ?? room.name,
+      checks: room.workspace?.pullRequest?.checks,
+    })),
   );
   const all = rows.map(({ row, team, checks }) =>
     toSession(row, team, checks, born, out, cacheClock),

@@ -4,7 +4,7 @@ import { CSS2DObject } from '../../../three/addons/renderers/CSS2DRenderer.js';
 import { state } from '../core/state.js';
 import { $, el, short } from '../core/env.js';
 import { scene } from '../scene/renderer.js';
-import { CHAIR_IDLE, DESKS, PODS, UNITS, chairs, unitOfDesk } from '../world/desks.js';
+import { CHAIR_IDLE, DESKS, PODS, UNITS, chairs, deskKit, unitOfDesk } from '../world/desks.js';
 import { canvasTex } from '../scene/blocks.js';
 import { DEPTS } from '../world/layout.js';
 import { DEPT_SIGNS } from '../world/pro/wing.js';
@@ -91,12 +91,22 @@ export function updateTeamTags() {
 export function upsertSession(s, walkIn = true) {
   // (no 3D yet, the 2D list opened first: no desk and nobody at it; core/world-boot.js seats everyone once it is built)
   if (!state.world) { s.desk = -1; sessions.set(s.id, s); queueUi(); return; }
-  s.desk = proDesk(s);   // (every layout: the project's area)
   const previous = sessions.get(s.id);
+  // PASEO: a seated person whose team took another name (a roster teammate handed out while the office is open, a team
+  // name typed on the workspace) gives the desk up and is seated again, in the area of the team it is of now. Kept at
+  // the old desk, the area's chip would go on showing the old name, and one team would sit in several areas.
+  const left = previous && deskOf.has(s.id) && projOf(previous) !== projOf(s) ? deskOf.get(s.id) : -1;
+  if (left >= 0) { freeDesk(s.id); chairs[left].color.set(CHAIR_IDLE); }
+  s.desk = proDesk(s);   // (every layout: the project's area)
   const had = !!previous;
   sessions.set(s.id, s);
   let w = workers.get(s.id);
   if (!w && !leavingIds.has(s.id)) w = addWorker(s, walkIn && had === false && state.connectedOnce);
+  if (w && left >= 0 && s.desk !== left) {   // PASEO: its things and itself to the new desk; someone away from it comes back to the new one
+    if (deskKit[left] === w) { deskKit[left] = null; if (s.desk >= 0) deskKit[s.desk] = w; }
+    if (s.desk >= 0) chairs[s.desk].color.set(w.cfg.shirt);
+    if (w.station === 'desk' && w.phase !== 'walk') { const home = w.homeSpot(); w.pos.set(home.x, home.z); w.spot = home; w.face = w.faceTarget = home.face; w.pose = home.sit ? 'sit' : 'stand'; }
+  }
   if (w) {
     if (previous && (previous.appearance?.gender !== s.appearance?.gender || previous.shirt !== s.shirt || previous.appearance?.avatar !== s.appearance?.avatar || previous.name !== s.name)) {
       Object.assign(w.cfg, lookOf(s), { name: s.name });

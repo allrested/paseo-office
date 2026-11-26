@@ -139,8 +139,11 @@ export function createLifeFeed(deps: {
           if (!next) break;
           parent = next;
         }
-        const name = names.get(agent.workspaceId ?? "") ?? names.get(parent.workspaceId ?? "");
+        // A roster teammate's turns count for its team, whatever its workspace.
+        const name =
+          agent.team ?? names.get(agent.workspaceId ?? "") ?? names.get(parent.workspaceId ?? "");
         if (!name) continue;
+        if (!seeds.has(name)) seeds.set(name, { first: at, days: new Set([today]) });
         teams.set(agent.id, name);
         if (agent.status === "closed") continue;
         live.add(name);

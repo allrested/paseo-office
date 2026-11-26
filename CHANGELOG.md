@@ -2,6 +2,17 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## Unreleased
+
+- Team roster: a team is its teammates, whatever workspace each agent works in. Agents fill the
+  first team, then the next, and the 3D floor shows one desk area per roster team: with PR-DEV
+  (four teammates) and QA-PR (two), the first four agents sit as Team PR-DEV and the next two as
+  Team QA-PR. An agent the roster has nobody left for keeps its own name and its workspace's
+  team. Workspaces are no longer renamed, and a team no longer repeats across workspaces as in
+  0.2.13. A closed agent is handed no teammate.
+- A person on the 3D floor whose team changes while the office is open moves to that team's
+  desks; before, the area kept its old name until the page was loaded again.
+
 ## 0.2.13 (2026-11-25)
 
 - Team roster: once every team is held, the teams are shared. A workspace takes the team the

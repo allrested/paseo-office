@@ -17,17 +17,11 @@ import type {
   WorkspaceScript,
 } from "../shared/contracts.js";
 import type { ActivityLines, ActivitySteps } from "./activity.js";
-import { settleResets, sortWorkspaces } from "./directory.js";
+import { settleResets } from "./directory.js";
 import { errorMessage } from "./errors.js";
 import type { Timers } from "./timers.js";
-import {
-  NO_ROSTER,
-  ROSTER_MEMBER_KEY,
-  ROSTER_TEAM_KEY,
-  type Roster,
-  type RosterMark,
-} from "../shared/roster.js";
-import { byChance, planRoster, rosterNames, type RosterWrite } from "./roster.js";
+import { NO_ROSTER, ROSTER_MEMBER_KEY, type Roster, type RosterMark } from "../shared/roster.js";
+import { byChance, planRoster, rosterNames } from "./roster.js";
 import { NEXT_KEY, NUMBER_KEY, officeNames, planNumbers } from "./subagent-names.js";
 
 /** Directory updates come in bursts while agents stream; one event per window is enough. */
@@ -72,8 +66,6 @@ export interface HubPorts {
   setAgentMetadata?(agentId: string, patch: Record<string, string | number>): Promise<void>;
   /** The chance a teammate is picked by, a number in [0, 1); Math.random when absent. */
   random?(): number;
-  /** Stores the office's own data on a workspace: its roster team. */
-  setWorkspaceMetadata?(workspaceId: string, patch: Record<string, string | number>): Promise<void>;
 }
 
 export interface Hub {
@@ -292,115 +284,72 @@ export function createHub(ports: HubPorts): Hub {
   }
 
   let roster: Roster = NO_ROSTER;
-  // Marks sent and not yet reported back, by `workspace:<id>` or `agent:<id>`. They are planned
-  // as if stored, so a team or teammate in flight is never handed out twice; names come from
+  // Marks sent and not yet reported back, by agent id. They are planned
+  // as if stored, so a teammate in flight is never handed out twice; names come from
   // what the directory reports, so none shows before its mark is stored.
   const pendingRoster = new Map<string, RosterMark>();
-  // Marks the host refused, by key. They are planned as if still in flight and not sent again
+  // Marks the host refused, by agent id. They are planned as if still in flight and not sent again
   // until the roster is set again or the directory is opened again: a host that refuses every
   // write would otherwise be sent one, and log one, at each directory change.
   const failedRoster = new Map<string, RosterMark>();
 
-  function withPendingRoster<Entry extends { id: string; roster?: RosterMark }>(
-    kind: RosterWrite["kind"],
-    entries: readonly Entry[],
-  ): Entry[] {
-    return entries.map((entry) => {
-      const key = `${kind}:${entry.id}`;
-      const failed = failedRoster.get(key);
-      if (failed !== undefined) return { ...entry, roster: failed };
-      const mark = pendingRoster.get(key);
-      if (mark === undefined) return entry;
-      if (entry.roster === mark) {
-        pendingRoster.delete(key);
-        return entry;
+  function withPendingRoster(agents: readonly OfficeAgent[]): OfficeAgent[] {
+    return agents.map((agent) => {
+      const failed = failedRoster.get(agent.id);
+      if (failed !== undefined) return { ...agent, roster: failed };
+      const mark = pendingRoster.get(agent.id);
+      if (mark === undefined) return agent;
+      if (agent.roster === mark) {
+        pendingRoster.delete(agent.id);
+        return agent;
       }
-      return { ...entry, roster: mark };
+      return { ...agent, roster: mark };
     });
   }
 
   function writeRoster(next: DirectoryView): void {
-    const toWorkspace = ports.setWorkspaceMetadata;
     const toAgent = ports.setAgentMetadata;
-    if (toWorkspace === undefined || toAgent === undefined) return;
-    const send = (key: string, sending: () => Promise<void>, mark: RosterMark): Promise<boolean> =>
-      sending().then(
-        () => true,
-        (error: unknown) => {
-          // A later mark for the same key may be out already: that one stands.
-          if (pendingRoster.get(key) === mark) {
-            pendingRoster.delete(key);
-            failedRoster.set(key, mark);
-          }
-          ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
-          return false;
-        },
-      );
-    const workspaceOf = new Map(next.agents.map((agent) => [agent.id, agent.workspaceId]));
-    // A workspace's team is stored before its agents' teammates go out (as planNumbers holds a
-    // sub-agent's number on its parent's next): a teammate is never stored under no team.
-    const teamStored = new Map<string, Promise<boolean>>();
-    const pickMember = byChance(ports.random ?? Math.random);
+    if (toAgent === undefined) return;
     const planned = planRoster(
       roster,
-      withPendingRoster("workspace", next.workspaces),
-      withPendingRoster("agent", next.agents),
-      pickMember,
+      withPendingRoster(next.agents),
+      byChance(ports.random ?? Math.random),
     );
-    for (const { kind, id, mark } of planned) {
-      const key = `${kind}:${id}`;
-      if (failedRoster.has(key)) continue;
-      if (kind === "workspace") {
-        pendingRoster.set(key, mark);
-        teamStored.set(
-          id,
-          send(key, () => toWorkspace(id, { [ROSTER_TEAM_KEY]: mark }), mark),
-        );
-        continue;
-      }
-      const workspaceId = workspaceOf.get(id) ?? "";
-      if (failedRoster.has(`workspace:${workspaceId}`)) continue;
-      pendingRoster.set(key, mark);
-      const sending = () => toAgent(id, { [ROSTER_MEMBER_KEY]: mark });
-      const team = teamStored.get(workspaceId);
-      if (team === undefined) {
-        void send(key, sending, mark);
-        continue;
-      }
-      void team.then((stored) => {
-        // A later plan may have given the agent a newer mark meanwhile: that one stands.
-        if (pendingRoster.get(key) !== mark) return false;
-        if (stored) return send(key, sending, mark);
-        pendingRoster.delete(key);
-        return false;
+    for (const { id, mark } of planned) {
+      if (failedRoster.has(id)) continue;
+      pendingRoster.set(id, mark);
+      void toAgent(id, { [ROSTER_MEMBER_KEY]: mark }).catch((error: unknown) => {
+        // A later mark for the same agent may be out already: that one stands.
+        if (pendingRoster.get(id) === mark) {
+          pendingRoster.delete(id);
+          failedRoster.set(id, mark);
+        }
+        ports.log(`[office] roster mark failed: ${errorMessage(error)}`);
       });
     }
   }
 
-  /** The workspaces under their roster team's name, where the owner typed none. */
-  function teamed(
-    workspaces: readonly OfficeWorkspace[],
-    teams: ReadonlyMap<string, string>,
-  ): readonly OfficeWorkspace[] {
-    if (teams.size === 0) return workspaces;
-    return sortWorkspaces(
-      workspaces.map((workspace) => {
-        const team = teams.get(workspace.id);
-        // A workspaceName says the owner typed a team name: it stays.
-        if (team === undefined || workspace.workspaceName !== undefined) return workspace;
-        return { ...workspace, name: team, workspaceName: workspace.name };
-      }),
+  /**
+   * The agents under their office names, each with the roster team its teammate is of. A team
+   * name typed on the workspace stays the team of everyone in it.
+   */
+  function named(source: DirectoryView, agents: readonly OfficeAgent[]): OfficeAgent[] {
+    const given = rosterNames(roster, source.agents);
+    const names = officeNames(agents, given.members);
+    const typed = new Set(
+      source.workspaces
+        .filter((workspace) => workspace.workspaceName !== undefined)
+        .map((workspace) => workspace.id),
     );
-  }
-
-  function named(
-    agents: readonly OfficeAgent[],
-    given: ReadonlyMap<string, string>,
-  ): OfficeAgent[] {
-    const names = officeNames(agents, given);
     return agents.map((agent) => {
       const name = names.get(agent.id);
-      return name === undefined ? agent : { ...agent, name };
+      const team = typed.has(agent.workspaceId ?? "") ? undefined : given.teams.get(agent.id);
+      if (name === undefined && team === undefined) return agent;
+      return {
+        ...agent,
+        ...(name === undefined ? {} : { name }),
+        ...(team === undefined ? {} : { team }),
+      };
     });
   }
 
@@ -435,10 +384,9 @@ export function createHub(ports: HubPorts): Hub {
     writeRoster(next);
     const settled = settleResets(next.agents, resets);
     resets = settled.resets;
-    const names = rosterNames(roster, next.workspaces, next.agents);
     view = {
-      agents: named(resets.size === 0 ? next.agents : settled.agents, names.members),
-      workspaces: teamed(next.workspaces, names.teams),
+      agents: named(next, resets.size === 0 ? next.agents : settled.agents),
+      workspaces: next.workspaces,
       folders: next.folders,
     };
     tell(view);
@@ -701,11 +649,10 @@ export function createHub(ports: HubPorts): Hub {
       } catch (error) {
         ports.log(`[office] directory stop failed: ${errorMessage(error)}`);
       }
-      const names = rosterNames(roster, latest.workspaces, latest.agents);
       return {
         ...snapshot(),
-        agents: named(latest.agents, names.members),
-        workspaces: [...teamed(latest.workspaces, names.teams)],
+        agents: named(latest, latest.agents),
+        workspaces: [...latest.workspaces],
       };
     },
     script(workspaceId, name) {
