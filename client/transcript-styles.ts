@@ -31,6 +31,17 @@ export function transcriptStyles(colors: PluginTheme["colors"], touch: boolean) 
       backgroundColor: colors.surface2,
     },
     text: { color: colors.foreground, fontSize: 14, lineHeight: 21 },
+    images: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    image: {
+      width: 96,
+      height: 96,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface1,
+    },
+    imageWide: { width: "100%", height: 260 },
+    imageNote: { color: colors.foregroundMuted, fontSize: 12, lineHeight: 17 },
     assignment: {
       minWidth: 0,
       gap: 4,

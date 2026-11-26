@@ -12,6 +12,7 @@ import {
   rowLabel,
   uiCardTitle,
 } from "./session-text.js";
+import { SentImages } from "./sent-images.js";
 import { avatarInitials } from "./sessions-text.js";
 import type { OfficeStyles } from "./styles.js";
 
@@ -190,9 +191,7 @@ const Row = memo(function Row({ row, name, appearance, uiCards, styles }: RowPro
       return (
         <View accessibilityLabel={label} style={s.outgoing}>
           <Text style={s.name}>You</Text>
-          {row.imageUrls && (
-            <Markdown>{row.imageUrls.map((url) => `![Image](<${url}>)`).join("\n\n")}</Markdown>
-          )}
+          {row.imageUrls && <SentImages urls={row.imageUrls} styles={styles} />}
           <Text selectable style={s.text}>
             {row.text}
           </Text>
