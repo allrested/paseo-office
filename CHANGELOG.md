@@ -8,6 +8,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   is `office/timeline.jsonl`, a line per mark. A change writes one conversation, or adds lines to
   the timeline, where 0.2.14 wrote the whole file again. The `vault.json` and `timeline.json` of
   an earlier version are taken over when the office first starts, and then removed.
+- **Keep watching**, a host setting, off by default: the office goes on reading the agents with
+  no office open, every 15 seconds, so the Timeline, This week, the History vault and what the
+  office notices have no gaps for the hours nobody looked.
 
 ## 0.2.14 (2026-11-26)
 

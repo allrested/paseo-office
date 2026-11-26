@@ -552,6 +552,11 @@ export function createOfficePlugin(
     log(`[office] chat unavailable: ${errorMessage(error)}`),
   );
   let agentToolsOn = false;
+  // Whether the owner has the office go on reading with no office open; off until the settings are read.
+  let keepWatching = false;
+  // The directory needs the Paseo API, which the first handler or hook brings.
+  const followWatching = () => hub.keepOpen(keepWatching && holder.held());
+  void holder.wait().then(followWatching);
   // The roster the names follow; off until the settings are read.
   let roster: Roster = NO_ROSTER;
   void holder.wait().then(() => office.setPickupEnabled(agentToolsOn));
@@ -561,6 +566,8 @@ export function createOfficePlugin(
     stepsNamed = false;
     vaultOn = false;
     pinnedNotes = "";
+    keepWatching = false;
+    followWatching();
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
@@ -586,6 +593,8 @@ export function createOfficePlugin(
     vaultOn = state.values.historyVault;
     chatLines = chatWords(state.values.chatCulture);
     pinnedNotes = state.values.pinnedNotes;
+    keepWatching = state.values.keepWatching;
+    followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
     await notesSchedule.sync(state.values);

@@ -59,6 +59,8 @@ export interface HubPorts {
       progress?: Readonly<ChecklistCounts>,
       subagents?: Readonly<SubagentCalls>,
     ) => void,
+    /** Whether an office is open: with none, the reads may come further apart. */
+    watched?: () => boolean,
   ): () => void;
   timers: Timers;
   log(message: string): void;
@@ -69,6 +71,11 @@ export interface HubPorts {
 }
 
 export interface Hub {
+  /**
+   * Keeps the directory and the activity reads going with no office open, so the timeline, the
+   * vault and what the office notices have no gaps. Off, they stop when the last office closes.
+   */
+  keepOpen(on: boolean): void;
   /** Streams the office to one subscriber. Resolves when its signal aborts; rejects when the directory cannot start. */
   attach(subscriber: HubSubscriber): Promise<void>;
   setBoards(boards: Readonly<Record<string, readonly Post[]>>): void;
@@ -133,6 +140,9 @@ function waitForAbort(signal: AbortSignal): Promise<void> {
 
 export function createHub(ports: HubPorts): Hub {
   const subscribers = new Set<HubSubscriber>();
+  let watching = false;
+  /** Whether the directory has anyone to run for: an open office, or the host keeps watching. */
+  const wanted = () => subscribers.size > 0 || watching;
   // Subscribers whose snapshot went out; changes reach only them, so a snapshot comes first.
   const ready = new WeakSet<HubSubscriber>();
   let view = EMPTY_VIEW;
@@ -436,7 +446,7 @@ export function createHub(ports: HubPorts): Hub {
     const mine = generation;
     failedRoster.clear();
     const stop = await ports.openDirectory(onDirectory, () => onDirectoryEnd(mine));
-    if (subscribers.size === 0 || mine !== generation) {
+    if (!wanted() || mine !== generation) {
       view = EMPTY_VIEW;
       reported = EMPTY_VIEW;
       tell(null);
@@ -451,14 +461,14 @@ export function createHub(ports: HubPorts): Hub {
     stopDirectory = stop;
     sentAgents = JSON.stringify(view.agents);
     sentWorkspaces = JSON.stringify(view.workspaces);
-    stopActivity = ports.startActivity(running, onActivity);
+    stopActivity = ports.startActivity(running, onActivity, () => subscribers.size > 0);
     // Subscribers that already had a snapshot saw an older directory; attaches still waiting push their own.
     broadcast({ type: "snapshot", state: snapshot() });
   }
 
   async function ensureStarted(): Promise<void> {
     // A start that found nobody waiting closes its directory; whoever arrived meanwhile starts again.
-    while (stopDirectory === null && subscribers.size > 0) {
+    while (stopDirectory === null && wanted()) {
       starting ??= start().finally(() => {
         starting = null;
       });
@@ -468,7 +478,7 @@ export function createHub(ports: HubPorts): Hub {
 
   async function restart(): Promise<void> {
     await idle();
-    if (subscribers.size === 0) return;
+    if (!wanted()) return;
     try {
       await ensureStarted();
     } catch (error) {
@@ -482,7 +492,7 @@ export function createHub(ports: HubPorts): Hub {
    * restart timer is pending. Restarts stay at least one window apart.
    */
   function queueRestart(): void {
-    if (subscribers.size === 0 || stopDirectory !== null || starting !== null) return;
+    if (!wanted() || stopDirectory !== null || starting !== null) return;
     restartQueued = generation;
     cancelCooldown ??= ports.timers.setTimeout(onCooldownEnd, DIRECTORY_RESTART_MS);
   }
@@ -498,7 +508,7 @@ export function createHub(ports: HubPorts): Hub {
   function onCooldownEnd(): void {
     cancelCooldown = null;
     try {
-      if (restartQueued === generation && subscribers.size > 0) runRestart();
+      if (restartQueued === generation && wanted()) runRestart();
       else restartQueued = null;
     } catch (error) {
       ports.log(`[office] directory restart failed: ${errorMessage(error)}`);
@@ -538,6 +548,18 @@ export function createHub(ports: HubPorts): Hub {
   }
 
   return {
+    keepOpen(on) {
+      if (watching === on) return;
+      watching = on;
+      if (on) {
+        ensureStarted().catch((error: unknown) => {
+          ports.log(`[office] unable to start: ${errorMessage(error)}`);
+          queueRestart();
+        });
+      } else if (!wanted()) {
+        idle().catch((error: unknown) => ports.log(`[office] idle failed: ${errorMessage(error)}`));
+      }
+    },
     async attach(subscriber) {
       if (subscriber.signal.aborted) return;
       subscribers.add(subscriber);
@@ -545,7 +567,7 @@ export function createHub(ports: HubPorts): Hub {
         "abort",
         () => {
           subscribers.delete(subscriber);
-          if (subscribers.size === 0) {
+          if (!wanted()) {
             idle().catch((error: unknown) =>
               ports.log(`[office] idle failed: ${errorMessage(error)}`),
             );
