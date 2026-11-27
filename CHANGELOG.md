@@ -2,7 +2,7 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
-## Unreleased
+## 0.3.0 (2026-11-27)
 
 - On a **Mac**, the Host card lists memory, process count and listening ports by agent, and marks
   an idle agent as left running, read from `ps -E` (the environment of the user's own processes)
