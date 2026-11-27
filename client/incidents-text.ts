@@ -3,6 +3,7 @@ import {
   type Incident,
   type IncidentSource,
   type IncidentsState,
+  type Post,
 } from "../shared/contracts.js";
 import type { StripCard } from "./attention-strip.js";
 
@@ -24,6 +25,22 @@ export interface IncidentRow {
   url: string;
   /** How long ago the office found it: "just now", "12 min ago", "3 h ago". */
   age: string;
+  /** A task of the lobby's board that is not done already holds this incident's address. */
+  onLobby: boolean;
+}
+
+/**
+ * What an agent is asked about an incident, as a lobby task and as a new agent's first prompt.
+ * The address is on a line of its own: that is how the office finds the task again.
+ */
+export function incidentTask(
+  row: Pick<IncidentRow, "sourceLabel" | "key" | "title" | "url">,
+): string {
+  return [
+    `Analyze the ${row.sourceLabel} incident ${row.key}: ${row.title}`,
+    row.url,
+    "Find the likely cause in the code and say what you found, how sure you are and what fix you propose. Change nothing until the fix is agreed.",
+  ].join("\n");
 }
 
 /**
@@ -63,9 +80,17 @@ export function ageText(ms: number): string {
 }
 
 /** The card's rows, newest first. `now` is when the card opened. */
-export function incidentRows(state: IncidentsState | undefined, now: number): IncidentRow[] {
+export function incidentRows(
+  state: IncidentsState | undefined,
+  now: number,
+  lobby: readonly Post[] = [],
+): IncidentRow[] {
   if (state === undefined) return [];
+  const waiting = lobby
+    .filter((post) => post.kind === "task" && post.state !== "done")
+    .map((post) => post.text.split("\n"));
   return newestFirst(state.open).map((incident) => ({
+    onLobby: waiting.some((lines) => lines.includes(incident.url)),
     id: incident.id,
     sourceLabel: SOURCE_LABEL[incident.source],
     key: incident.key,

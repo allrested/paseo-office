@@ -69,6 +69,7 @@ test("rows newest first with ages at 0 s, 12 min and 3 h", () => {
       title: "Checkout fails on Safari",
       url: "https://example.atlassian.net/browse/SHOP-12",
       age: "just now",
+      onLobby: false,
     },
     {
       id: "sentry:API-7",
@@ -77,6 +78,7 @@ test("rows newest first with ages at 0 s, 12 min and 3 h", () => {
       title: "TypeError in /orders",
       url: "https://sentry.io/organizations/acme/issues/7/",
       age: "12 min ago",
+      onLobby: false,
     },
     {
       id: "jira:SHOP-3",
@@ -85,6 +87,7 @@ test("rows newest first with ages at 0 s, 12 min and 3 h", () => {
       title: "Refund email is empty",
       url: "https://example.atlassian.net/browse/SHOP-3",
       age: "3 h ago",
+      onLobby: false,
     },
   ]);
   expect(incidentRows(undefined, NOW)).toEqual([]);

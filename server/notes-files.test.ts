@@ -61,6 +61,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       notifyLevel: "danger",
       teams: [],
       jiraProjects: "",
+      jiraTypes: "Bug",
       sentryOrg: "",
       sentryProjects: "",
       weatherMode: "off" as const,

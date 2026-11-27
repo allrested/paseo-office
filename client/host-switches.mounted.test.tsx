@@ -47,6 +47,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 /** The incident fields as a host that never set them holds them. */
 const NO_TRACKERS = {
   jiraProjects: "",
+  jiraTypes: "Bug",
   sentryOrg: "",
   sentryProjects: "",
   weatherMode: "off" as const,
@@ -573,7 +574,7 @@ test("a mode that asks for nothing says so, and one the provider lacks says what
   );
 });
 
-const JIRA_HINT = "Project keys, comma separated. New bugs in them ring the incident alarm.";
+const JIRA_HINT = "Project keys, comma separated. New issues in them ring the incident alarm.";
 const JIRA_UNSET = "No Jira connection on this host: save one above";
 const SENTRY_UNSET = "No Sentry token on this host: save one above";
 

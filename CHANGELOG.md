@@ -18,6 +18,12 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   warnings.
 - A room's board opened from the lobby's board has **Back to Lobby board**, so the lobby's is one
   press away and the dialog need not be closed first.
+- Incidents: each one on the card has **Analyze**, which opens the New agent form with the
+  incident as its first prompt, and **Add to lobby**, which posts it as a lobby task for an idle
+  agent to pick up.
+- Incidents: one resolved in Jira or Sentry closes at the next check. **Jira issue types** names
+  the types that ring (Bug when empty). A Jira project key that does not exist, or that the token
+  cannot see, is now a problem on the card and no longer silent.
 
 ## 0.2.14 (2026-11-26)
 

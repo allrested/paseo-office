@@ -8,6 +8,8 @@ import { RosterTeamsSchema, refuseBadTeams } from "./roster.js";
 
 /** A Jira project key and a Sentry slug: only these reach a JQL query or a Sentry address. */
 export const JIRA_KEY = /^[A-Z][A-Z0-9_]+$/;
+/** A Jira issue type by its name: letters, digits, spaces and hyphens, so it holds no quote. */
+export const JIRA_TYPE = /^[\p{L}\p{N}][\p{L}\p{N} -]{0,39}$/u;
 export const SENTRY_SLUG = /^[a-z0-9][a-z0-9_-]*$/;
 /** What reaches the host's AWS CLI as an argument: none can start with a dash. */
 export const AWS_PROFILE = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
@@ -115,6 +117,7 @@ const HostValuesSchema = z.object({
   notifyUrl: z.string().default(""),
   notifyLevel: z.enum(NOTIFY_LEVELS).default("danger"),
   jiraProjects: z.string().default(""),
+  jiraTypes: z.string().default("Bug"),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
   weatherMode: z.enum(WEATHER_MODES).default("off"),
@@ -130,6 +133,7 @@ type HostValues = z.output<typeof HostValuesSchema>;
 
 const LISTS = [
   { field: "jiraProjects", pattern: JIRA_KEY, what: "a Jira project key" },
+  { field: "jiraTypes", pattern: JIRA_TYPE, what: "a Jira issue type" },
   { field: "sentryProjects", pattern: SENTRY_SLUG, what: "a Sentry project slug" },
   { field: "awsLogGroups", pattern: AWS_LOG_GROUP, what: "a CloudWatch log group name" },
 ] as const;
@@ -223,7 +227,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * timeline, the vault and what the office notices have no gaps. `notifyUrl` is the webhook the
  * office posts to when it raises an alert or opens an incident; empty posts nothing.
  * `notifyLevel` is what is posted: `danger` a loop and an incident only, `warning` the rest too.
- * `jiraProjects`
+ * `jiraTypes` are the comma separated Jira issue types that ring, Bug when empty. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`
  * name a profile of the host's AWS CLI whose CloudWatch alarms are checked too, `awsLogGroups` the
@@ -232,7 +236,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 10,
+  version: 11,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
@@ -259,6 +263,7 @@ export const officeHostSettings = defineSettings({
   // Version 5 adds Headquarters and weather. Older documents keep their floor plan and start with weather off.
   // Version 7 adds the roster, off and empty. Version 8 adds `uiCards`, off.
   // Version 9 adds `keepWatching`, off. Version 10 adds `notifyUrl`, empty, and `notifyLevel`, danger.
+  // Version 11 adds `jiraTypes`, Bug.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

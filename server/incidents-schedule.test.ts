@@ -74,6 +74,7 @@ test("changes are synced one at a time, so a slow save cannot land after a later
 
 const NONE: IncidentsSettings = {
   jiraProjects: "",
+  jiraTypes: "Bug",
   sentryOrg: "",
   sentryProjects: "",
   sentryUrl: "https://sentry.io",
@@ -152,6 +153,7 @@ async function standIn(answers: Record<string, unknown>): Promise<{ base: string
 test("the readers read the settings' projects from the environment's Jira and the settings' Sentry", async () => {
   const server = await standIn({
     "/rest/api/3/myself": { timeZone: "UTC" },
+    "/rest/api/3/project/search": { values: [{ key: "OPS" }, { key: "QA" }] },
     "/rest/api/3/search/jql": { issues: [] },
     "/api/0/organizations/acme/projects/": [{ id: "7", slug: "pos" }],
     "/api/0/organizations/acme/issues/": [],
@@ -173,13 +175,14 @@ test("the readers read the settings' projects from the environment's Jira and th
   await readers.jira?.read(Date.UTC(2026, 10, 17, 5, 0));
   await readers.sentry?.read(Date.UTC(2026, 10, 17, 5, 0));
   expect(server.asked.map((url) => url.pathname)).toEqual([
+    "/rest/api/3/project/search",
     "/rest/api/3/myself",
     "/rest/api/3/search/jql",
     "/api/0/organizations/acme/projects/",
     "/api/0/organizations/acme/issues/",
   ]);
-  expect(server.asked[1].searchParams.get("jql")).toMatch(/^project in \("OPS", "QA"\) AND /);
-  expect(server.asked[3].searchParams.getAll("project")).toEqual(["7"]);
+  expect(server.asked[2].searchParams.get("jql")).toMatch(/^project in \("OPS", "QA"\) AND /);
+  expect(server.asked[4].searchParams.getAll("project")).toEqual(["7"]);
 });
 
 test("CloudWatch is on with a profile and a region, and needs no saved sign-in", () => {

@@ -69,6 +69,7 @@ const NO_NOTES = {
 };
 const NO_TRACKERS = {
   jiraProjects: "",
+  jiraTypes: "Bug",
   sentryOrg: "",
   sentryProjects: "",
   weatherMode: "off" as const,
@@ -1599,7 +1600,18 @@ async function jiraStandIn(): Promise<JiraStandIn> {
       res.end(JSON.stringify({ timeZone: "UTC" }));
       return;
     }
-    searches.push(url.searchParams.get("jql") ?? "");
+    if (url.pathname === "/rest/api/3/project/search") {
+      const values = url.searchParams.getAll("keys").map((key) => ({ key }));
+      res.end(JSON.stringify({ values }));
+      return;
+    }
+    const jql = url.searchParams.get("jql") ?? "";
+    // The look at what is resolved: nothing is.
+    if (jql.startsWith("key in")) {
+      res.end(JSON.stringify({ issues: [] }));
+      return;
+    }
+    searches.push(jql);
     const created = "2026-11-11T08:58:00.000+0000";
     const bug = { key: "OPS-7", fields: { summary: "Checkout fails on a split bill", created } };
     res.end(JSON.stringify({ issues: [bug] }));
@@ -1646,6 +1658,7 @@ const JIRA_ON: SettingsState = {
     notifyLevel: "danger",
     teams: [],
     jiraProjects: "OPS",
+    jiraTypes: "Bug",
   },
 };
 
@@ -1665,7 +1678,7 @@ test("a due incidents run calls the check; dismiss answers its count", async () 
   await open();
   await recorded.scheduleRuns.get("incidents")?.(clock.now());
   expect(jira.searches).toEqual([
-    'project in ("OPS") AND issuetype = Bug AND created >= "2026-11-11 08:45" ORDER BY created ASC',
+    'project in ("OPS") AND issuetype in ("Bug") AND created >= "2026-11-11 08:45" ORDER BY created ASC',
   ]);
   expect(incidentsStore.kept.open).toEqual([
     {

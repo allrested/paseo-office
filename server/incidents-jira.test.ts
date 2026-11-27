@@ -11,7 +11,12 @@ interface Request {
 
 interface StandIn {
   base: string;
+  /** Every request but the look at the projects, which each read makes first. */
   requests: Request[];
+  /** The project keys each read asked Jira for. */
+  projectChecks: string[][];
+  /** The keys Jira knows; every key asked for while null. */
+  projects: string[] | null;
 }
 
 type Answer = (request: Request, res: ServerResponse) => void;
@@ -32,8 +37,17 @@ afterEach(async () => {
 /** A local server standing in for Jira; it records each request and answers through `answer`. */
 async function standIn(answer: Answer): Promise<StandIn> {
   const requests: Request[] = [];
+  const projectChecks: string[][] = [];
+  const stand: StandIn = { base: "", requests, projectChecks, projects: null };
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    if (url.pathname === "/rest/api/3/project/search" && stand.projects !== undefined) {
+      const asked = url.searchParams.getAll("keys");
+      projectChecks.push(asked);
+      const known = stand.projects ?? asked;
+      json(res, { values: asked.filter((key) => known.includes(key)).map((key) => ({ key })) });
+      return;
+    }
     const request = {
       path: url.pathname,
       query: url.searchParams,
@@ -46,7 +60,8 @@ async function standIn(answer: Answer): Promise<StandIn> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("expected a TCP address");
-  return { base: `http://127.0.0.1:${address.port}`, requests };
+  stand.base = `http://127.0.0.1:${address.port}`;
+  return stand;
 }
 
 function json(res: ServerResponse, body: unknown, status = 200): void {
@@ -83,7 +98,7 @@ test("builds the JQL with the keys, Bug and the time in the user's zone", async 
     "/rest/api/3/search/jql",
   ]);
   expect(Object.fromEntries(server.requests[1].query)).toEqual({
-    jql: 'project in ("SHOP", "QA") AND issuetype = Bug AND created >= "2026-11-17 08:00" ORDER BY created ASC',
+    jql: 'project in ("SHOP", "QA") AND issuetype in ("Bug") AND created >= "2026-11-17 08:00" ORDER BY created ASC',
     fields: "summary,created",
     maxResults: "100",
   });
@@ -216,4 +231,36 @@ test("jiraEnv is null when one variable is missing", () => {
     expect(jiraEnv({ ...all, [name]: undefined })).toBeNull();
     expect(jiraEnv({ ...all, [name]: "   " })).toBeNull();
   }
+});
+
+test("a project Jira does not know is a problem, not a quiet read", async () => {
+  const server = await standIn(jira("UTC", [{ issues: [], isLast: true }]));
+  server.projects = ["SHOP"];
+  await expect(createJiraReader(env(server.base), ["SHOP", "SHPO", "QA"]).read(0)).rejects.toThrow(
+    new TrackerProblem("Jira has no project SHPO, QA, or the token's user cannot see it"),
+  );
+  expect(server.projectChecks).toEqual([["SHOP", "SHPO", "QA"]]);
+  expect(server.requests).toEqual([]);
+});
+
+test("the issue types named in the settings ring in place of Bug", async () => {
+  const server = await standIn(jira("UTC", [{ issues: [], isLast: true }]));
+  await createJiraReader(env(server.base), ["SHOP"], fetch, ["Bug", "Production Incident"]).read(0);
+  expect(server.requests[1].query.get("jql")).toContain(
+    'issuetype in ("Bug", "Production Incident") AND',
+  );
+});
+
+test("the open incidents Jira holds as done are asked for by key", async () => {
+  const server = await standIn((_request, res) => json(res, { issues: [{ key: "SHOP-12" }] }));
+  const reader = createJiraReader(env(server.base), ["SHOP"]);
+  const open = ["SHOP-12", "SHOP-13"].map((key) => ({ key, url: `${server.base}/browse/${key}` }));
+  expect(await reader.resolved?.(open)).toEqual(["SHOP-12"]);
+  expect(Object.fromEntries(server.requests[0].query)).toEqual({
+    jql: 'key in ("SHOP-12", "SHOP-13") AND statusCategory = Done',
+    fields: "summary",
+    maxResults: "2",
+  });
+  expect(await reader.resolved?.([])).toEqual([]);
+  expect(server.requests).toHaveLength(1);
 });

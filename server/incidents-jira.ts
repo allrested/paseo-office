@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   type FoundIssue,
   getJson,
+  RESOLVED_MAX,
   type Tracker,
   TrackerProblem,
   type TrackerReader,
@@ -29,6 +30,9 @@ export function jiraEnv(env: NodeJS.ProcessEnv): JiraEnv | null {
 
 // Jira gives the instance's zone when the user's is hidden or unset, so it is rarely absent.
 const MyselfSchema = z.object({ timeZone: z.string().nullish() });
+
+const ProjectsSchema = z.object({ values: z.array(z.object({ key: z.string() })) });
+const KeysSchema = z.object({ issues: z.array(z.object({ key: z.string() })) });
 
 const SearchSchema = z.object({
   issues: z.array(
@@ -88,22 +92,60 @@ export async function probeJira(env: JiraEnv, fetchFn: typeof fetch = fetch): Pr
   await getJson({ tracker, url: `${env.baseUrl}/rest/api/3/myself`, schema: MyselfSchema });
 }
 
-/** New bugs in `projects`, keys already checked against the settings' pattern. */
+/**
+ * New issues of `types` (Bug when none are named) in `projects`, both already checked against the
+ * settings' patterns.
+ */
 export function createJiraReader(
   env: JiraEnv,
   projects: string[],
   fetchFn: typeof fetch = fetch,
+  types: string[] = ["Bug"],
 ): TrackerReader {
   const tracker = jiraTracker(env, fetchFn);
   const api = `${env.baseUrl}/rest/api/3`;
+  const quoted = (words: readonly string[]) => words.map((word) => `"${word}"`).join(", ");
+
+  /**
+   * The search answers a project it does not know with no issues and no error, so a mistyped key
+   * would ring nothing and say nothing. The projects are asked for by key first.
+   */
+  async function refuseUnknownProjects(): Promise<void> {
+    const query = new URLSearchParams({ maxResults: String(projects.length) });
+    for (const key of projects) query.append("keys", key);
+    const listed = await getJson({
+      tracker,
+      url: `${api}/project/search?${query}`,
+      schema: ProjectsSchema,
+    });
+    const known = new Set(listed.values.map((project) => project.key.toUpperCase()));
+    const missing = projects.filter((key) => !known.has(key.toUpperCase()));
+    if (missing.length > 0) {
+      throw new TrackerProblem(
+        `Jira has no project ${missing.join(", ")}, or the token's user cannot see it`,
+      );
+    }
+  }
+
+  async function resolved(open: readonly { key: string }[]): Promise<string[]> {
+    const keys = open.slice(0, RESOLVED_MAX).map((incident) => incident.key);
+    if (keys.length === 0) return [];
+    const query = new URLSearchParams({
+      jql: `key in (${quoted(keys)}) AND statusCategory = Done`,
+      fields: "summary",
+      maxResults: String(keys.length),
+    });
+    const done = await getJson({ tracker, url: `${api}/search/jql?${query}`, schema: KeysSchema });
+    return done.issues.map((issue) => issue.key);
+  }
 
   async function read(since: number): Promise<FoundIssue[]> {
+    await refuseUnknownProjects();
     const myself = await getJson({ tracker, url: `${api}/myself`, schema: MyselfSchema });
     // Without a zone from Jira, UTC: the instance's own zone is not known here.
     const time = jqlTime(since, myself.timeZone ?? "UTC");
     // Quoted, since a key such as USER or IN is a word JQL reserves. A key holds no `"`.
-    const keys = projects.map((key) => `"${key}"`).join(", ");
-    const jql = `project in (${keys}) AND issuetype = Bug AND created >= "${time}" ORDER BY created ASC`;
+    const jql = `project in (${quoted(projects)}) AND issuetype in (${quoted(types)}) AND created >= "${time}" ORDER BY created ASC`;
     const found: FoundIssue[] = [];
     const tokensSeen = new Set<string>();
     let pageToken: string | null = null;
@@ -137,5 +179,5 @@ export function createJiraReader(
     return found.slice(0, READ_MAX);
   }
 
-  return { read };
+  return { read, resolved };
 }

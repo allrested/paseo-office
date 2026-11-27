@@ -162,3 +162,21 @@ test("sentryToken is null when the variable is missing or blank", () => {
   expect(sentryToken({})).toBeNull();
   expect(sentryToken({ SENTRY_AUTH_TOKEN: "  " })).toBeNull();
 });
+
+test("each open incident is asked for by the number in its address, and the resolved ones named", async () => {
+  const server = await standIn((request, res) => {
+    const status = request.path.endsWith("/issues/7/") ? "resolved" : "unresolved";
+    json(res, { status });
+  });
+  const open = [
+    { key: "API-7", url: "https://acme.sentry.io/issues/7/?project=11" },
+    { key: "API-8", url: "https://sentry.io/organizations/acme/issues/8/" },
+    // No number to ask by: left open.
+    { key: "API-9", url: "https://sentry.io/organizations/acme/" },
+  ];
+  expect(await reader(server.base, ["api"]).resolved?.(open)).toEqual(["API-7"]);
+  expect(server.requests.map((request) => request.path)).toEqual([
+    "/api/0/organizations/acme/issues/7/",
+    "/api/0/organizations/acme/issues/8/",
+  ]);
+});

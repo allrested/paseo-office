@@ -5,6 +5,7 @@ import {
   type Tracker,
   TrackerProblem,
   type TrackerReader,
+  RESOLVED_MAX,
 } from "./incidents-http.js";
 
 /** Sentry's largest page of issues. One page is read; a burst over it loses its oldest. */
@@ -69,6 +70,8 @@ export async function probeSentry(
 }
 
 /** New unresolved issues in the listed projects. */
+const StatusSchema = z.object({ status: z.string() });
+
 export function createSentryReader(
   input: SentryReaderInput,
   fetchFn: typeof fetch = fetch,
@@ -119,5 +122,17 @@ export function createSentryReader(
     return found.sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  return { read };
+  /** Asked issue by issue, by the number in its page's address: the search has no "these keys". */
+  async function resolved(open: readonly { key: string; url: string }[]): Promise<string[]> {
+    const keys: string[] = [];
+    for (const incident of open.slice(0, RESOLVED_MAX)) {
+      const id = /\/issues\/(\d+)/.exec(incident.url)?.[1];
+      if (id === undefined) continue;
+      const issue = await getJson({ tracker, url: `${api}/issues/${id}/`, schema: StatusSchema });
+      if (issue.status === "resolved") keys.push(incident.key);
+    }
+    return keys;
+  }
+
+  return { read, resolved };
 }

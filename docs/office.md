@@ -861,10 +861,12 @@ office sets them from its settings each time it starts and at each save, and sto
 
 The office rings my-office's incident alarm for a new Jira bug, a new Sentry issue, a CloudWatch
 alarm or error lines in a CloudWatch log group. "Jira projects"
-takes project keys, and a new issue of type Bug in one of them rings. "Sentry organisation",
+takes project keys, and a new issue in one of them rings when its type is one of "Jira issue
+types" (names, comma separated; Bug when empty). "Sentry organisation",
 "Sentry projects" and "Sentry address" (`https://sentry.io` by default) do the same for a new
-unresolved Sentry issue. Jira does not refuse a project key it does not know, so a mistyped key
-rings nothing and shows no problem.
+unresolved Sentry issue. Jira's search answers a project key it does not know with nothing, so each
+check first asks Jira for the projects by key: a mistyped key, or one the token's user cannot
+see, is a problem on the Incidents card.
 
 Each tracker needs a sign-in, set under Services in the office's settings. Jira takes its
 address, the account's email and an API token; Sentry takes an auth token. "Save connection"
@@ -899,11 +901,21 @@ per tracker, the oldest first, leaving the rest to the next check. The office ke
 last check, the keys it saw in the last 2 days and the open incidents in
 `<PASEO_HOME>/office/incidents.json`; without that file the next check is a first check again.
 
-An incident stays open on the host until it is dismissed or a day old, so whoever opens the office
-later still gets the alarm, and resolving the issue in its tracker does not close it. A failed
+An incident stays open on the host until it is dismissed, a day old, or resolved in its tracker,
+so whoever opens the office later still gets the alarm. Each check asks Jira which of its open
+incidents are in a done status and Sentry for the status of each (20 at most a check), and closes
+those; a CloudWatch incident closes only by Dismiss or its age. A failed
 check keeps the Attention entry and a problem line on the Incidents card until a check succeeds or
 the tracker is turned off. A tracker turned off and on again starts afresh: its first check after
 rings nothing for the time it was off.
+
+Each incident on the card has a link to its page, **Analyze**, **Add to lobby** and Dismiss.
+Analyze opens the New agent form with the incident as its first prompt (the tracker, the key, the
+title and the address, and a line asking for the likely cause and a proposed fix, with nothing
+changed until it is agreed): choose the workspace and press Create. Add to lobby posts the same
+text as a task on the lobby's board, where an idle agent picks it up as it does any to-do; while a
+task with the incident's address is on that board and not done, the row says "On the lobby board"
+and offers no second one.
 
 The Incidents card dismisses through `office.incidents.dismiss.request`. The 3D floor shows a
 banner naming the newest, with 25 s of red light, a fail bubble over each person at work and

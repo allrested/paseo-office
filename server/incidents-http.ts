@@ -11,7 +11,15 @@ export interface FoundIssue {
 export interface TrackerReader {
   /** The issues made since `since` (epoch ms), oldest first. Rejects with a `TrackerProblem`. */
   read(since: number): Promise<FoundIssue[]>;
+  /**
+   * Which of these open incidents the tracker now holds as resolved, by key. A tracker without
+   * it closes nothing: its incidents stay until dismissed or a day old.
+   */
+  resolved?(open: readonly { key: string; url: string }[]): Promise<string[]>;
 }
+
+/** The most open incidents one check asks a tracker about. */
+export const RESOLVED_MAX = 20;
 
 /**
  * Why a tracker could not be read. The message is shown on the Incidents card and logged, so it
