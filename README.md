@@ -6,7 +6,7 @@ Office 3D puts your Paseo agents on a shared floor. Each workspace has a room. P
 
 ## Install on a host
 
-Office 3D requires Paseo **0.16.0 or newer**. The plugin has been tested on stock Paseo 0.16.2.
+Office 3D requires Paseo **0.16.0 or newer**. The plugin has been tested on stock Paseo 0.16.2 and runs on 0.17.4. It is typechecked against SDK 0.17.5 and against 0.16.2, the oldest it supports.
 
 1. In the host’s existing `$PASEO_HOME/config.json` (default `~/.paseo/config.json`), set `"pluginsEnabled": true`. If you changed it on a running daemon, run `paseo daemon reload`.
 2. Install from the repository’s default branch.
