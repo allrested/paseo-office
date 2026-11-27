@@ -41,7 +41,7 @@ export function sessionOf(
 ): { agent: OfficeAgent | null; room: string | null } {
   const roomId = model.roomOfAgent.get(agentId);
   return {
-    agent: model.agents.get(agentId) ?? null,
+    agent: model.agents.get(agentId) ?? model.home.get(agentId) ?? null,
     room: model.rooms.find((candidate) => candidate.id === roomId)?.name ?? null,
   };
 }

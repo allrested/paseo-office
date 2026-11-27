@@ -141,16 +141,23 @@ test("an agent without a workspace sits in the lobby", () => {
   );
 });
 
-test("closed, archived, internal, background and unknown agents are not shown", () => {
-  expect(projectAgent(agentInput({ status: "closed" }))).toBe(null);
+test("archived, internal, background and unknown agents are not shown; a closed one is at home", () => {
+  expect(projectAgent(agentInput({ status: "closed" }))).toEqual(officeAgent({ status: "closed" }));
+  // A sub-agent that closed has done its work.
+  const child = { labels: { "paseo.parent-agent-id": "a0" } };
+  expect(projectAgent(agentInput({ ...child, status: "idle" }))).not.toBe(null);
+  expect(projectAgent(agentInput({ ...child, status: "closed" }))).toBe(null);
   expect(projectAgent(agentInput({ archivedAt: "2026-11-11T09:00:00.000Z" }))).toBe(null);
   expect(projectAgent(agentInput({ internal: true }))).toBe(null);
   expect(projectAgent(agentInput({ background: true }))).toBe(null);
   expect(projectAgent(agentInput({ status: "sleeping" }))).toBe(null);
 });
 
-test("updates replace, remove, and drop an agent that closed", () => {
-  const start = agentsFromSnapshot([agentInput({}), agentInput({ id: "a2", status: "closed" })]);
+test("updates replace and remove; an agent that closed stays, at home, until it is archived", () => {
+  const start = agentsFromSnapshot([
+    agentInput({}),
+    agentInput({ id: "a2", status: "closed", archivedAt: "2026-11-11T09:00:00.000Z" }),
+  ]);
   expect([...start.values()]).toEqual([officeAgent({})]);
 
   const running = applyAgentUpdate(start, {
@@ -164,7 +171,12 @@ test("updates replace, remove, and drop an agent that closed", () => {
     kind: "upsert",
     agent: agentInput({ status: "closed" }),
   });
-  expect(closed.size).toBe(0);
+  expect([...closed.values()]).toEqual([officeAgent({ status: "closed" })]);
+  const archived = applyAgentUpdate(closed, {
+    kind: "upsert",
+    agent: agentInput({ status: "closed", archivedAt: "2026-11-11T09:00:00.000Z" }),
+  });
+  expect(archived.size).toBe(0);
 
   const removed = applyAgentUpdate(running, { kind: "remove", agentId: "a1" });
   expect(removed.size).toBe(0);

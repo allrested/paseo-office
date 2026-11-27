@@ -69,10 +69,12 @@ export function liveHubPorts(
 }
 
 /** A finished-turn notification is normal for an available agent. Other attention needs the user. */
-function availableForOfficeWork(agent: AgentSnapshotPayload): boolean {
+function availableForOfficeWork(agent: AgentSnapshotPayload, home = false): boolean {
   const attention = agent.requiresAttention || agent.attentionReason;
   return (
-    agent.status === "idle" &&
+    // Closed and not archived is at home: a task's prompt starts its runtime again. Only a task
+    // calls it back (`home`); a line in the group chat does not.
+    (agent.status === "idle" || (home && agent.status === "closed")) &&
     !agent.archivedAt &&
     !agent.activeTurn &&
     !agent.backgroundWork?.count &&
@@ -96,23 +98,30 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
       if (!holder.held()) return [];
       const agents = holder.require().agents;
       const ids = new Set<string>();
-      let cursor: string | undefined;
-      do {
-        const result = await agents.list({
-          filter: { statuses: ["idle"] },
-          sort: [{ key: "updated_at", direction: "asc" }],
-          page: { limit: 200, cursor },
-        });
-        for (const { agent } of result.entries) {
-          if (availableForOfficeWork(agent)) ids.add(agent.id);
-        }
-        cursor = result.pageInfo.nextCursor ?? undefined;
-      } while (cursor);
+      // Whoever is in the office first; those at home come in only for what is left over, the
+      // one that left last first.
+      for (const [status, direction] of [
+        ["idle", "asc"],
+        ["closed", "desc"],
+      ] as const) {
+        let cursor: string | undefined;
+        do {
+          const result = await agents.list({
+            filter: { statuses: [status] },
+            sort: [{ key: "updated_at", direction }],
+            page: { limit: 200, cursor },
+          });
+          for (const { agent } of result.entries) {
+            if (availableForOfficeWork(agent, true)) ids.add(agent.id);
+          }
+          cursor = result.pageInfo.nextCursor ?? undefined;
+        } while (cursor);
+      }
       return [...ids];
     },
     async lobbyEligible(agentId) {
       const result = await refresh(agentId);
-      return result !== null && availableForOfficeWork(result.agent);
+      return result !== null && availableForOfficeWork(result.agent, true);
     },
     async status(agentId) {
       const result = await refresh(agentId);

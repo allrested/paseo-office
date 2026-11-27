@@ -76,7 +76,7 @@ test("an agent's wake state is read from the daemon; one it does not know is gon
   expect(await ports.status("nobody")).toBe("gone");
 });
 
-test("lobby pickup reads every page of idle agents, oldest idle first, and rechecks the live state", async () => {
+test("lobby pickup reads every page of idle agents, oldest idle first, then those at home, and rechecks the live state", async () => {
   const waiting = {
     ...agent("waiting"),
     labels: {},
@@ -107,7 +107,15 @@ test("lobby pickup reads every page of idle agents, oldest idle first, and reche
       entries: [waiting, ...unavailable].map((entry) => ({ agent: entry })),
       pageInfo: { nextCursor: "next" },
     })
-    .mockResolvedValueOnce({ entries: [{ agent: next }], pageInfo: { nextCursor: null } });
+    .mockResolvedValueOnce({ entries: [{ agent: next }], pageInfo: { nextCursor: null } })
+    // Those at home, asked for after the idle: one that can be called back, one archived.
+    .mockResolvedValueOnce({
+      entries: [
+        { agent: { ...next, id: "home", status: "closed" } },
+        { agent: { ...next, id: "filed", status: "closed", archivedAt: "2026-11-18T08:00:00Z" } },
+      ],
+      pageInfo: { nextCursor: null },
+    });
   const refresh = vi
     .fn()
     .mockResolvedValueOnce({ agent: waiting })
@@ -118,7 +126,7 @@ test("lobby pickup reads every page of idle agents, oldest idle first, and reche
     require: () => ({ agents: { list, ref: () => ({ refresh }) } }),
   } as unknown as PaseoHolder;
   const ports = liveAgentPorts(holder);
-  expect(await ports.lobbyCandidates()).toEqual(["waiting", "second"]);
+  expect(await ports.lobbyCandidates()).toEqual(["waiting", "second", "home"]);
   const options = {
     filter: { statuses: ["idle"] },
     sort: [{ key: "updated_at", direction: "asc" }],
@@ -126,6 +134,13 @@ test("lobby pickup reads every page of idle agents, oldest idle first, and reche
   expect(list.mock.calls).toEqual([
     [{ ...options, page: { limit: 200, cursor: undefined } }],
     [{ ...options, page: { limit: 200, cursor: "next" } }],
+    [
+      {
+        filter: { statuses: ["closed"] },
+        sort: [{ key: "updated_at", direction: "desc" }],
+        page: { limit: 200, cursor: undefined },
+      },
+    ],
   ]);
   expect(await ports.lobbyEligible("waiting")).toBe(true);
   expect(await ports.lobbyEligible("waiting")).toBe(false);
@@ -149,9 +164,10 @@ test("a start of an id resolves to the full id; an agent that can get no post re
   expect(await ports.resolve("b-fu")).toBe("b-full-id");
   expect(await ports.resolve("run")).toBe("run");
   expect(await ports.resolve("nobody")).toBeNull();
-  // The queue drops posts for archived and closed agents unsent, so a post may not name one.
+  // The queue drops posts for archived agents unsent, so a post may not name one. One that is
+  // closed and not archived is at home, and a post that names it calls it back.
   expect(await ports.resolve("old")).toBeNull();
-  expect(await ports.resolve("shut")).toBeNull();
+  expect(await ports.resolve("shut")).toBe("shut");
 });
 
 test("a wake names its source agent; a wake as from the user names none and never cuts a turn", async () => {

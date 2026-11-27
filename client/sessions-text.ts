@@ -77,7 +77,8 @@ export function sessionRows(model: OfficeModel, tab: ListTab, query: string): Se
   return shown;
 }
 
-export type SessionGroup = Exclude<ListTab, "all">;
+/** The list's sections: the three the filters name, and the agents at home under them. */
+export type SessionGroup = Exclude<ListTab, "all"> | "home";
 export interface GroupedSession extends SessionRow {
   /** Levels of visible parents in this same status section. */
   level: number;
@@ -90,6 +91,7 @@ export function sessionSections(model: OfficeModel, tab: ListTab, query: string)
     attention: [],
     working: [],
     resting: [],
+    home: [],
   };
   const levels = new Map<string, { group: SessionGroup; level: number }>();
   for (const entry of sessionRows(model, tab, query)) {
@@ -102,6 +104,20 @@ export function sessionSections(model: OfficeModel, tab: ListTab, query: string)
     const parentTitle = parent && level === 0 ? agentTitle(parent) : null;
     sections[group].push({ ...entry, level, parentTitle });
     levels.set(entry.row.agent.id, { group, level });
+  }
+  // Those at home are in no room's rows. They rest, so All and Resting list them, the one that
+  // left last first.
+  if (tab === "all" || tab === "resting") {
+    const lobby = model.rooms.find((room) => room.lobby);
+    for (const agent of model.home.values()) {
+      const roomId = model.roomOfAgent.get(agent.id);
+      const room = model.rooms.find((candidate) => candidate.id === roomId) ?? lobby;
+      if (room === undefined) continue;
+      const row: OfficeRow = { agent, depth: 0, activity: null, step: null, waitingOn: 0 };
+      if (!matchesQuery(row, room, query)) continue;
+      sections.home.push({ row, room, level: 0, parentTitle: null });
+    }
+    sections.home.sort((left, right) => changedAt(right.row) - changedAt(left.row));
   }
   return sections;
 }
@@ -124,7 +140,7 @@ export function sessionDetail({ row, room, parentTitle }: GroupedSession): strin
   const task = agentTask(agent);
   if (task) return task;
   if (agent.status === "initializing") return "Starting session";
-  if (agent.status === "closed") return "Closed";
+  if (agent.status === "closed") return "At home · a task or a reply brings it back";
   return room.workspace?.branch || agent.model || "";
 }
 

@@ -141,9 +141,18 @@ test("a change to the reply's text draws the pane", async () => {
 test("sessionOf reads one agent and its room off the model", () => {
   const model = {
     agents: new Map([["a1", agent("a1")]]),
-    roomOfAgent: new Map([["a1", "r1"]]),
+    home: new Map([["h1", { ...agent("h1"), status: "closed" }]]),
+    roomOfAgent: new Map([
+      ["a1", "r1"],
+      ["h1", "r1"],
+    ]),
     rooms: [{ id: "r1", name: "Acme shop" }],
   } as unknown as OfficeModel;
   expect(sessionOf(model, "a1")).toEqual({ agent: agent("a1"), room: "Acme shop" });
+  // An agent at home is a session too: its panel opens, and a reply brings it back.
+  expect(sessionOf(model, "h1")).toEqual({
+    agent: { ...agent("h1"), status: "closed" },
+    room: "Acme shop",
+  });
   expect(sessionOf(model, "gone")).toEqual({ agent: null, room: null });
 });

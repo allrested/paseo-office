@@ -17,9 +17,11 @@ export interface WakeSnapshotInput {
 }
 
 export function wakeTargetOf(agent: WakeSnapshotInput | null): WakeTarget {
-  if (agent === null || agent.archivedAt || agent.status === "closed") return "gone";
+  if (agent === null || agent.archivedAt) return "gone";
   if (agent.pendingPermissions.length > 0) return "busy";
-  return agent.status === "idle" || agent.status === "error" ? "wakeable" : "busy";
+  // Closed and not archived is at home: a prompt starts its runtime again.
+  const resting = agent.status === "idle" || agent.status === "error" || agent.status === "closed";
+  return resting ? "wakeable" : "busy";
 }
 
 export interface Delivery {
