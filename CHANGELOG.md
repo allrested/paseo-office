@@ -2,6 +2,13 @@
 
 Versions are the npm package `paseo-office`. Dates are the day the version was published.
 
+## Unreleased
+
+- The History vault is a folder, `office/vault/`, with a file per conversation, and the timeline
+  is `office/timeline.jsonl`, a line per mark. A change writes one conversation, or adds lines to
+  the timeline, where 0.2.14 wrote the whole file again. The `vault.json` and `timeline.json` of
+  an earlier version are taken over when the office first starts, and then removed.
+
 ## 0.2.14 (2026-11-26)
 
 - Team roster: a team is its teammates, whatever workspace each agent works in. Agents fill the

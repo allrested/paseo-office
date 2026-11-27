@@ -10,7 +10,16 @@ import { createStreetWatch, streetReaders } from "./server/street-watch.js";
 import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
-import { liftFile, tenureFile, timelineFile, vaultFile } from "./server/paths.js";
+import {
+  liftFile,
+  tenureFile,
+  timelineFile,
+  timelineLegacyFile,
+  vaultDir,
+  vaultLegacyFile,
+} from "./server/paths.js";
+import { createTimelineStore, type TimelineStore } from "./server/timeline-store.js";
+import { createVaultStore, type VaultStore } from "./server/vault-store.js";
 import { createDepartureArchiver } from "./server/home-departure.js";
 import {
   lifeSubscription,
@@ -50,20 +59,8 @@ import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
 import { createWatchers } from "./server/watchers.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
-import {
-  VAULT_TAIL_LIMIT,
-  VaultFileSchema,
-  createVault,
-  type Vault,
-  type VaultFile,
-} from "./server/vault.js";
-import {
-  TIMELINE_KEEP_MS,
-  TimelineFileSchema,
-  createTimelineLog,
-  type TimelineFile,
-  type TimelineLog,
-} from "./server/timeline.js";
+import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
+import { TIMELINE_KEEP_MS, createTimelineLog, type TimelineLog } from "./server/timeline.js";
 import {
   NO_ROSTER,
   ROSTER_MEMBER_KEY,
@@ -184,9 +181,9 @@ export interface OfficePluginDeps {
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
   /** Where the timeline is kept; without it the timeline lasts as long as the server. */
-  timelineFile?: LifeFile<TimelineFile>;
+  timelineStore?: TimelineStore;
   /** Where the history vault is kept; without it the vault lasts as long as the server. */
-  vaultFile?: LifeFile<VaultFile>;
+  vaultStore?: VaultStore;
   liftFile: LifeFile<LiftKept>;
   /** The owner's duty list. */
   dutiesFile: LifeFile<DutiesFile>;
@@ -278,18 +275,12 @@ export function createOfficePlugin(
         onChange(activity, doing, ...rest);
       }),
   });
-  const timelineSaves =
-    deps.timelineFile === undefined
-      ? null
-      : createSaveQueue(deps.timelineFile, deps.clock, log, 30_000);
   // Off until the settings are read: nothing is kept before the owner has said it may be.
   let vaultOn = false;
   let vault: Vault | null = null;
-  const vaultSaves =
-    deps.vaultFile === undefined ? null : createSaveQueue(deps.vaultFile, deps.clock, log, 30_000);
   let stopVault: (() => void) | undefined;
   const vaultReady = (async () => {
-    const kept = (await deps.vaultFile?.load()) ?? null;
+    const kept = (await deps.vaultStore?.load()) ?? null;
     vault = createVault(
       {
         tail: async (agentId) => {
@@ -304,7 +295,8 @@ export function createOfficePlugin(
           }));
         },
         on: () => vaultOn,
-        save: (file) => vaultSaves?.save(file),
+        save: (agentId, talk) => deps.vaultStore?.save(agentId, talk),
+        drop: (agentId) => deps.vaultStore?.drop(agentId),
         log,
       },
       kept,
@@ -322,9 +314,13 @@ export function createOfficePlugin(
   });
   let stopTimeline: (() => void) | undefined;
   const timelineReady = (async () => {
-    const kept = (await deps.timelineFile?.load()) ?? null;
+    const kept = (await deps.timelineStore?.load()) ?? null;
     timeline = createTimelineLog(
-      { now: () => deps.clock.now(), save: (file) => timelineSaves?.save(file) },
+      {
+        now: () => deps.clock.now(),
+        append: (lines) => deps.timelineStore?.append(lines),
+        rewrite: (file) => deps.timelineStore?.rewrite(file),
+      },
       kept,
     );
     stopTimeline = hub.watch(timeline.view);
@@ -1048,8 +1044,8 @@ export function createOfficePlugin(
     stopWatchers();
     stopCheckouts();
     stopVault?.();
-    await vaultSaves?.flush();
-    await timelineSaves?.flush();
+    await deps.vaultStore?.flush();
+    await deps.timelineStore?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
     machine.stop();
@@ -1080,8 +1076,18 @@ export default function contribute(server: PluginServerContext): () => Promise<v
       log,
     }),
     tenureFile: createLifeFile(tenureFile(process.env, homedir()), TenureLedgerSchema),
-    timelineFile: createLifeFile(timelineFile(process.env, homedir()), TimelineFileSchema),
-    vaultFile: createLifeFile(vaultFile(process.env, homedir()), VaultFileSchema),
+    timelineStore: createTimelineStore(
+      timelineFile(process.env, homedir()),
+      timelineLegacyFile(process.env, homedir()),
+      nodeClock,
+      log,
+    ),
+    vaultStore: createVaultStore(
+      vaultDir(process.env, homedir()),
+      vaultLegacyFile(process.env, homedir()),
+      nodeClock,
+      log,
+    ),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     chatStore: createChatStore({

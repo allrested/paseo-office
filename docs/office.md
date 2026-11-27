@@ -560,12 +560,14 @@ only: the 3D floor keeps showing the present.
 **This week** adds the last seven days up: time at work, turns started, edits, commands, cost where
 the provider reports one, the busiest team, and a bar for each 24 hours.
 
-The office's server keeps this log itself (`server/timeline.ts`, `office/timeline.json`, mode 600):
+The office's server keeps this log itself (`server/timeline.ts`, `office/timeline.jsonl`, mode 600):
 each change of an agent's state, the kind of each tool call (never its file, command or text) and
 each rise of its cost, for eight days and at most 40,000 marks. It sees only while an office
 surface is open on some device, at the directory's changes and the 5-second activity reads. A time
 the office was closed is a gap in every lane, not a rest, and the week's figures count only what
-was seen. `office.timeline.request` reads it.
+was seen. `office.timeline.request` reads it. The file is a line per mark: a change adds lines to its end,
+and the whole file is written again only when the server starts and when old marks are cut off. A
+`timeline.json` of 0.2.14 or earlier is read once and replaced.
 
 ## What the office notices
 
@@ -623,8 +625,10 @@ conversation: the prompts and the replies, not the tool calls. It reads an agent
 Paseo when it first sees the agent and after each of its turns, for every provider, so it holds
 what was said while an office surface was open. A message is cut at 2,000 characters, a
 conversation at its newest 300 messages, and the vault at its 200 most recent conversations. It is
-one file on the host, `office/vault.json`, mode 600; turning the setting off stops the reading and
-hides what is kept, and deleting the file empties it.
+a folder on the host, `office/vault/`, with one file per conversation, mode 600, so a turn's end
+writes that conversation only. Turning the setting off stops the reading and hides what is kept,
+and deleting the folder empties it. A `vault.json` of 0.2.14 or earlier is moved into the folder
+the first time the office starts.
 
 **History**, in the toolbar of a wide office and at the top of the Activity tab, searches it with **Find**: the
 newest 40 messages that hold every word typed, each with the words around the match. A hit opens
