@@ -645,3 +645,69 @@ test("a request that cannot be read keeps the words that say where to answer it"
   expect(container.textContent).toContain("Answer this in the workspace.");
   expect(maybe("Approve plan")).toBeNull();
 });
+
+test("typing a slash lists the session's commands, and a press puts one in the box", async () => {
+  const commands = vi.fn(async () => [
+    { name: "compact", description: "Shrink the conversation" },
+    { name: "model", description: "Choose the model" },
+  ]);
+  await draw({ actions: { send, respond, cancel, commands } });
+  expect(commands).not.toHaveBeenCalled();
+  expect(maybe("/compact: Shrink the conversation")).toBeNull();
+
+  await type("/");
+  expect(commands).toHaveBeenCalledWith("a1");
+  expect(maybe("/compact: Shrink the conversation")).not.toBeNull();
+  await type("/mo");
+  expect(maybe("/compact: Shrink the conversation")).toBeNull();
+  await press("/model: Choose the model");
+  expect(box().value).toBe("/model ");
+  // With what the command takes typed after it, the list is out of the way.
+  expect(maybe("/model: Choose the model")).toBeNull();
+  // Read once: the word typed only filters what was listed.
+  expect(commands).toHaveBeenCalledTimes(1);
+});
+
+test("Options shows what the session's provider lets a client change, and a press changes it", async () => {
+  let model = "fast";
+  const controls = vi.fn(async () => ({
+    controls: [
+      {
+        type: "select",
+        key: "model",
+        label: "Model",
+        choices: [
+          { value: "fast", label: "Fast" },
+          { value: "deep", label: "Deep" },
+        ],
+      },
+    ],
+    options: { model },
+  }));
+  const setOption = vi.fn(async (_agentId: string, _key: string, value: string | boolean) => {
+    if (value === "deep") model = "deep";
+    else throw new Error("The provider cannot change that while a turn runs");
+  });
+  await draw({ actions: { send, respond, cancel, controls, setOption } });
+  expect(maybe("Fast")).toBeNull();
+  await press("Session options");
+  expect(labelled("Fast").getAttribute("aria-pressed")).toBe("true");
+
+  await press("Deep");
+  expect(setOption).toHaveBeenLastCalledWith("a1", "model", "deep");
+  expect(labelled("Deep").getAttribute("aria-pressed")).toBe("true");
+
+  await press("Fast");
+  expect(alerts()).toContain("The provider cannot change that while a turn runs");
+  expect(labelled("Deep").getAttribute("aria-pressed")).toBe("true");
+});
+
+test("a session with nothing to change says so, and a host that cannot read options offers none", async () => {
+  await draw();
+  expect(maybe("Session options")).toBeNull();
+  const controls = vi.fn(async () => ({ controls: undefined, options: undefined }));
+  const setOption = vi.fn(async () => undefined);
+  await draw({ actions: { send, respond, cancel, controls, setOption } });
+  await press("Session options");
+  expect(container.textContent).toContain("This session has no options to change here.");
+});

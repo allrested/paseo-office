@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSettings } from "@getpaseo/plugin/client";
-import { officeColumnSettings } from "../shared/settings.js";
+import { COLUMN_SESSIONS_MAX, officeColumnSettings } from "../shared/settings.js";
 import {
   COLUMN_DEFAULT,
   NO_SESSIONS,
@@ -14,6 +14,8 @@ import {
 interface ColumnValues {
   width: number;
   collapsed: boolean;
+  /** The open session tabs, kept so a reload brings them back. */
+  sessions?: string[];
 }
 
 const DEFAULTS: ColumnValues = { width: COLUMN_DEFAULT, collapsed: false };
@@ -51,12 +53,24 @@ export function useColumn(compact: boolean): ColumnState {
   const [tabs, setTabs] = useState(NO_SESSIONS);
   const width = local.width ?? stored?.width ?? DEFAULTS.width;
   const collapsed = local.collapsed ?? stored?.collapsed ?? DEFAULTS.collapsed;
+  // The tabs a reload left behind come back once, when the device's document is first read.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (stored === null || restored.current) return;
+    restored.current = true;
+    const kept = stored.sessions ?? [];
+    if (kept.length > 0)
+      setTabs((current) => (current.open.length > 0 ? current : { ...current, open: kept }));
+  }, [stored]);
   const change = useCallback(
     (patch: Partial<ColumnValues>) => {
       setLocal((current) => ({ ...current, ...patch }));
-      if (revision !== null) void save({ width, collapsed, ...patch }, revision);
+      if (revision === null) return;
+      // Every save writes the document whole: the tabs go along with the width, and the width with the tabs.
+      const sessions = (patch.sessions ?? tabs.open).slice(-COLUMN_SESSIONS_MAX);
+      void save({ width, collapsed, ...patch, sessions }, revision);
     },
-    [save, revision, width, collapsed],
+    [save, revision, width, collapsed, tabs.open],
   );
   const show = useCallback(
     (next: ColumnTab) => {
@@ -67,14 +81,22 @@ export function useColumn(compact: boolean): ColumnState {
   );
   const openSession = useCallback(
     (agentId: string) => {
-      setTabs((current) => openTab(current, agentId));
-      if (collapsed && !compact) change({ collapsed: false });
+      const next = openTab(tabs, agentId);
+      setTabs(next);
+      change({
+        sessions: [...next.open],
+        ...(collapsed && !compact ? { collapsed: false } : {}),
+      });
     },
-    [collapsed, compact, change],
+    [tabs, collapsed, compact, change],
   );
   const closeSession = useCallback(
-    (agentId: string) => setTabs((current) => closeTab(current, agentId)),
-    [],
+    (agentId: string) => {
+      const next = closeTab(tabs, agentId);
+      setTabs(next);
+      if (next !== tabs) change({ sessions: [...next.open] });
+    },
+    [tabs, change],
   );
   const setCollapsed = useCallback((next: boolean) => change({ collapsed: next }), [change]);
   const setWidth = useCallback((next: number) => change({ width: next }), [change]);

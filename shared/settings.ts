@@ -322,13 +322,19 @@ export const officeDeviceSettings = defineSettings({
  * its rail. A setting of its own: the view's and the incidents' saves write `office-device` whole,
  * and would drop a field of the column's.
  */
+/** The most open session tabs a device keeps across a reload. */
+export const COLUMN_SESSIONS_MAX = 12;
+
 export const officeColumnSettings = defineSettings({
   id: "office-column",
   scope: "device",
   version: 1,
+  // `sessions` are the open session tabs, by agent id, so a reload brings them back. It is an
+  // additive optional field: a client from before it still reads the document.
   schema: z.object({
     width: z.number().default(360),
     collapsed: z.boolean().default(false),
+    sessions: z.array(z.string()).max(COLUMN_SESSIONS_MAX).optional(),
   }),
 });
 

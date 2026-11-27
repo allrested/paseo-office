@@ -213,9 +213,17 @@ a plan shows its text with the request's own actions, or Approve plan and Keep p
 line of what to change that goes with a refusal; a question shows its form, the options as
 buttons and a box where another answer is taken, with Send answers once each question has one,
 and Dismiss. The office reads the request from Paseo when the session shows it; a request it
-cannot read, or of a shape it does not know, says to answer it in the workspace. For attachments, model changes or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
+cannot read, or of a shape it does not know, says to answer it in the workspace. Typing `/` in the reply box lists the slash commands and skills the running session reports
+(`client/session-extras.ts`): the list narrows as the word is typed, and a press puts the command
+in the box with a space after it for what it takes. It is read from Paseo the first time a slash
+is typed, and a command can be typed whole and sent where there is no list. **Options**, over the
+box, shows the session's own options as its provider describes them to Paseo, each a switch or a
+row of choices, and a press changes one at once; what a provider refuses to change says why. That
+is how a model or a mode is changed here, for a provider that offers it as an option: Paseo gives
+a plugin no call of its own for either, so a provider that offers neither shows "This session has
+no options to change here." For attachments or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
-Open sessions and the chosen tab last while the office is mounted, not across a reload.
+The open sessions are kept on the device (`sessions` in the `office-column` setting, twelve at most), so a reload opens their tabs again, on the Sessions tab; the chosen tab itself is not kept.
 
 [Desktop Office controls](workspace-controls.webp) · [Phone Office controls](workspace-controls-mobile.webp)
 
