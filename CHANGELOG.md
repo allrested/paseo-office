@@ -23,6 +23,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   are read from the Mac's own commands. A Mac cannot say which process an agent started, so the
   card lists no agent, marks nothing as left running and offers no clean-up there. Linux is
   unchanged, and Windows still has no local reading.
+- Stand-up notes: a daemon that restarts after 08:00 on a stand-up day, with no entry for the day
+  in the notes yet, now writes it when the office starts, as soon as the Paseo API is there. A
+  run due on one day that could only start on the next is still dropped. Before, the day's entry
+  was never written.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

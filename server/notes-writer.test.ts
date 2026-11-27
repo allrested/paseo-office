@@ -516,3 +516,23 @@ test("the store keeps the state in its file, and reads a missing or broken file 
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("a make-up start writes nothing when today's entry is already in the notes", async () => {
+  wrote();
+  expect(await w.start({ unlessWritten: true })).toEqual({ started: false });
+  expect(ports.started).toEqual([]);
+  expect(ports.checked).toEqual([TODAY]);
+});
+
+test("a make-up start starts one writer when today's entry is not there, and not a second", async () => {
+  expect(await w.start({ unlessWritten: true })).toEqual({ started: true });
+  expect(await w.start({ unlessWritten: true })).toEqual({ started: false });
+  expect(ports.started).toHaveLength(1);
+});
+
+test("a make-up start leaves a writer at work alone, and a plain start does not look at the notes", async () => {
+  expect(await w.start()).toEqual({ started: true });
+  expect(ports.checked).toEqual([]);
+  expect(await w.start({ unlessWritten: true })).toEqual({ started: false });
+  expect(ports.checked).toEqual([]);
+});

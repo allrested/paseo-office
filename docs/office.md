@@ -994,7 +994,12 @@ at 08:00 every day in the same zone, and the incidents check every 5 minutes, wh
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
-- A run that came due while the daemon was down is not made up.
+- A run that came due while the daemon was down is not made up, with one exception: the stand-up
+  notes. When the office starts, or a save sets its notes schedule (a new folder, zone or days),
+  and today is a stand-up day in the notes' zone, 08:00 has passed there and today's
+  `## DD Month YYYY` entry is not in the notes, the day's run is made up at once, and waits for the
+  Paseo API like any run. It starts nothing while a writer is at work, so a day never has two
+  entries, and it follows the rule below when it could only start on a later day.
 - After a daemon restart, a run waits until the office is opened or an agent opens or ends a turn.
   An installed plugin gets the Paseo API only on a handler's or a hook's context, and a run needs
   it. The plugin's log says when a run is waiting.

@@ -114,6 +114,7 @@ import { nodeNotesFs, readMonthNotes } from "./server/notes-files.js";
 import {
   createNotesSchedule,
   lateNotesRun,
+  missedNotesRun,
   NOTES_SCHEDULE,
   notesTimeZone,
 } from "./server/notes-schedule.js";
@@ -677,7 +678,14 @@ export function createOfficePlugin(
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
-    await notesSchedule.sync(state.values);
+    const notesSaved = await notesSchedule.sync(state.values);
+    // The schedule was just set: at the daemon's start, or by a changed zone, folder or days. A
+    // run that came due earlier today is made up.
+    if (notesSaved && missedNotesRun(state.values, deps.hostTimeZone, deps.clock.now())) {
+      void startNotesRun(deps.clock.now(), { unlessWritten: true }).catch((error: unknown) =>
+        log(`[office] ${NOTES_SCHEDULE} make-up run failed: ${errorMessage(error)}`),
+      );
+    }
     await duties.settingsChanged();
     // The writer reads the folder again, and its push carries the schedule's error with it.
     await writer
@@ -822,8 +830,12 @@ export function createOfficePlugin(
     }
     await holder.wait();
   }
-  // The 8:00 run ends once the writer started; the writer's own end is its turn's hook.
-  const stopNotesRuns = deps.schedules.handle(NOTES_SCHEDULE, async (dueAt) => {
+  // The 8:00 run ends once the writer started; the writer's own end is its turn's hook. A run
+  // made up after a restart is the same, given the day it came due.
+  async function startNotesRun(
+    dueAt: number,
+    options?: { unlessWritten?: boolean },
+  ): Promise<void> {
     await paseoForRun(NOTES_SCHEDULE);
     // The writer writes the day it starts on: a run that waited past midnight would write the
     // wrong day. Settings that cannot be read are left to the writer, which shows why.
@@ -838,8 +850,9 @@ export function createOfficePlugin(
       );
       return;
     }
-    await writer.start();
-  });
+    await writer.start(options);
+  }
+  const stopNotesRuns = deps.schedules.handle(NOTES_SCHEDULE, (dueAt) => startNotesRun(dueAt));
   // The duty board's day: what is due is posted, and done duties of earlier days leave.
   const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(notifyTestRpc, () => notifier.send(testNotice(deps.clock.now(), officeName)));

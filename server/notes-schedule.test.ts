@@ -3,12 +3,15 @@ import { fakeSchedules } from "./fake-schedules.js";
 import {
   createNotesSchedule,
   lateNotesRun,
+  missedNotesRun,
   NOTES_SCHEDULE,
   notesCadence,
   syncNotesSchedule,
 } from "./notes-schedule.js";
 
 const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
+/** Wednesday 11 November 2026, noon in Riyadh. */
+const NOON = Date.parse("2026-11-11T09:00:00.000Z");
 const RIYADH_EIGHT = {
   type: "cron",
   expression: "0 8 * * 0,1,2,3,4",
@@ -236,4 +239,51 @@ test("the days are the zone's: midnight west of UTC is passed while the UTC day 
   expect(
     lateNotesRun(at("2026-11-18T23:00:00Z"), at("2026-11-19T01:00:00Z"), "America/New_York"),
   ).toBeNull();
+});
+
+const RIYADH_VALUES = { notesFolder: "/n", notesTimeZone: "", notesDays: SUNDAY_TO_THURSDAY };
+
+test("the 8:00 run is missed on a stand-up day from 8:00 in the notes' zone", () => {
+  // Tuesday 17 November 2026: 07:59 and 08:00 in Riyadh.
+  expect(missedNotesRun(RIYADH_VALUES, "Asia/Riyadh", Date.parse("2026-11-17T04:59:00.000Z"))).toBe(
+    false,
+  );
+  expect(missedNotesRun(RIYADH_VALUES, "Asia/Riyadh", Date.parse("2026-11-17T05:00:00.000Z"))).toBe(
+    true,
+  );
+  expect(missedNotesRun(RIYADH_VALUES, "Asia/Riyadh", Date.parse("2026-11-17T20:59:00.000Z"))).toBe(
+    true,
+  );
+});
+
+test("the zone's day counts, not the host's", () => {
+  // 22:00 Saturday UTC is 01:00 Sunday in Riyadh, before 8:00; 09:00 Sunday UTC is noon there.
+  expect(missedNotesRun(RIYADH_VALUES, "UTC", Date.parse("2026-11-14T22:00:00.000Z"))).toBe(false);
+  expect(missedNotesRun(RIYADH_VALUES, "UTC", Date.parse("2026-11-15T09:00:00.000Z"))).toBe(true);
+  const auckland = { ...RIYADH_VALUES, notesTimeZone: "Pacific/Auckland" };
+  // 20:00 Tuesday UTC is 09:00 Wednesday in Auckland, a stand-up day.
+  expect(missedNotesRun(auckland, "UTC", Date.parse("2026-11-17T20:00:00.000Z"))).toBe(true);
+});
+
+test("a day that is not a stand-up day, and a schedule that is not set, miss nothing", () => {
+  // Friday 20 November 2026, noon in Riyadh.
+  const friday = Date.parse("2026-11-20T09:00:00.000Z");
+  expect(missedNotesRun(RIYADH_VALUES, "Asia/Riyadh", friday)).toBe(false);
+  expect(missedNotesRun({ ...RIYADH_VALUES, notesFolder: "" }, "Asia/Riyadh", NOON)).toBe(false);
+  expect(missedNotesRun({ ...RIYADH_VALUES, notesDays: [] }, "Asia/Riyadh", NOON)).toBe(false);
+});
+
+test("a sync says whether it saved the schedule", async () => {
+  const fake = fakeSchedules();
+  const notes = createNotesSchedule({
+    schedules: fake,
+    hostTimeZone: "Asia/Riyadh",
+    log: () => {},
+  });
+  expect(await notes.sync(RIYADH_VALUES)).toBe(true);
+  // Already so: not saved again.
+  expect(await notes.sync(RIYADH_VALUES)).toBe(false);
+  expect(await notes.sync({ ...RIYADH_VALUES, notesFolder: "" })).toBe(false);
+  fake.upsertRejects(new Error("Invalid time zone: Mars/Base"));
+  expect(await notes.sync({ ...RIYADH_VALUES, notesTimeZone: "Mars/Base" })).toBe(false);
 });
