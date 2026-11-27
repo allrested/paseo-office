@@ -28,6 +28,12 @@ interface FakeReader extends TrackerReader {
   reads: number[];
   /** A read waits for this before it answers, while set. */
   hold: Promise<void> | null;
+  /** The keys the tracker holds as resolved. */
+  done: string[];
+  /** The keys each look at what is resolved asked about. */
+  asked: string[][];
+  /** Thrown by every look at what is resolved while set. */
+  resolvedFailure: Error | null;
 }
 
 function fakeReader(events: string[]): FakeReader {
@@ -36,6 +42,14 @@ function fakeReader(events: string[]): FakeReader {
     failure: null,
     reads: [],
     hold: null,
+    done: [],
+    asked: [],
+    resolvedFailure: null,
+    async resolved(open) {
+      reader.asked.push(open.map((incident) => incident.key));
+      if (reader.resolvedFailure !== null) throw reader.resolvedFailure;
+      return reader.done;
+    },
     async read(since) {
       reader.reads.push(since);
       events.push("read");
@@ -617,4 +631,35 @@ test("a dismiss during a check waits for it, and closes what it opened", async (
   expect(await dismissing).toBe(1);
   expect(h.store.kept.open).toEqual([]);
   expect(h.changes.at(-1)).toEqual({ open: [], problems: {} });
+});
+
+test("an incident its tracker holds as resolved closes at the next check, and does not open again", async () => {
+  const h = await checkedOnce();
+  h.jira.issues.push(bug("SHOP-3", NOW + MINUTE), bug("SHOP-4", NOW + 2 * MINUTE));
+  await h.check.check();
+  expect(h.store.kept.open.map((open) => open.key)).toEqual(["SHOP-3", "SHOP-4"]);
+  // Asked about what was open, the two just opened included.
+  expect(h.jira.asked.at(-1)).toEqual(["SHOP-3", "SHOP-4"]);
+
+  h.jira.done = ["SHOP-3"];
+  h.clock.advance(5 * MINUTE);
+  await h.check.check();
+  expect(h.store.kept.open.map((open) => open.key)).toEqual(["SHOP-4"]);
+  expect(h.changes.at(-1)?.open.map((open) => open.key)).toEqual(["SHOP-4"]);
+
+  // Its key stays seen: the issue is still in the tracker's answer, and rings nothing.
+  h.jira.done = [];
+  h.clock.advance(5 * MINUTE);
+  await h.check.check();
+  expect(h.store.kept.open.map((open) => open.key)).toEqual(["SHOP-4"]);
+  expect(h.told).toEqual(["jira:SHOP-3", "jira:SHOP-4"]);
+});
+
+test("a look at what is resolved that fails is the tracker's problem and closes nothing", async () => {
+  const h = await checkedOnce();
+  h.jira.issues.push(bug("SHOP-3", NOW + MINUTE));
+  h.jira.resolvedFailure = new TrackerProblem("Jira answered HTTP 500");
+  await h.check.check();
+  expect(h.store.kept.open.map((open) => open.key)).toEqual(["SHOP-3"]);
+  expect(h.changes.at(-1)?.problems).toEqual({ jira: "Jira answered HTTP 500" });
 });

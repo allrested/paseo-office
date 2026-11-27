@@ -13,6 +13,7 @@ import {
 const WEATHER_DEFAULTS = { weatherMode: "off", weatherManual: "season", weatherUrl: "" };
 const INCIDENT_DEFAULTS = {
   jiraProjects: "",
+  jiraTypes: "Bug",
   sentryOrg: "",
   sentryProjects: "",
   sentryUrl: "https://sentry.io",
@@ -91,11 +92,12 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     notesTimeZone: "Asia/Riyadh",
     notesMode: "",
     jiraProjects: "SHOP",
+    jiraTypes: "Bug",
     sentryOrg: "acme",
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(10);
+  expect(officeHostSettings.version).toBe(11);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -111,11 +113,12 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     notesMode: "",
     notesDays: [1, 3],
     jiraProjects: "SHOP",
+    jiraTypes: "Bug",
     sentryOrg: "acme",
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(10);
+  expect(officeHostSettings.version).toBe(11);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -145,6 +148,7 @@ test("a plan this build does not know reads as the company floor and the rest is
     notesMode: "",
     notesDays: [1, 3],
     jiraProjects: "SHOP",
+    jiraTypes: "Bug",
     sentryOrg: "acme",
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
@@ -367,5 +371,5 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(10);
+  expect(officeHostSettings.version).toBe(11);
 });

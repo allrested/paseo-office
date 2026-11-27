@@ -4,6 +4,7 @@ import {
   AWS_PROFILE,
   AWS_REGION,
   JIRA_KEY,
+  JIRA_TYPE,
   parseKeys,
   SENTRY_SLUG,
 } from "../shared/settings.js";
@@ -26,6 +27,7 @@ const EVERY_MS = 300_000;
 
 export interface IncidentsSettings {
   jiraProjects: string;
+  jiraTypes: string;
   sentryOrg: string;
   sentryProjects: string;
   sentryUrl: string;
@@ -48,7 +50,8 @@ export function incidentsReaders(
   const { jira, sentry } = credentials;
   const jiraProjects = parseKeys(values.jiraProjects, JIRA_KEY);
   if (jira !== null && jiraProjects.length > 0) {
-    readers.jira = createJiraReader(jira, jiraProjects);
+    const types = parseKeys(values.jiraTypes, JIRA_TYPE);
+    readers.jira = createJiraReader(jira, jiraProjects, fetch, types.length > 0 ? types : ["Bug"]);
   }
   const org = values.sentryOrg.trim();
   const sentryProjects = parseKeys(values.sentryProjects, SENTRY_SLUG);

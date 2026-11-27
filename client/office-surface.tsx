@@ -2202,6 +2202,21 @@ export function OfficeSurface(
     newAgent,
     closeTeam,
   );
+  const incidentToLobby = useCallback(
+    (text: string) => boardActions.post({ board: LOBBY, kind: "task", text }),
+    [boardActions],
+  );
+  const { change: changeNewAgent } = newAgent;
+  const { onNewAgent } = chatTasks;
+  const { close: closeIncidents } = incidentsCard;
+  const analyzeIncident = useCallback(
+    (prompt: string) => {
+      changeNewAgent({ prompt });
+      closeIncidents();
+      onNewAgent();
+    },
+    [changeNewAgent, closeIncidents, onNewAgent],
+  );
   const panel = {
     office,
     styles,
@@ -2399,6 +2414,9 @@ export function OfficeSurface(
         open={incidentsCard.open}
         now={incidentsCard.openedAt}
         onDismiss={dismissIncidents}
+        lobby={office.state.boards[LOBBY]}
+        onLobby={incidentToLobby}
+        onAnalyze={analyzeIncident}
         styles={styles}
         onClose={incidentsCard.close}
       />

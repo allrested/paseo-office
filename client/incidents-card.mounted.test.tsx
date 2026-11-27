@@ -7,7 +7,7 @@ import { act, createElement, type MouseEvent, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { Incident, IncidentsState } from "../shared/contracts.js";
+import type { Incident, IncidentsState, Post } from "../shared/contracts.js";
 import { IncidentsCard } from "./incidents-card.js";
 import { useOfficeStyles } from "./styles.js";
 
@@ -79,6 +79,19 @@ async function dismiss(ids?: string[]): Promise<void> {
 
 const ignore = () => undefined;
 
+let lobby: Post[];
+let lobbied: string[];
+let analyzed: string[];
+async function toLobby(task: string): Promise<void> {
+  lobbied.push(task);
+}
+const analyze = (prompt: string) => void analyzed.push(prompt);
+const BUG_TASK = [
+  "Analyze the Jira incident SHOP-12: Checkout fails on Safari",
+  "https://example.atlassian.net/browse/SHOP-12",
+  "Find the likely cause in the code and say what you found, how sure you are and what fix you propose. Change nothing until the fix is agreed.",
+].join("\n");
+
 function Harness({ state }: { state: IncidentsState | undefined }) {
   const styles = useOfficeStyles(THEME, false, false);
   return (
@@ -87,6 +100,9 @@ function Harness({ state }: { state: IncidentsState | undefined }) {
       open
       now={NOW}
       onDismiss={dismiss}
+      lobby={lobby}
+      onLobby={toLobby}
+      onAnalyze={analyze}
       styles={styles}
       onClose={ignore}
     />
@@ -98,6 +114,9 @@ let root: Root;
 
 beforeEach(() => {
   dismissed = [];
+  lobby = [];
+  lobbied = [];
+  analyzed = [];
   dismissFailure = null;
   linkFailure = null;
   container = document.createElement("div");
@@ -161,4 +180,24 @@ test("nothing open: the card says so, and each tracker's problem is a line at th
 
   await mount(undefined);
   expect(card()?.textContent).toBe("No open incidents");
+});
+
+test("Analyze hands the incident over as a first prompt, and Add to lobby as a task, once", async () => {
+  await mount(TWO_OPEN);
+  await press('[aria-label="Start an agent to analyze SHOP-12"]');
+  expect(analyzed).toEqual([BUG_TASK]);
+  await press('[aria-label="Add SHOP-12 to the lobby board"]');
+  expect(lobbied).toEqual([BUG_TASK]);
+
+  // The task is on the lobby's board now: no second one is offered until it is done.
+  const task = { id: "p1", seq: 1, board: "lobby", kind: "task", text: BUG_TASK, author: "user" };
+  lobby = [{ ...task, state: "claimed" } as Post];
+  await mount(TWO_OPEN);
+  expect(container.querySelector('[aria-label="Add SHOP-12 to the lobby board"]')).toBeNull();
+  expect(card()?.textContent).toContain("On the lobby board");
+  expect(container.querySelector('[aria-label="Add API-7 to the lobby board"]')).not.toBeNull();
+
+  lobby = [{ ...task, state: "done" } as Post];
+  await mount(TWO_OPEN);
+  expect(container.querySelector('[aria-label="Add SHOP-12 to the lobby board"]')).not.toBeNull();
 });

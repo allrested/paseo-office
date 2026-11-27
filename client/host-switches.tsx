@@ -55,6 +55,7 @@ type HostSetting =
   | typeof NOTES_MODE_LABEL
   | typeof FLOOR_PLAN_LABEL
   | "Jira projects"
+  | "Jira issue types"
   | "Sentry organisation"
   | "Sentry projects"
   | "Sentry address"
@@ -369,6 +370,7 @@ function storedMode(values: HostValues | null): string | null {
 
 type TrackerField =
   | "jiraProjects"
+  | "jiraTypes"
   | "sentryOrg"
   | "sentryProjects"
   | "sentryUrl"
@@ -469,6 +471,10 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
     (next: string) => change("Jira projects", { jiraProjects: next }),
     [change],
   );
+  const saveJiraTypes = useCallback(
+    (next: string) => change("Jira issue types", { jiraTypes: next }),
+    [change],
+  );
   const saveSentryOrg = useCallback(
     (next: string) => change("Sentry organisation", { sentryOrg: next }),
     [change],
@@ -504,10 +510,18 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         <JiraConnection connection={incidents?.connections?.jira} styles={styles} />
         <SettingField
           label="Jira projects"
-          hint="Project keys, comma separated. New bugs in them ring the incident alarm."
+          hint="Project keys, comma separated. New issues in them ring the incident alarm."
           value={jiraProjects}
           onSave={saveJiraProjects}
           problem={jiraProblem}
+          styles={styles}
+        />
+        <SettingField
+          label="Jira issue types"
+          hint="The issue types that ring, by name, comma separated. Bug when empty."
+          value={storedText(values, "jiraTypes")}
+          onSave={saveJiraTypes}
+          problem={saveProblem("Jira issue types")}
           styles={styles}
         />
         <SentryConnection connection={incidents?.connections?.sentry} styles={styles} />

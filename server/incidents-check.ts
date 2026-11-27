@@ -105,6 +105,24 @@ export function createIncidentsCheck(ports: IncidentsPorts): IncidentsCheck {
     problems[source] = problem;
   }
 
+  /** What the tracker now holds as resolved leaves the open incidents; its key stays seen. */
+  async function closeResolved(
+    data: IncidentsData,
+    source: IncidentSource,
+    reader: TrackerReader,
+  ): Promise<void> {
+    const open = data.open.filter((kept) => kept.source === source);
+    if (reader.resolved === undefined || open.length === 0) return;
+    let keys: Set<string>;
+    try {
+      keys = new Set(await reader.resolved(open));
+    } catch (error) {
+      failed(source, error);
+      return;
+    }
+    data.open = data.open.filter((kept) => kept.source !== source || !keys.has(kept.key));
+  }
+
   async function checkTracker({ data, source, reader, now }: TrackerCheck): Promise<void> {
     const mark = data.trackers[source];
     let found: FoundIssue[];
@@ -133,6 +151,7 @@ export function createIncidentsCheck(ports: IncidentsPorts): IncidentsCheck {
     // With some left over, the next read starts at the last one opened and finds the rest.
     const leftOver = fresh.length > taken.length;
     mark.checkedAt = leftOver ? taken[taken.length - 1].createdAt : now;
+    await closeResolved(data, source, reader);
   }
 
   async function checkTrackers(data: IncidentsData, now: number): Promise<void> {
