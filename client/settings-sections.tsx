@@ -1,8 +1,7 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "./text.js";
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
-import { useFullscreenDialog } from "./office-modal.js";
 import type { OfficeStyles } from "./styles.js";
 
 const sections = ["Appearance", "Teams", "Automation", "Services"] as const;
@@ -15,7 +14,22 @@ const icons = {
 };
 export const settingsLayout = StyleSheet.create({
   fill: { flex: 1, minHeight: 0 },
-  flush: { padding: 0, gap: 0 },
+  /** A dialog's body that holds the sections: they fill it and scroll inside it. */
+  body: { flex: 1, minHeight: 0, padding: 0, gap: 0 },
+  /** A phone's tab: the icon over its name, so all four read alike at any width. */
+  tabStacked: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: 2,
+    paddingVertical: 6,
+    minHeight: 44,
+    borderRadius: 8,
+  },
+  /** A phone's page: room under the last field, so it clears the home bar. */
+  pagePhone: { padding: 18, paddingBottom: 32, gap: 20 },
   nav: {
     flexDirection: "row",
     alignItems: "center",
@@ -52,11 +66,13 @@ function SectionButton({
   section,
   active,
   select,
+  stacked,
   styles,
 }: {
   section: Section;
   active: boolean;
   select(section: Section): void;
+  stacked: boolean;
   styles: OfficeStyles;
 }) {
   const press = useCallback(() => select(section), [select, section]);
@@ -68,7 +84,7 @@ function SectionButton({
       onPress={press}
       style={StyleSheet.compose(
         active ? styles.sidebarButtonActive : styles.workspaceAction,
-        settingsLayout.tab,
+        stacked ? settingsLayout.tabStacked : settingsLayout.tab,
       )}
     >
       <Icon
@@ -76,7 +92,9 @@ function SectionButton({
         size={16}
         color={active ? styles.workspaceAccent : styles.iconColor}
       />
-      <Text style={styles.sidebarButtonText}>{section}</Text>
+      <Text numberOfLines={1} style={styles.sidebarButtonText}>
+        {section}
+      </Text>
     </Pressable>
   );
 }
@@ -86,8 +104,14 @@ export function SettingsSections({
   teams,
   automation,
   services,
+  bounded = false,
   styles,
 }: {
+  /**
+   * In a dialog, on a phone's sheet or a wide screen: the tabs stay and the chosen section
+   * scrolls under them. The settings screen scrolls as a whole and leaves it false.
+   */
+  bounded?: boolean;
   appearance: ReactNode;
   teams: ReactNode;
   automation: ReactNode;
@@ -95,18 +119,24 @@ export function SettingsSections({
   styles: OfficeStyles;
 }) {
   const [section, select] = useState<Section>("Appearance");
-  const fullscreen = useFullscreenDialog();
+  // Four tabs with an icon beside each name do not fit a phone's width.
+  const stacked = useWindowDimensions().width < 520;
   const pages = {
     Appearance: appearance,
     Teams: teams,
     Automation: automation,
     Services: services,
   };
-  const contentStyle = fullscreen ? settingsLayout.fill : undefined;
+  const contentStyle = bounded ? settingsLayout.fill : undefined;
+  const pageStyle = stacked ? settingsLayout.pagePhone : settingsLayout.page;
   const content = sections.map((name) => (
     <View key={name} style={name !== section ? styles.hidden : contentStyle}>
-      {fullscreen ? (
-        <ScrollView style={settingsLayout.fill} contentContainerStyle={settingsLayout.page}>
+      {bounded ? (
+        <ScrollView
+          style={settingsLayout.fill}
+          contentContainerStyle={pageStyle}
+          keyboardShouldPersistTaps="handled"
+        >
           {pages[name]}
         </ScrollView>
       ) : (
@@ -115,7 +145,7 @@ export function SettingsSections({
     </View>
   ));
   return (
-    <View style={fullscreen ? settingsLayout.fill : undefined}>
+    <View style={bounded ? settingsLayout.fill : undefined}>
       <View
         role="group"
         aria-label="Settings sections"
@@ -129,6 +159,7 @@ export function SettingsSections({
             section={name}
             active={section === name}
             select={select}
+            stacked={stacked}
             styles={styles}
           />
         ))}

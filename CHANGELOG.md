@@ -4,6 +4,16 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 
 ## Unreleased
 
+- On a phone, **Office settings** opened from the 3D view scrolls: the four section tabs stay at
+  the top and the chosen section scrolls under them, so Branding and every field below it can be
+  reached. Before, the sheet did not scroll and what did not fit was cut off. The tabs show
+  their icon over their name on a narrow screen.
+- A session's **Options** button is as tall as itself. Before, it kept 240 pixels of the panel
+  for itself and the conversation above was left a sliver, worst on a phone. Opened, the options
+  are a card over the reply box that scrolls inside itself. Before, each option kept 240 pixels
+  too, and the ones that did not fit were drawn under the reply box.
+- Settings: **Writer mode** has a row of its own and its modes wrap. Before, the modes past the
+  third were cut off at the edge. The floor plan, Team chat and cup pills wrap too.
 - **Keep watching** now covers the plan limits and the host's memory for the webhook. The plan
   limits are read every 5 minutes with no office open, and a provider's closest limit sends one
   message as it reaches 80%, 95% and 100%, once until it resets; a provider switched off in the Host

@@ -116,6 +116,8 @@ export interface HostSwitchesProps {
   /** Who holds which team and teammate, for the Teams section; none until the office has loaded. */
   rosterHolders?: RosterHolders;
   language?: ReactNode;
+  /** In a dialog: the sections scroll inside its body. */
+  bounded?: boolean;
   children?: ReactNode;
 }
 
@@ -135,6 +137,7 @@ export function HostSwitches({
   weather,
   rosterHolders,
   language,
+  bounded,
   children,
 }: HostSwitchesProps) {
   const settings = useSettings(officeHostSettings);
@@ -243,6 +246,7 @@ export function HostSwitches({
   );
   return (
     <SettingsSections
+      bounded={bounded}
       styles={styles}
       appearance={
         <>
@@ -752,7 +756,7 @@ function FloorSettings({
         <View
           role="group"
           aria-label="Cache clock"
-          style={stored ? styles.segments : styles.segmentsDisabled}
+          style={stored ? styles.notesDays : styles.notesDaysDisabled}
         >
           {CACHE_CLOCKS.map((value) => (
             <SegmentPill
@@ -782,7 +786,7 @@ function FloorSettings({
         <View
           role="group"
           aria-label="Team chat"
-          style={stored ? styles.segments : styles.segmentsDisabled}
+          style={stored ? styles.notesDays : styles.notesDaysDisabled}
         >
           {CHAT_CULTURES.map((value) => (
             <SegmentPill

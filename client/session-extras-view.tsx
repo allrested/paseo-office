@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Text } from "./text.js";
+import { ScrollView } from "@getpaseo/plugin/client/ui";
 import { ActionButton } from "./action-button.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { SegmentPill } from "./segment-pill.js";
@@ -109,7 +110,7 @@ function Option({ option, onChange, styles }: OptionProps) {
   const choose = useCallback((next: string) => onChange(key, next), [onChange, key]);
   if (option.type === "toggle") {
     return (
-      <View style={styles.headerField}>
+      <View style={styles.sessions.option}>
         <LabeledSwitch
           label={option.label}
           value={option.value}
@@ -121,7 +122,7 @@ function Option({ option, onChange, styles }: OptionProps) {
     );
   }
   return (
-    <View style={styles.headerField}>
+    <View style={styles.sessions.option}>
       <Text style={styles.sheetLabel}>{option.label}</Text>
       <View role="group" aria-label={option.label} style={styles.notesDays}>
         {option.choices.map((choice) => (
@@ -184,7 +185,7 @@ export function SessionOptions({ agentId, actions, styles }: OptionsProps) {
   );
   if (controls === undefined || setOption === undefined) return null;
   return (
-    <View style={styles.headerField}>
+    <View style={styles.sessions.options}>
       <View style={styles.actions}>
         <ActionButton
           label={open ? "Hide options" : "Options"}
@@ -197,11 +198,19 @@ export function SessionOptions({ agentId, actions, styles }: OptionsProps) {
       {open && options !== null && options.length === 0 ? (
         <Text style={styles.muted}>{NO_OPTIONS}</Text>
       ) : null}
-      {open && options !== null
-        ? options.map((option) => (
+      {open && options !== null && options.length > 0 ? (
+        // The options scroll in their own room, so the conversation above keeps most of its own.
+        <ScrollView
+          style={styles.sessions.optionList}
+          contentContainerStyle={styles.sessions.optionListBody}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
+          {options.map((option) => (
             <Option key={option.key} option={option} onChange={change} styles={styles} />
-          ))
-        : null}
+          ))}
+        </ScrollView>
+      ) : null}
       {problem === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {problem}

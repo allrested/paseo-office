@@ -92,12 +92,12 @@ export function NotesModeRow({ value, onSave, problem, styles }: NotesModeRowPro
   const disabled = shown === null || wanted !== null;
   const note = wanted === null ? noteOf(asked, shown) : null;
   return (
-    <View style={styles.headerField}>
+    <View style={styles.headerFieldWide}>
       <Text style={styles.sheetLabel}>{NOTES_MODE_LABEL}</Text>
       <View
         role="group"
         aria-label={NOTES_MODE_LABEL}
-        style={disabled ? styles.segmentsDisabled : styles.segments}
+        style={disabled ? styles.notesDaysDisabled : styles.notesDays}
       >
         <SegmentPill
           value=""

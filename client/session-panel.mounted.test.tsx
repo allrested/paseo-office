@@ -803,6 +803,10 @@ test("Options shows what the session's provider lets a client change, and a pres
   });
   await draw({ actions: { send, respond, cancel, controls, setOption } });
   expect(maybe("Fast")).toBeNull();
+  // Closed, the button is as tall as itself: it takes no room from the conversation above.
+  const block = labelled("Session options").parentElement?.parentElement?.parentElement;
+  expect(block?.style.flexBasis).toBe("");
+  expect(block?.style.flexGrow).toBe("");
   await press("Session options");
   expect(labelled("Fast").getAttribute("aria-pressed")).toBe("true");
 
