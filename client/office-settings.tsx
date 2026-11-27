@@ -16,8 +16,17 @@ import { useSoundSwitch } from "./use-sound.js";
 import { SceneChoices } from "./scene-picker.js";
 import { holdersOf } from "./teams-text.js";
 import { ViewSwitch } from "./view-switch.js";
+import { UiLanguage } from "./ui-language.js";
 
-export function OfficeSettings({ theme, layout }: PluginSurfaceProps) {
+export function OfficeSettings(props: PluginSurfaceProps) {
+  return (
+    <UiLanguage>
+      <SettingsPage {...props} />
+    </UiLanguage>
+  );
+}
+
+function SettingsPage({ theme, layout }: PluginSurfaceProps) {
   const touchScreen = useMemo(
     () => hasTouchScreen(layout.platform, layout.platform === "web" ? readPointer() : null),
     [layout.platform],

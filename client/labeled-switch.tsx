@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId } from "react";
 import { Pressable, Text, View } from "react-native";
 import { listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 
 export interface LabeledSwitchProps {
   label: string;
@@ -23,7 +24,8 @@ export interface LabeledSwitchProps {
  * what it turns, and has room for more controls beside it. react-native's Switch is 40 x 20 on
  * web whatever the pointer, and its thumb is a fixed teal while on.
  */
-export function LabeledSwitch({ label, note, value, onChange, styles }: LabeledSwitchProps) {
+export function LabeledSwitch({ label: name, note, value, onChange, styles }: LabeledSwitchProps) {
+  const label = useT()(name);
   const on = value ?? true;
   const disabled = value === null;
   const flip = useCallback(() => onChange(!on), [onChange, on]);

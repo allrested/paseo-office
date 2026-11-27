@@ -14,6 +14,7 @@ import {
   type SyntheticEvent,
 } from "react";
 import { RegisterWorkspaceDock } from "./world/workspace-dock.js";
+import { useT } from "./ui-language.js";
 import { View } from "react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import {
@@ -386,7 +387,9 @@ function BrowserDialog({
   );
 }
 
-export function OfficeModal({ size, headerActions, dockRequest, ...props }: OfficeModalProps) {
+export function OfficeModal({ size, headerActions, dockRequest, ...given }: OfficeModalProps) {
+  const t = useT();
+  const props = { ...given, title: t(given.title) };
   const appearance = useContext(Fullscreen);
   if (appearance === null) return <PaseoModal {...props} />;
   return props.open ? (

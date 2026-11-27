@@ -18,6 +18,7 @@ import {
 } from "./column-model.js";
 import { useTabReveal } from "./tab-reveal.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 import type { ColumnState } from "./use-column.js";
 
 export interface ColumnBadges {
@@ -216,6 +217,7 @@ export function ColumnTabs({
   onClose,
   styles,
 }: ColumnTabsProps) {
+  const t = useT();
   const tab = view?.kind === "tab" ? view.tab : null;
   const reveal = useTabReveal(view?.kind === "session" ? view.agentId : null);
   const list = (
@@ -241,7 +243,7 @@ export function ColumnTabs({
           <Tab
             key={each.tab}
             tab={each.tab}
-            label={each.label}
+            label={t(each.label)}
             icon={each.icon}
             selected={each.tab === tab}
             count={count}

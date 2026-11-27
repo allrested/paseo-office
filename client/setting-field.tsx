@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Text, View } from "react-native";
 import { TextInput } from "@getpaseo/plugin/client/ui";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 interface SettingFieldProps {
   label: string;
   hint: string;
@@ -18,7 +19,11 @@ interface SettingFieldProps {
  * keystroke, since each save brings the daemon's schedule in step again. The text, trimmed, shows
  * until the host has answered; a refused save goes back to the stored value.
  */
-export function SettingField({ label, hint, value, onSave, problem, styles }: SettingFieldProps) {
+export function SettingField(props: SettingFieldProps) {
+  const { value, onSave, problem, styles } = props;
+  const t = useT();
+  const label = t(props.label);
+  const hint = t(props.hint);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
