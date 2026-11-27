@@ -903,12 +903,29 @@ a shell and with a timeout: `sysctl -n hw.memsize hw.ncpu vm.loadavg vm.swapusag
 for the CPU, `ps -axo pid=,rss=,comm=` for the largest processes and `df -k` for the home disk. Memory in
 use is what Activity Monitor calls Memory Used: the anonymous pages less the purgeable ones, plus the
 wired pages, plus the pages the compressor occupies, times the page size `vm_stat` names in its first
-line (4096 on an Intel Mac, 16384 on Apple Silicon); the file cache is not counted. A Mac does not let a
-process read another's environment, so no process can be tied to the agent that started it. The
-reading says so (`perAgent: false`) and lists no agent: the Agents section explains why instead of
-showing "Memory by agent", nothing is marked as left running, and no clean-up is offered. The
-clean-up request is refused on a Mac, so no process is ever signalled there. The readings were built
-from the commands' documented output (see `docs/verified.md`).
+line (4096 on an Intel Mac, 16384 on Apple Silicon); the file cache is not counted.
+
+A Mac does not let a process read another's environment, but `ps -axEww -o pid=,ppid=,rss=,command=`
+prints the environment after the arguments of the user's own processes, and the daemon and its
+agents run as one user. One call reads every process; a row counts for an agent when its **last**
+`PASEO_AGENT_ID=` token (the environment follows the arguments, so an argument that says the text
+comes before it) is an id of an agent the daemon has with a runtime, and its parents are genuine: the
+parent is a counted process of the same agent, since a child inherits the environment, or the
+process is the top of the chain, started by the daemon or left behind with launchd (pid 1). A
+command line that only contains the text sits under a shell or another program that carries no id,
+so it is dropped; the daemon and its ancestors are never counted. A decoy would have to be started by the daemon or by launchd itself to be counted, and it would
+only add its memory to that agent's figure. A process that cleared its environment is not found. Linux needs none of this
+(`/proc/<pid>/environ` is the process's own). The rows feed the same `buildMachine`, so memory by
+agent, process counts and "left running" appear, with `perAgent: true`. The ports come from
+`lsof -nP -iTCP -sTCP:LISTEN -Fpn`, which lists the user's own processes by pid; if it fails, no
+port is shown and no idle agent is marked as left running for lack of one. Environments and
+arguments are never shown or stored; the name stays the program's `comm`. If `ps -E` shows no
+environment at all (the flag unsupported or everything hidden, judged by `PATH=`, `HOME=` or
+`USER=` on any row), the reading says so (`perAgent: false`) and lists no agent, and the Agents
+section explains why instead of "Memory by agent". Only live agents are counted, so what a closed
+agent left behind is not listed on a Mac. Clean-up is still refused on a Mac, so no process is
+ever signalled there (`canCloseRuntime: false`): it waits until the readings have been seen on a
+Mac. The readings were built from the commands' documented output (see `docs/verified.md`).
 
 In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. With **Keep watching** on, the
 host is read every minute with no office open, so that history has no gap, and memory at 90% goes
@@ -969,7 +986,7 @@ command says so under the buttons. A provider reports a context's size when a tu
 reset the old number would stay until the next turn; the office reads a reset agent's context as
 empty until the provider reports another number (`settleResets` in `server/directory.ts`). The janitor
 reads no process, so it is the same on a Mac; it is the host's clean-up of what an agent left
-running, in the Host card, that a Mac does not offer.
+running, in the Host card, that a Mac does not offer yet.
 
 ## The stand-up
 

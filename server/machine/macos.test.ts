@@ -2,9 +2,13 @@ import { expect, test } from "vitest";
 import {
   activityMonitorUsedBytes,
   createMacMachineReader,
+  lastAgentId,
+  macAgentProcesses,
   macMemory,
   parseDf,
+  parseLsofListeners,
   parsePs,
+  parsePsEnvironment,
   parseSysctl,
   parseTopCpu,
   parseVmStat,
@@ -13,6 +17,7 @@ import {
   type Run,
 } from "./macos.js";
 import { createMachineReader, readDetails } from "./machine.js";
+import type { KnownAgent } from "./reading.js";
 
 const GIB = 1024 ** 3;
 
@@ -168,11 +173,15 @@ function fakeRun(outputs: Record<string, string | null>, asked: string[][] = [])
   };
 }
 
-test("a Mac's reading has memory and CPU and no agent, says so, and offers no clean-up", async () => {
+const NO_AGENTS = async (): Promise<KnownAgent[]> => [];
+
+test("a Mac whose ps shows no environment has memory and CPU and no agent, says so, and offers no clean-up", async () => {
   const asked: string[][] = [];
   const reader = createMacMachineReader({
     now: () => NOW,
-    run: fakeRun({ sysctl: SYSCTL, vm_stat: vmStat(16384, 280000), top: TOP }, asked),
+    liveAgents: NO_AGENTS,
+    daemonPid: 100,
+    run: fakeRun({ sysctl: SYSCTL, vm_stat: vmStat(16384, 280000), top: TOP, ps: PS }, asked),
   });
   expect(await reader.read()).toEqual({
     readAt: "2026-11-27T10:00:00.000Z",
@@ -182,11 +191,22 @@ test("a Mac's reading has memory and CPU and no agent, says so, and offers no cl
     canCloseRuntime: false,
     perAgent: false,
   });
-  expect(asked.map((command) => command[0]).toSorted()).toEqual(["sysctl", "top", "vm_stat"]);
+  expect(asked.map((command) => command[0]).toSorted()).toEqual([
+    "lsof",
+    "ps",
+    "sysctl",
+    "top",
+    "vm_stat",
+  ]);
 });
 
 test("a command that fails leaves its figure unread, not zero", async () => {
-  const reader = createMacMachineReader({ now: () => NOW, run: fakeRun({}) });
+  const reader = createMacMachineReader({
+    now: () => NOW,
+    liveAgents: NO_AGENTS,
+    daemonPid: 100,
+    run: fakeRun({}),
+  });
   const machine = await reader.read();
   expect(machine.memory).toBeNull();
   expect(machine.cpuPercent).toBeNull();
@@ -197,9 +217,7 @@ test("the machine reader picks the Mac's source on darwin, and neither on anothe
     procRoot: "/nonexistent",
     cgroupRoot: "/nonexistent",
     now: () => NOW,
-    liveAgents: async () => {
-      throw new Error("a Mac reading asks no agent");
-    },
+    liveAgents: NO_AGENTS,
     agent: async () => null,
     run: fakeRun({ sysctl: SYSCTL, vm_stat: vmStat(4096, 280000), top: TOP }),
   };
@@ -246,4 +264,182 @@ test("the details come from the Mac's commands on darwin only", async () => {
     [],
   );
   expect(darwin.apps[0]?.name).toBe("Google Chrome");
+});
+
+// `ps -axEww -o pid=,ppid=,rss=,command=`: arguments, then the environment, on one line.
+const ENV = "HOME=/Users/me USER=me PATH=/usr/bin:/bin SHELL=/bin/zsh";
+const OLD_ID = "0b1c-agent_old";
+const ID_A = "a1b2c3d4-0000-4000-8000-000000000001";
+const ID_B = "b1b2c3d4-0000-4000-8000-000000000002";
+const ID_GONE = "c1b2c3d4-0000-4000-8000-000000000003";
+
+const PS_E = `  PID  PPID   RSS COMMAND
+    1     0  9000 /sbin/launchd
+  100     1 80000 /usr/local/bin/node /opt/paseo/daemon.js ${ENV}
+  200   100 50000 /usr/local/bin/claude --model x PASEO_AGENT_ID=${ID_A} ${ENV} PASEO_AGENT_ID=${ID_A}
+  201   200 30000 /bin/zsh -c node my app.js --flag=a=b PASEO_AGENT_ID=${ID_A} ${ENV}
+  202   201 20000 node /Users/me/my project/server.js --title=x PASEO_AGENT_ID=${ID_A} ${ENV}
+  300   100 40000 /usr/local/bin/claude PASEO_AGENT_ID=${ID_B} ${ENV}
+  301     1 10000 node /tmp/orphan.js PASEO_AGENT_ID=${ID_B} ${ENV}
+  400   500  1000 grep PASEO_AGENT_ID=${ID_A} ${ENV}
+  500     1  5000 /bin/zsh ${ENV}
+  600   200  2000 sh -c echo PASEO_AGENT_ID=fake ${ENV} PASEO_AGENT_ID=${ID_A}
+  610   200  3000 node tool.js PASEO_AGENT_ID=${ID_B} ${ENV}
+  620   200     0 (defunct-child)
+  700     1 60000 /Applications/Other User App.app/Contents/MacOS/App
+  710   700  7000 node x PASEO_AGENT_ID=${ID_GONE} ${ENV}
+`;
+
+test("the rows of ps -E keep pid, parent and resident memory, and skip the header", () => {
+  const rows = parsePsEnvironment(PS_E);
+  expect(rows).toHaveLength(14);
+  expect(rows[1]).toMatchObject({ pid: 100, ppid: 1, rssBytes: 80000 * 1024 });
+  expect(rows.find((row) => row.pid === 620)).toMatchObject({ rssBytes: 0 });
+  expect(parsePsEnvironment("garbage\n\n  12  1  5\n")).toEqual([
+    { pid: 12, ppid: 1, rssBytes: 5 * 1024, command: "" },
+  ]);
+});
+
+test("the agent id is the last PASEO_AGENT_ID token, and only one of an id's shape", () => {
+  expect(lastAgentId(`node a=b PASEO_AGENT_ID=${ID_A} ${ENV}`)).toBe(ID_A);
+  expect(lastAgentId(`node PASEO_AGENT_ID=fake ${ENV} PASEO_AGENT_ID=${ID_B}`)).toBe(ID_B);
+  expect(lastAgentId(`node ${ENV} PASEO_AGENT_ID=fake`)).toBe("fake");
+  expect(lastAgentId(`node ${ENV}`)).toBeNull();
+  expect(lastAgentId(`node XPASEO_AGENT_ID=${ID_A}`)).toBeNull();
+  expect(lastAgentId(`node --x=PASEO_AGENT_ID=${ID_A}`)).toBeNull();
+  expect(lastAgentId("node PASEO_AGENT_ID=")).toBeNull();
+  expect(lastAgentId("node PASEO_AGENT_ID=../../etc")).toBeNull();
+  expect(lastAgentId(`node PASEO_AGENT_ID=${"a".repeat(81)}`)).toBeNull();
+});
+
+test("a process counts for an agent it descends from, and an argument that names an id counts for nothing", () => {
+  const { processes, environmentSeen } = macAgentProcesses(
+    parsePsEnvironment(PS_E),
+    new Set([ID_A, ID_B]),
+    100,
+  );
+  expect(environmentSeen).toBe(true);
+  const byAgent = (id: string) => processes.filter((p) => p.agentId === id).map((p) => p.pid);
+  // 200 is started by the daemon; 201 and 202 descend through it; 600's env token is the last.
+  expect(byAgent(ID_A)).toEqual([200, 201, 202, 600]);
+  // 300 is started by the daemon, 301 was left with launchd; 610 carries B under A's process.
+  expect(byAgent(ID_B)).toEqual([300, 301]);
+  // The grep names A under a shell, an agent the daemon does not know is ignored, a zombie has none.
+  expect(processes.map((p) => p.pid)).not.toContain(400);
+  expect(processes.map((p) => p.pid)).not.toContain(710);
+  expect(processes.map((p) => p.pid)).not.toContain(620);
+  expect(processes.find((p) => p.pid === 202)?.rssBytes).toBe(20000 * 1024);
+});
+
+test("the daemon and the processes above it are never an agent's, whatever their environment says", () => {
+  const rows = parsePsEnvironment(
+    `    1     0  9000 /sbin/launchd
+   50     1  9000 /bin/zsh ${ENV} PASEO_AGENT_ID=${ID_A}
+  100    50 80000 node daemon.js ${ENV} PASEO_AGENT_ID=${ID_A}
+  200   100 50000 claude ${ENV} PASEO_AGENT_ID=${ID_A}
+  210    50  1000 node sibling.js ${ENV} PASEO_AGENT_ID=${ID_A}
+`,
+  );
+  expect(
+    macAgentProcesses(rows, new Set([ID_A]), 100).processes.map((process) => process.pid),
+  ).toEqual([200]);
+});
+
+test("a loop in the parent chain and an old-style id are handled without hanging", () => {
+  const rows = parsePsEnvironment(
+    `  10  11 1000 node ${ENV} PASEO_AGENT_ID=${OLD_ID}
+  11  10 1000 node ${ENV} PASEO_AGENT_ID=${OLD_ID}
+  12   1 1000 node ${ENV} PASEO_AGENT_ID=${OLD_ID}
+`,
+  );
+  expect(macAgentProcesses(rows, new Set([OLD_ID]), 999).processes.map((p) => p.pid)).toEqual([12]);
+});
+
+test("a very long line is read whole, and the environment is not kept in the result", () => {
+  const long = `node ${"--flag=a=b ".repeat(20000)} PASEO_AGENT_ID=fake ${ENV} PASEO_AGENT_ID=${ID_A}`;
+  const rows = parsePsEnvironment(`  200  100  4000 ${long}\n`);
+  const { processes } = macAgentProcesses(rows, new Set([ID_A]), 100);
+  expect(processes).toHaveLength(1);
+  expect(JSON.stringify(processes)).not.toContain("--flag");
+  expect(JSON.stringify(processes)).not.toContain("/Users/me");
+});
+
+test("ps that shows no environment is not taken for a breakdown", () => {
+  const rows = parsePsEnvironment(PS);
+  expect(macAgentProcesses(rows, new Set([ID_A]), 100)).toEqual({
+    environmentSeen: false,
+    processes: [],
+  });
+});
+
+const LSOF = `p200
+f12
+n*:3000
+f13
+n127.0.0.1:8080
+p202
+n[::1]:5173
+n*:3000
+p999
+nlocalhost:http
+`;
+
+test("lsof gives each process's listening ports", () => {
+  expect(parseLsofListeners(LSOF)).toEqual(
+    new Map([
+      [200, [3000, 8080]],
+      [202, [5173, 3000]],
+    ]),
+  );
+  expect(parseLsofListeners("")).toEqual(new Map());
+});
+
+const AGENT_A: KnownAgent = { id: ID_A, title: "Build", status: "idle", updatedAt: null };
+const AGENT_B: KnownAgent = { id: ID_B, title: null, status: "running", updatedAt: null };
+
+test("a Mac reads memory, process counts and ports by agent, and still offers no clean-up", async () => {
+  const reader = createMacMachineReader({
+    now: () => NOW,
+    liveAgents: async () => [AGENT_A, AGENT_B],
+    daemonPid: 100,
+    run: fakeRun({
+      sysctl: SYSCTL,
+      vm_stat: vmStat(16384, 280000),
+      top: TOP,
+      ps: PS_E,
+      lsof: LSOF,
+    }),
+  });
+  const machine = await reader.read();
+  expect(machine.perAgent).toBe(true);
+  expect(machine.canCloseRuntime).toBe(false);
+  expect(machine.agents.map((agent) => agent.agentId)).toEqual([ID_A, ID_B]);
+  expect(machine.agents[0]).toMatchObject({
+    rssBytes: (50000 + 30000 + 20000 + 2000) * 1024,
+    processCount: 4,
+    ports: [3000, 5173, 8080],
+  });
+  expect(machine.agents[1]).toMatchObject({ processCount: 2, ports: [] });
+});
+
+test("a Mac whose lsof fails still reads memory by agent, with no ports", async () => {
+  const reader = createMacMachineReader({
+    now: () => NOW,
+    liveAgents: async () => [AGENT_A],
+    daemonPid: 100,
+    run: fakeRun({ sysctl: SYSCTL, vm_stat: vmStat(16384, 1), top: TOP, ps: PS_E }),
+  });
+  const machine = await reader.read();
+  expect(machine.perAgent).toBe(true);
+  expect(machine.agents[0]?.ports).toEqual([]);
+});
+
+test("a Mac whose ps fails keeps the card without a breakdown", async () => {
+  const reader = createMacMachineReader({
+    now: () => NOW,
+    liveAgents: async () => [AGENT_A],
+    daemonPid: 100,
+    run: fakeRun({ sysctl: SYSCTL, vm_stat: vmStat(16384, 1), top: TOP }),
+  });
+  expect(await reader.read()).toMatchObject({ perAgent: false, agents: [] });
 });

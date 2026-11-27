@@ -4,6 +4,11 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 
 ## Unreleased
 
+- On a **Mac**, the Host card lists memory, process count and listening ports by agent, and marks
+  an idle agent as left running, read from `ps -E` (the environment of the user's own processes)
+  and `lsof`. Only processes that descend from the agent's own, or that the daemon started or
+  launchd holds, count. Clean-up is still not offered there until the readings have been seen on a
+  Mac. A Mac where `ps -E` shows no environment keeps the card without a breakdown.
 - On a phone, **Office settings** opened from the 3D view scrolls: the four section tabs stay at
   the top and the chosen section scrolls under them, so Branding and every field below it can be
   reached. Before, the sheet did not scroll and what did not fit was cut off. The tabs show
@@ -35,9 +40,7 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   run script and nothing else, with no network, under the block's title. A `ui` block, an `app`
   block still being written, and any block on a phone stay a title card.
 - The Host card works on **macOS**: memory, CPU, swap, disk, load and the largest process groups
-  are read from the Mac's own commands. A Mac cannot say which process an agent started, so the
-  card lists no agent, marks nothing as left running and offers no clean-up there. Linux is
-  unchanged, and Windows still has no local reading.
+  are read from the Mac's own commands. Linux is unchanged, and Windows still has no local reading.
 - Stand-up notes: a daemon that restarts after 08:00 on a stand-up day, with no entry for the day
   in the notes yet, now writes it when the office starts, as soon as the Paseo API is there. A
   run due on one day that could only start on the next is still dropped. Before, the day's entry
