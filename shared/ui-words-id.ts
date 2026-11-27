@@ -723,4 +723,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "stopped on an error": "berhenti karena galat",
   "not watched": "tidak terpantau",
   "under a minute": "kurang dari semenit",
+  "Slash commands": "Perintah garis miring",
+  "Session options": "Opsi sesi",
+  "Hide session options": "Sembunyikan opsi sesi",
 };

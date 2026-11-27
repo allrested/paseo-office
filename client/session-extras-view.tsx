@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { ActionButton } from "./action-button.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { SegmentPill } from "./segment-pill.js";
