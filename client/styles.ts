@@ -122,6 +122,23 @@ export interface OfficeStyles {
   content: ViewStyle;
   muted: TextStyle;
   banner: ViewStyle;
+  /** The bar over the 3D floor while it replays the timeline. */
+  replay: {
+    bar: ViewStyle;
+    when: ViewStyle;
+    kicker: TextStyle;
+    clockRow: ViewStyle;
+    day: TextStyle;
+    clock: TextStyle;
+    seen: TextStyle;
+    middle: ViewStyle;
+    trackRow: ViewStyle;
+    track: ViewStyle;
+    rail: ViewStyle;
+    fill: ViewStyle;
+    edge: TextStyle;
+    controls: ViewStyle;
+  };
   /** Holds the banner in the column and gives it the side padding. */
   bannerSlot: ViewStyle;
   bannerText: TextStyle;
@@ -894,6 +911,40 @@ export function useOfficeStyles(
         gap: 8,
       },
       bannerText: { ...base, color: colors.statusDanger },
+      replay: {
+        bar: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 16,
+          paddingHorizontal: pad,
+          paddingVertical: 10,
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface1,
+        },
+        when: { gap: 2, minWidth: 180 },
+        kicker: { ...small, color: colors.accent, fontWeight: "600" },
+        clockRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+        day: { ...base, color: colors.foregroundMuted },
+        // Tabular figures: the seconds change four times a second and must not shift the row.
+        clock: {
+          fontSize: 26,
+          lineHeight: 32,
+          fontWeight: "700",
+          color: colors.foreground,
+          fontVariant: ["tabular-nums"],
+        },
+        seen: { ...small, color: colors.foregroundMuted },
+        middle: { flex: 1, minWidth: 260, gap: 8 },
+        trackRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+        // A touch target's height around a thin rail.
+        track: { flex: 1, height: 24, justifyContent: "center" },
+        rail: { height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" },
+        fill: { height: 6, backgroundColor: colors.accent },
+        edge: { ...small, color: colors.foregroundMuted, fontVariant: ["tabular-nums"] },
+        controls: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+      },
       // On a wide screen the rail gives the scroller the ring's room at each side, so the first
       // and the last entry keep their focus rings and still rest on the cards' rails.
       stripRail: compact ? column : { ...column, paddingHorizontal: pad - FOCUS_RING },

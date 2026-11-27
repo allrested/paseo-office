@@ -201,7 +201,7 @@ export function useWorldFeed(
       api === null
         ? null
         : [
-            floorNote(model.agents.size, people.overflow),
+            floorNote(model.agents.size, people.overflow, model.replayed === true),
             streetNote ? "The street's cars could not be loaded." : null,
           ]
             .filter(Boolean)

@@ -460,7 +460,9 @@ export function worldMachine(machine: Machine | null): WorldMachine | null {
 }
 
 /** The line with a floor: nobody is in, or some have no desk on it; null otherwise. */
-export function floorNote(agents: number, overflow: number): string | null {
+export function floorNote(agents: number, overflow: number, replayed = false): string | null {
+  // A replay's bar says who was seen then: an empty floor is not a host without agents.
+  if (agents === 0 && replayed) return null;
   if (agents === 0) return "No agents on this host yet. One that starts takes a desk here.";
   if (overflow <= 0) return null;
   const who = overflow === 1 ? "1 agent has" : `${overflow} agents have`;

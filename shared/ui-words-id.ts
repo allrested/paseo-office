@@ -750,4 +750,16 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "an earlier day": "hari sebelumnya",
   "Agents fill the first team, then the next: each takes a free teammate, by chance, and sits with that team on the 3D floor whatever its workspace. An agent the roster has nobody left for keeps its own name and its workspace's team. Paseo's own names stay. A name you type on a team or an agent wins.":
     "Agen mengisi tim pertama, lalu tim berikutnya: masing-masing mengambil anggota tim yang masih kosong secara acak, dan duduk bersama tim itu di lantai 3D apa pun workspace-nya. Agen yang tidak kebagian nama dari daftar tetap memakai namanya sendiri dan tim workspace-nya. Nama dari Paseo tetap ada. Nama yang Anda ketik pada tim atau agen selalu dipakai.",
+  Replaying: "Memutar ulang",
+  "Replay paused": "Putar ulang dijeda",
+  "From the start": "Dari awal",
+  "Back to now": "Kembali ke sekarang",
+  "Nobody was seen at this moment": "Tidak ada yang terlihat pada saat ini",
+  "1 person on the floor": "1 orang di lantai",
+  Yesterday: "Kemarin",
+  "−10 min": "−10 mnt",
+  "+10 min": "+10 mnt",
+  "Back 10 minutes": "Mundur 10 menit",
+  "Forward 10 minutes": "Maju 10 menit",
+  "Replay position": "Posisi putar ulang",
 };
