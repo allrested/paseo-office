@@ -19,6 +19,13 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Replay · 14:05 · 60×", "Xem lại · 14:05 · 60×"],
     ["3 h 20 min at work", "3 giờ 20 phút làm việc"],
     ["1.5 GB free", "1.5 GB trống"],
+    [
+      "Undo the last turn's edits to 3 files?",
+      "Hoàn tác các chỉnh sửa của lượt gần nhất trên 3 tệp?",
+    ],
+    ["1 file restored, 0 skipped", "1 tệp đã khôi phục, 0 bỏ qua"],
+    ["2 files changed after the turn", "2 tệp đã thay đổi sau lượt đó"],
+    ["1 file left alone, being a link", "1 tệp được giữ nguyên vì là liên kết"],
   ];
   for (const [english, vietnamese] of lines) expect(translatePattern(english)).toBe(vietnamese);
 });

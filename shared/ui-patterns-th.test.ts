@@ -16,6 +16,10 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Task · claimed by Builder", "งาน · Builder รับแล้ว"],
     ["3 h 20 min at work", "ทำงานมา 3 ชม. 20 นาที"],
     ["1.5 GB free", "ว่าง 1.5 GB"],
+    ["Undo the last turn's edits to 3 files?", "เลิกทำการแก้ไขของรอบล่าสุดใน 3 ไฟล์หรือไม่?"],
+    ["1 file restored, 0 skipped", "คืนค่า 1 ไฟล์ ข้าม 0 ไฟล์"],
+    ["2 files changed after the turn", "2 ไฟล์ถูกแก้ไขหลังรอบนั้น"],
+    ["1 file left alone, being a link", "1 ไฟล์ที่ไม่แตะต้องเพราะเป็นลิงก์"],
   ];
   for (const [english, thai] of lines) expect(translatePattern(english)).toBe(thai);
 });
