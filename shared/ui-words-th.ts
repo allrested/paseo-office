@@ -749,4 +749,6 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "left alone, being a link": "ที่ไม่แตะต้องเพราะเป็นลิงก์",
   "with nothing to put back": "ที่ไม่มีอะไรให้คืนค่า",
   "that could not be written": "ที่เขียนไม่ได้",
+  "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
+    "host นี้ระบุไม่ได้ว่า agent เริ่มโปรเซสใด จึงไม่แสดงหน่วยความจำแยกตาม agent และไม่มีตัวเลือกล้างข้อมูล ส่วน System แสดงโปรเซสที่ใหญ่ที่สุด",
 };

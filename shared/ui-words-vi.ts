@@ -772,4 +772,6 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "left alone, being a link": "được giữ nguyên vì là liên kết",
   "with nothing to put back": "không có gì để khôi phục",
   "that could not be written": "không ghi được",
+  "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
+    "Host này không biết agent đã khởi chạy tiến trình nào, nên bộ nhớ không được hiển thị theo agent và không có tính năng dọn dẹp. Mục System liệt kê các tiến trình lớn nhất.",
 };
