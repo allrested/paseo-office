@@ -35,6 +35,11 @@ export interface Watchers {
   tail(agentId: string, entries: readonly WatchedEntry[]): void;
   alerts(): Alert[];
   dismiss(id: string): void;
+  /**
+   * Why a request should be refused: the agent asks for the very call that just failed three
+   * times running. Null for any other request.
+   */
+  repeats(agentId: string, request: { name?: unknown; detail?: unknown }): string | null;
 }
 
 /** The same failing call this many times running is a loop. */
@@ -51,6 +56,8 @@ const PORT_TAKEN = /EADDRINUSE|address already in use/i;
 interface Call {
   id: string;
   sig: string;
+  /** What the call was asked to do, as a request for it would say: null where that is not known. */
+  ask: string | null;
   tool: string;
   label: string;
   file: string | null;
@@ -83,6 +90,17 @@ function baseName(path: string): string {
   return path.split(/[\\/]/).at(-1) ?? path;
 }
 
+/**
+ * A call by what it was asked to do: the tool with its command or its file. A request for a call
+ * carries these too, and nothing of how the call ended, so the two can be told to be the same.
+ */
+function askOf(tool: string, detail: unknown): string | null {
+  const command = field(detail, "command");
+  if (typeof command === "string" && command !== "") return `${tool}\n${command}`;
+  const filePath = field(detail, "filePath");
+  return typeof filePath === "string" && filePath !== "" ? `${tool}\n${filePath}` : null;
+}
+
 function callOf(item: WatchedEntry["item"]): Call | null {
   if (item.type !== "tool_call" || typeof item.callId !== "string" || item.callId === "") {
     return null;
@@ -98,6 +116,7 @@ function callOf(item: WatchedEntry["item"]): Call | null {
     id: item.callId,
     // What makes two calls the same call: the tool and what it was given.
     sig: `${tool}\n${text(item.detail)}`,
+    ask: askOf(tool, item.detail),
     tool,
     label,
     file: isEdit && typeof filePath === "string" ? filePath : null,
@@ -129,6 +148,8 @@ export function createWatchers(ports: WatcherPorts): Watchers {
   const edits = new Map<string, Edit[]>();
   const alerts = new Map<string, Alert>();
   const dismissed = new Set<string>();
+  /** The call each looping agent keeps making, and how it failed. */
+  const loops = new Map<string, { ask: string; error: string }>();
 
   function raise(alert: Omit<Alert, "at">): void {
     if (alerts.has(alert.id) || dismissed.has(alert.id)) return;
@@ -152,8 +173,10 @@ export function createWatchers(ports: WatcherPorts): Watchers {
       // It got past it, or tried something else: the loop is over, and a new one is a new alert.
       alerts.delete(id);
       dismissed.delete(id);
+      loops.delete(agentId);
       return;
     }
+    if (first.ask !== null) loops.set(agentId, { ask: first.ask, error: first.error });
     raise({
       id,
       kind: "loop",
@@ -252,11 +275,14 @@ export function createWatchers(ports: WatcherPorts): Watchers {
     const here = new Set(agents.map((agent) => agent.id));
     for (const agent of agents) names.set(agent.id, agentTitle(agent));
     for (const id of watched.keys()) if (!here.has(id)) watched.delete(id);
+    for (const id of loops.keys()) if (!here.has(id)) loops.delete(id);
     for (const id of names.keys()) if (!here.has(id)) names.delete(id);
     forget((id) => !here.has(id));
     // A turn that ended is past its loop.
     for (const agent of agents) {
-      if (agent.status === "idle") alerts.delete(`loop:${agent.id}`);
+      if (agent.status !== "idle") continue;
+      alerts.delete(`loop:${agent.id}`);
+      loops.delete(agent.id);
     }
   }
 
@@ -304,6 +330,14 @@ export function createWatchers(ports: WatcherPorts): Watchers {
         if (passing && now - alert.at > ALERT_TTL_MS) alerts.delete(id);
       }
       return [...alerts.values()].sort((a, b) => b.at - a.at);
+    },
+    repeats(agentId, request) {
+      const loop = loops.get(agentId);
+      if (loop === undefined) return null;
+      const tool = typeof request.name === "string" ? cut(request.name, 40) : "a tool";
+      if (askOf(tool, request.detail) !== loop.ask) return null;
+      const how = loop.error === "" ? "" : ` (${cut(loop.error, 120)})`;
+      return `Office notice: this exact call failed ${LOOP_CALLS} times running${how}. It was not run again. Try another way, or say what is in the way.`;
     },
     dismiss(id) {
       if (alerts.delete(id)) dismissed.add(id);

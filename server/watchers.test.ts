@@ -230,3 +230,24 @@ test("an alert is told once as it is raised, with the name of its agent", () => 
   watchers.tail("a", [fail("n4")]);
   expect(raised).toEqual(["loop:a Agent a"]);
 });
+
+test("a request for the call that just failed three times running is one to refuse, and no other", () => {
+  const { watchers } = setup();
+  const fail = (id: string) => shell(id, "failed", "exit 1");
+  const again = { name: "Bash", detail: { type: "shell", command: "npm test" } };
+  watchers.tail("a", [fail("g1"), fail("g2")]);
+  expect(watchers.repeats("a", again)).toBeNull();
+  watchers.tail("a", [fail("g3")]);
+  expect(watchers.repeats("a", again)).toBe(
+    "Office notice: this exact call failed 3 times running (exit 1). It was not run again. Try another way, or say what is in the way.",
+  );
+  // Another command, another agent, or a request that says nothing of what it runs.
+  expect(
+    watchers.repeats("a", { name: "Bash", detail: { type: "shell", command: "npm run lint" } }),
+  ).toBeNull();
+  expect(watchers.repeats("b", again)).toBeNull();
+  expect(watchers.repeats("a", { name: "Bash" })).toBeNull();
+  // Past the loop, the same call may be asked for again.
+  watchers.tail("a", [shell("g4", "completed")]);
+  expect(watchers.repeats("a", again)).toBeNull();
+});

@@ -43,6 +43,7 @@ type HostSetting =
   | "Streamer mode"
   | "History vault"
   | "Keep watching"
+  | "Stop repeated failing calls"
   | "Pinned notes"
   | "Cache clock"
   | "Team chat"
@@ -606,6 +607,11 @@ function FloorSettings({
     [change],
   );
   const watchingProblem = saveProblem("Keep watching");
+  const toggleGuard = useCallback(
+    (next: boolean) => void change("Stop repeated failing calls", { loopGuard: next }),
+    [change],
+  );
+  const guardProblem = saveProblem("Stop repeated failing calls");
   const saveCache = useCallback(
     (next: CacheClock) => void change("Cache clock", { cacheClock: next }),
     [change],
@@ -674,6 +680,24 @@ function FloorSettings({
       {watchingProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {watchingProblem}
+        </Text>
+      )}
+      {stored && (
+        <LabeledSwitch
+          label="Stop repeated failing calls"
+          value={stored.loopGuard}
+          onChange={toggleGuard}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default. On, when an agent asks permission for the very command or file edit that
+        just failed three times running, the office refuses it and tells the agent why. It works
+        only where the agent asks: a mode that runs calls without asking is not stopped.
+      </Text>
+      {guardProblem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {guardProblem}
         </Text>
       )}
       {stored && (

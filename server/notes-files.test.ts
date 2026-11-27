@@ -57,6 +57,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       rosterEdition: 0,
       uiCards: false,
       keepWatching: false,
+      loopGuard: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
