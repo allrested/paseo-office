@@ -7,6 +7,8 @@ import type { SessionCommand } from "./session-extras.js";
 /** What a send may ask for: "steer" joins the running turn, where the daemon interrupts it by default. */
 export interface SendOptions {
   activeTurnBehavior?: "steer" | "interrupt";
+  /** Images that go with the prompt, as the team chat sends them. */
+  images?: { data: string; mimeType: string }[];
 }
 
 export interface AgentActions {

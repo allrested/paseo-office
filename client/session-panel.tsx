@@ -13,11 +13,13 @@ import { TextInput } from "./text.js";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTitle, answerableInOffice } from "../shared/model.js";
 import { ActionButton, failureText } from "./action-button.js";
+import { ImageDrafts, ImagePicker } from "./chat-compose-tools.js";
 import { textAfterSend } from "./agent-card.js";
 import { enterSends } from "./chat-text.js";
 import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
+import { canSendReply, imagesAfterSend, replySend, type ReplyImages } from "./reply-send.js";
 import { AskCard } from "./ask-card.js";
 import { CommandList, SessionOptions } from "./session-extras-view.js";
 import {
@@ -43,11 +45,13 @@ import type { AgentActions } from "./use-agent-actions.js";
 import { useConversation, type Conversation } from "./use-conversation.js";
 import { useUiCards } from "./use-ui-cards.js";
 
-/** What is typed in the reply box, kept by the surface. */
+/** What is typed in the reply box and attached to it, kept by the surface. */
 export interface ReplyDraft {
   text: string;
   /** Takes an updater as well: a send that returns keeps what was typed while it was away. */
   setText(next: SetStateAction<string>): void;
+  images: ReplyImages;
+  setImages(next: SetStateAction<ReplyImages>): void;
 }
 
 export interface SessionPanelProps {
@@ -268,6 +272,8 @@ interface ComposerProps {
   draft: ReplyDraft;
   actions: AgentActions;
   touchScreen: boolean;
+  /** Where the image picker works: the team chat offers it on the web only. */
+  web: boolean;
   styles: OfficeStyles;
   focused: boolean;
   setFocused(value: boolean): void;
@@ -278,11 +284,13 @@ function Composer({
   draft,
   actions,
   touchScreen,
+  web,
   styles,
   focused,
   setFocused,
 }: ComposerProps) {
-  const { text, setText } = draft;
+  const { text, setText, images, setImages } = draft;
+  const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Enter and the Send button can both fire before the first send returns.
   const sending = useRef(false);
@@ -296,20 +304,22 @@ function Composer({
   const agentId = agent.id;
   const send = useCallback(async () => {
     const sent = text.trim();
-    if (sent === "" || sending.current) return;
+    if (!canSendReply(text, images, reading) || sending.current) return;
     sending.current = true;
     setPending(true);
     try {
       // A reply to a working agent joins its turn: a plain send makes the daemon interrupt it.
-      await actions.send(agentId, sent, { activeTurnBehavior: "steer" });
+      const { prompt, options } = replySend(text, images);
+      await actions.send(agentId, prompt, options);
       setError(null);
       setText((current) => textAfterSend(current, sent));
+      setImages((current) => imagesAfterSend(current, images));
     } catch (failure) {
       setError(failureText("Send", failure));
     }
     sending.current = false;
     setPending(false);
-  }, [text, setText, actions, agentId]);
+  }, [text, setText, images, setImages, reading, actions, agentId]);
   const stop = useCallback(() => actions.cancel?.(agentId), [actions, agentId]);
   const onKeyPress = useCallback(
     (event: KeyPress) => {
@@ -331,6 +341,7 @@ function Composer({
         onPick={setText}
         styles={styles}
       />
+      {images.length > 0 && <ImageDrafts draft={draft} styles={styles} />}
       <View style={shell}>
         <TextInput
           accessibilityLabel="Message"
@@ -348,11 +359,12 @@ function Composer({
         {agent.status === "running" && actions.cancel !== null && (
           <ActionButton label="Stop" pendingLabel="Stopping..." onPress={stop} styles={styles} />
         )}
+        {web && <ImagePicker draft={draft} styles={styles} onReading={setReading} />}
         <SessionButton
           label={pending ? "Sending..." : "Send"}
           icon={pending ? "Ellipsis" : "ArrowUp"}
           onPress={send}
-          disabled={text.trim() === "" || pending}
+          disabled={!canSendReply(text, images, reading) || pending}
           primary
           styles={styles}
         />
@@ -466,6 +478,7 @@ export function SessionPanel({
             draft={draft}
             actions={actions}
             touchScreen={touchScreen}
+            web={layout.platform === "web"}
             styles={styles}
           />
         </>

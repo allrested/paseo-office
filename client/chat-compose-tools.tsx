@@ -117,12 +117,12 @@ async function readImage(file: File): Promise<ChatDraft["images"][number]> {
   }
 }
 
-function ImagePicker({
+export function ImagePicker({
   draft,
   styles,
   onReading,
 }: {
-  draft: ChatDraft;
+  draft: Pick<ChatDraft, "images" | "setImages">;
   styles: OfficeStyles;
   onReading(value: boolean): void;
 }) {
@@ -185,7 +185,13 @@ function ImagePicker({
   );
 }
 
-function ImageDrafts({ draft, styles }: { draft: ChatDraft; styles: OfficeStyles }) {
+export function ImageDrafts({
+  draft,
+  styles,
+}: {
+  draft: Pick<ChatDraft, "images" | "setImages">;
+  styles: OfficeStyles;
+}) {
   return (
     <View style={styles.chatReactions}>
       {draft.images.map((image) => (
