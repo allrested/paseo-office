@@ -1,4 +1,4 @@
-import type { Alert } from "../shared/alerts.js";
+import { LOOP_NOTE, type Alert } from "../shared/alerts.js";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTitle } from "../shared/model.js";
 import type { DirectoryView } from "./hub.js";
@@ -24,8 +24,17 @@ export interface WatcherPorts {
   pinnedNotes(): string;
   /** Says the pinned notes to an agent whose conversation was compacted mid-turn. */
   remind(agentId: string, notes: string): void;
-  /** Told each alert once, as it is raised, with the name of the agent it is about. */
+  /**
+   * Told each alert once, as it is raised, with the name of the agent it is about; a loop again
+   * if the office stops the agent's turn.
+   */
   raised?(alert: Alert, agent: string | null): void;
+  /** Whether the office acts on a loop by itself: the host's Stop repeated failing calls is on. */
+  guarding(): boolean;
+  /** Sends a line into the agent's running turn. */
+  steer(agentId: string, text: string): void;
+  /** Stops the agent's running turn; false where the host cannot. */
+  stop(agentId: string): Promise<boolean>;
 }
 
 export interface Watchers {
@@ -150,6 +159,13 @@ export function createWatchers(ports: WatcherPorts): Watchers {
   const dismissed = new Set<string>();
   /** The call each looping agent keeps making, and how it failed. */
   const loops = new Map<string, { ask: string; error: string }>();
+  /**
+   * What the office did about each loop. A loop is acted on from the read after the one that saw
+   * it, so that a refused request (`guarded`) has come first. `hinted` is how many identical
+   * failures there were when the hint was sent: a stop needs one more.
+   */
+  const acts = new Map<string, { hinted: number | null; stopped: boolean }>();
+  const guarded = new Set<string>();
 
   function raise(alert: Omit<Alert, "at">): void {
     if (alerts.has(alert.id) || dismissed.has(alert.id)) return;
@@ -174,6 +190,8 @@ export function createWatchers(ports: WatcherPorts): Watchers {
       alerts.delete(id);
       dismissed.delete(id);
       loops.delete(agentId);
+      acts.delete(agentId);
+      guarded.delete(agentId);
       return;
     }
     if (first.ask !== null) loops.set(agentId, { ask: first.ask, error: first.error });
@@ -184,6 +202,48 @@ export function createWatchers(ports: WatcherPorts): Watchers {
       title: `${nameOf(agentId)} is stuck in a loop`,
       detail: cut(`${what(first)} failed ${LOOP_CALLS} times running: ${first.error}`),
     });
+    actOnLoop(agentId, first, loopLength(ended));
+  }
+
+  /** How many calls at the end failed the same way: the length of the loop so far. */
+  function loopLength(ended: readonly Call[]): number {
+    const sig = ended.at(-1)?.sig;
+    let count = 0;
+    for (const call of ended.toReversed()) {
+      if (call.status !== "failed" || call.sig !== sig) break;
+      count += 1;
+    }
+    return count;
+  }
+
+  async function stopTurn(agentId: string, call: Call, length: number): Promise<void> {
+    const id = `loop:${agentId}`;
+    const done = await ports.stop(agentId).catch(() => false);
+    const kept = alerts.get(id);
+    if (!done || kept === undefined) return;
+    const detail = `${cut(`${what(call)} failed ${length} times running: ${call.error}`)}. The office stopped its turn: the same call failed again after the hint.`;
+    const updated = { ...kept, detail };
+    alerts.set(id, updated);
+    ports.raised?.(updated, names.get(agentId) ?? null);
+  }
+
+  function actOnLoop(agentId: string, call: Call, length: number): void {
+    const id = `loop:${agentId}`;
+    // A card the owner dismissed is theirs; a request the office refused has already been answered.
+    if (!ports.guarding() || dismissed.has(id) || guarded.has(agentId)) return;
+    const act = acts.get(agentId);
+    if (act === undefined) {
+      acts.set(agentId, { hinted: null, stopped: false });
+      return;
+    }
+    if (act.hinted === null) {
+      act.hinted = length;
+      ports.steer(agentId, LOOP_NOTE);
+      return;
+    }
+    if (length <= act.hinted || act.stopped) return;
+    act.stopped = true;
+    void stopTurn(agentId, call, length);
   }
 
   function noticeFailure(agentId: string, call: Call): void {
@@ -276,6 +336,8 @@ export function createWatchers(ports: WatcherPorts): Watchers {
     for (const agent of agents) names.set(agent.id, agentTitle(agent));
     for (const id of watched.keys()) if (!here.has(id)) watched.delete(id);
     for (const id of loops.keys()) if (!here.has(id)) loops.delete(id);
+    for (const id of acts.keys()) if (!here.has(id)) acts.delete(id);
+    for (const id of guarded) if (!here.has(id)) guarded.delete(id);
     for (const id of names.keys()) if (!here.has(id)) names.delete(id);
     forget((id) => !here.has(id));
     // A turn that ended is past its loop.
@@ -283,6 +345,8 @@ export function createWatchers(ports: WatcherPorts): Watchers {
       if (agent.status !== "idle") continue;
       alerts.delete(`loop:${agent.id}`);
       loops.delete(agent.id);
+      acts.delete(agent.id);
+      guarded.delete(agent.id);
     }
   }
 
@@ -336,6 +400,7 @@ export function createWatchers(ports: WatcherPorts): Watchers {
       if (loop === undefined) return null;
       const tool = typeof request.name === "string" ? cut(request.name, 40) : "a tool";
       if (askOf(tool, request.detail) !== loop.ask) return null;
+      guarded.add(agentId);
       const how = loop.error === "" ? "" : ` (${cut(loop.error, 120)})`;
       return `Office notice: this exact call failed ${LOOP_CALLS} times running${how}. It was not run again. Try another way, or say what is in the way.`;
     },
