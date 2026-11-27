@@ -22,7 +22,7 @@ For configuration, see [Office settings](#settings), [branding](#custom-branding
 | `server/weather-service.ts`, `server/weather-read.ts`                        | Weather polling, bounded HTTP reads and failure reporting                             |
 | `shared/weather.ts`, `client/weather-settings.tsx`, `client/weather-text.ts` | Presets, settings and Attention text                                                  |
 | `vendor/my-office/src/office/paseo-weather-plan.js`                          | Resolves a scene reading and the seasonal sky                                         |
-| `server/machine/`                                                            | The host's readings and the clean-up, from `/proc`                                    |
+| `server/machine/`                                                            | The host's readings and the clean-up, from `/proc` or a Mac's commands                |
 | `client/`                                                                    | The column, the cards, the list                                                       |
 | `client/world/`                                                              | The 3D floor: the frame, the bridge to the scene, the people the scene is told about  |
 | `client/pixel/`                                                              | The 2D floor                                                                          |
@@ -853,6 +853,18 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
+On a Mac (`server/machine/macos.ts`) the same reading comes from the system's commands, run without
+a shell and with a timeout: `sysctl -n hw.memsize hw.ncpu vm.loadavg vm.swapusage`, `vm_stat`, `top -l 2`
+for the CPU, `ps -axo pid=,rss=,comm=` for the largest processes and `df -k` for the home disk. Memory in
+use is what Activity Monitor calls Memory Used: the anonymous pages less the purgeable ones, plus the
+wired pages, plus the pages the compressor occupies, times the page size `vm_stat` names in its first
+line (4096 on an Intel Mac, 16384 on Apple Silicon); the file cache is not counted. A Mac does not let a
+process read another's environment, so no process can be tied to the agent that started it. The
+reading says so (`perAgent: false`) and lists no agent: the Agents section explains why instead of
+showing "Memory by agent", nothing is marked as left running, and no clean-up is offered. The
+clean-up request is refused on a Mac, so no process is ever signalled there. The readings were built
+from the commands' documented output (see `docs/verified.md`).
+
 In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. With **Keep watching** on, the
 host is read every minute with no office open, so that history has no gap, and memory at 90% goes
 to the webhook. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
@@ -877,8 +889,8 @@ name). On the 3D floor a plan at 100% puts the countdown board on the wall, and 
 plan who are resting take a break in the pantry until it resets. Whoever is still working keeps
 working.
 
-Local process readings require Linux. On other platforms the Host card is available when Office
-finds a configured SSH-MCP installation.
+Local readings come from Linux (`/proc`) or macOS. On Windows the Host card is available when
+Office finds a configured SSH-MCP installation.
 
 **Host → SSH** shows the hosts provided by SSH-MCP. Select a host to see its readings in detail.
 Load is the one-minute load average relative to the number of cores, so it can exceed 100%.
@@ -910,7 +922,9 @@ press: the plugin kit has no confirm dialog. Both go as a prompt through `office
 An agent at work is refused, since the command would cut its turn, and a provider without the
 command says so under the buttons. A provider reports a context's size when a turn ends, so after a
 reset the old number would stay until the next turn; the office reads a reset agent's context as
-empty until the provider reports another number (`settleResets` in `server/directory.ts`).
+empty until the provider reports another number (`settleResets` in `server/directory.ts`). The janitor
+reads no process, so it is the same on a Mac; it is the host's clean-up of what an agent left
+running, in the Host card, that a Mac does not offer.
 
 ## The stand-up
 

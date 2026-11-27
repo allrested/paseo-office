@@ -1,4 +1,5 @@
 import type { Machine } from "../../shared/contracts.js";
+import type { HostDetails, HostSample } from "../../shared/host-details.js";
 import {
   cpuPercent,
   readAgentProcesses,
@@ -7,13 +8,17 @@ import {
   readMemory,
   type CpuTimes,
 } from "./proc.js";
+import { createMacMachineReader, readMacHostDetails, runCommand, type Run } from "./macos.js";
+import { readHostDetails } from "./details.js";
 import { buildMachine, type KnownAgent } from "./reading.js";
 
 export interface MachinePorts {
   procRoot: string;
   cgroupRoot: string;
-  /** `process.platform`: the readings exist on Linux only. */
+  /** `process.platform`: the readings exist on Linux and macOS ("darwin"). */
   platform: string;
+  /** Runs a program on macOS, where the readings are its commands' output; the system's by default. */
+  run?: Run;
   now(): number;
   /** The agents with a runtime: starting, idle, running or in error. */
   liveAgents(): Promise<KnownAgent[]>;
@@ -24,11 +29,25 @@ export interface MachinePorts {
 }
 
 export interface MachineReader {
-  /** Null on a host without /proc. */
+  /** Null on a host that is neither Linux nor a Mac. */
   read(): Promise<Machine | null>;
 }
 
+/** The Host card's System readings: from /proc on Linux, from the system's commands on a Mac. */
+export function readDetails(
+  ports: Pick<MachinePorts, "platform" | "procRoot" | "run">,
+  home: string,
+  history: HostSample[],
+): Promise<HostDetails> {
+  return ports.platform === "darwin"
+    ? readMacHostDetails(ports.run ?? runCommand, home, history)
+    : readHostDetails(ports.procRoot, home, history);
+}
+
 export function createMachineReader(ports: MachinePorts): MachineReader {
+  if (ports.platform === "darwin") {
+    return createMacMachineReader({ now: ports.now, run: ports.run ?? runCommand });
+  }
   let cpuBefore: CpuTimes | null = null;
   // An id no agent of this daemon has: asked once, since an agent id is never given out twice.
   const strangers = new Set<string>();

@@ -47,7 +47,7 @@ Under **Branding**, set the office name, logo URL and mark color. Blank fields i
 | Mobile app                     | 2D and List. Mobile builds with a script-capable frame also support 3D. Use Office session controls for replies and approvals. |
 | Stock Paseo 0.16               | Stop and idle-runtime cleanup depend on host SDK support. The stock 0.16 SDK lacks these operations.                           |
 
-The Linux Host panel shows memory, CPU and processes. Choose **Host → SSH** for memory, load averages and disk use on hosts configured through SSH-MCP. The floor also reflects reported agent spending, repository birthdays and team tenure. Git tags, pull-request checks and the installed Claude CLI version can trigger city activities. Weather and Jira or Sentry alerts are optional. [Feature guide](https://github.com/allrested/paseo-office/blob/main/docs/office.md) · [Compatibility checks](https://github.com/allrested/paseo-office/blob/main/docs/verified.md)
+The Host panel shows memory, CPU and processes on Linux and macOS (on a Mac without a breakdown by agent). Choose **Host → SSH** for memory, load averages and disk use on hosts configured through SSH-MCP. The floor also reflects reported agent spending, repository birthdays and team tenure. Git tags, pull-request checks and the installed Claude CLI version can trigger city activities. Weather and Jira or Sentry alerts are optional. [Feature guide](https://github.com/allrested/paseo-office/blob/main/docs/office.md) · [Compatibility checks](https://github.com/allrested/paseo-office/blob/main/docs/verified.md)
 
 ## Data and integrations
 

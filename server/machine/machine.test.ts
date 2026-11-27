@@ -86,8 +86,8 @@ test("an agent that got a runtime between the two calls is left for the next rea
   expect((await machine.read())?.agents.map((agent) => agent.agentId)).toEqual(["live"]);
 });
 
-test("a host that is not Linux has no reading", async () => {
-  expect(await (await reader({ platform: "darwin" })).read()).toBe(null);
+test("a host that is neither Linux nor a Mac has no reading", async () => {
+  expect(await (await reader({ platform: "win32" })).read()).toBe(null);
 });
 
 test("a reading says whether this host can close an agent's runtime", async () => {

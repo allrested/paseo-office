@@ -506,6 +506,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Loading quick messages…": "Memuat pesan cepat…",
   "Lobby task": "Tugas lobi",
   "Memory not read": "Memori belum dibaca",
+  "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
+    "Host ini tidak dapat mengetahui proses mana yang dimulai oleh agen, jadi memori tidak ditampilkan per agen dan tidak ada pembersihan. Bagian System mencantumkan proses terbesar.",
   "Message recalled": "Pesan ditarik kembali",
   "Message recipient": "Penerima pesan",
   "More actions": "Aksi lainnya",

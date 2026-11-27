@@ -106,8 +106,9 @@ import { sshReadingRpc, sshServersRpc } from "./shared/ssh.js";
 import { cleanUpAgent } from "./server/machine/cleanup.js";
 import { liveCleanupPorts, liveMachinePorts } from "./server/machine/live-ports.js";
 import { hostDetailsRpc, type HostSample } from "./shared/host-details.js";
-import { readHostDetails, recordSample } from "./server/machine/details.js";
-import { createMachineReader } from "./server/machine/machine.js";
+import { recordSample } from "./server/machine/details.js";
+import { MAC_CLEANUP_REFUSAL } from "./server/machine/macos.js";
+import { createMachineReader, readDetails } from "./server/machine/machine.js";
 import { createMachineWatch } from "./server/machine/watch.js";
 import { nodeNotesFs, readMonthNotes } from "./server/notes-files.js";
 import {
@@ -729,7 +730,7 @@ export function createOfficePlugin(
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
   server.handle(sshServersRpc, (_input, context) => ssh.list(context.paseo));
   server.handle(sshReadingRpc, ({ id }, context) => ssh.read(context.paseo, id));
-  server.handle(hostDetailsRpc, () => readHostDetails(deps.machine.procRoot, homedir(), samples));
+  server.handle(hostDetailsRpc, () => readDetails(deps.machine, homedir(), samples));
   server.handle(machineSubscription, (_input, context) => {
     holder.remember(context.paseo);
     return machine.attach(context);
@@ -737,6 +738,14 @@ export function createOfficePlugin(
   server.handle(cleanupRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("cleanup", async () => {
+      if (deps.machine.platform === "darwin") {
+        const refused = input.agentIds.map((agentId) => ({
+          agentId,
+          ok: false,
+          error: MAC_CLEANUP_REFUSAL,
+        }));
+        return { results: refused };
+      }
       // One at a time: each close waits for its runtime's processes.
       const results = [];
       for (const agentId of new Set(input.agentIds)) {
