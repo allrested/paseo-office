@@ -35,7 +35,7 @@ On wide screens, **Sessions** and **Details** toggle the sidebars independently.
 
 ## Make the office yours
 
-In **Office settings → Appearance**, choose Company floor, Cozy room or Headquarters. Choose City for streets and shops, Countryside, Beach or Plain for the backdrop, and App theme, Day or Night for lighting. The scene offers English, Vietnamese, Thai and Indonesian. The Office panels and team chat use English.
+In **Office settings → Appearance**, choose Company floor, Cozy room or Headquarters. Choose City for streets and shops, Countryside, Beach or Plain for the backdrop, and App theme, Day or Night for lighting. The scene offers English, Vietnamese, Thai and Indonesian. The Office panels follow the same choice, and the team chat speaks by the host's **Team chat** setting.
 
 Under **Branding**, set the office name, logo URL and mark color. Blank fields inherit their host defaults. To change one agent’s name, character or avatar, open their session and choose **Customize agent**. [Branding environment variables](https://github.com/allrested/paseo-office/blob/main/docs/office.md#custom-branding)
 

@@ -8,6 +8,8 @@ import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ActionButton } from "./action-button.js";
+import { UI_TH } from "../shared/ui-words-th.js";
+import { UI_VI } from "../shared/ui-words-vi.js";
 import { LabeledSwitch } from "./labeled-switch.js";
 import { useOfficeStyles } from "./styles.js";
 import { Text, TextInput } from "./text.js";
@@ -80,12 +82,42 @@ test("the interface is English until Indonesian is chosen, or is the app's own l
   expect(container.textContent).toContain("Check why the login failed");
   expect(container.querySelector("input")?.getAttribute("placeholder")).toBe("Cari sesi");
 
-  // Automatic follows the app; a language without words of its own shows English.
+  // Automatic follows the app.
   choice = "auto";
   locale = "id-ID";
   await draw();
   expect(labels()).toEqual(["Abaikan", "Suara"]);
+});
+
+test("Vietnamese and Thai put the interface in their words, chosen or from the app's language", async () => {
+  choice = "vi";
+  await draw();
+  expect(labels()).toEqual([UI_VI.Dismiss, UI_VI.Sound]);
+  expect(container.textContent).toContain(UI_VI["No agents yet."]);
+  expect(container.textContent).toContain("12 phút trước");
+  expect(container.textContent).toContain("Check why the login failed");
+  expect(container.querySelector("input")?.getAttribute("placeholder")).toBe(
+    UI_VI["Search sessions"],
+  );
+
   choice = "th";
+  await draw();
+  expect(labels()).toEqual([UI_TH.Dismiss, UI_TH.Sound]);
+  expect(container.textContent).toContain(UI_TH["No agents yet."]);
+  expect(container.textContent).toContain("12 นาทีที่แล้ว");
+  expect(container.querySelector("input")?.getAttribute("placeholder")).toBe(
+    UI_TH["Search sessions"],
+  );
+
+  choice = "auto";
+  locale = "vi-VN";
+  await draw();
+  expect(labels()).toEqual([UI_VI.Dismiss, UI_VI.Sound]);
+  locale = "th-TH";
+  await draw();
+  expect(labels()).toEqual([UI_TH.Dismiss, UI_TH.Sound]);
+  // Any other language still shows English.
+  locale = "fr-FR";
   await draw();
   expect(labels()).toEqual(["Dismiss", "Sound"]);
 });

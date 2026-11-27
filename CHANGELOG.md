@@ -14,6 +14,11 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   too, and the ones that did not fit were drawn under the reply box.
 - Settings: **Writer mode** has a row of its own and its modes wrap. Before, the modes past the
   third were cut off at the edge. The floor plan, Team chat and cup pills wrap too.
+- The office's own interface speaks Vietnamese and Thai when that is the 3D office language, or
+  the app's language for Automatic, as it already does Indonesian: buttons, fields with their
+  hints and placeholders, switches, dialogs, cards, the settings page, and the lines built from
+  data. The words were written by a machine and have not been read by a native speaker. A test
+  fails when a text is in one language's table and not in another's.
 - **Keep watching** now covers the plan limits and the host's memory for the webhook. The plan
   limits are read every 5 minutes with no office open, and a provider's closest limit sends one
   message as it reaches 80%, 95% and 100%, once until it resets; a provider switched off in the Host

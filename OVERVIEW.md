@@ -14,7 +14,7 @@ Use **Team chat** to talk to the group or address one session. Use the **Lobby b
 
 Office 3D requires Paseo 0.16.0 or newer and plugins enabled on the host. Desktop and web support the 3D floor with WebGL 2. The store mobile app offers the 2D floor and List. Mobile builds with a script-capable frame can also show 3D.
 
-The settings gear controls the floor plan, backdrop, lighting and sound. Under **Appearance → Branding**, the host can set a shared office name, logo and mark color. The 3D scene supports English, Vietnamese, Thai and Indonesian. The surrounding Office controls follow the same choice: Indonesian when Bahasa Indonesia is chosen, English otherwise.
+The settings gear controls the floor plan, backdrop, lighting and sound. Under **Appearance → Branding**, the host can set a shared office name, logo and mark color. The 3D scene supports English, Vietnamese, Thai and Indonesian. The surrounding Office controls follow the same choice: Vietnamese, Thai or Indonesian when that language is chosen, English otherwise.
 
 **Archive idle sessions** is off by default. Enable it under **Office settings → Automation** if you want an open 3D floor to archive a session when its worker goes home. Workers can go home after resting for at least 30 minutes at night or after evening drinks. The session must still be idle, with no pending approval or working subagent. Archiving removes it from the active list and keeps its conversation history.
 

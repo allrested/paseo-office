@@ -17,7 +17,7 @@ const lower = (text: string) => {
   return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 };
 
-const RULES: readonly Rule[] = [
+export const RULES: readonly Rule[] = [
   [
     /^Undo the last turn's edits to (\d+) files?\?$/,
     (n) => `Urungkan suntingan giliran terakhir pada ${n} berkas?`,
