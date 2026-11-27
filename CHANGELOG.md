@@ -39,6 +39,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   sections. Lines put together from data, and anything without a translation yet, stay English.
 - Timeline: **Replay on the floor** replays the chosen range on the 3D floor, with a bar for the
   moment shown, Pause and Now. Before, a replay moved only inside the card.
+- **Stop repeated failing calls**, a host setting, off by default: a request for the very call
+  that just failed three times running is refused, and the agent is told why. Only where the
+  provider asks permission for the call.
 
 ## 0.2.14 (2026-11-26)
 

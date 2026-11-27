@@ -694,8 +694,17 @@ prompt. With streamer mode on, a card names the tool and not the file or the com
 turn, as a line into that turn. A compaction of a resting agent sends nothing, since that would
 start a turn.
 
-Not done here: blocking a call before it runs and undoing a turn's edits. Both need real Claude
-Code hooks written into the host's `~/.claude/settings.json`.
+**Stop repeated failing calls** (Settings, host-wide, off by default) goes one step further for
+a loop. When an agent asks permission for the very command or file edit that just failed three
+times running, the office refuses the request and tells the agent why, so the fourth try is not
+run (`repeats` in `server/watchers.ts`, on Paseo's `agent.permission.before` hook). It works only
+where the provider asks: a mode that runs calls without asking is not stopped, the loop must have
+been seen (an office open, or Keep watching on), and a tool whose request names neither a command
+nor a file is left alone.
+
+Not done here: blocking a call that needs no permission, and undoing a turn's edits. Both need
+real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo gives a plugin no
+call that reverts a session.
 
 ## Plan and machine tools
 

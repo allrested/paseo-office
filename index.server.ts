@@ -573,6 +573,8 @@ export function createOfficePlugin(
   let agentToolsOn = false;
   // Whether the owner has the office go on reading with no office open; off until the settings are read.
   let keepWatching = false;
+  // Whether a request for a call that just failed three times running is refused; off until the settings say.
+  let loopGuard = false;
   // The directory needs the Paseo API, which the first handler or hook brings.
   const followWatching = () => hub.keepOpen(keepWatching && holder.held());
   void holder.wait().then(followWatching);
@@ -587,6 +589,7 @@ export function createOfficePlugin(
     pinnedNotes = "";
     notifyUrl = "";
     keepWatching = false;
+    loopGuard = false;
     followWatching();
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
@@ -617,6 +620,7 @@ export function createOfficePlugin(
     chatLines = chatWords(state.values.chatCulture);
     pinnedNotes = state.values.pinnedNotes;
     keepWatching = state.values.keepWatching;
+    loopGuard = state.values.loopGuard;
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
@@ -1023,6 +1027,27 @@ export function createOfficePlugin(
         await writer.turnEnded(agent.id, outcome.kind !== "completed", turnProblem(outcome));
       } catch (error) {
         log(`[office] notes writer turn end failed: ${errorMessage(error)}`);
+      }
+    }),
+    server.addHook("agent.permission.before", async ({ agent, request }, context) => {
+      try {
+        holder.remember(context.paseo);
+        const reason = loopGuard ? watchers.repeats(agent.id, request) : null;
+        if (reason === null) return;
+        // Answered after the hook has returned: the daemon may not hold the request before then.
+        deps.clock.setTimeout(() => {
+          context.paseo.agents
+            .ref(agent.id)
+            .respondToPermission({
+              requestId: request.id,
+              response: { behavior: "deny", message: reason },
+            })
+            .catch((error: unknown) =>
+              log(`[office] loop guard for ${agent.id}: ${errorMessage(error)}`),
+            );
+        }, 0);
+      } catch (error) {
+        log(`[office] agent.permission.before failed: ${errorMessage(error)}`);
       }
     }),
     server.addHook("agent.close.after", async ({ agent }) => {
