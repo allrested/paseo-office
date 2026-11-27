@@ -58,6 +58,7 @@ import {
   type MentionOption,
 } from "./chat-text.js";
 import { getChatSeen, markChatSeen } from "./chat-seen.js";
+import { useT } from "./ui-language.js";
 import { useFollowEnd } from "./follow-end.js";
 import type { ChatDraft, ColumnPanelProps, OfficeLink } from "./office-link.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
@@ -682,6 +683,31 @@ function StickerTray({ onPick, styles }: { onPick(index: number): void; styles: 
   );
 }
 
+/** Shown over the list's corner while you read older messages; the count is what arrived since. */
+function JumpToLatest({
+  count,
+  onPress,
+  styles,
+}: {
+  count: number;
+  onPress(): void;
+  styles: OfficeStyles;
+}) {
+  const t = useT();
+  const label = t("Jump to latest");
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={count > 0 ? `${label}, ${count} ${t("new")}` : label}
+      onPress={onPress}
+      style={styles.messenger.latest}
+    >
+      {count > 0 && <Text style={styles.messenger.latestCount}>{count > 99 ? "99+" : count}</Text>}
+      <Icon name="ArrowDown" size={18} color={styles.iconColor} />
+    </Pressable>
+  );
+}
+
 /**
  * The Chat tab of the office's column, fed by the surface's subscription: the team conversation,
  * which the surface keeps apart from the floor's state.
@@ -855,7 +881,15 @@ export function ChatPanel({
     if (newest > 0 && needle === "") markChatSeen(newest);
   }, [newest, needle]);
   // Stays at the bottom while you are there.
-  const { scroller, onScroll, followEnd } = useFollowEnd();
+  const { scroller, onScroll, followEnd, away, toEnd } = useFollowEnd();
+  // What arrived since you were last at the bottom, for the Jump to latest button.
+  const [readTo, setReadTo] = useState(newest);
+  useEffect(() => {
+    if (!away) setReadTo(newest);
+  }, [away, newest]);
+  const arrived = away
+    ? messages.filter((m) => m.at > readTo && !isYours(m) && m.kind !== "sys").length
+    : 0;
 
   const run = useCallback(
     async (input: ChatRequest): Promise<boolean> => {
@@ -889,11 +923,13 @@ export function ChatPanel({
       });
       sending.current = false;
       if (!ok) return;
+      // Your own message is shown, wherever you were reading.
+      toEnd();
       setText((current) => textAfterSend(current, sent));
       if (images.length) setImages((current) => current.filter((image) => !images.includes(image)));
       setReplyTo(null);
     },
-    [text, replyTo, recipient, images, setImages, canSend, run, setText, setReplyTo],
+    [text, replyTo, recipient, images, setImages, canSend, run, toEnd, setText, setReplyTo],
   );
   const send = useCallback(() => post(false), [post]);
   const sendLike = useCallback(() => post(true), [post]);
@@ -906,10 +942,11 @@ export function ChatPanel({
         ...(recipient ? { to: recipient } : {}),
       });
       if (!ok) return;
+      toEnd();
       setStickersOpen(false);
       setReplyTo(null);
     },
-    [replyTo, recipient, run, setReplyTo],
+    [replyTo, recipient, run, toEnd, setReplyTo],
   );
 
   const options = useMemo(() => {
@@ -958,6 +995,7 @@ export function ChatPanel({
     },
     [touchScreen, first, pick, send],
   );
+  const clear = useCallback(() => run({ op: "clear" }), [run]);
   const toggleStickers = useCallback(() => setStickersOpen((open) => !open), []);
   const closeReply = useCallback(() => setReplyTo(null), [setReplyTo]);
   const typing = typingText(chat?.typing ?? []);
@@ -989,28 +1027,31 @@ export function ChatPanel({
         </View>
       )}
       <View style={styles.messenger.conversationBody}>
-        <ScrollView
-          ref={scroller}
-          contentContainerStyle={styles.chatList}
-          onScroll={onScroll}
-          onContentSizeChange={followEnd}
-          onLayout={followEnd}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Messages
-            messages={shownMessages}
-            emptyLabel={needle ? "No matching messages" : CHAT_EMPTY}
-            firstUnread={needle ? undefined : firstUnread}
-            agents={model.agents}
-            problem={problem}
-            always={touchScreen}
-            link={link}
-            run={run}
-            onReply={setReplyTo}
-            styles={styles}
-          />
-        </ScrollView>
+        <View style={styles.messenger.conversationBody}>
+          <ScrollView
+            ref={scroller}
+            contentContainerStyle={styles.chatList}
+            onScroll={onScroll}
+            onContentSizeChange={followEnd}
+            onLayout={followEnd}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Messages
+              messages={shownMessages}
+              emptyLabel={needle ? "No matching messages" : CHAT_EMPTY}
+              firstUnread={needle ? undefined : firstUnread}
+              agents={model.agents}
+              problem={problem}
+              always={touchScreen}
+              link={link}
+              run={run}
+              onReply={setReplyTo}
+              styles={styles}
+            />
+          </ScrollView>
+          {away && <JumpToLatest count={arrived} onPress={toEnd} styles={styles} />}
+        </View>
         {typing && <Text style={styles.chatTyping}>{typing}</Text>}
         <View style={styles.messenger.composer}>
           <ScrollView
@@ -1029,6 +1070,7 @@ export function ChatPanel({
               />
             )}
             <ComposeTools
+              onClear={clear}
               draft={draft}
               members={members}
               web={layout.platform === "web"}

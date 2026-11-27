@@ -238,7 +238,9 @@ export function ComposeTools({
   onDuties,
   onNewAgent,
   onGroupPhoto,
+  onClear,
 }: ChatShortcuts & {
+  onClear(): Promise<boolean>;
   onUse(message: string): void;
   openSession(id: string): void;
   draft: ChatDraft;
@@ -304,6 +306,7 @@ export function ComposeTools({
           onDuties={onDuties}
           onNewAgent={onNewAgent}
           onGroupPhoto={onGroupPhoto}
+          onClear={onClear}
         />
       )}
       {pollOpen && <PollForm run={run} onClose={close} styles={styles} />}

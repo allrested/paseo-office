@@ -4,6 +4,11 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 
 ## Unreleased
 
+- The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
+  the newest message, with the count of what arrived since. Sending a message also goes to the
+  newest one, wherever you were reading.
+- **Clear chat**, under the team chat's More actions, removes every message and the pin for
+  everyone, after asking. It cannot be undone.
 - The History vault is a folder, `office/vault/`, with a file per conversation, and the timeline
   is `office/timeline.jsonl`, a line per mark. A change writes one conversation, or adds lines to
   the timeline, where 0.2.14 wrote the whole file again. The `vault.json` and `timeline.json` of
