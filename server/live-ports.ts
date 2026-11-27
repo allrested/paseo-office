@@ -215,6 +215,19 @@ export function liveChatPorts(holder: PaseoHolder): Pick<ChatServicePorts, "send
   };
 }
 
+/** The items of one turn of an agent's timeline, by the hook's own recipe; none once a newer turn has begun. */
+export async function turnItems(
+  paseo: Paseo,
+  agentId: string,
+  turnId: string,
+): Promise<{ type: string; status?: unknown; detail?: unknown }[]> {
+  const page = await paseo.agents
+    .ref(agentId)
+    .timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
+  if (page.error) throw new Error(page.error);
+  return page.entries.filter((entry) => entry.turnId === turnId).map((entry) => entry.item);
+}
+
 /** Janitor ports on the daemon's own API; the holder is set by the handler that uses them. */
 export function liveJanitorPorts(holder: PaseoHolder): JanitorPorts {
   const ref = (agentId: string) => holder.require().agents.ref(agentId);

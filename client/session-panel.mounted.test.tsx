@@ -41,6 +41,9 @@ vi.mock("./session-text.js", async (importOriginal) => {
 
 /** The host's "Gen-UI cards" setting, as the panel reads it. */
 let uiCards: boolean;
+// Undo last turn asks the host over an RPC these tests do not have; its own test mounts it.
+vi.mock("./undo-turn.js", () => ({ UndoTurn: () => null }));
+
 vi.mock("./use-ui-cards.js", () => ({ useUiCards: () => uiCards }));
 
 vi.mock("./use-conversation.js", () => ({

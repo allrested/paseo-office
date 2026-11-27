@@ -22,6 +22,7 @@ import { PermissionActions } from "./permission-actions.js";
 import { canSendReply, imagesAfterSend, replySend, type ReplyImages } from "./reply-send.js";
 import { AskCard } from "./ask-card.js";
 import { CommandList, SessionOptions } from "./session-extras-view.js";
+import { UndoTurn } from "./undo-turn.js";
 import {
   SessionButton,
   SessionDetailTabs,
@@ -334,6 +335,7 @@ function Composer({
   return (
     <View style={styles.sessions.deskComposer}>
       <SessionOptions agentId={agentId} actions={actions} styles={styles} />
+      <UndoTurn agentId={agentId} running={agent.status === "running"} styles={styles} />
       <CommandList
         agentId={agentId}
         text={text}

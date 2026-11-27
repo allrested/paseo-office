@@ -1037,6 +1037,22 @@ export const homeDepartureRpc = defineRpc({
   input: z.object({ agentId: z.string().min(1), idleSince: z.string().min(1) }),
   output: z.object({ archived: z.boolean() }),
 });
+/** Why an undo leaves a file as it is. */
+export const UNDO_SKIPS = ["changed", "outside", "ignored", "link", "same", "write"] as const;
+export type UndoSkip = (typeof UNDO_SKIPS)[number];
+/**
+ * The last turn's undo of a session: `status` says how many files an undo would put back (0 for
+ * none), `undo` puts them back and says what it did.
+ */
+export const undoRpc = defineRpc({
+  name: "office.undo",
+  input: z.object({ agentId: z.string().min(1), op: z.enum(["status", "undo"]) }),
+  output: z.object({
+    files: z.number().int().nonnegative(),
+    restored: z.number().int().nonnegative(),
+    skipped: z.array(z.object({ reason: z.enum(UNDO_SKIPS), count: z.number().int().positive() })),
+  }),
+});
 export const tenureRpc = defineRpc({
   name: "office.tenure.request",
   input: z.object({ op: z.enum(["farewell", "official"]), name: z.string().min(1).max(200) }),

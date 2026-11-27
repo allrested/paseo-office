@@ -27,6 +27,13 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   in the notes yet, now writes it when the office starts, as soon as the Paseo API is there. A
   run due on one day that could only start on the next is still dropped. Before, the day's entry
   was never written.
+- **Undo last turn**, a host setting, off by default: with it on, a session whose last turn
+  edited or wrote files has **Undo last turn**, which puts those files back as they were when the
+  turn began (a file the turn made is deleted) after asking, and says how many it restored and
+  why it left any. It uses git and Paseo's turn hooks, so it works for every provider. A file
+  changed since the turn, a path git ignores or one outside the repository is left alone; a
+  change a shell command made is not undone. One turn is kept, in memory. The office writes git
+  objects into the repositories agents work in while it is on.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

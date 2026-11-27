@@ -115,6 +115,7 @@ const HostValuesSchema = z.object({
   uiCards: z.boolean().default(false),
   keepWatching: z.boolean().default(false),
   loopGuard: z.boolean().default(false),
+  undoTurn: z.boolean().default(false),
   notifyUrl: z.string().default(""),
   notifyLevel: z.enum(NOTIFY_LEVELS).default("danger"),
   jiraProjects: z.string().default(""),
@@ -226,7 +227,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * where a reply holds a `ui` or `app` block of the Generative UI plugin, not the block's source.
  * `keepWatching` on has the office go on reading the agents while no office is open, so the
  * timeline, the vault and what the office notices have no gaps. `loopGuard` on has the office
- * refuse a request for the call an agent just failed three times running. `notifyUrl` is the webhook the
+ * refuse a request for the call an agent just failed three times running. `undoTurn` on has the
+ * office snapshot the work tree when a turn starts, so the turn's edits can be undone. `notifyUrl` is the webhook the
  * office posts to when it raises an alert or opens an incident; empty posts nothing.
  * `notifyLevel` is what is posted: `danger` a loop, an incident, a plan limit used up and memory nearly full only, `warning` the rest too.
  * `jiraTypes` are the comma separated Jira issue types that ring, Bug when empty. `jiraProjects`
@@ -238,7 +240,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 12,
+  version: 13,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
@@ -265,7 +267,7 @@ export const officeHostSettings = defineSettings({
   // Version 5 adds Headquarters and weather. Older documents keep their floor plan and start with weather off.
   // Version 7 adds the roster, off and empty. Version 8 adds `uiCards`, off.
   // Version 9 adds `keepWatching`, off. Version 10 adds `notifyUrl`, empty, and `notifyLevel`, danger.
-  // Version 11 adds `jiraTypes`, Bug. Version 12 adds `loopGuard`, off.
+  // Version 11 adds `jiraTypes`, Bug. Version 12 adds `loopGuard`, off. Version 13 adds `undoTurn`, off.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

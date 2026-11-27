@@ -763,9 +763,50 @@ meanwhile; with no office open and Keep watching off nothing is read, and nothin
 webhook hears of the loop once as it is raised, and again, as the same `loop` kind with the
 extended detail, if the office stopped the turn.
 
-Not done here: blocking a call before it runs where no permission is asked, and undoing a turn's
-edits. Both need real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo
-gives a plugin no call that reverts a session.
+Not done here: blocking a call before it runs where no permission is asked. That needs real
+Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo gives a plugin no call
+that does it.
+
+### Undo last turn
+
+**Undo last turn** (Settings, host-wide, off by default) puts back the files an agent's last turn
+edited or wrote. It is git's and Paseo's turn hooks, not Claude Code's, so it works for every
+provider and writes nothing into the host's Claude settings (`server/undo-turn.ts`).
+
+- When a turn starts (`agent.turn.before`) and the agent's folder is inside a git work tree, the
+  office saves the work tree as a git tree object: a copy of the repository's index in a
+  temporary folder, `git add -A` on the copy, `git write-tree`. Untracked files are in it, what
+  `.gitignore` excludes is not. The repository's own index, HEAD, branches, stash and files are
+  not touched; only objects are added, and no ref. Unreferenced objects are not removed by
+  `git gc` until they are two weeks old, far longer than the snapshot is kept, so a ref would
+  only be one more thing in the repository to clean up.
+- When the turn ends (`agent.turn.after`) the office reads the turn's tool calls and keeps the
+  paths of its edit and write calls, and saves the work tree a second time. Each call has a
+  limit of 15 seconds, the hooks do not hold the turn, and any error means no undo for that turn.
+- A session with an undo that is not at work has **Undo last turn** beside Options. It asks,
+  naming the number of files, and says: "N files restored, M skipped", with the count for each
+  reason.
+
+Undo puts back exactly those paths and nothing else, so another agent's or the owner's changes to
+other files stay. A path that is in the snapshot is written back from it (with its mode and git's
+line-end rules); a path that is not (the turn made it) is deleted. It leaves a path as it is, and
+counts it skipped, when:
+
+- the file changed after the turn ended: its content is not what the second snapshot holds, so
+  it is somebody's later work;
+- the path is outside the work tree (a `..`, a link out of it, another repository) or inside `.git`;
+- git ignores the path, so a snapshot has nothing to restore it from;
+- the path is a symbolic link;
+- the file is already as it was before the turn;
+- the write failed.
+
+Limits, said in the confirmation too: a change a shell command made (`sed -i`, `git checkout`,
+`rm`, a formatter) is **not** undone, only the files the turn's edit and write calls named, since
+undoing the whole tree would destroy what other agents in the repository did meanwhile. One level
+only: the next turn, and an undo, replace the snapshot. It is kept in the daemon's memory, so a
+restart loses it. A snapshot is taken when the hook runs, which Paseo does not wait for, so an
+edit made in the first moments of the turn may already be in it, and then undo leaves that file
+as the snapshot saw it.
 
 ## Plan and machine tools
 
@@ -1154,6 +1195,9 @@ The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.jso
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
+With **Undo last turn** on, the office also writes git objects (blobs and trees, no ref) into the
+repositories agents work in, and a temporary index in the system's temporary folder while it
+does; nothing else of it is kept on disk, and the last turn's snapshot is only in memory.
 A save of a device setting spreads the values it read and never passes a key with no value: the host
 refuses a document that holds `undefined`, and the device then keeps nothing.
 

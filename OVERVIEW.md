@@ -32,4 +32,6 @@ Office reads session status, activity and provider-reported usage. It stores tea
 
 **History vault** is off by default. When it is on, Office copies the prompts and replies from each session’s timeline, not the tool calls, into a searchable folder on the Paseo host, `office/vault/`, one file per conversation, which only the host’s user can read. It keeps up to 2,000 characters of a message, the newest 300 messages of a conversation and the 200 most recent conversations. The copies outlive the agent: a conversation stays readable after its agent is archived. Turning the vault off stops new reads and hides what is kept, but leaves the folder in place; deleting the folder empties it.
 
+**Undo last turn** is off by default. When it is on, Office writes git objects, blobs and trees but no ref, into each repository an agent works in at the start and end of a turn, so the turn's edits can be put back. It leaves the repository's index, branches, stash and files alone, and keeps only the last turn, in memory, until the host restarts. A change a shell command made is not undone.
+
 Configured issue trackers and weather services receive requests from the host. Clients fetch a custom logo from its configured URL. A session’s available actions depend on its provider and the host SDK.

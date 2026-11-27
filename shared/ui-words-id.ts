@@ -766,4 +766,17 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Back 10 minutes": "Mundur 10 menit",
   "Forward 10 minutes": "Maju 10 menit",
   "Replay position": "Posisi putar ulang",
+  "Undo last turn": "Urungkan giliran terakhir",
+  Undo: "Urungkan",
+  "Undoing...": "Mengurungkan...",
+  "Off by default. On, the office saves the state of the files of a repository when the turn of an agent starts, as objects in that repository (its index, branches and stash are not touched), so a session can undo the files that turn edited or wrote. A change a shell command made is not undone, and the last turn is the only one kept, until the host restarts.":
+    "Bawaannya mati. Jika nyala, kantor menyimpan keadaan berkas repositori saat giliran agen dimulai, sebagai objek di repositori itu (indeks, cabang, dan stash-nya tidak disentuh), sehingga sesi bisa mengurungkan berkas yang disunting atau ditulis giliran itu. Perubahan dari perintah shell tidak diurungkan, dan hanya giliran terakhir yang disimpan, sampai host dimulai ulang.",
+  "Changes a shell command made are not undone, and a file changed since the turn is left as it is.":
+    "Perubahan dari perintah shell tidak diurungkan, dan berkas yang diubah setelah giliran itu dibiarkan apa adanya.",
+  "changed after the turn": "diubah setelah giliran",
+  "outside the repository": "di luar repositori",
+  "ignored by git": "diabaikan git",
+  "left alone, being a link": "dibiarkan karena berupa tautan",
+  "with nothing to put back": "tanpa yang perlu dikembalikan",
+  "that could not be written": "yang tidak bisa ditulis",
 };
