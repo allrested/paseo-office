@@ -72,6 +72,11 @@ export interface OfficeModel {
   /** Every agent with an unfinished step, room by room and in each room's row order. */
   agentTasks: AgentTaskGroup[];
   agents: ReadonlyMap<string, OfficeAgent>;
+  /**
+   * The agents at home: their runtime is closed and they are not archived. They have no desk and
+   * are in no room's rows; a task or a reply brings one back, and it is then among `agents`.
+   */
+  home: ReadonlyMap<string, OfficeAgent>;
   roomOfAgent: ReadonlyMap<string, string>;
   /** The agents that wait on sub-agents, each with how many (`waitingOnOf`). */
   waitingOn: ReadonlyMap<string, number>;
@@ -263,15 +268,18 @@ function agentTaskGroups(rooms: readonly OfficeRoom[], checklists: Checklists): 
 export function buildOfficeModel(state: OfficeSnapshot): OfficeModel {
   const workspaceIds = new Set(state.workspaces.map((workspace) => workspace.id));
   const agents = new Map<string, OfficeAgent>();
-  for (const agent of state.agents) if (agent.status !== "closed") agents.set(agent.id, agent);
+  const home = new Map<string, OfficeAgent>();
+  for (const agent of state.agents) {
+    (agent.status === "closed" ? home : agents).set(agent.id, agent);
+  }
   const waitingOn = waitingOnOf(agents.values());
   const byRoom = new Map<string, OfficeAgent[]>();
   const roomOfAgent = new Map<string, string>();
-  for (const agent of agents.values()) {
+  for (const agent of [...agents.values(), ...home.values()]) {
     const known = agent.workspaceId !== null && workspaceIds.has(agent.workspaceId);
     const roomId = known && agent.workspaceId !== null ? agent.workspaceId : LOBBY;
     roomOfAgent.set(agent.id, roomId);
-    byRoom.set(roomId, [...(byRoom.get(roomId) ?? []), agent]);
+    if (agent.status !== "closed") byRoom.set(roomId, [...(byRoom.get(roomId) ?? []), agent]);
   }
   function room(
     id: string,
@@ -311,6 +319,7 @@ export function buildOfficeModel(state: OfficeSnapshot): OfficeModel {
     attention: attentionList(agents.values(), roomOfAgent),
     agentTasks: agentTaskGroups(rooms, state.checklists ?? {}),
     agents,
+    home,
     roomOfAgent,
     waitingOn,
     dutyList: state.duties?.duties ?? null,

@@ -65,7 +65,8 @@ export async function openPaseoDirectory(
   }
   const agentList = await paseo.agents.list({
     subscribe: {},
-    filter: { statuses: ["initializing", "idle", "running", "error"] },
+    // Closed too: a session whose runtime the daemon shut is at home until it is archived.
+    filter: { statuses: ["initializing", "idle", "running", "error", "closed"] },
     page: { limit: PAGE_LIMIT },
   });
   const workspaceList = await paseo.workspaces

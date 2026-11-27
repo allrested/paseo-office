@@ -60,13 +60,17 @@ function delivery(n: number, author = "a"): Delivery {
   return { postId: `p${n}`, author, authorLabel: `Agent ${author}`, text: `text ${n}` };
 }
 
-test("wake targets: idle or error wake, running or asking wait, closed or archived are gone", () => {
+test("wake targets: idle, error or at home wake, running or asking wait, archived are gone", () => {
   expect(wakeTargetOf({ status: "idle", pendingPermissions: [] })).toBe("wakeable");
   expect(wakeTargetOf({ status: "error", pendingPermissions: [] })).toBe("wakeable");
   expect(wakeTargetOf({ status: "idle", pendingPermissions: [{}] })).toBe("busy");
   expect(wakeTargetOf({ status: "running", pendingPermissions: [] })).toBe("busy");
   expect(wakeTargetOf({ status: "initializing", pendingPermissions: [] })).toBe("busy");
-  expect(wakeTargetOf({ status: "closed", pendingPermissions: [] })).toBe("gone");
+  // Closed and not archived is at home: a post that names it starts its runtime again.
+  expect(wakeTargetOf({ status: "closed", pendingPermissions: [] })).toBe("wakeable");
+  expect(
+    wakeTargetOf({ status: "closed", archivedAt: "2026-11-11T09:00:00Z", pendingPermissions: [] }),
+  ).toBe("gone");
   expect(
     wakeTargetOf({
       status: "idle",

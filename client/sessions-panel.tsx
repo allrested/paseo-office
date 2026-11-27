@@ -211,7 +211,8 @@ const METRICS = [
   { group: "attention", label: "Needs you", tone: "warning" },
   { group: "resting", label: "Resting", tone: "idle" },
 ] as const;
-const GROUPS: readonly SessionGroup[] = ["attention", "working", "resting"];
+const GROUPS: readonly SessionGroup[] = ["attention", "working", "resting", "home"];
+const GROUP_TITLES = { working: "Working", resting: "Resting", home: "At home" } as const;
 function SectionHeading({
   group,
   rows,
@@ -226,7 +227,7 @@ function SectionHeading({
   styles: OfficeStyles;
 }) {
   const ui = styles.sessions;
-  let title = group === "working" ? "Working" : "Resting";
+  let title: string = group === "attention" ? "" : GROUP_TITLES[group];
   let accent: typeof ui.warningText | undefined;
   if (group === "attention") {
     title = rows.every(
@@ -309,7 +310,12 @@ function SessionList({
   const model = useMemo(() => buildOfficeModel(state), [state]);
   const now = useRowClock(model.rooms);
   // The counts ignore the search, as the List view's do.
-  const counts = useMemo(() => tabCounts(model.rooms.flatMap((room) => room.rows)), [model]);
+  const counts = useMemo(() => {
+    const seated = tabCounts(model.rooms.flatMap((room) => room.rows));
+    // Those at home are sessions too, and they rest.
+    const home = model.home.size;
+    return { ...seated, all: seated.all + home, resting: seated.resting + home };
+  }, [model]);
   const shown = useMemo(() => sessionSections(model, tab, query), [model, tab, query]);
   const filtered = tab !== "all" || query.length > 0;
   const reset = useCallback(() => {
@@ -418,7 +424,7 @@ function SessionList({
 }
 
 interface MetricProps {
-  group: SessionGroup;
+  group: Exclude<ListTab, "all">;
   label: string;
   tone: "running" | "warning" | "idle";
   count: number;

@@ -22,6 +22,7 @@ const MODEL: OfficeModel = {
   attention: [],
   agentTasks: [],
   agents: new Map(),
+  home: new Map(),
   roomOfAgent: new Map(),
   waitingOn: new Map(),
   dutyList: null,

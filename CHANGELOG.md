@@ -24,6 +24,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - Incidents: one resolved in Jira or Sentry closes at the next check. **Jira issue types** names
   the types that ring (Bug when empty). A Jira project key that does not exist, or that the token
   cannot see, is now a problem on the card and no longer silent.
+- A session whose runtime Paseo closed, and that is not archived, stays in the office as an agent
+  **At home**: the Sessions list keeps it, a reply brings it back, and a lobby task or a duty
+  goes to it when no idle agent is free. Before, such sessions were not shown at all, and a task
+  waited for a working agent to finish.
 
 ## 0.2.14 (2026-11-26)
 

@@ -177,3 +177,33 @@ test("session details share the feed's activity wording and permission title pol
     ).not.toContain("Private prose");
   }
 });
+
+test("agents at home are sessions of their own section, under All and Resting, the last to leave first", () => {
+  const model = buildOfficeModel(
+    office([
+      agent("live", { workspaceId: "w1" }),
+      agent("early", {
+        status: "closed",
+        workspaceId: "w1",
+        idleSince: "2026-11-17T09:00:00.000Z",
+      }),
+      agent("late", { status: "closed", workspaceId: "w2", idleSince: "2026-11-17T10:00:00.000Z" }),
+    ]),
+  );
+  // No desk and no room's row: the floors, the boards and the stand-up do not list them.
+  expect(model.rooms.flatMap((room) => room.rows.map((row) => row.agent.id))).toEqual(["live"]);
+  expect([...model.home.keys()]).toEqual(["early", "late"]);
+
+  const all = sessionSections(model, "all", "");
+  expect(all.resting.map((entry) => entry.row.agent.id)).toEqual(["live"]);
+  expect(all.home.map((entry) => [entry.row.agent.id, entry.room.name])).toEqual([
+    ["late", "blog"],
+    ["early", "shop-api"],
+  ]);
+  expect(sessionDetail(all.home[0]!)).toBe("At home · a task or a reply brings it back");
+  expect(sessionSections(model, "resting", "").home).toHaveLength(2);
+  expect(sessionSections(model, "working", "").home).toEqual([]);
+  expect(sessionSections(model, "all", "blog").home.map((entry) => entry.row.agent.id)).toEqual([
+    "late",
+  ]);
+});

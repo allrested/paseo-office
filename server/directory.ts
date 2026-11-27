@@ -254,12 +254,20 @@ function rosterField(value: unknown): { roster?: string | number } {
   return roster === undefined ? {} : { roster };
 }
 
+/**
+ * A session whose runtime the daemon shut is at home: listed, and woken by a task or a reply. A
+ * sub-agent that closed has done its work and is not coming back.
+ */
+function leftForGood(status: AgentStatus, parent: string): boolean {
+  return status === "closed" && parent !== "";
+}
+
 /** The office's view of an agent, or null when the office does not show it. */
 export function projectAgent(agent: DirectoryAgentInput): OfficeAgent | null {
   if (agent.internal === true || agent.background === true || agent.archivedAt) return null;
   const status = AgentStatusSchema.safeParse(agent.status);
-  if (!status.success || status.data === "closed") return null;
   const parent = agent.labels?.[PARENT_AGENT_ID_LABEL]?.trim() ?? "";
+  if (!status.success || leftForGood(status.data, parent)) return null;
   const context = contextOf(agent);
   const cost = costOf(agent);
   const appearance = AppearanceSchema.safeParse(agent.metadata?.[APPEARANCE_KEY]);

@@ -81,6 +81,20 @@ report for the notes writer follows the rule too, but the server's wakes and cle
 they take such an agent for idle, so a mention on a board wakes it, and the Host card can still
 close a waiting agent.
 
+## Agents at home
+
+Paseo closes the runtime of a session that has been idle for a while. The session is still there,
+unarchived, and its next prompt starts it again: the office takes such an agent to be at home. It
+has no desk on either floor and is in no room's rows, so the boards, the stand-up and the Janitor
+leave it alone; the Sessions list keeps it, in an **At home** section under Resting,
+and counts it in All and Resting. Selecting it opens its conversation, and a reply brings it back.
+
+A task brings it back too. The lobby's to-dos and the duties with instructions go to the idle
+agents first; when none is free, the agents at home are next, the one that left last first, so a
+task no longer waits for somebody to finish. A post that names an agent at home wakes it as it
+wakes an idle one. The team chat's whole-group messages do not: only work calls an agent back.
+An archived session is gone from the office, as before, and so is a sub-agent that closed.
+
 ## The agent card
 
 Tapping a row, a desk or a person opens the agent's card. It opens the session, sends a prompt,
