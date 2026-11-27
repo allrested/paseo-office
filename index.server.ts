@@ -25,6 +25,7 @@ import {
   lifeSubscription,
   homeDepartureRpc,
   tenureRpc,
+  undoRpc,
   type LifeEvent,
 } from "./shared/contracts.js";
 import { embeddedWorldWords, type WorldWords } from "./server/world-words.js";
@@ -72,7 +73,9 @@ import {
   type Notice,
 } from "./shared/notify.js";
 import type { NotifyLevel } from "./shared/settings.js";
+import { turnItems } from "./server/live-ports.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
+import { createUndo, editedFiles } from "./server/undo-turn.js";
 import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
 import { TIMELINE_KEEP_MS, createTimelineLog, type TimelineLog } from "./server/timeline.js";
 import {
@@ -623,6 +626,9 @@ export function createOfficePlugin(
   let keepWatching = false;
   // Whether a request for a call that just failed three times running is refused; off until the settings say.
   let loopGuard = false;
+  // Whether a turn's work tree is snapshotted so its edits can be undone; off until the settings say.
+  let undoOn = false;
+  const undo = createUndo({ exec: execCommand, enabled: () => undoOn, log });
   // The directory needs the Paseo API, which the first handler or hook brings.
   const followWatching = () => {
     const on = keepWatching && holder.held();
@@ -643,6 +649,7 @@ export function createOfficePlugin(
     notifyUrl = "";
     keepWatching = false;
     loopGuard = false;
+    undoOn = false;
     followWatching();
     office.setPickupEnabled(false);
     const message = `The office's settings cannot be read: ${reason}`;
@@ -675,6 +682,7 @@ export function createOfficePlugin(
     keepWatching = state.values.keepWatching;
     planHidden = new Set(state.values.planHidden);
     loopGuard = state.values.loopGuard;
+    undoOn = state.values.undoTurn;
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
@@ -1025,6 +1033,15 @@ export function createOfficePlugin(
       return { archived: await archiveDeparture(context.paseo, input.agentId, input.idleSince) };
     }),
   );
+  server.handle(undoRpc, (input, context) =>
+    guarded("undo", async () => {
+      holder.remember(context.paseo);
+      const none = { files: 0, restored: 0, skipped: [] };
+      if (input.op === "status") return { ...none, files: undo.available(input.agentId) };
+      const result = await undo.undo(input.agentId);
+      return result === null ? none : { files: 0, ...result };
+    }),
+  );
   server.handle(tenureRpc, async (input, context) => {
     holder.remember(context.paseo);
     return (await lifeReady)?.write(input) ?? { ok: false };
@@ -1056,7 +1073,22 @@ export function createOfficePlugin(
         return undefined;
       }
     }),
+    server.addHook("agent.turn.before", async ({ agent }, context) => {
+      try {
+        holder.remember(context.paseo);
+        await undo.begin(agent.id, agent.cwd);
+      } catch (error) {
+        log(`[office] agent.turn.before failed: ${errorMessage(error)}`);
+      }
+    }),
     server.addHook("agent.turn.after", async ({ agent, outcome, turnId }, context) => {
+      // Not waited for: a second snapshot takes as long as the first, and nothing here needs it.
+      if (undoOn && turnId !== null) {
+        void (async () => {
+          const files = editedFiles(await turnItems(context.paseo, agent.id, turnId));
+          await undo.end(agent.id, agent.cwd, files);
+        })().catch((error: unknown) => log(`[office] undo read failed: ${errorMessage(error)}`));
+      }
       try {
         holder.remember(context.paseo);
         office.noteAgent(agent);
@@ -1127,6 +1159,7 @@ export function createOfficePlugin(
     server.addHook("agent.close.after", async ({ agent }) => {
       try {
         office.agentGone(agent.id);
+        undo.forget(agent.id);
         await writer.agentClosed(agent.id);
       } catch (error) {
         log(`[office] agent.close.after failed: ${errorMessage(error)}`);
@@ -1140,6 +1173,7 @@ export function createOfficePlugin(
     server.addHook("agent.archive.after", async ({ agent }) => {
       try {
         office.agentGone(agent.id);
+        undo.forget(agent.id);
         await writer.agentArchived(agent.id);
       } catch (error) {
         log(`[office] agent.archive.after failed: ${errorMessage(error)}`);

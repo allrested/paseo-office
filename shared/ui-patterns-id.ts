@@ -18,6 +18,15 @@ const lower = (text: string) => {
 };
 
 const RULES: readonly Rule[] = [
+  [
+    /^Undo the last turn's edits to (\d+) files?\?$/,
+    (n) => `Urungkan suntingan giliran terakhir pada ${n} berkas?`,
+  ],
+  [/^(\d+) files? restored, (\d+) skipped$/, (n, m) => `${n} berkas dikembalikan, ${m} dilewati`],
+  [
+    /^(\d+) files? (changed after the turn|outside the repository|ignored by git|left alone, being a link|with nothing to put back|that could not be written)$/,
+    (n, why) => `${n} berkas ${translatePattern(why)}`,
+  ],
   [/^(\d+) min ago$/, (n) => `${n} mnt lalu`],
   [/^(\d+) h ago$/, (n) => `${n} jam lalu`],
   [/^(\d+) min$/, (n) => `${n} mnt`],

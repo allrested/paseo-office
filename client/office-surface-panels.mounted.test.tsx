@@ -127,6 +127,9 @@ const DEVICE: SettingsState<typeof officeDeviceSettings.schema> = {
   reload: async () => undefined,
 };
 
+// Undo last turn asks the host over an RPC these tests do not have; its own test mounts it.
+vi.mock("./undo-turn.js", () => ({ UndoTurn: () => null }));
+
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
   // The device's view is the test's; the host's settings are the schema's defaults.

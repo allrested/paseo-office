@@ -16,6 +16,9 @@ import { useOfficeStyles } from "./styles.js";
 
 let draws: number;
 
+// Undo last turn asks the host over an RPC these tests do not have; its own test mounts it.
+vi.mock("./undo-turn.js", () => ({ UndoTurn: () => null }));
+
 vi.mock("./use-ui-cards.js", () => ({ useUiCards: () => false }));
 
 vi.mock("./use-conversation.js", () => ({

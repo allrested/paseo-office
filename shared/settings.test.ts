@@ -56,6 +56,7 @@ const COMPANY = {
   uiCards: false,
   keepWatching: false,
   loopGuard: false,
+  undoTurn: false,
   notifyUrl: "",
   notifyLevel: "danger",
   teams: [],
@@ -98,7 +99,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(12);
+  expect(officeHostSettings.version).toBe(13);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -119,7 +120,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(12);
+  expect(officeHostSettings.version).toBe(13);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -372,5 +373,5 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(12);
+  expect(officeHostSettings.version).toBe(13);
 });

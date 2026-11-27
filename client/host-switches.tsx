@@ -45,6 +45,7 @@ type HostSetting =
   | "History vault"
   | "Keep watching"
   | "Stop repeated failing calls"
+  | "Undo last turn"
   | "Pinned notes"
   | "Cache clock"
   | "Team chat"
@@ -613,6 +614,11 @@ function FloorSettings({
     [change],
   );
   const guardProblem = saveProblem("Stop repeated failing calls");
+  const toggleUndo = useCallback(
+    (next: boolean) => void change("Undo last turn", { undoTurn: next }),
+    [change],
+  );
+  const undoProblem = saveProblem("Undo last turn");
   const saveCache = useCallback(
     (next: CacheClock) => void change("Cache clock", { cacheClock: next }),
     [change],
@@ -702,6 +708,25 @@ function FloorSettings({
       {guardProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {guardProblem}
+        </Text>
+      )}
+      {stored && (
+        <LabeledSwitch
+          label="Undo last turn"
+          value={stored.undoTurn}
+          onChange={toggleUndo}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default. On, the office saves the state of the files of a repository when the turn of
+        an agent starts, as objects in that repository (its index, branches and stash are not
+        touched), so a session can undo the files that turn edited or wrote. A change a shell
+        command made is not undone, and the last turn is the only one kept, until the host restarts.
+      </Text>
+      {undoProblem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {undoProblem}
         </Text>
       )}
       {stored && (

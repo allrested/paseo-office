@@ -58,6 +58,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       uiCards: false,
       keepWatching: false,
       loopGuard: false,
+      undoTurn: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],

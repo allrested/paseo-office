@@ -20,6 +20,13 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Replay · 14:05 · 60×", "Putar ulang · 14:05 · 60×"],
     ["3 h 20 min at work", "3 jam 20 mnt bekerja"],
     ["1.5 GB free", "1.5 GB kosong"],
+    [
+      "Undo the last turn's edits to 3 files?",
+      "Urungkan suntingan giliran terakhir pada 3 berkas?",
+    ],
+    ["1 file restored, 0 skipped", "1 berkas dikembalikan, 0 dilewati"],
+    ["2 files changed after the turn", "2 berkas diubah setelah giliran"],
+    ["1 file left alone, being a link", "1 berkas dibiarkan karena berupa tautan"],
   ];
   for (const [english, indonesian] of lines) expect(translatePattern(english)).toBe(indonesian);
 });
