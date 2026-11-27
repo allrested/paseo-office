@@ -399,24 +399,28 @@ existing text. Vietnamese has its own karaoke lyrics. Thai and Indonesian use En
 
 ### The interface's language
 
-The office's own interface follows the same choice (`client/ui-language.tsx`): with Bahasa
-Indonesia chosen, or Automatic in an app whose language is Indonesian, it is in Indonesian; with
-English, or any other language, in English. That covers the buttons, the fields with their hints
+The office's own interface follows the same choice (`client/ui-language.tsx`): with Tiếng Việt,
+ไทย or Bahasa Indonesia chosen, or Automatic in an app whose language is one of them, it is in that
+language; with English, or any other language, in English. That covers the buttons, the fields with their hints
 and placeholders, the switches, the dialogs and what they say, the column, the cards, the
 settings page, and the lines put together from data: an age ("12 mnt lalu"), a count, an agent's
 activity, the cards' summaries, a failure up to the host's own reason.
 
 Every view draws its words through one text component and one text field (`client/text.tsx`).
-A text that is one string is looked up whole in `shared/ui-words-id.ts`, by the English it stands
-for, and then against the shapes in `shared/ui-patterns-id.ts`, which carry the data over as it
-is. A text with no entry and no shape is shown in English. What a person or an agent wrote goes
+A text that is one string is looked up whole in the language's table (`shared/ui-words-id.ts`,
+`-vi.ts` or `-th.ts`), by the English it stands for, and then against the shapes in
+`shared/ui-patterns-id.ts` (`-vi`, `-th`), which carry the data over as it is. Vietnamese and Thai
+have no plural, so a count is the number and a classifier ("3 tệp", "3 ไฟล์"). The three tables
+have the same keys and the three lists of shapes the same shapes in the same order;
+`shared/ui-languages.test.ts` fails when a text or a shape is in one language and not in another. A text with no entry and no shape is shown in English. What a person or an agent wrote goes
 through the same component, so a shape takes a line only by words no title is likely to end in.
 
 Not translated: the reason a host or a provider gives for a failure, a name read out by a screen
 reader where it is put together from several parts, host notifications and the webhook's
 message, and the prompts the office sends to agents, which stay English for the agents' sake.
 The people in the team chat speak by the host's **Team chat** setting, which has Indonesia of its
-own. Vietnamese and Thai show the English interface.
+own. The Vietnamese and Thai interface was written by a machine and has not been read by a
+native speaker (see `docs/verified.md`).
 
 ### Sound
 

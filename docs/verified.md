@@ -565,6 +565,7 @@ games still need a device and a populated office.
 | iOS and its ring switch                                                         | No iOS device; unknown                                                                                                                                  |
 | An incident's siren with Sound on and off                                       | Needs Jira or Sentry tokens on the host, and none were set                                                                                              |
 | Sound's note with reduced motion, in photo mode, and read by a screen reader    | Not tried                                                                                                                                               |
+| The Vietnamese and Thai interface read by a native speaker                      | Written by a machine, checked against the scene's own words for the same things, not by a person. Fit on a phone not seen                               |
 | A refused full screen and my-office's game and karaoke lines in the note        | Not tried                                                                                                                                               |
 
 ## Headquarters

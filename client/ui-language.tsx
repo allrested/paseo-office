@@ -2,19 +2,27 @@ import { createContext, useCallback, useContext, type ReactNode } from "react";
 import { useSettings } from "@getpaseo/plugin/client";
 import { sceneLanguage, type SceneLanguage } from "../shared/scene-language.js";
 import { officeLanguageSettings } from "../shared/settings.js";
-import { translatePattern } from "../shared/ui-patterns-id.js";
+import { translatePattern as translateId } from "../shared/ui-patterns-id.js";
+import { translatePattern as translateTh } from "../shared/ui-patterns-th.js";
+import { translatePattern as translateVi } from "../shared/ui-patterns-vi.js";
 import { useAppLocale } from "./app-locale.js";
 
 const UiLanguageContext = createContext<SceneLanguage>("en");
 
+const TRANSLATORS: Readonly<Partial<Record<SceneLanguage, (text: string) => string>>> = {
+  id: translateId,
+  vi: translateVi,
+  th: translateTh,
+};
+
 /** The text in the interface's language; the English itself where that language has no word for it. */
 export function translate(language: SceneLanguage, text: string): string {
-  return language === "id" ? translatePattern(text) : text;
+  return TRANSLATORS[language]?.(text) ?? text;
 }
 
 /**
  * Gives the office's own interface the language the 3D scene speaks: the device's choice, or the
- * app's language for Automatic. Indonesian has words; any other language shows English.
+ * app's language for Automatic. Vietnamese, Thai and Indonesian have words; English is the text itself.
  */
 export function UiLanguage({ children }: { children: ReactNode }) {
   const settings = useSettings(officeLanguageSettings);
