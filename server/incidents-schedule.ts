@@ -106,7 +106,9 @@ export function createIncidentsSchedule(ports: IncidentsSchedulePorts): Incident
     log: ports.log,
   });
   return {
-    sync: (on) => follower.sync(() => incidentsCadence(on)),
+    sync: async (on) => {
+      await follower.sync(() => incidentsCadence(on));
+    },
     error: follower.error,
     fail: follower.fail,
   };

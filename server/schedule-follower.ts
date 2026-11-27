@@ -14,26 +14,27 @@ export interface OfficeSchedule {
 /**
  * Brings the office's schedule in step with `cadence`: saves it, or removes it for null. A
  * schedule that is already so is left alone, since a save counts the next run again from now and
- * can move a run that is due.
+ * can move a run that is due. Resolves whether it saved the schedule.
  */
 export async function syncSchedule(
   schedules: OfficeSchedules,
   schedule: OfficeSchedule,
   cadence: OfficeCadence | null,
-): Promise<void> {
+): Promise<boolean> {
   if (cadence === null) {
     await schedules.remove(schedule.name);
-    return;
+    return false;
   }
   // `list` leaves the label out; only this function saves the schedule, always with its label.
   const kept = (await schedules.list()).find((saved) => saved.name === schedule.name);
-  if (kept?.handler === schedule.name && isDeepStrictEqual(kept.cadence, cadence)) return;
+  if (kept?.handler === schedule.name && isDeepStrictEqual(kept.cadence, cadence)) return false;
   await schedules.upsert({
     name: schedule.name,
     handler: schedule.name,
     prompt: schedule.label,
     cadence,
   });
+  return true;
 }
 
 export interface ScheduleFollowerPorts {
@@ -45,9 +46,10 @@ export interface ScheduleFollowerPorts {
 export interface ScheduleFollower {
   /**
    * Follows the cadence `cadence()` gives, worked out in turn, so it may throw like a refused
-   * save. Never rejects: a failure is logged and kept for `error`.
+   * save. Never rejects: a failure is logged and kept for `error`. Resolves whether it saved the
+   * schedule: false when it was already so, removed, or failed.
    */
-  sync(cadence: () => OfficeCadence | null): Promise<void>;
+  sync(cadence: () => OfficeCadence | null): Promise<boolean>;
   /** Why the schedule could not follow; null once a later sync succeeds. */
   error(): string | null;
   /** Keeps a reason found outside a sync (settings that cannot be read) until a sync succeeds. */
@@ -57,20 +59,23 @@ export interface ScheduleFollower {
 export function createScheduleFollower(ports: ScheduleFollowerPorts): ScheduleFollower {
   let scheduleError: string | null = null;
   // One at a time, in order: a slow save must not land after a later one.
-  let queue: Promise<void> = Promise.resolve();
-  async function follow(cadence: () => OfficeCadence | null): Promise<void> {
+  let queue: Promise<unknown> = Promise.resolve();
+  async function follow(cadence: () => OfficeCadence | null): Promise<boolean> {
     try {
-      await syncSchedule(ports.schedules, ports.schedule, cadence());
+      const saved = await syncSchedule(ports.schedules, ports.schedule, cadence());
       scheduleError = null;
+      return saved;
     } catch (error) {
       scheduleError = errorMessage(error);
       ports.log(`[office] ${ports.schedule.logName} schedule failed: ${scheduleError}`);
+      return false;
     }
   }
   return {
     sync(cadence) {
-      queue = queue.then(() => follow(cadence));
-      return queue;
+      const run = queue.then(() => follow(cadence));
+      queue = run;
+      return run;
     },
     error: () => scheduleError,
     fail(message) {

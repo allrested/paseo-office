@@ -1165,6 +1165,9 @@ const NOTES: SettingsState = {
   },
 };
 
+/** Wednesday 11 November 2026, 07:00 in Riyadh: the day's 8:00 run has not come yet. */
+const BEFORE_EIGHT = Date.parse("2026-11-11T04:00:00.000Z");
+
 /** The writer leaves the day's entry in the notes: the fake clock's day in Asia/Riyadh. */
 function writeEntry(): Promise<void> {
   const text = "# Notes\n\n---\n\n## 11 November 2026\n\nB\n";
@@ -1286,7 +1289,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
     },
   });
   let saved: SettingsState = NOTES;
-  const { recorded, writers, context, stop } = setup(async () => saved);
+  const { recorded, writers, context, stop } = setup(async () => saved, { start: BEFORE_EIGHT });
   const modes = recorded.handlers.get("office.notes.modes.request");
   expect(await modes?.({}, context)).toEqual({
     ok: true,
@@ -1335,7 +1338,9 @@ test("the bell's request starts one writer in the notes folder, and its good end
 });
 
 test("the 8:00 run starts the writer with the run's Paseo API", async () => {
-  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES);
+  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES, {
+    start: BEFORE_EIGHT,
+  });
   await settle();
   // A run has no Paseo API of its own: a handler or hook brought it before.
   await open();
@@ -1349,7 +1354,9 @@ const NOTES_WAITING =
   "[office] standup-notes run is waiting for the Paseo API: open the office, or let an agent open or end a turn";
 
 test("a run due before any handler brought the Paseo API says so once and waits for it", async () => {
-  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES);
+  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES, {
+    start: BEFORE_EIGHT,
+  });
   await settle();
   const run = recorded.scheduleRuns.get("standup-notes")?.(clock.now());
   await settle();
@@ -1364,7 +1371,9 @@ test("a run due before any handler brought the Paseo API says so once and waits 
 });
 
 test("a notes run that could only start the next day starts no writer and says why", async () => {
-  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES);
+  const { recorded, writers, logs, clock, open, stop } = setup(async () => NOTES, {
+    start: BEFORE_EIGHT,
+  });
   await settle();
   const run = recorded.scheduleRuns.get("standup-notes")?.(clock.now());
   await settle();
@@ -1375,6 +1384,81 @@ test("a notes run that could only start the next day starts no writer and says w
   expect(logs).toContain(
     "[office] standup-notes run dropped: it was due on 2026-11-11 and could only start on 2026-11-12",
   );
+  await stop();
+});
+
+/** The notes folder has no entry: an earlier test may have left one. */
+function noEntry(): Promise<void> {
+  return rm(join(NOTES_FOLDER, "daily-standup-202611.md"), { force: true });
+}
+
+/** The notes settings with their days as given: Sunday to Thursday by default. */
+function notesOnDays(days: number[]): SettingsState {
+  if (NOTES.status !== "ready") throw new Error("NOTES is the ready state");
+  return {
+    ...NOTES,
+    revision: `days${days.join("")}`,
+    values: { ...NOTES.values, notesDays: days },
+  };
+}
+
+test("a start after 8:00 on a stand-up day with no entry makes up the run, once, when the Paseo API comes", async () => {
+  await noEntry();
+  // Noon in Riyadh on a Wednesday: the clock's default.
+  const { writers, logs, open, stop } = setup(async () => NOTES);
+  await settle();
+  expect(writers.created).toHaveLength(0);
+  expect(logs.filter((line) => line === NOTES_WAITING)).toHaveLength(1);
+  await open();
+  await vi.waitFor(() =>
+    expect(writers.created).toEqual([`${NOTES_FOLDER} claude/opus Stand-up notes`]),
+  );
+  await stop();
+});
+
+test("a start after 8:00 makes up nothing when today's entry is already written", async () => {
+  await writeEntry();
+  const { writers, open, stop } = setup(async () => NOTES);
+  await open();
+  await settle();
+  expect(writers.created).toHaveLength(0);
+  await stop();
+});
+
+test("a start after 8:00 on a day that is not a stand-up day makes up nothing", async () => {
+  await noEntry();
+  const { writers, open, stop } = setup(async () => notesOnDays([0, 1, 2, 4]));
+  await open();
+  await settle();
+  expect(writers.created).toHaveLength(0);
+  await stop();
+});
+
+test("a start before 8:00 leaves the day's run to the schedule, which starts one writer", async () => {
+  const { recorded, writers, clock, open, stop } = setup(async () => NOTES, {
+    start: BEFORE_EIGHT,
+  });
+  await open();
+  await settle();
+  expect(writers.created).toHaveLength(0);
+  clock.advance(60 * 60 * 1000);
+  await recorded.scheduleRuns.get("standup-notes")?.(clock.now());
+  expect(writers.created).toHaveLength(1);
+  await stop();
+});
+
+test("a run made up that could only start the next day is dropped like any other", async () => {
+  await noEntry();
+  const { writers, logs, clock, open, stop } = setup(async () => NOTES);
+  await settle();
+  clock.advance(24 * 60 * 60 * 1000);
+  await open();
+  await vi.waitFor(() =>
+    expect(logs).toContain(
+      "[office] standup-notes run dropped: it was due on 2026-11-11 and could only start on 2026-11-12",
+    ),
+  );
+  expect(writers.created).toHaveLength(0);
   await stop();
 });
 
