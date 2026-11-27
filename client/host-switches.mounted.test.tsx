@@ -158,6 +158,8 @@ beforeEach(() => {
     rosterEdition: 0,
     uiCards: false,
     keepWatching: false,
+    notifyUrl: "",
+    notifyLevel: "danger",
     teams: [],
     ...NO_TRACKERS,
   };
@@ -227,6 +229,8 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         rosterEdition: 0,
         uiCards: false,
         keepWatching: false,
+        notifyUrl: "",
+        notifyLevel: "danger",
         teams: [],
         ...NO_TRACKERS,
       },
@@ -295,6 +299,8 @@ test("the switch keeps the notes settings when it saves", async () => {
       rosterEdition: 0,
       uiCards: false,
       keepWatching: false,
+      notifyUrl: "",
+      notifyLevel: "danger",
       teams: [],
       ...NO_TRACKERS,
     },
@@ -733,4 +739,28 @@ test("the Teams section saves the roster with the other host settings", async ()
     teams: [],
     agentTools: false,
   });
+});
+
+test("the webhook address is saved, and a test message is sent only once there is one", async () => {
+  await mount();
+  expect(field("Webhook address").value).toBe("");
+  expect(container.querySelector('[aria-label="Send a test message to the webhook"]')).toBeNull();
+  await type("Webhook address", "https://hooks.test/in/KEY");
+  await leave("Webhook address");
+  expect(saved.at(-1)?.values.notifyUrl).toBe("https://hooks.test/in/KEY");
+  stored = { ...stored, notifyUrl: "https://hooks.test/in/KEY" };
+  await mount();
+  const level = (label: string) =>
+    container.querySelector<HTMLElement>(`[role="button"][aria-label="${label}"]`);
+  expect(level("Danger only")?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => level("Warning and danger")?.click());
+  expect(saved.at(-1)?.values.notifyLevel).toBe("warning");
+  await press("Send a test message to the webhook");
+  expect(calls).toEqual([{ name: "office.notify.test.request", input: {} }]);
+  expect(container.textContent).toContain("The webhook took the test message");
+
+  rpcAnswer = { ok: false, problem: "The webhook answered 403" };
+  await press("Send a test message to the webhook");
+  expect(alerts()).toEqual(["Unable to send a test: The webhook answered 403"]);
+  expect(container.textContent).not.toContain("The webhook took the test message");
 });

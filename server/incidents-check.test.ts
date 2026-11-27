@@ -77,6 +77,8 @@ function memoryStore(events: string[]): MemoryStore {
 }
 
 interface Harness {
+  /** The incidents told as they opened, by id. */
+  told: string[];
   check: IncidentsCheck;
   clock: FakeClock;
   store: MemoryStore;
@@ -97,6 +99,7 @@ function harness(): Harness {
   const clock = createFakeClock(NOW);
   const store = memoryStore(events);
   const h: Harness = {
+    told: [],
     clock,
     store,
     jira: fakeReader(events),
@@ -118,6 +121,7 @@ function harness(): Harness {
       now: clock.now,
       log: (message) => h.logs.push(message),
       changed: (state) => h.changes.push(state),
+      opened: (incident) => h.told.push(incident.id),
     }),
   };
   return h;
@@ -200,6 +204,11 @@ test("a new key opens one incident with id jira:SHOP-3 and the title cut at 200"
     open: [incident],
   });
   expect(h.store.kept.open[0].id).toBe("jira:SHOP-3");
+  // Told once, as it opens: the next check finds it seen.
+  expect(h.told).toEqual(["jira:SHOP-3"]);
+  h.clock.advance(5 * MINUTE);
+  await h.check.check();
+  expect(h.told).toEqual(["jira:SHOP-3"]);
   expect(h.changes.at(-1)).toEqual({ open: [incident], problems: {} });
 });
 

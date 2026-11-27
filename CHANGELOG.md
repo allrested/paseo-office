@@ -11,6 +11,11 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - **Keep watching**, a host setting, off by default: the office goes on reading the agents with
   no office open, every 15 seconds, so the Timeline, This week, the History vault and what the
   office notices have no gaps for the hours nobody looked.
+- **Webhook address**, a host setting under Services: the office posts a JSON message there
+  when it raises an alert (a loop, a refused call, two agents in one file, a taken port, failing
+  checks) or opens an incident, so the owner hears of it with no office open. **Send a test**
+  tries the address. By default only a loop and an incident are sent; **Notify for** adds the
+  warnings.
 
 ## 0.2.14 (2026-11-26)
 

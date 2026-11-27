@@ -100,6 +100,8 @@ const ON: SettingsState = {
     rosterEdition: 0,
     uiCards: false,
     keepWatching: false,
+    notifyUrl: "",
+    notifyLevel: "danger",
     teams: [],
   },
 };
@@ -123,6 +125,8 @@ const OFF: SettingsState = {
     rosterEdition: 0,
     uiCards: false,
     keepWatching: false,
+    notifyUrl: "",
+    notifyLevel: "danger",
     teams: [],
   },
 };
@@ -654,6 +658,8 @@ function notesSettings(
       rosterEdition: 0,
       uiCards: false,
       keepWatching: false,
+      notifyUrl: "",
+      notifyLevel: "danger",
       teams: [],
     },
   };
@@ -886,6 +892,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.duties.save.request",
     "office.duty.acted.request",
     "office.notes.write.request",
+    "office.notify.test.request",
     "office.incidents.dismiss.request",
     "office.timeline.request",
     "office.forgotten.request",
@@ -1145,6 +1152,8 @@ const NOTES: SettingsState = {
     rosterEdition: 0,
     uiCards: false,
     keepWatching: false,
+    notifyUrl: "",
+    notifyLevel: "danger",
     teams: [],
   },
 };
@@ -1263,6 +1272,8 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       rosterEdition: 0,
       uiCards: false,
       keepWatching: false,
+      notifyUrl: "",
+      notifyLevel: "danger",
       teams: [],
     },
   });
@@ -1631,6 +1642,8 @@ const JIRA_ON: SettingsState = {
     rosterEdition: 0,
     uiCards: false,
     keepWatching: false,
+    notifyUrl: "",
+    notifyLevel: "danger",
     teams: [],
     jiraProjects: "OPS",
   },

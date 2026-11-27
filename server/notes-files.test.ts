@@ -57,6 +57,8 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       rosterEdition: 0,
       uiCards: false,
       keepWatching: false,
+      notifyUrl: "",
+      notifyLevel: "danger",
       teams: [],
       jiraProjects: "",
       sentryOrg: "",
