@@ -17,6 +17,8 @@ export type { ActivityStep };
 
 /** At most one read per agent per interval (spec: once per 5 s per agent). */
 export const ACTIVITY_INTERVAL_MS = 5000;
+/** The time between reads while no office is open and the host keeps watching. */
+export const ACTIVITY_BACKGROUND_MS = 15_000;
 /** Timeline items read from the tail of each running agent. */
 export const ACTIVITY_TAIL_LIMIT = 10;
 // Providers put free text (a command, a path) in a tool name; only identifier-like names are shown.
@@ -349,6 +351,8 @@ export type ActivityLines = Readonly<Record<string, string>>;
 export type ActivitySteps = Readonly<Record<string, ActivityStep>>;
 
 export interface ActivityPorts {
+  /** The time to the next read, asked after each one; every 5 s without it. */
+  interval?(): number;
   /** Ids of the agents running now. */
   running(): readonly string[];
   tail(agentId: string): Promise<readonly ActivityItem[]>;
@@ -501,7 +505,9 @@ export function startActivityPoller(ports: ActivityPorts): ActivityPoller {
     } catch (error) {
       ports.log(`[office] activity failed: ${errorMessage(error)}`);
     }
-    if (!stopped) cancel = ports.timers.setTimeout(runLogged, ACTIVITY_INTERVAL_MS);
+    if (!stopped) {
+      cancel = ports.timers.setTimeout(runLogged, ports.interval?.() ?? ACTIVITY_INTERVAL_MS);
+    }
   }
 
   runLogged();

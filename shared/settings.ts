@@ -107,6 +107,7 @@ const HostValuesSchema = z.object({
   rosterEdition: z.number().int().nonnegative().default(0),
   teams: RosterTeamsSchema,
   uiCards: z.boolean().default(false),
+  keepWatching: z.boolean().default(false),
   jiraProjects: z.string().default(""),
   sentryOrg: z.string().default(""),
   sentryProjects: z.string().default(""),
@@ -212,6 +213,8 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * they are handed out, each with its teammates; `rosterEdition` goes up when that list grows or is switched
  * on, so what was passed over is looked at again. `uiCards` on has a session's chat show a card
  * where a reply holds a `ui` or `app` block of the Generative UI plugin, not the block's source.
+ * `keepWatching` on has the office go on reading the agents while no office is open, so the
+ * timeline, the vault and what the office notices have no gaps.
  * `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`
@@ -221,7 +224,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 8,
+  version: 9,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
@@ -239,6 +242,7 @@ export const officeHostSettings = defineSettings({
   // version 4 the notes ran Sunday to Thursday, so a host that had settings keeps those days.
   // Version 5 adds Headquarters and weather. Older documents keep their floor plan and start with weather off.
   // Version 7 adds the roster, off and empty. Version 8 adds `uiCards`, off.
+  // Version 9 adds `keepWatching`, off.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

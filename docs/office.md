@@ -569,6 +569,20 @@ was seen. `office.timeline.request` reads it. The file is a line per mark: a cha
 and the whole file is written again only when the server starts and when old marks are cut off. A
 `timeline.json` of 0.2.14 or earlier is read once and replaced.
 
+## Keep watching
+
+The directory and the activity reads run while an office is open on some device and stop when the
+last one closes. So the timeline has a gap for every hour nobody looked, the week's figures leave
+those hours out, the vault misses turns, and nothing below is noticed overnight.
+
+**Keep watching** (Settings, host-wide, off by default) keeps both going with no office open
+(`keepOpen` in `server/hub.ts`). The reads then come every 15 seconds, not every 5, and are back
+at 5 as soon as an office opens. What is read is what an open office reads: each running agent's
+newest timeline entries, and with the History vault on, what was said after each turn. Nothing new
+is stored or sent. After a daemon restart the watching starts when the first agent opens or ends
+a turn, or an office is opened: an installed plugin gets the Paseo API only then. The weather, the
+plan limits, the host readings and the street's checks still run only while an office is open.
+
 ## What the office notices
 
 Upstream does these with Claude Code hooks. Here the office's server does them from what it reads

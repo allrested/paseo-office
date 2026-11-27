@@ -78,6 +78,8 @@ interface FakeDirectory {
 }
 
 interface FakeActivity {
+  /** Whether the hub says an office is open; null before the reads start. */
+  watched: () => boolean | null;
   starts: number;
   stops: number;
   running(): readonly string[];
@@ -111,6 +113,7 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
       ) => void)
     | null = null;
   let runningList: () => readonly string[] = () => [];
+  let watchedNow: (() => boolean) | undefined;
   const directory: FakeDirectory = {
     opens: 0,
     stops: 0,
@@ -125,6 +128,7 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
     starts: 0,
     stops: 0,
     running: () => runningList(),
+    watched: () => watchedNow?.() ?? null,
     emit: (next, doing = {}, checklists = {}, progress, subagents) =>
       activityListener?.(next, doing, checklists, progress, subagents),
   };
@@ -144,9 +148,10 @@ function startHarness(initial: DirectoryView, extra: Partial<HubPorts> = {}): Ha
         if (directory.stopFailure) throw directory.stopFailure;
       };
     },
-    startActivity(running, listener) {
+    startActivity(running, listener, watched) {
       activity.starts += 1;
       runningList = running;
+      watchedNow = watched;
       activityListener = listener;
       return () => {
         activity.stops += 1;
@@ -1566,4 +1571,60 @@ test("an agent takes one of the first team's free teammates by chance, and keeps
   expect(writes).toHaveLength(2);
   watcher.controller.abort();
   await watcher.done;
+});
+
+test("a host that keeps watching reads with no office open, and stops when told", async () => {
+  const harness = startHarness({ agents: [agent("a", "running")], workspaces: [] });
+  const views: (number | null)[] = [];
+  harness.hub.watch((view) => views.push(view === null ? null : view.agents.length));
+  harness.hub.keepOpen(true);
+  await settle();
+  expect(harness.directory.opens).toBe(1);
+  expect(harness.activity.starts).toBe(1);
+  expect(harness.activity.running()).toEqual(["a"]);
+  expect(harness.activity.watched()).toBe(false);
+  expect(views.at(-1)).toBe(1);
+
+  // An office opens on the directory already running, and its closing leaves it running.
+  const office = subscribe(harness.hub);
+  await settle();
+  expect(office.events.map((event) => event.type)).toEqual(["snapshot"]);
+  expect(harness.activity.watched()).toBe(true);
+  office.controller.abort();
+  await office.done;
+  await settle();
+  expect(harness.directory.opens).toBe(1);
+  expect(harness.directory.stops).toBe(0);
+  expect(harness.activity.watched()).toBe(false);
+
+  harness.hub.keepOpen(false);
+  await settle();
+  expect(harness.directory.stops).toBe(1);
+  expect(harness.activity.stops).toBe(1);
+  expect(views.at(-1)).toBeNull();
+});
+
+test("turning watching off leaves an open office its directory", async () => {
+  const harness = startHarness({ agents: [], workspaces: [] });
+  harness.hub.keepOpen(true);
+  const office = subscribe(harness.hub);
+  await settle();
+  harness.hub.keepOpen(false);
+  await settle();
+  expect(harness.directory.stops).toBe(0);
+  office.controller.abort();
+  await office.done;
+  await settle();
+  expect(harness.directory.stops).toBe(1);
+});
+
+test("a watching host's directory that ends is opened again", async () => {
+  const harness = startHarness({ agents: [], workspaces: [] });
+  harness.hub.keepOpen(true);
+  await settle();
+  harness.directory.end();
+  await settle();
+  harness.clock.advance(DIRECTORY_RESTART_MS);
+  await settle();
+  expect(harness.directory.opens).toBe(2);
 });

@@ -41,6 +41,7 @@ type HostSetting =
   | "Agent tools"
   | "Streamer mode"
   | "History vault"
+  | "Keep watching"
   | "Pinned notes"
   | "Cache clock"
   | "Team chat"
@@ -582,6 +583,11 @@ function FloorSettings({
     [change],
   );
   const vaultProblem = saveProblem("History vault");
+  const toggleWatching = useCallback(
+    (next: boolean) => void change("Keep watching", { keepWatching: next }),
+    [change],
+  );
+  const watchingProblem = saveProblem("Keep watching");
   const saveCache = useCallback(
     (next: CacheClock) => void change("Cache clock", { cacheClock: next }),
     [change],
@@ -632,6 +638,24 @@ function FloorSettings({
       {vaultProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {vaultProblem}
+        </Text>
+      )}
+      {stored && (
+        <LabeledSwitch
+          label="Keep watching"
+          value={stored.keepWatching}
+          onChange={toggleWatching}
+          styles={styles}
+        />
+      )}
+      <Text style={styles.fieldHint}>
+        Off by default: the office reads the agents only while it is open on some device. On, it
+        goes on reading every 15 seconds with no office open, so the Timeline, This week, the
+        History vault and what the office notices have no gaps.
+      </Text>
+      {watchingProblem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {watchingProblem}
         </Text>
       )}
       {stored && (

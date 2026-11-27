@@ -56,6 +56,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       rosterOn: false,
       rosterEdition: 0,
       uiCards: false,
+      keepWatching: false,
       teams: [],
       jiraProjects: "",
       sentryOrg: "",

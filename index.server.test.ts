@@ -99,6 +99,7 @@ const ON: SettingsState = {
     rosterOn: false,
     rosterEdition: 0,
     uiCards: false,
+    keepWatching: false,
     teams: [],
   },
 };
@@ -121,6 +122,7 @@ const OFF: SettingsState = {
     rosterOn: false,
     rosterEdition: 0,
     uiCards: false,
+    keepWatching: false,
     teams: [],
   },
 };
@@ -651,6 +653,7 @@ function notesSettings(
       rosterOn: false,
       rosterEdition: 0,
       uiCards: false,
+      keepWatching: false,
       teams: [],
     },
   };
@@ -1141,6 +1144,7 @@ const NOTES: SettingsState = {
     rosterOn: false,
     rosterEdition: 0,
     uiCards: false,
+    keepWatching: false,
     teams: [],
   },
 };
@@ -1258,6 +1262,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       rosterOn: false,
       rosterEdition: 0,
       uiCards: false,
+      keepWatching: false,
       teams: [],
     },
   });
@@ -1625,6 +1630,7 @@ const JIRA_ON: SettingsState = {
     rosterOn: false,
     rosterEdition: 0,
     uiCards: false,
+    keepWatching: false,
     teams: [],
     jiraProjects: "OPS",
   },

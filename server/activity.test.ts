@@ -847,3 +847,32 @@ test("a step says what it is at only when asked to, in one cut line", () => {
   expect(named({ type: "plan" })).toBeUndefined();
   expect(named({ type: "shell", command: "x".repeat(200) })).toHaveLength(80);
 });
+
+test("the time to the next read is asked after each read", async () => {
+  const clock = createFakeClock();
+  const reads: string[] = [];
+  let interval = ACTIVITY_INTERVAL_MS * 3;
+  const poller = startActivityPoller({
+    running: () => ["a"],
+    tail: async (agentId) => {
+      reads.push(agentId);
+      return [];
+    },
+    timers: clock,
+    log: () => undefined,
+    onChange: () => undefined,
+    interval: () => interval,
+  });
+  await settle();
+  clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(reads).toHaveLength(1);
+  interval = ACTIVITY_INTERVAL_MS;
+  clock.advance(ACTIVITY_INTERVAL_MS * 2);
+  await settle();
+  expect(reads).toHaveLength(2);
+  clock.advance(ACTIVITY_INTERVAL_MS);
+  await settle();
+  expect(reads).toHaveLength(3);
+  poller.stop();
+});

@@ -1,6 +1,11 @@
 import { stat } from "node:fs/promises";
 import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
-import { ACTIVITY_TAIL_LIMIT, startActivityPoller } from "./activity.js";
+import {
+  ACTIVITY_BACKGROUND_MS,
+  ACTIVITY_INTERVAL_MS,
+  ACTIVITY_TAIL_LIMIT,
+  startActivityPoller,
+} from "./activity.js";
 import {
   GroupSessionUnavailable,
   lastAssistantText,
@@ -35,7 +40,7 @@ export function liveHubPorts(
 ): HubPorts {
   return {
     openDirectory: (onChange, onEnd) => openPaseoDirectory(holder.require(), onChange, log, onEnd),
-    startActivity: (running, onChange) => {
+    startActivity: (running, onChange, watched) => {
       const paseo = holder.require();
       const poller = startActivityPoller({
         running,
@@ -53,6 +58,7 @@ export function liveHubPorts(
         log,
         named,
         onChange,
+        interval: () => (watched?.() === false ? ACTIVITY_BACKGROUND_MS : ACTIVITY_INTERVAL_MS),
       });
       return () => poller.stop();
     },
