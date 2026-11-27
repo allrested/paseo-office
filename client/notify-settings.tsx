@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { notifyTestRpc } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";

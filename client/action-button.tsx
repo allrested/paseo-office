@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Pressable,
-  Text,
-  View,
-  type PressableStateCallbackType,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, View, type PressableStateCallbackType, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 

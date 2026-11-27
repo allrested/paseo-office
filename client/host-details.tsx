@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import type { Machine, OfficeWorkspace } from "../shared/contracts.js";
 import { hostDetailsRpc, type HostDetails } from "../shared/host-details.js";

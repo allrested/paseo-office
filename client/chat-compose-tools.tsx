@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Text, View } from "react-native";
-import { TextInput, ScrollView } from "@getpaseo/plugin/client/ui";
+import { View } from "react-native";
+import { Text } from "./text.js";
+import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { CHAT_IMAGE_CHARS, CHAT_IMAGE_LIMIT, type ChatRequest } from "../shared/contracts.js";
 import type { ChatDraft } from "./office-link.js";
 import type { OfficeStyles } from "./styles.js";

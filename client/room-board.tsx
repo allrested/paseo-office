@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import type { Post } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
 import { boardPreview, postMeta, todoPreview } from "./board-text.js";

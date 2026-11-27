@@ -1,14 +1,15 @@
 import { AppearanceEditor } from "./agent-appearance.js";
 import { useCallback, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import {
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from "react-native";
+import { Text } from "./text.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
-import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTitle, answerableInOffice } from "../shared/model.js";
 import { ActionButton, failureText } from "./action-button.js";

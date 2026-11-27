@@ -1,6 +1,7 @@
 import { OfficeBrandContext } from "./office-brand-context.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { OfficeModal } from "./office-modal.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { HostSwitches } from "./host-switches.js";

@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { defineSettings } from "@getpaseo/plugin";
 import { useSettings } from "@getpaseo/plugin/client";
-import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { z } from "zod";
 import { chatT } from "../shared/chat-words.js";
 import { CHAT_TEXT_MAX } from "../shared/contracts.js";

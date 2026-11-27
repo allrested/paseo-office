@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { forgottenRpc, type OfficeAgent } from "../shared/contracts.js";
 import {

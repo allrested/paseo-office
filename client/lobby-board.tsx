@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";

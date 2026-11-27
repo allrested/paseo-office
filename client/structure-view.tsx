@@ -3,12 +3,13 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
-  Text,
   View,
   type TextInputKeyPressEvent,
   type ViewStyle,
 } from "react-native";
-import { ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Text } from "./text.js";
+import { ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { stateLabel } from "./agent-card.js";
 import { contextPercent } from "./context-text.js";
 import {

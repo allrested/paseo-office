@@ -393,12 +393,23 @@ existing text. Vietnamese has its own karaoke lyrics. Thai and Indonesian use En
 ### The interface's language
 
 The office's own interface follows the same choice (`client/ui-language.tsx`): with Bahasa
-Indonesia chosen, or Automatic in an app whose language is Indonesian, the buttons, the fields and
-their hints, the switches, the dialogs' titles, the column's tabs and the Sessions list's
-sections are in Indonesian. The words are in `shared/ui-words-id.ts`, by the English they stand
-for, and a text with no entry there is shown in English: so are the lines the office puts
-together from data (an agent's activity, ages, counts, the notes under a card), the team chat, a
-failure's message and host notifications. Vietnamese and Thai show the English interface.
+Indonesia chosen, or Automatic in an app whose language is Indonesian, it is in Indonesian; with
+English, or any other language, in English. That covers the buttons, the fields with their hints
+and placeholders, the switches, the dialogs and what they say, the column, the cards, the
+settings page, and the lines put together from data: an age ("12 mnt lalu"), a count, an agent's
+activity, a failure up to the host's own reason.
+
+Every view draws its words through one text component and one text field (`client/text.tsx`).
+A text that is one string is looked up whole in `shared/ui-words-id.ts`, by the English it stands
+for, and then against the shapes in `shared/ui-patterns-id.ts`, which carry the data over as it
+is. A text with no entry and no shape is shown in English. What a person or an agent wrote goes
+through the same component, so a shape takes a line only by words no title is likely to end in.
+
+Not translated: the reason a host or a provider gives for a failure, a name read out by a screen
+reader where it is put together from several parts, host notifications and the webhook's
+message, and the prompts the office sends to agents, which stay English for the agents' sake.
+The people in the team chat speak by the host's **Team chat** setting, which has Indonesia of its
+own. Vietnamese and Thai show the English interface.
 
 ### Sound
 

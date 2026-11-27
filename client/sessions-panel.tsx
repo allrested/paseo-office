@@ -1,9 +1,11 @@
 import { AVATARS, shirtColor } from "../shared/appearance.js";
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
-import { Platform, Pressable, Text, View, type ViewStyle } from "react-native";
+import { Platform, Pressable, View, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import type { ChecklistProgress } from "../shared/contracts.js";
 import { useRowClock } from "./structure-view.js";
-import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { agentTitle, buildOfficeModel, dotTone } from "../shared/model.js";
 import { loadProblem } from "./activity-panel.js";
 import { stateLabel } from "./agent-card.js";

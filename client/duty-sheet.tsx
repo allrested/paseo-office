@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import type { Duty } from "../shared/contracts.js";
 import {
   DUTY_INSTRUCTIONS_MAX,

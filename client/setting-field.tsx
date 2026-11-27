@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Text, View } from "react-native";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { View } from "react-native";
+import { Text } from "./text.js";
+import { TextInput } from "./text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 interface SettingFieldProps {

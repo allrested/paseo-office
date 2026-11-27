@@ -2,14 +2,14 @@ import { createContext, useCallback, useContext, type ReactNode } from "react";
 import { useSettings } from "@getpaseo/plugin/client";
 import { sceneLanguage, type SceneLanguage } from "../shared/scene-language.js";
 import { officeLanguageSettings } from "../shared/settings.js";
-import { UI_ID } from "../shared/ui-words-id.js";
+import { translatePattern } from "../shared/ui-patterns-id.js";
 import { useAppLocale } from "./app-locale.js";
 
 const UiLanguageContext = createContext<SceneLanguage>("en");
 
 /** The text in the interface's language; the English itself where that language has no word for it. */
 export function translate(language: SceneLanguage, text: string): string {
-  return language === "id" ? (UI_ID[text] ?? text) : text;
+  return language === "id" ? translatePattern(text) : text;
 }
 
 /**

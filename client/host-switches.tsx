@@ -1,7 +1,8 @@
 import { useOfficeBrand } from "./office-brand-context.js";
 import { OfficeMark } from "./office-mark.js";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
 import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";

@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./text.js";
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import { useFullscreenDialog } from "./office-modal.js";
 import type { OfficeStyles } from "./styles.js";

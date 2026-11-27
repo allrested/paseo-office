@@ -1,12 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  PanResponder,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from "react-native";
+import { PanResponder, Pressable, ScrollView, View, type LayoutChangeEvent } from "react-native";
+import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { DotTone } from "../shared/model.js";
 import {

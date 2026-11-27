@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { StripCard } from "./attention-strip.js";
 import { OfficeModal as Modal } from "./office-modal.js";

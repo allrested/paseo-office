@@ -14,14 +14,15 @@ import {
 import {
   Pressable,
   Image,
-  Text,
   View,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
   type ViewStyle,
 } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
-import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { CHAT_TEXT_MAX, chatRpc, type ChatMessage, type ChatRequest } from "../shared/contracts.js";
 import { agentTitle, buildOfficeModel } from "../shared/model.js";
 import { failureText } from "./action-button.js";

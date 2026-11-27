@@ -6,7 +6,8 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import { OfficeModal, useFullscreenDialog } from "./office-modal.js";

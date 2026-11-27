@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../text.js";
 import type { OfficeStyles } from "../styles.js";
 
 /** The 3D view's place while the host's plan is not known: nothing is started yet. */

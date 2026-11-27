@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
-import { Markdown, TextInput } from "@getpaseo/plugin/client/ui";
+import { View } from "react-native";
+import { Text } from "./text.js";
+import { Markdown } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import type { OfficePermission } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
 import {

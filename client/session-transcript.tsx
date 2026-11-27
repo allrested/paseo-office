@@ -1,6 +1,7 @@
 import { type Appearance, AVATARS, shirtColor } from "../shared/appearance.js";
 import { memo, useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./text.js";
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
 import { readLobbyAssignment } from "../shared/lobby-assignment.js";
 import { splitUiBlocks, type UiPiece } from "../shared/ui-blocks.js";

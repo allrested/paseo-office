@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { vaultReportRpc, vaultSearchRpc, vaultTalkRpc } from "../shared/contracts.js";
 import {

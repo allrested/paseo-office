@@ -1,8 +1,10 @@
 import type { Appearance } from "../shared/appearance.js";
 import { AppearanceFields } from "./agent-appearance.js";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { Pill } from "./activity-panel.js";
 import { ActionButton } from "./action-button.js";
 import { Row as ChoiceRow } from "./agent-picker.js";

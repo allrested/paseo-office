@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { contextTone, inShownOrder, janitorRowLabel, type JanitorRow } from "./context-text.js";

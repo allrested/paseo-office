@@ -1,12 +1,6 @@
 import { useCallback, useMemo } from "react";
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type PressableStateCallbackType,
-} from "react-native";
+import { Image, Pressable, StyleSheet, View, type PressableStateCallbackType } from "react-native";
+import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import { OFFICE_GRAPHICS, OFFICE_LIGHTING, OFFICE_SCENES } from "../shared/settings.js";
 import type { OfficeStyles } from "./styles.js";

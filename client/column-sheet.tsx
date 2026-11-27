@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { KeyboardAvoidingView, Pressable, Text, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { Icon, Modal } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { statusLine } from "./session-text.js";
