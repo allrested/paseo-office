@@ -585,12 +585,18 @@ export const MachineSchema = z.object({
    * Absent from an older version of this server, which ran only on hosts that can: read it as true.
    */
   canCloseRuntime: z.boolean().optional(),
+  /**
+   * Whether each process could be tied to the agent that started it. False on a Mac, which does
+   * not let a process read another's environment: `agents` is then empty, and no clean-up is
+   * offered. Absent from an older version of this server, which ran only on Linux: read it as true.
+   */
+  perAgent: z.boolean().optional(),
 });
 export type Machine = z.output<typeof MachineSchema>;
 
 export const MachineEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reading"), machine: MachineSchema }),
-  /** The host has no /proc to read (macOS, Windows). */
+  /** The host has nothing to read: not Linux or macOS (Windows). */
   z.object({ type: z.literal("unavailable") }),
 ]);
 export type MachineEvent = z.output<typeof MachineEventSchema>;

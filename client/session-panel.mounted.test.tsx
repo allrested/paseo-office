@@ -10,7 +10,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
 import type { OfficeAgent } from "../shared/contracts.js";
 import type { ConversationRow } from "./conversation-model.js";
-import { SessionPanel, type SessionPanelProps } from "./session-panel.js";
+import { SessionPanel, type ReplyDraft, type SessionPanelProps } from "./session-panel.js";
 import { useOfficeStyles } from "./styles.js";
 import type { Conversation } from "./use-conversation.js";
 import type { AgentActions } from "./use-agent-actions.js";
@@ -86,6 +86,15 @@ const AGENT: OfficeAgent = {
   createdAt: "2026-11-19T08:00:00.000Z",
 };
 
+/** The images the reply box starts with: the picker itself needs a browser's canvas. */
+let attached: ReplyDraft["images"];
+const photo = (id: number): ReplyDraft["images"][number] => ({
+  id,
+  name: `p${id}.jpg`,
+  mimeType: "image/jpeg",
+  data: "/9j/AA==",
+});
+
 let send: Mock<AgentActions["send"]>;
 let respond: Mock<AgentActions["respond"]>;
 let cancel: Mock<(agentId: string) => Promise<void>>;
@@ -113,10 +122,11 @@ function Harness(props: Partial<SessionPanelProps>) {
   const styles = useOfficeStyles(THEME, layout.compact, false);
   // The surface keeps the reply's text; here the harness does, for as long as it stays mounted.
   const [text, setText] = useState("");
+  const [images, setImages] = useState<ReplyDraft["images"]>(attached);
   return createElement(SessionPanel, {
     agent: AGENT,
     agentId: "a1",
-    draft: { text, setText },
+    draft: { text, setText, images, setImages },
     room: "Acme shop",
     actions: { send, respond, cancel },
     styles,
@@ -133,6 +143,7 @@ const draw = (props: Partial<SessionPanelProps> = {}) =>
 beforeEach(() => {
   asked = [];
   drawn = [];
+  attached = [];
   uiCards = false;
   conversation = ready([]);
   send = vi.fn(async () => undefined);
@@ -286,6 +297,53 @@ test("a reply's ui block is its source until Gen-UI cards is on, then a card wit
   expect(reply).toContain("Still coming");
   expect(reply).toContain("Being written...");
   expect(reply).not.toContain("Table(");
+});
+
+const APP_REPLY = [
+  "A timer.",
+  "",
+  "```app",
+  "<title>Timer</title><script>parent.document.cookie</script><p>go</p>",
+  "```",
+  "",
+  "```app",
+  "<title>Half</title><p>still",
+].join("\n");
+
+test("an app block is drawn in a script-only frame behind a network-blocking policy when Gen-UI cards is on", async () => {
+  conversation = ready([{ kind: "agent", key: "1", text: APP_REPLY }]);
+  await draw();
+  expect(container.querySelector("iframe")).toBeNull();
+  uiCards = true;
+  await draw();
+  const frames = container.querySelectorAll("iframe");
+  // The block still streaming stays a placeholder.
+  expect(frames).toHaveLength(1);
+  const frame = frames[0];
+  expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+  expect(frame.getAttribute("title")).toBe("Timer");
+  const page = frame.getAttribute("srcdoc") ?? "";
+  expect(page).toContain("Content-Security-Policy");
+  expect(page).toContain("<p>go</p>");
+  expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<script>"));
+  const reply = container.textContent ?? "";
+  expect(reply).toContain("Runs here in a sandboxed frame with no network.");
+  expect(reply).toContain("Being written...");
+  expect(reply).not.toContain("parent.document");
+});
+
+test("a ui block is never run: it stays a title card even when it holds script", async () => {
+  uiCards = true;
+  conversation = ready([
+    {
+      kind: "agent",
+      key: "1",
+      text: '```ui\nCard("Plan", [Text("<script>x</script>")])\n```',
+    },
+  ]);
+  await draw();
+  expect(container.querySelector("iframe")).toBeNull();
+  expect(container.textContent).toContain("Drawn in the workspace chat.");
 });
 
 test("chat folds consecutive tool steps, leaves a failed call visible, and keeps the run open during updates", async () => {
@@ -446,6 +504,58 @@ test("Send sends the trimmed text and clears the box; empty text sends nothing",
   expect(send).toHaveBeenCalledWith("a1", "Add tests", { activeTurnBehavior: "steer" });
   expect(box().value).toBe("");
   expect(box().getAttribute("placeholder")).toBe("Message Builder");
+});
+
+test("on the web the reply box offers the image picker; on a native client it offers none", async () => {
+  await draw();
+  expect(maybe("Attach images")).not.toBeNull();
+  await draw({ layout: { compact: true, platform: "ios" } as never });
+  expect(maybe("Attach images")).toBeNull();
+});
+
+test("more than four images chosen are refused, with the sentence the chat gives", async () => {
+  await draw();
+  const input = labelled("Choose images") as HTMLInputElement;
+  const files = Array.from({ length: 5 }, (_, i) => new File(["x"], `p${i}.png`));
+  Object.defineProperty(input, "files", { value: files, configurable: true });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  expect(alerts()).toContain("Choose up to four images.");
+});
+
+test("attached images alone make a reply; they go with it, joining the turn, and are cleared", async () => {
+  attached = [photo(1), photo(2)];
+  await draw({ agent: { ...AGENT, status: "running" } });
+  expect(labelled("Remove p1.jpg")).not.toBeNull();
+  await press("Send");
+  expect(send).toHaveBeenCalledWith("a1", "2 images", {
+    activeTurnBehavior: "steer",
+    images: [
+      { data: "/9j/AA==", mimeType: "image/jpeg" },
+      { data: "/9j/AA==", mimeType: "image/jpeg" },
+    ],
+  });
+  expect(maybe("Remove p1.jpg")).toBeNull();
+});
+
+test("images go with the typed text, and a Remove takes one off the reply", async () => {
+  attached = [photo(1), photo(2)];
+  await draw();
+  await press("Remove p2.jpg");
+  await type("Look");
+  await press("Send");
+  expect(send).toHaveBeenCalledWith("a1", "Look", {
+    activeTurnBehavior: "steer",
+    images: [{ data: "/9j/AA==", mimeType: "image/jpeg" }],
+  });
+});
+
+test("a send that fails keeps its images", async () => {
+  attached = [photo(1)];
+  send.mockRejectedValueOnce(new Error("offline"));
+  await draw();
+  await press("Send");
+  expect(alerts().join()).toContain("offline");
+  expect(maybe("Remove p1.jpg")).not.toBeNull();
 });
 
 test("a streamed piece redraws only the row that changed", async () => {

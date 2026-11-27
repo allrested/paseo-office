@@ -3,7 +3,7 @@ import type { OfficeAgent, OfficeSnapshot } from "../shared/contracts.js";
 import type { Timeline, TimelineLane } from "../shared/timeline.js";
 import { replayedOffice, replaySignature } from "./floor-replay.js";
 import { EMPTY_OFFICE } from "./office-state.js";
-import { replayLine } from "./use-floor-replay.js";
+import { replayClock, replayDay, replaySeen } from "./use-floor-replay.js";
 
 const MIN = 60_000;
 
@@ -89,7 +89,15 @@ test("two moments with the same people at the same things are one floor", () => 
   expect(sign(25)).not.toBe(sign(35));
 });
 
-test("the bar names the moment shown and the speed", () => {
-  const head = new Date(2026, 10, 17, 14, 5, 40).getTime();
-  expect(replayLine(head, 60)).toBe("Replay · 14:05 · 60×");
+test("the bar says the time to the second, the day as it is spoken of, and who is on the floor", () => {
+  const now = new Date(2026, 10, 27, 12, 40, 0).getTime();
+  const moment = (day: number, hour: number) => new Date(2026, 10, day, hour, 43, 5).getTime();
+  expect(replayClock(moment(26, 13))).toBe("13:43:05");
+  expect(replayDay(moment(27, 9), now)).toBe("Today");
+  // Later on the clock than now, and still the day before.
+  expect(replayDay(moment(26, 13), now)).toBe("Yesterday");
+  expect(replayDay(moment(25, 13), now)).toBe("Wed 25 Nov");
+  expect(replaySeen(0)).toBe("Nobody was seen at this moment");
+  expect(replaySeen(1)).toBe("1 person on the floor");
+  expect(replaySeen(4)).toBe("4 people on the floor");
 });

@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
-import { alertNotice, incidentNotice, testNotice, wanted } from "../shared/notify.js";
+import {
+  alertNotice,
+  hostNotice,
+  incidentNotice,
+  planNotice,
+  testNotice,
+  wanted,
+} from "../shared/notify.js";
 import { createNotifier } from "./notify.js";
 
 const ADDRESS = "https://hooks.test/in/SECRET";
@@ -121,4 +128,30 @@ test("an alert and an incident read as one line a chat can show, with what a rec
     url: "https://example.atlassian.net/browse/SHOP-3",
     at: 9,
   });
+});
+
+test("a plan limit is a warning at 80 and 95 and danger at 100, and a host is danger", () => {
+  const level = (usedPct: number) => planNotice("Claude", "5 hours", usedPct, 9, "Acme").severity;
+  expect([80, 95, 100].map(level)).toEqual(["warning", "warning", "danger"]);
+  const plan = planNotice("Claude", "5 hours", 95, 9, "Acme");
+  expect(plan).toMatchObject({
+    source: "paseo-office",
+    kind: "plan",
+    title: "Claude is at 95% of its 5 hours limit",
+    at: 9,
+  });
+  expect(plan.text).toBe("Acme: Claude is at 95% of its 5 hours limit");
+  expect(planNotice("Claude", "5 hours", 100, 9, "Acme").title).toBe(
+    "Claude is out of its 5 hours limit",
+  );
+  const host = hostNotice(93, 9, "Acme");
+  expect(host).toMatchObject({
+    kind: "host",
+    severity: "danger",
+    title: "The host is low on memory",
+  });
+  expect(host.detail).toBe("93% of memory is in use");
+  expect(wanted(host, "danger")).toBe(true);
+  expect(wanted(plan, "danger")).toBe(false);
+  expect(wanted(plan, "warning")).toBe(true);
 });

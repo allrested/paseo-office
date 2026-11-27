@@ -34,16 +34,27 @@ const shell = (id: string, status: string, error: unknown = null) =>
   call(id, status, { type: "shell", command: "npm test" }, error);
 const edit = (id: string, filePath: string) => call(id, "completed", { type: "edit", filePath });
 
-function setup(options: { named?: boolean; notes?: string } = {}) {
+function setup(
+  options: { named?: boolean; notes?: string; guard?: boolean; stops?: boolean } = {},
+) {
   let now = 0;
   const reminded: string[] = [];
   const raised: string[] = [];
+  const hinted: string[] = [];
+  const stopped: string[] = [];
   const watchers = createWatchers({
     now: () => now,
+    guarding: () => options.guard ?? false,
+    steer: (agentId, text) => hinted.push(`${agentId}: ${text}`),
+    stop: (agentId) => {
+      if (options.stops === false) return Promise.resolve(false);
+      stopped.push(agentId);
+      return Promise.resolve(true);
+    },
     named: () => options.named ?? true,
     pinnedNotes: () => options.notes ?? "",
     remind: (agentId, notes) => reminded.push(`${agentId}: ${notes}`),
-    raised: (alert, name) => raised.push(`${alert.id} ${name}`),
+    raised: (alert, name) => raised.push(`${alert.id} ${name}: ${alert.detail}`),
   });
   watchers.view({ agents: [agent("a"), agent("b")], workspaces: workspace("success") });
   // The first read of each agent is what was there before the office looked.
@@ -53,6 +64,8 @@ function setup(options: { named?: boolean; notes?: string } = {}) {
     watchers,
     reminded,
     raised,
+    hinted,
+    stopped,
     later(ms: number) {
       now += ms;
     },
@@ -225,10 +238,10 @@ test("an alert is told once as it is raised, with the name of its agent", () => 
   const { watchers, raised } = setup();
   const fail = (id: string) => shell(id, "failed", "exit 1");
   watchers.tail("a", [fail("n1"), fail("n2"), fail("n3")]);
-  expect(raised).toEqual(["loop:a Agent a"]);
+  expect(raised).toEqual(["loop:a Agent a: npm test failed 3 times running: exit 1"]);
   // Still looping at the next read: the same alert, not a new one.
   watchers.tail("a", [fail("n4")]);
-  expect(raised).toEqual(["loop:a Agent a"]);
+  expect(raised).toEqual(["loop:a Agent a: npm test failed 3 times running: exit 1"]);
 });
 
 test("a request for the call that just failed three times running is one to refuse, and no other", () => {
@@ -250,4 +263,121 @@ test("a request for the call that just failed three times running is one to refu
   // Past the loop, the same call may be asked for again.
   watchers.tail("a", [shell("g4", "completed")]);
   expect(watchers.repeats("a", again)).toBeNull();
+});
+
+const LOOP_NOTE =
+  "Office notice: the same call has failed 3 times running with the same error. Do not repeat it unchanged: find out why it fails and try another way, or say what is in the way.";
+const failed = (id: string) => shell(id, "failed", "exit 1");
+const again = { name: "Bash", detail: { type: "shell", command: "npm test" } };
+const settle = async () => {
+  for (let turn = 0; turn < 3; turn++) await Promise.resolve();
+};
+
+test("with the guard on, the read after the one that saw the loop sends one hint into the turn", async () => {
+  const { watchers, hinted, stopped } = setup({ guard: true });
+  watchers.tail("a", [failed("h1"), failed("h2")]);
+  watchers.tail("a", [failed("h3")]);
+  // The permission guard has this read to refuse the next request first.
+  expect(hinted).toEqual([]);
+  watchers.tail("a", []);
+  expect(hinted).toEqual([`a: ${LOOP_NOTE}`]);
+  watchers.tail("a", []);
+  expect(hinted).toHaveLength(1);
+  await settle();
+  expect(stopped).toEqual([]);
+});
+
+test("with the guard off, a loop is only a card", async () => {
+  const { watchers, hinted, stopped } = setup();
+  watchers.tail("a", [failed("o1"), failed("o2"), failed("o3")]);
+  watchers.tail("a", []);
+  watchers.tail("a", [failed("o4"), failed("o5")]);
+  await settle();
+  expect(hinted).toEqual([]);
+  expect(stopped).toEqual([]);
+});
+
+test("nothing is sent or stopped where the office refused the request that came after the loop", async () => {
+  const { watchers, hinted, stopped } = setup({ guard: true });
+  watchers.tail("a", [failed("r1"), failed("r2"), failed("r3")]);
+  expect(watchers.repeats("a", again)).not.toBeNull();
+  watchers.tail("a", []);
+  watchers.tail("a", [failed("r4"), failed("r5")]);
+  await settle();
+  expect(hinted).toEqual([]);
+  expect(stopped).toEqual([]);
+});
+
+test("the same call failing again after the hint stops the turn, once, and the card says so", async () => {
+  const { watchers, hinted, stopped, raised } = setup({ guard: true });
+  watchers.tail("a", [failed("s1"), failed("s2"), failed("s3")]);
+  watchers.tail("a", []);
+  expect(hinted).toHaveLength(1);
+  await settle();
+  expect(stopped).toEqual([]);
+  watchers.tail("a", [failed("s4")]);
+  await settle();
+  expect(stopped).toEqual(["a"]);
+  const stoppedCard =
+    "npm test failed 4 times running: exit 1. The office stopped its turn: the same call failed again after the hint.";
+  expect(watchers.alerts()).toMatchObject([{ id: "loop:a", detail: stoppedCard }]);
+  // The webhook hears of the loop when it is raised, and of the stop when it is made.
+  expect(raised).toEqual([
+    "loop:a Agent a: npm test failed 3 times running: exit 1",
+    `loop:a Agent a: ${stoppedCard}`,
+  ]);
+  watchers.tail("a", [failed("s5")]);
+  await settle();
+  expect(stopped).toEqual(["a"]);
+  expect(hinted).toHaveLength(1);
+});
+
+test("a fourth failure before the hint is part of the loop: the stop waits for a fifth", async () => {
+  const { watchers, hinted, stopped } = setup({ guard: true });
+  watchers.tail("a", [failed("f1"), failed("f2"), failed("f3")]);
+  watchers.tail("a", [failed("f4")]);
+  expect(hinted).toHaveLength(1);
+  await settle();
+  expect(stopped).toEqual([]);
+  watchers.tail("a", [failed("f5")]);
+  await settle();
+  expect(stopped).toEqual(["a"]);
+});
+
+test("a host that cannot stop a turn gets the hint, and its card stays as it was", async () => {
+  const { watchers, hinted, raised } = setup({ guard: true, stops: false });
+  watchers.tail("a", [failed("n1"), failed("n2"), failed("n3")]);
+  watchers.tail("a", []);
+  watchers.tail("a", [failed("n4"), failed("n5")]);
+  await settle();
+  expect(hinted).toHaveLength(1);
+  expect(raised).toHaveLength(1);
+  expect(watchers.alerts()[0]?.detail).toBe("npm test failed 3 times running: exit 1");
+});
+
+test("another call or a success ends the loop, and the next loop is hinted afresh", async () => {
+  const { watchers, hinted, stopped } = setup({ guard: true });
+  watchers.tail("a", [failed("d1"), failed("d2"), failed("d3")]);
+  watchers.tail("a", []);
+  watchers.tail("a", [call("d4", "failed", { type: "shell", command: "npm run lint" }, "x")]);
+  watchers.tail("a", [failed("d5")]);
+  await settle();
+  expect(stopped).toEqual([]);
+  watchers.tail("a", [shell("d6", "completed")]);
+  watchers.tail("a", [failed("d7"), failed("d8"), failed("d9")]);
+  watchers.tail("a", []);
+  expect(hinted).toHaveLength(2);
+  await settle();
+  expect(stopped).toEqual([]);
+});
+
+test("a loop whose card was dismissed is left alone", async () => {
+  const { watchers, hinted, stopped } = setup({ guard: true });
+  watchers.tail("a", [failed("x1"), failed("x2"), failed("x3")]);
+  watchers.dismiss("loop:a");
+  watchers.tail("a", []);
+  watchers.tail("a", [failed("x4")]);
+  await settle();
+  expect(hinted).toEqual([]);
+  expect(stopped).toEqual([]);
 });

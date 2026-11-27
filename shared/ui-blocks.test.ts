@@ -40,8 +40,20 @@ test("a block with no card title, an app block and its page title", () => {
   ].join("\n");
   expect(splitUiBlocks(text)).toEqual([
     { kind: "block", language: "ui", title: null, complete: true },
-    { kind: "block", language: "app", title: "Dice & odds", complete: true },
-    { kind: "block", language: "app", title: null, complete: true },
+    {
+      kind: "block",
+      language: "app",
+      title: "Dice & odds",
+      complete: true,
+      source: "<html><head><title>Dice &amp; odds</title></head></html>",
+    },
+    {
+      kind: "block",
+      language: "app",
+      title: null,
+      complete: true,
+      source: "<p>hi</p>",
+    },
   ]);
 });
 
@@ -71,4 +83,13 @@ test("a longer closing fence closes, a shorter one or another character does not
     { kind: "block", language: "ui", title: "A", complete: true },
     { kind: "text", text: "after" },
   ]);
+});
+
+test("an app block keeps its page; a ui block keeps no source", () => {
+  const [block] = splitUiBlocks("```app\n<title>Timer</title>\n<p>go</p>\n```");
+  expect(block).toMatchObject({
+    language: "app",
+    source: "<title>Timer</title>\n<p>go</p>",
+  });
+  expect("source" in splitUiBlocks('```ui\nCard("A", [])\n```')[0]).toBe(false);
 });

@@ -14,6 +14,29 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   too, and the ones that did not fit were drawn under the reply box.
 - Settings: **Writer mode** has a row of its own and its modes wrap. Before, the modes past the
   third were cut off at the edge. The floor plan, Team chat and cup pills wrap too.
+- **Keep watching** now covers the plan limits and the host's memory for the webhook. The plan
+  limits are read every 5 minutes with no office open, and a provider's closest limit sends one
+  message as it reaches 80%, 95% and 100%, once until it resets; a provider switched off in the Host
+  card stays out. The host is read every minute with no office open (Linux), so the Host card's
+  30-minute RAM and CPU history has no gap, and memory at 90%, the Host card's red, sends one
+  message until it is back under 80%. **Notify for** keeps its two choices: a plan limit used up and
+  memory nearly full are danger, the 80% and 95% messages are warnings. The weather and the
+  street's checks still run only while an office is open.
+- A session's reply box can attach images on the web, with the team chat's own button and limit of
+  four. They go with the reply, a running turn included, and are kept with the typed text until it
+  is sent or the tab is closed. Other files still go through **Open in workspace**.
+- With **Gen-UI cards** on, an `app` block of the Generative UI plugin is drawn live in a
+  session's chat in a browser or the desktop app: the agent's HTML page runs in a frame that can
+  run script and nothing else, with no network, under the block's title. A `ui` block, an `app`
+  block still being written, and any block on a phone stay a title card.
+- The Host card works on **macOS**: memory, CPU, swap, disk, load and the largest process groups
+  are read from the Mac's own commands. A Mac cannot say which process an agent started, so the
+  card lists no agent, marks nothing as left running and offers no clean-up there. Linux is
+  unchanged, and Windows still has no local reading.
+- Stand-up notes: a daemon that restarts after 08:00 on a stand-up day, with no entry for the day
+  in the notes yet, now writes it when the office starts, as soon as the Paseo API is there. A
+  run due on one day that could only start on the next is still dropped. Before, the day's entry
+  was never written.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.
@@ -53,11 +76,16 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   and English when it is English: buttons, fields with their hints and placeholders, switches,
   dialogs, cards, the settings page, and the lines built from data (ages, counts, an agent's
   activity, a failure up to the host's own reason).
-- Timeline: **Replay on the floor** replays the chosen range on the 3D floor, with a bar for the
-  moment shown, Pause and Now. Before, a replay moved only inside the card.
+- Timeline: **Replay on the floor** replays the chosen range on the 3D floor. Its bar says the
+  day and the time shown and who is on the floor, and has a track to jump along, ten minutes
+  back or on, the speed (10× to 600×), Pause and Back to now. Before, a replay moved only inside
+  the card.
 - **Stop repeated failing calls**, a host setting, off by default: a request for the very call
   that just failed three times running is refused, and the agent is told why. Only where the
-  provider asks permission for the call.
+  provider asks permission for the call. Where it asks nothing, the office sends the agent a hint
+  into its turn, and stops the turn if the same call fails again, on a host that can stop a turn;
+  the webhook says when it did. A loop is seen within 5 seconds (15 with Keep watching and no
+  office open).
 - The session panel: open session tabs come back after a reload; typing `/` lists the session's
   slash commands; and **Options** shows what the session's provider lets a client change (a
   model or a mode, where it offers one) and changes it.

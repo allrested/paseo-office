@@ -76,10 +76,11 @@ export interface NotesPorts {
 
 export interface NotesWriter {
   /**
-   * Starts a writer unless one is at work, a start is on its way, or no folder is set. Never
-   * rejects: why a writer could not start is kept as `problem`.
+   * Starts a writer unless one is at work, a start is on its way, or no folder is set; with
+   * `unlessWritten`, also unless today's entry is already in the notes. Never rejects: why a
+   * writer could not start is kept as `problem`.
    */
-  start(): Promise<{ started: boolean }>;
+  start(options?: { unlessWritten?: boolean }): Promise<{ started: boolean }>;
   /** From agent.turn.after. Rejects when the archive of a writer that wrote its entry fails. */
   turnEnded(agentId: string, failed: boolean, message: string | null): Promise<void>;
   /** From agent.close.after: a writer closed at its turn has stopped, and stays the office's. */
@@ -231,8 +232,9 @@ export function createNotesWriter(ports: NotesPorts): NotesWriter {
     return { writerId, entry: { folder, ...day } };
   }
 
-  async function startWriter(): Promise<{ started: boolean }> {
+  async function startWriter(unlessWritten: boolean): Promise<{ started: boolean }> {
     if (await atWork()) return { started: false };
+    if (unlessWritten && (await written(undefined))) return { started: false };
     const settings = await ports.settings();
     folderSet = hasFolder(settings);
     let launched: Launched | null;
@@ -260,12 +262,12 @@ export function createNotesWriter(ports: NotesPorts): NotesWriter {
   }
 
   return {
-    async start() {
+    async start({ unlessWritten = false } = {}) {
       await loaded;
       if (starting) return { started: false };
       starting = true;
       try {
-        return await startWriter();
+        return await startWriter(unlessWritten);
       } catch (error) {
         // The check of a kept writer or the settings' read failed: the ids stay as they are.
         await keep({ ...kept, problem: errorMessage(error) });

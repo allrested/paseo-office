@@ -6,6 +6,7 @@ import type { ColumnSession } from "./office-column.js";
 import { SessionPanel } from "./session-panel.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
+import type { ReplyImages } from "./reply-send.js";
 import type { ReplyDrafts } from "./use-reply-drafts.js";
 
 /** The tab for an open session; one whose agent has left keeps a tab that names its id. */
@@ -62,6 +63,9 @@ export interface SessionPaneProps {
   /** What is typed in this session's reply box, and where a change to it goes. */
   reply: string;
   setReply: ReplyDrafts["setText"];
+  /** What is attached to this session's reply, and where a change to it goes. */
+  replyImages: ReplyImages;
+  setReplyImages: ReplyDrafts["setImages"];
   context: SessionPaneContext;
   styles: OfficeStyles;
   layout: PluginSurfaceProps["layout"];
@@ -79,6 +83,8 @@ function samePane(before: SessionPaneProps, after: SessionPaneProps): boolean {
     before.hideClose === after.hideClose &&
     before.reply === after.reply &&
     before.setReply === after.setReply &&
+    before.replyImages === after.replyImages &&
+    before.setReplyImages === after.setReplyImages &&
     before.context.actions === after.context.actions &&
     before.context.showWorkspace === after.context.showWorkspace &&
     before.context.closeSession === after.context.closeSession &&
@@ -101,14 +107,21 @@ export const SessionPane = memo(function SessionPane({
   room,
   reply,
   setReply,
+  replyImages,
+  setReplyImages,
   context,
   styles,
   layout,
 }: SessionPaneProps) {
   const { actions, showWorkspace, closeSession } = context;
   const draft = useMemo(
-    () => ({ text: reply, setText: (next: SetStateAction<string>) => setReply(agentId, next) }),
-    [reply, setReply, agentId],
+    () => ({
+      text: reply,
+      setText: (next: SetStateAction<string>) => setReply(agentId, next),
+      images: replyImages,
+      setImages: (next: SetStateAction<ReplyImages>) => setReplyImages(agentId, next),
+    }),
+    [reply, setReply, replyImages, setReplyImages, agentId],
   );
   const onOpenWorkspace = useMemo(
     () => (showWorkspace ? () => showWorkspace(agentId) : undefined),

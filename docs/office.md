@@ -22,7 +22,7 @@ For configuration, see [Office settings](#settings), [branding](#custom-branding
 | `server/weather-service.ts`, `server/weather-read.ts`                        | Weather polling, bounded HTTP reads and failure reporting                             |
 | `shared/weather.ts`, `client/weather-settings.tsx`, `client/weather-text.ts` | Presets, settings and Attention text                                                  |
 | `vendor/my-office/src/office/paseo-weather-plan.js`                          | Resolves a scene reading and the seasonal sky                                         |
-| `server/machine/`                                                            | The host's readings and the clean-up, from `/proc`                                    |
+| `server/machine/`                                                            | The host's readings and the clean-up, from `/proc` or a Mac's commands                |
 | `client/`                                                                    | The column, the cards, the list                                                       |
 | `client/world/`                                                              | The 3D floor: the frame, the bridge to the scene, the people the scene is told about  |
 | `client/pixel/`                                                              | The 2D floor                                                                          |
@@ -207,8 +207,12 @@ A lobby assignment shows the task and expands to reveal the original instruction
 The session also shows requests with Approve and Deny, a reply box, and Stop while
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
-says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
-tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
+says so. On the web the reply box has an **Attach images** button, the chat's own: up to four
+images, each resized to a JPEG before it is sent, and they go with the reply, a running turn
+included. Images alone are a reply too, and say how many. Other files are not taken here, and a
+native client shows no button; for those choose **Open in workspace**. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
+tab switch or a dismissed sheet keeps it, the attached images with it, and a sent reply or a
+closed tab clears both; a reply that fails to send keeps them. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
 a plan shows its text with the request's own actions, or Approve plan and Keep planning, and a
 line of what to change that goes with a refusal; a question shows its form, the options as
 buttons and a box where another answer is taken, with Send answers once each question has one,
@@ -221,7 +225,7 @@ box, shows the session's own options as its provider describes them to Paseo, ea
 row of choices, and a press changes one at once; what a provider refuses to change says why. That
 is how a model or a mode is changed here, for a provider that offers it as an option: Paseo gives
 a plugin no call of its own for either, so a provider that offers neither shows "This session has
-no options to change here." For attachments or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
+no options to change here." For other files or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 The open sessions are kept on the device (`sessions` in the `office-column` setting, twelve at most), so a reload opens their tabs again, on the Sessions tab; the chosen tab itself is not kept.
 
@@ -618,8 +622,10 @@ only: the 3D floor keeps showing the present.
 **Replay on the floor**, beside it while the 3D floor is showing, closes the card and replays the
 range there (`client/floor-replay.ts`, `client/use-floor-replay.tsx`): the people sit, work, wait
 and stop as the timeline saw them, each at the kind of thing it was at for a minute after the
-call was seen, and a bar over the floor has the moment shown, Pause and **Now**. It ends by itself
-at the range's end. An agent the office was not watching at a moment is off the floor then, and
+call was seen, and a bar over the floor says the day and the time shown, to the second, and how many
+people the floor has then. Its track shows where that is in the range, and a press on it moves
+there; the buttons are From the start, ten minutes back or on, Pause or Resume, the speed (10 to
+600 times the clock) and Back to now. It ends by itself at the range's end. An agent the office was not watching at a moment is off the floor then, and
 one archived since cannot be drawn. The lists, the boards and the cards stay today's, and so do
 the staff scenes, the weather and the sound, which follow the device's clock.
 
@@ -646,8 +652,15 @@ those hours out, the vault misses turns, and nothing below is noticed overnight.
 at 5 as soon as an office opens. What is read is what an open office reads: each running agent's
 newest timeline entries, and with the History vault on, what was said after each turn. Nothing new
 is stored or sent. After a daemon restart the watching starts when the first agent opens or ends
-a turn, or an office is opened: an installed plugin gets the Paseo API only then. The weather, the
-plan limits, the host readings and the street's checks still run only while an office is open.
+a turn, or an office is opened: an installed plugin gets the Paseo API only then.
+
+It also does two things for the [webhook](#notifications), which the open office does not need
+from the server. The plan limits are read from Paseo every 5 minutes (`server/plan-watch.ts`),
+and the host is read every minute with no office open (`MACHINE_BACKGROUND_MS` in
+`server/machine/watch.ts`; Linux only), so the Host card's 30 minutes of RAM and CPU have no gap
+when an office opens. An open office reads the host every 10 seconds and the plans every two
+minutes, as before. The weather and the street's checks still run only while an office is open:
+they only draw the scene, and nobody is looking.
 
 ## Notifications
 
@@ -671,15 +684,25 @@ opens an incident:
 }
 ```
 
-`kind` is `loop`, `refused`, `clash`, `port`, `checks`, `incident` or `test`; `severity` is
-`danger` for a loop and an incident and `warning` for the rest; an incident carries its tracker
+`kind` is `loop`, `refused`, `clash`, `port`, `checks`, `incident`, `plan`, `host` or `test`;
+`severity` is `danger` for a loop, an incident, a plan limit used up and memory nearly full, and
+`warning` for the rest; an incident carries its tracker
 page as `url`. `text` is the whole message as lines, which is what Slack's incoming webhooks show;
 n8n or another relay can pass it on to Telegram or ntfy. The title and detail are the alert's own,
 so with streamer mode on they name the tool and not the file or the command. A prompt or a reply
 is never sent.
 
-**Notify for** chooses what is sent: **Danger only**, the default, is a loop and an incident;
-**Warning and danger** adds the rest.
+**Notify for** chooses what is sent: **Danger only**, the default, is a loop, an incident, a plan
+limit used up and memory nearly full; **Warning and danger** adds the rest, among them a plan
+limit at 80% and at 95%.
+
+With **Keep watching** on, the office tells of a plan limit and of the host's memory too
+(`server/plan-watch.ts`, `server/host-alert.ts`). A provider's closest limit sends one `plan`
+message as it reaches 80%, 95% and 100% (used up), and none again until it has fallen, which a
+reset does; a jump from 50% to 97% is one message, for 95%. A provider switched off in the Host
+card's Plan section is left out, and a read that fails sends nothing. Memory at the Host card's
+red (90%) sends one `host` message, and the next only after memory has been under 80% again. The
+state is in memory: after a daemon restart a limit already past a threshold is told once more.
 
 Each alert and each incident is sent once, as it is raised. A request waits 10 seconds, follows
 no redirect and is not tried again; a failure is one line in the plugin's log, without the
@@ -719,14 +742,30 @@ start a turn.
 **Stop repeated failing calls** (Settings, host-wide, off by default) goes one step further for
 a loop. When an agent asks permission for the very command or file edit that just failed three
 times running, the office refuses the request and tells the agent why, so the fourth try is not
-run (`repeats` in `server/watchers.ts`, on Paseo's `agent.permission.before` hook). It works only
-where the provider asks: a mode that runs calls without asking is not stopped, the loop must have
-been seen (an office open, or Keep watching on), and a tool whose request names neither a command
-nor a file is left alone.
+run (`repeats` in `server/watchers.ts`, on Paseo's `agent.permission.before` hook). It needs the
+loop to have been seen (an office open, or Keep watching on), and a tool whose request names
+neither a command nor a file is left alone.
 
-Not done here: blocking a call that needs no permission, and undoing a turn's edits. Both need
-real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo gives a plugin no
-call that reverts a session.
+Where the provider asks nothing (an auto, full access or bypass mode) there is no request to
+refuse, so with the same setting on the office acts on the loop itself, once per loop. On the
+read after the one that saw the loop, so that a refusal comes first, it sends the agent a fixed
+line into its turn, the same "steer" as Send a hint: the same call failed 3 times running with
+the same error, do not repeat it unchanged. If the very same call then fails once more than it
+had when the hint was sent (the fourth failure, or the fifth when the fourth was already there
+when the loop was first read), and the host can stop a turn, the office stops the turn and the
+card's detail ends "The office stopped its turn: the same call failed again after the hint." On
+a host that cannot stop a turn (stock Paseo 0.16) it sends the hint only, and the card stays as
+it was. Nothing is sent where the office has refused a request for the loop's call, or where the
+card was dismissed, and another call or a success ends the loop. The loop is seen by the 5
+second reads, 15 seconds with Keep watching and no office open, so the hint comes 5 to 10 seconds
+after the third failure (up to 30 seconds with Keep watching alone) and the agent may fail again
+meanwhile; with no office open and Keep watching off nothing is read, and nothing is done. The
+webhook hears of the loop once as it is raised, and again, as the same `loop` kind with the
+extended detail, if the office stopped the turn.
+
+Not done here: blocking a call before it runs where no permission is asked, and undoing a turn's
+edits. Both need real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo
+gives a plugin no call that reverts a session.
 
 ## Plan and machine tools
 
@@ -778,11 +817,27 @@ person, to everyone who opens this office. Prompts and replies are never sent ei
 
 **Gen-UI cards** (Settings, host-wide, off by default) is for a host that has the Generative UI
 plugin (`genui`), whose agents write `ui` and `app` code blocks that Paseo's chat draws as
-live cards. The office's own session chat cannot draw them. With the setting on it shows, in
-place of a block's source, a card with the block's title (the first `Card("...")` of a `ui`
-block, the page title of an `app` block) and where the live card is: the workspace chat, one
-press away with **Open in workspace**. A block inside another code block stays source. The
-office cannot tell whether the plugin is installed, so the switch is always listed.
+live cards. With the setting on, the office's session chat shows each block in place of its source:
+
+- A **`ui` block** is a small language only that plugin can run, so the office shows a card with
+  the block's title (the first `Card("...")`) and where the live card is: the workspace chat, one
+  press away with **Open in workspace**. It is never run here.
+- An **`app` block** is a self-contained HTML page. In a browser or the desktop app the office runs
+  it, once the block is complete, in a frame under the card's title: `sandbox="allow-scripts"` and
+  nothing else (the page has its own empty origin, so it cannot read the office's storage or
+  page, and cannot navigate the top window, submit a form or open a popup), `srcdoc`, no referrer,
+  a fixed 360 px height that scrolls. The page starts with a Content-Security-Policy that allows
+  inline script and style and `data:`/`blob:` images, fonts and media, and nothing else: no
+  fetch, no WebSocket, no frame, no `<base>`, no form action. This is the plugin's own policy plus
+  `base-uri` and `form-action`. The frame is inert toward the office: the office listens for no
+  message from it, and the plugin's buttons that send a reply (which `ui` blocks use) do not exist
+  in an `app` page. The plugin's own page tells its host its height and script errors; the office
+  does not read either. A policy cannot stop the page navigating its own frame, so a page can
+  load another site inside the frame; it has nothing of the office to send there.
+- On a phone, and while a block is still streaming, an `app` block is the title card too.
+
+A block inside another code block stays source. The office cannot tell whether the plugin is
+installed, so the switch is always listed.
 
 **Graphics** (Settings → the scene picker, per device) is Auto, Low, Medium or High. Auto picks for
 the device and steps down when frames keep coming late; Low draws no shadows and no post effects at
@@ -798,7 +853,21 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
-In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
+On a Mac (`server/machine/macos.ts`) the same reading comes from the system's commands, run without
+a shell and with a timeout: `sysctl -n hw.memsize hw.ncpu vm.loadavg vm.swapusage`, `vm_stat`, `top -l 2`
+for the CPU, `ps -axo pid=,rss=,comm=` for the largest processes and `df -k` for the home disk. Memory in
+use is what Activity Monitor calls Memory Used: the anonymous pages less the purgeable ones, plus the
+wired pages, plus the pages the compressor occupies, times the page size `vm_stat` names in its first
+line (4096 on an Intel Mac, 16384 on Apple Silicon); the file cache is not counted. A Mac does not let a
+process read another's environment, so no process can be tied to the agent that started it. The
+reading says so (`perAgent: false`) and lists no agent: the Agents section explains why instead of
+showing "Memory by agent", nothing is marked as left running, and no clean-up is offered. The
+clean-up request is refused on a Mac, so no process is ever signalled there. The readings were built
+from the commands' documented output (see `docs/verified.md`).
+
+In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. With **Keep watching** on, the
+host is read every minute with no office open, so that history has no gap, and memory at 90% goes
+to the webhook. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
 
 ### Plan limits
 
@@ -810,7 +879,8 @@ listed there and is left out everywhere else: the toolbar's button, the closest 
 floor. A plan nobody pays for reads as used up, so switch that one off (`planHidden` in the host
 settings, shared by every device). The office asks Paseo for them
 (`office.plan.usage.request`, which reads `providers.listUsage()`) when it opens and every two
-minutes after; it stores none of it. A provider that is unavailable or reports no percentage is not
+minutes after; it stores none of it. With **Keep watching** on, the server reads them too, every
+5 minutes, to tell the webhook as they pass 80%, 95% and 100%. A provider that is unavailable or reports no percentage is not
 listed, and a host whose Paseo has no provider usage shows no limits at all.
 
 From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the
@@ -819,8 +889,8 @@ name). On the 3D floor a plan at 100% puts the countdown board on the wall, and 
 plan who are resting take a break in the pantry until it resets. Whoever is still working keeps
 working.
 
-Local process readings require Linux. On other platforms the Host card is available when Office
-finds a configured SSH-MCP installation.
+Local readings come from Linux (`/proc`) or macOS. On Windows the Host card is available when
+Office finds a configured SSH-MCP installation.
 
 **Host → SSH** shows the hosts provided by SSH-MCP. Select a host to see its readings in detail.
 Load is the one-minute load average relative to the number of cores, so it can exceed 100%.
@@ -852,7 +922,9 @@ press: the plugin kit has no confirm dialog. Both go as a prompt through `office
 An agent at work is refused, since the command would cut its turn, and a provider without the
 command says so under the buttons. A provider reports a context's size when a turn ends, so after a
 reset the old number would stay until the next turn; the office reads a reset agent's context as
-empty until the provider reports another number (`settleResets` in `server/directory.ts`).
+empty until the provider reports another number (`settleResets` in `server/directory.ts`). The janitor
+reads no process, so it is the same on a Mac; it is the host's clean-up of what an agent left
+running, in the Host card, that a Mac does not offer.
 
 ## The stand-up
 
@@ -922,7 +994,12 @@ at 08:00 every day in the same zone, and the incidents check every 5 minutes, wh
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
-- A run that came due while the daemon was down is not made up.
+- A run that came due while the daemon was down is not made up, with one exception: the stand-up
+  notes. When the office starts, or a save sets its notes schedule (a new folder, zone or days),
+  and today is a stand-up day in the notes' zone, 08:00 has passed there and today's
+  `## DD Month YYYY` entry is not in the notes, the day's run is made up at once, and waits for the
+  Paseo API like any run. It starts nothing while a writer is at work, so a day never has two
+  entries, and it follows the rule below when it could only start on a later day.
 - After a daemon restart, a run waits until the office is opened or an agent opens or ends a turn.
   An installed plugin gets the Paseo API only on a handler's or a hook's context, and a run needs
   it. The plugin's log says when a run is waiting.

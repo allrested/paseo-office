@@ -61,6 +61,28 @@ export function lateNotesRun(
   return dueDay === startDay ? null : { dueDay, startDay };
 }
 
+/**
+ * Whether today is a stand-up day in the notes' zone and 8:00 has passed there, so the day's
+ * run is due, whether or not it ran. False while no folder or day is set.
+ */
+export function missedNotesRun(
+  values: NotesScheduleSettings,
+  hostTimeZone: string,
+  now: number,
+): boolean {
+  const cadence = notesCadence(values, hostTimeZone);
+  if (cadence === null || cadence.type !== "cron") return false;
+  const weekday = new Date(`${zoneDate(now, cadence.timezone)}T00:00:00Z`).getUTCDay();
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: cadence.timezone,
+      hourCycle: "h23",
+      hour: "numeric",
+    }).format(now),
+  );
+  return values.notesDays.includes(weekday) && hour >= 8;
+}
+
 /** When the stand-up notes are written: 8:00 on their days, null while no folder or day is set. */
 export function notesCadence(
   values: NotesScheduleSettings,
@@ -81,7 +103,7 @@ export function notesCadence(
 export function syncNotesSchedule(
   schedules: OfficeSchedules,
   cadence: OfficeCadence | null,
-): Promise<void> {
+): Promise<boolean> {
   return syncSchedule(schedules, NOTES, cadence);
 }
 
@@ -92,8 +114,11 @@ export interface NotesSchedulePorts {
 }
 
 export interface NotesSchedule {
-  /** Follows these settings. Never rejects: a failure is logged and kept for `error`. */
-  sync(values: NotesScheduleSettings): Promise<void>;
+  /**
+   * Follows these settings. Never rejects: a failure is logged and kept for `error`. Resolves
+   * whether it saved the schedule, as `syncSchedule` does.
+   */
+  sync(values: NotesScheduleSettings): Promise<boolean>;
   /** Why the schedule could not follow the settings; null once a later sync succeeds. */
   error(): string | null;
   /** Keeps a reason found outside a sync until a sync succeeds. */

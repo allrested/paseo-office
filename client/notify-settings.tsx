@@ -16,10 +16,10 @@ const LEVELS = [
   { value: "warning", label: "Warning and danger" },
 ] as const;
 const LEVEL_HINT =
-  "Danger is a loop and an incident. Warning adds a refused call, two agents in one file, a taken port and failing checks.";
+  "Danger is a loop, an incident, a plan limit used up and memory nearly full. Warning adds a refused call, two agents in one file, a taken port, failing checks and a plan limit at 80% or 95%.";
 
 const HINT =
-  "The office posts a JSON message here when it raises an alert or opens an incident, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.";
+  "The office posts a JSON message here when it raises an alert, opens an incident, a plan limit runs low or the host runs out of memory, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.";
 
 interface Props {
   values: HostValues | null;

@@ -43,6 +43,9 @@ export function portNote(port: number, holder: string | null): string {
 export function checksNote(failing: string): string {
   return `The checks of this workspace's pull request are failing${failing === "" ? "" : ` (${failing})`}. Find out why and fix it, then say what you changed.`;
 }
+/** What the office sends into a turn that is stuck in a loop, with Stop repeated failing calls on. */
+export const LOOP_NOTE =
+  "Office notice: the same call has failed 3 times running with the same error. Do not repeat it unchanged: find out why it fails and try another way, or say what is in the way.";
 export function pinnedNote(notes: string): string {
   return `Office notice: this conversation was just compacted. The owner's pinned notes still apply:\n${notes}`;
 }

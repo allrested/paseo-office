@@ -55,11 +55,22 @@ import {
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
+import { createPlanWatch } from "./server/plan-watch.js";
+import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
+import { extra } from "./shared/host-extras.js";
 import { createWatchers } from "./server/watchers.js";
 import { createNotifier } from "./server/notify.js";
-import { alertNotice, incidentNotice, testNotice, wanted, type Notice } from "./shared/notify.js";
+import {
+  alertNotice,
+  hostNotice,
+  incidentNotice,
+  planNotice,
+  testNotice,
+  wanted,
+  type Notice,
+} from "./shared/notify.js";
 import type { NotifyLevel } from "./shared/settings.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
 import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
@@ -95,13 +106,15 @@ import { sshReadingRpc, sshServersRpc } from "./shared/ssh.js";
 import { cleanUpAgent } from "./server/machine/cleanup.js";
 import { liveCleanupPorts, liveMachinePorts } from "./server/machine/live-ports.js";
 import { hostDetailsRpc, type HostSample } from "./shared/host-details.js";
-import { readHostDetails, recordSample } from "./server/machine/details.js";
-import { createMachineReader } from "./server/machine/machine.js";
+import { recordSample } from "./server/machine/details.js";
+import { MAC_CLEANUP_REFUSAL } from "./server/machine/macos.js";
+import { createMachineReader, readDetails } from "./server/machine/machine.js";
 import { createMachineWatch } from "./server/machine/watch.js";
 import { nodeNotesFs, readMonthNotes } from "./server/notes-files.js";
 import {
   createNotesSchedule,
   lateNotesRun,
+  missedNotesRun,
   NOTES_SCHEDULE,
   notesTimeZone,
 } from "./server/notes-schedule.js";
@@ -266,6 +279,22 @@ export function createOfficePlugin(
     raised: (alert, agent) => {
       tell(alertNotice(alert, agent, officeName));
     },
+    guarding: () => loopGuard,
+    steer: (agentId, text) => {
+      if (!holder.held()) return;
+      holder
+        .require()
+        .agents.ref(agentId)
+        .send(text, { activeTurnBehavior: "steer" })
+        .catch((error: unknown) => log(`[office] loop hint to ${agentId}: ${errorMessage(error)}`));
+    },
+    stop: async (agentId) => {
+      if (!holder.held()) return false;
+      const cancel = extra(holder.require().agents.ref(agentId), "cancel");
+      if (cancel === null) return false;
+      await cancel();
+      return true;
+    },
     now: () => deps.clock.now(),
     named: () => stepsNamed,
     pinnedNotes: () => pinnedNotes,
@@ -351,6 +380,10 @@ export function createOfficePlugin(
   });
 
   const samples: HostSample[] = [];
+  // Told only while the owner keeps the office watching; a reading with no office open is one too.
+  const hostAlert = createHostAlert((percent) =>
+    tell(hostNotice(percent, deps.clock.now(), officeName)),
+  );
   const reader = createMachineReader({
     procRoot: deps.machine.procRoot,
     cgroupRoot: deps.machine.cgroupRoot,
@@ -360,9 +393,24 @@ export function createOfficePlugin(
   const machine = createMachineWatch({
     async read() {
       const reading = await reader.read();
-      if (reading) recordSample(samples, reading);
+      if (reading) {
+        recordSample(samples, reading);
+        if (keepWatching) hostAlert.observe(reading);
+      }
       return reading;
     },
+    timers: deps.clock,
+    log,
+  });
+  // The providers whose plan the owner left out; empty until the settings are read.
+  let planHidden: ReadonlySet<string> = new Set();
+  const planWatch = createPlanWatch({
+    async read() {
+      return projectPlanUsage((await holder.require().providers.listUsage()).providers);
+    },
+    counted: (provider) => !planHidden.has(provider),
+    raised: ({ provider, window }) =>
+      tell(planNotice(provider.name, window.label, window.usedPct, deps.clock.now(), officeName)),
     timers: deps.clock,
     log,
   });
@@ -576,7 +624,12 @@ export function createOfficePlugin(
   // Whether a request for a call that just failed three times running is refused; off until the settings say.
   let loopGuard = false;
   // The directory needs the Paseo API, which the first handler or hook brings.
-  const followWatching = () => hub.keepOpen(keepWatching && holder.held());
+  const followWatching = () => {
+    const on = keepWatching && holder.held();
+    hub.keepOpen(on);
+    machine.keep(on);
+    planWatch.keep(on);
+  };
   void holder.wait().then(followWatching);
   // The roster the names follow; off until the settings are read.
   let roster: Roster = NO_ROSTER;
@@ -620,11 +673,19 @@ export function createOfficePlugin(
     chatLines = chatWords(state.values.chatCulture);
     pinnedNotes = state.values.pinnedNotes;
     keepWatching = state.values.keepWatching;
+    planHidden = new Set(state.values.planHidden);
     loopGuard = state.values.loopGuard;
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
     weather.settingsChanged(state.values);
-    await notesSchedule.sync(state.values);
+    const notesSaved = await notesSchedule.sync(state.values);
+    // The schedule was just set: at the daemon's start, or by a changed zone, folder or days. A
+    // run that came due earlier today is made up.
+    if (notesSaved && missedNotesRun(state.values, deps.hostTimeZone, deps.clock.now())) {
+      void startNotesRun(deps.clock.now(), { unlessWritten: true }).catch((error: unknown) =>
+        log(`[office] ${NOTES_SCHEDULE} make-up run failed: ${errorMessage(error)}`),
+      );
+    }
     await duties.settingsChanged();
     // The writer reads the folder again, and its push carries the schedule's error with it.
     await writer
@@ -677,7 +738,7 @@ export function createOfficePlugin(
   // The readings stop with the last subscriber: nothing walks /proc while no office is open.
   server.handle(sshServersRpc, (_input, context) => ssh.list(context.paseo));
   server.handle(sshReadingRpc, ({ id }, context) => ssh.read(context.paseo, id));
-  server.handle(hostDetailsRpc, () => readHostDetails(deps.machine.procRoot, homedir(), samples));
+  server.handle(hostDetailsRpc, () => readDetails(deps.machine, homedir(), samples));
   server.handle(machineSubscription, (_input, context) => {
     holder.remember(context.paseo);
     return machine.attach(context);
@@ -685,6 +746,14 @@ export function createOfficePlugin(
   server.handle(cleanupRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("cleanup", async () => {
+      if (deps.machine.platform === "darwin") {
+        const refused = input.agentIds.map((agentId) => ({
+          agentId,
+          ok: false,
+          error: MAC_CLEANUP_REFUSAL,
+        }));
+        return { results: refused };
+      }
       // One at a time: each close waits for its runtime's processes.
       const results = [];
       for (const agentId of new Set(input.agentIds)) {
@@ -761,8 +830,12 @@ export function createOfficePlugin(
     }
     await holder.wait();
   }
-  // The 8:00 run ends once the writer started; the writer's own end is its turn's hook.
-  const stopNotesRuns = deps.schedules.handle(NOTES_SCHEDULE, async (dueAt) => {
+  // The 8:00 run ends once the writer started; the writer's own end is its turn's hook. A run
+  // made up after a restart is the same, given the day it came due.
+  async function startNotesRun(
+    dueAt: number,
+    options?: { unlessWritten?: boolean },
+  ): Promise<void> {
     await paseoForRun(NOTES_SCHEDULE);
     // The writer writes the day it starts on: a run that waited past midnight would write the
     // wrong day. Settings that cannot be read are left to the writer, which shows why.
@@ -777,8 +850,9 @@ export function createOfficePlugin(
       );
       return;
     }
-    await writer.start();
-  });
+    await writer.start(options);
+  }
+  const stopNotesRuns = deps.schedules.handle(NOTES_SCHEDULE, (dueAt) => startNotesRun(dueAt));
   // The duty board's day: what is due is posted, and done duties of earlier days leave.
   const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(notifyTestRpc, () => notifier.send(testNotice(deps.clock.now(), officeName)));
@@ -1106,6 +1180,8 @@ export function createOfficePlugin(
     await deps.timelineStore?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
+    planWatch.keep(false);
+    machine.keep(false);
     machine.stop();
     await ssh.stop();
     await office.stop();

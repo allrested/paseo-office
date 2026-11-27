@@ -356,14 +356,14 @@ export const UI_ID: Readonly<Record<string, string>> = {
   Notes: "Catatan",
   "Off by default. On, the office keeps the prompts and the replies of each conversation in a file on this host, readable by its owner only, so they can be searched from History after the agent is gone.":
     "Bawaannya mati. Jika nyala, kantor menyimpan prompt dan balasan tiap percakapan dalam berkas di host ini, hanya bisa dibaca pemiliknya, sehingga bisa dicari dari Riwayat setelah agennya tidak ada.",
-  "Off by default. On, when an agent asks permission for the very command or file edit that just failed three times running, the office refuses it and tells the agent why. It works only where the agent asks: a mode that runs calls without asking is not stopped.":
-    "Bawaannya mati. Jika nyala, saat agen meminta izin untuk perintah atau suntingan berkas yang baru saja gagal tiga kali berturut-turut, kantor menolaknya dan memberi tahu agen alasannya. Hanya berlaku bila agen meminta izin: mode yang menjalankan tanpa bertanya tidak dihentikan.",
+  "Off by default. On, when an agent asks permission for the very command or file edit that just failed three times running, the office refuses it and tells the agent why. Where the agent asks nothing, the office sends it a hint, and stops its turn if the same call fails again, on a host that can stop a turn. It sees a loop within 5 seconds, or 15 with Keep watching and no office open.":
+    "Bawaannya mati. Jika nyala, saat agen meminta izin untuk perintah atau suntingan berkas yang baru saja gagal tiga kali berturut-turut, kantor menolaknya dan memberi tahu agen alasannya. Bila agen tidak meminta izin apa pun, kantor mengirim petunjuk, dan menghentikan gilirannya jika panggilan yang sama gagal lagi, di host yang bisa menghentikan giliran. Perulangan terlihat dalam 5 detik, atau 15 detik dengan Terus memantau dan tanpa kantor terbuka.",
   "Off by default. Turn it on when the Generative UI plugin is installed: where a reply holds one of its ui or app blocks, the chat of a session here shows a card with the title of the block, not its source. The live card is drawn in the workspace chat.":
     "Bawaannya mati. Nyalakan bila plugin Generative UI terpasang: jika balasan berisi blok ui atau app, obrolan sesi di sini menampilkan kartu berjudul blok itu, bukan sumbernya. Kartu aslinya digambar di obrolan workspace.",
   "Off by default. When a worker goes home for the night or after evening drinks, an open 3D floor can archive its idle session on this host. Sessions awaiting approval or a working subagent stay active. Archived sessions leave the active list and keep their history.":
     "Bawaannya mati. Saat pekerja pulang di malam hari atau setelah minum sore, lantai 3D yang terbuka dapat mengarsipkan sesinya yang menganggur di host ini. Sesi yang menunggu persetujuan atau sub-agen yang bekerja tetap aktif. Sesi terarsip keluar dari daftar aktif dan riwayatnya tetap ada.",
-  "Off by default: the office reads the agents only while it is open on some device. On, it goes on reading every 15 seconds with no office open, so the Timeline, This week, the History vault and what the office notices have no gaps.":
-    "Bawaannya mati: kantor membaca agen hanya selama terbuka di suatu perangkat. Jika nyala, kantor terus membaca tiap 15 detik tanpa ada yang membukanya, sehingga Linimasa, Minggu ini, Brankas riwayat, dan pantauan kantor tidak berlubang.",
+  "Off by default: the office reads the agents only while it is open on some device. On, it goes on reading every 15 seconds with no office open, so the Timeline, This week, the History vault and what the office notices have no gaps. It also reads the plan limits every 5 minutes and the memory of the host every minute, to tell the webhook.":
+    "Bawaannya mati: kantor membaca agen hanya selama terbuka di suatu perangkat. Jika nyala, kantor terus membaca tiap 15 detik tanpa ada yang membukanya, sehingga Linimasa, Minggu ini, Brankas riwayat, dan pantauan kantor tidak berlubang. Kantor juga membaca batas paket tiap 5 menit dan memori host tiap menit, untuk memberi tahu webhook.",
   "On by default: the 3D floor names no file, command or site. Off, the bubble over a person names the one they are at, to everyone who opens this office.":
     "Bawaannya nyala: lantai 3D tidak menyebut berkas, perintah, atau situs. Jika mati, gelembung di atas orang menyebut yang sedang dikerjakan, kepada semua yang membuka kantor ini.",
   "On this host": "Di host ini",
@@ -461,8 +461,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Confirm reset": "Konfirmasi reset",
   "Cozy room": "Ruang nyaman",
   "Customize character": "Sesuaikan karakter",
-  "Danger is a loop and an incident. Warning adds a refused call, two agents in one file, a taken port and failing checks.":
-    "Bahaya adalah perulangan dan insiden. Peringatan menambah panggilan yang ditolak, dua agen di satu berkas, port yang terpakai, dan pemeriksaan yang gagal.",
+  "Danger is a loop, an incident, a plan limit used up and memory nearly full. Warning adds a refused call, two agents in one file, a taken port, failing checks and a plan limit at 80% or 95%.":
+    "Bahaya adalah perulangan, insiden, batas paket yang habis, dan memori yang hampir penuh. Peringatan menambah panggilan yang ditolak, dua agen di satu berkas, port yang terpakai, pemeriksaan yang gagal, dan batas paket di 80% atau 95%.",
   "Delete 1 finished to-do?": "Hapus 1 tugas yang selesai?",
   "Describe the goal": "Jelaskan tujuannya",
   "Dictate message": "Dikte pesan",
@@ -470,6 +470,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Dikte berhenti. Periksa mikrofon Anda lalu coba lagi.",
   "Drag to resize the column": "Seret untuk mengubah lebar kolom",
   "Drawn in the workspace chat.": "Digambar di obrolan workspace.",
+  "Runs here in a sandboxed frame with no network.":
+    "Berjalan di sini dalam bingkai terisolasi tanpa jaringan.",
   "Exit full screen": "Keluar dari layar penuh",
   "Expand all": "Bentangkan semua",
   "Fix it": "Perbaiki",
@@ -504,6 +506,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Loading quick messages…": "Memuat pesan cepat…",
   "Lobby task": "Tugas lobi",
   "Memory not read": "Memori belum dibaca",
+  "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
+    "Host ini tidak dapat mengetahui proses mana yang dimulai oleh agen, jadi memori tidak ditampilkan per agen dan tidak ada pembersihan. Bagian System mencantumkan proses terbesar.",
   "Message recalled": "Pesan ditarik kembali",
   "Message recipient": "Penerima pesan",
   "More actions": "Aksi lainnya",
@@ -650,8 +654,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Kantor tidak dapat mengambil foto. Coba lagi saat lantai 3D siap.",
   "The office does not list this agent: it may be closed, archived or still starting.":
     "Kantor tidak mencantumkan agen ini: mungkin tertutup, terarsip, atau masih memulai.",
-  "The office posts a JSON message here when it raises an alert or opens an incident, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.":
-    "Kantor mengirim pesan JSON ke sini saat memunculkan peringatan atau membuka insiden, sehingga Anda tahu tanpa membuka kantor. https, atau http di host itu sendiri. Siapa pun yang bisa membuka pengaturan ini dapat membaca alamatnya.",
+  "The office posts a JSON message here when it raises an alert, opens an incident, a plan limit runs low or the host runs out of memory, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.":
+    "Kantor mengirim pesan JSON ke sini saat memunculkan peringatan, membuka insiden, batas paket hampir habis, atau host kehabisan memori, sehingga Anda tahu tanpa membuka kantor. https, atau http di host itu sendiri. Siapa pun yang bisa membuka pengaturan ini dapat membaca alamatnya.",
   "The office's own name for this team. Empty goes back to the workspace's name.":
     "Nama dari kantor untuk tim ini. Kosong berarti kembali ke nama workspace.",
   "The plan goes on: the workspace has the rest.":
@@ -750,4 +754,16 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "an earlier day": "hari sebelumnya",
   "Agents fill the first team, then the next: each takes a free teammate, by chance, and sits with that team on the 3D floor whatever its workspace. An agent the roster has nobody left for keeps its own name and its workspace's team. Paseo's own names stay. A name you type on a team or an agent wins.":
     "Agen mengisi tim pertama, lalu tim berikutnya: masing-masing mengambil anggota tim yang masih kosong secara acak, dan duduk bersama tim itu di lantai 3D apa pun workspace-nya. Agen yang tidak kebagian nama dari daftar tetap memakai namanya sendiri dan tim workspace-nya. Nama dari Paseo tetap ada. Nama yang Anda ketik pada tim atau agen selalu dipakai.",
+  Replaying: "Memutar ulang",
+  "Replay paused": "Putar ulang dijeda",
+  "From the start": "Dari awal",
+  "Back to now": "Kembali ke sekarang",
+  "Nobody was seen at this moment": "Tidak ada yang terlihat pada saat ini",
+  "1 person on the floor": "1 orang di lantai",
+  Yesterday: "Kemarin",
+  "−10 min": "−10 mnt",
+  "+10 min": "+10 mnt",
+  "Back 10 minutes": "Mundur 10 menit",
+  "Forward 10 minutes": "Maju 10 menit",
+  "Replay position": "Posisi putar ulang",
 };
