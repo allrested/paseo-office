@@ -6,8 +6,10 @@ test("Indonesian has its words; a text it has none for, and any other language, 
   expect(translate("id", "Dismiss")).toBe("Abaikan");
   expect(translate("id", "Add to lobby")).toBe("Tambah ke lobi");
   expect(translate("id", "Start an agent to analyze SHOP-12")).toBe(
-    "Start an agent to analyze SHOP-12",
+    "Mulai agen untuk menganalisis SHOP-12",
   );
+  // A line the office has no words for stays as it is.
+  expect(translate("id", "Reticulating the splines")).toBe("Reticulating the splines");
   for (const language of ["en", "vi", "th"] as const) {
     expect(translate(language, "Dismiss")).toBe("Dismiss");
   }

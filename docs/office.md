@@ -400,7 +400,7 @@ Indonesia chosen, or Automatic in an app whose language is Indonesian, it is in 
 English, or any other language, in English. That covers the buttons, the fields with their hints
 and placeholders, the switches, the dialogs and what they say, the column, the cards, the
 settings page, and the lines put together from data: an age ("12 mnt lalu"), a count, an agent's
-activity, a failure up to the host's own reason.
+activity, the cards' summaries, a failure up to the host's own reason.
 
 Every view draws its words through one text component and one text field (`client/text.tsx`).
 A text that is one string is looked up whole in `shared/ui-words-id.ts`, by the English it stands
