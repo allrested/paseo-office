@@ -133,6 +133,15 @@ test("a host that cannot close offers neither for an idle agent", async () => {
   expect(await labels(reading([IDLE, FORGOTTEN_IDLE], false))).toEqual([]);
 });
 
+test("a host that cannot tell an agent's processes says so, and offers no action or empty list", async () => {
+  const machine = { ...reading([], false), perAgent: false };
+  expect(await labels(machine)).toEqual([]);
+  await section("Agents");
+  expect(container.textContent).toContain("cannot tell which process an agent started");
+  expect(container.textContent).not.toContain("Memory by agent");
+  expect(container.textContent).not.toContain("No agent holds a process");
+});
+
 test("a host that cannot close still stops what a closed agent left", async () => {
   expect(await labels(reading([CLOSED, FORGOTTEN_IDLE], false))).toEqual(["Clean up"]);
 });

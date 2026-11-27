@@ -19,6 +19,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   session's chat in a browser or the desktop app: the agent's HTML page runs in a frame that can
   run script and nothing else, with no network, under the block's title. A `ui` block, an `app`
   block still being written, and any block on a phone stay a title card.
+- The Host card works on **macOS**: memory, CPU, swap, disk, load and the largest process groups
+  are read from the Mac's own commands. A Mac cannot say which process an agent started, so the
+  card lists no agent, marks nothing as left running and offers no clean-up there. Linux is
+  unchanged, and Windows still has no local reading.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

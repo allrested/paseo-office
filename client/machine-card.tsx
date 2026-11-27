@@ -445,19 +445,26 @@ function MachineBody({
       {tab === "plan" && <PlanTab now={now} styles={styles} />}
       {tab === "agents" && (
         <>
-          <AgentGroup
-            title="Memory by agent"
-            agents={others}
-            now={now}
-            actionFor={forOther}
-            cleanUp={cleanUp}
-            styles={styles}
-            empty={
-              left.length === 0
-                ? "No agent holds a process on this host."
-                : "No other agent holds a process on this host."
-            }
-          />
+          {machine.perAgent === false ? (
+            <Text style={styles.host.note}>
+              This host cannot tell which process an agent started, so memory is not shown by agent
+              and no clean-up is offered. The System section lists the largest processes.
+            </Text>
+          ) : (
+            <AgentGroup
+              title="Memory by agent"
+              agents={others}
+              now={now}
+              actionFor={forOther}
+              cleanUp={cleanUp}
+              styles={styles}
+              empty={
+                left.length === 0
+                  ? "No agent holds a process on this host."
+                  : "No other agent holds a process on this host."
+              }
+            />
+          )}
           <SubagentModels agents={agents} styles={styles} />
           <ForgottenWork styles={styles} />
         </>
