@@ -280,4 +280,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Write a message": "Tulis pesan",
   "Your Jira site, such as https://your-site.atlassian.net.":
     "Situs Jira Anda, misalnya https://your-site.atlassian.net.",
+  "Replay on the floor": "Putar ulang di lantai",
+  Replay: "Putar ulang",
+  Pause: "Jeda",
+  Resume: "Lanjutkan",
 };
