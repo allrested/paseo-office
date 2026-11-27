@@ -836,18 +836,39 @@ interface BoardSheetState {
   /** The room whose board sheet is open. */
   room: OfficeRoom | null;
   open(roomId: string): void;
+  /** A room chosen on the board that is open, the lobby's: Back returns to that board. */
+  openFromBoard(roomId: string): void;
+  /** Back to the board this one was opened from; absent when it was opened from elsewhere. */
+  back: (() => void) | undefined;
   close(): void;
 }
 
+interface OpenBoard {
+  roomId: string | null;
+  /** The board this one was opened from. */
+  backTo: string | null;
+}
+
+const NO_BOARD: OpenBoard = { roomId: null, backTo: null };
+
 /** Which room's board sheet is open: none once its room has left or the data stopped being live. */
 function useBoardSheet(model: OfficeModel, live: boolean): BoardSheetState {
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const close = useCallback(() => setRoomId(null), []);
+  const [{ roomId, backTo }, setBoard] = useState(NO_BOARD);
+  const open = useCallback((next: string) => setBoard({ roomId: next, backTo: null }), []);
+  const openFromBoard = useCallback(
+    (next: string) => setBoard((current) => ({ roomId: next, backTo: current.roomId })),
+    [],
+  );
+  const goBack = useCallback(
+    () => setBoard((current) => ({ roomId: current.backTo, backTo: null })),
+    [],
+  );
+  const close = useCallback(() => setBoard(NO_BOARD), []);
   const room =
     roomId === null || !live
       ? null
       : (model.rooms.find((candidate) => candidate.id === roomId) ?? null);
-  return { room, open: setRoomId, close };
+  return { room, open, openFromBoard, back: backTo === null ? undefined : goBack, close };
 }
 
 /** An agent chosen on a board: the board leaves, and the agent opens as it does from its desk. */
@@ -2443,7 +2464,8 @@ export function OfficeSurface(
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
         onSelectAgent={selectFromBoard}
-        onOpenBoard={board.open}
+        onOpenBoard={board.openFromBoard}
+        onBack={board.back}
         onClose={board.close}
       />
       <DutySheet

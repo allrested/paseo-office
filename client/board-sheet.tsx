@@ -394,6 +394,8 @@ export interface BoardSheetProps {
   onSelectAgent(agentId: string): void;
   /** A room was chosen on the lobby's board: its board takes the sheet. */
   onOpenBoard(roomId: string): void;
+  /** Back to the lobby's board, when this room's was opened from it. */
+  onBack?: (() => void) | undefined;
   onClose(): void;
 }
 
@@ -413,6 +415,7 @@ export function BoardSheet({
   styles,
   onSelectAgent,
   onOpenBoard,
+  onBack,
   onClose,
 }: BoardSheetProps) {
   const [picking, setPicking] = useState(false);
@@ -460,6 +463,16 @@ export function BoardSheet({
             onOpenBoard={onOpenBoard}
             styles={styles}
           />
+        ) : null}
+        {room !== null && !room.lobby && !picking && onBack ? (
+          <View style={styles.actions}>
+            <ActionButton
+              label="Back to Lobby board"
+              pendingLabel="Back to Lobby board"
+              onPress={onBack}
+              styles={styles}
+            />
+          </View>
         ) : null}
         {/* The team's own name is set here too: this sheet opens from every view, the list from one. */}
         {room !== null && !room.lobby && !picking && room.workspace ? (
