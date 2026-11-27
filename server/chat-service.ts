@@ -768,6 +768,14 @@ export async function createChatService(ports: ChatServicePorts): Promise<ChatSe
           return OK;
         case "recall":
           return recall(input.id);
+        case "clear":
+          // The engine has no clear of its own. What it said once a day stays said.
+          engine.state.msgs.length = 0;
+          engine.state.pinned = null;
+          emit("all");
+          // Saves the empty chat, and starts it as a new one starts.
+          engine.system(tr("chat.sys.created"));
+          return OK;
       }
     },
 

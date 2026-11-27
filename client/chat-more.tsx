@@ -24,8 +24,11 @@ export function ChatMore({
   onDuties,
   onNewAgent,
   onGroupPhoto,
+  onClear,
   onUse,
 }: ChatShortcuts & {
+  /** Resolves true once the chat is cleared. */
+  onClear(): Promise<boolean>;
   draft: ChatDraft;
   web: boolean;
   styles: OfficeStyles;
@@ -57,6 +60,34 @@ export function ChatMore({
     },
     [onClose, onUse],
   );
+  // Clearing is for everyone and cannot be undone, so it asks first.
+  const [clearing, setClearing] = useState(false);
+  const askClear = useCallback(() => setClearing(true), []);
+  const keep = useCallback(() => setClearing(false), []);
+  const clear = useCallback(async () => {
+    if (await onClear()) onClose();
+    else setClearing(false);
+  }, [onClear, onClose]);
+  if (clearing)
+    return (
+      <View style={styles.messenger.morePanel}>
+        <View style={styles.messenger.quickRow}>
+          <Text style={styles.messenger.sectionTitle}>
+            {"Clear all messages for everyone? This can't be undone."}
+          </Text>
+        </View>
+        <View style={styles.messenger.toolbar}>
+          <ActionButton
+            label="Clear all messages"
+            pendingLabel="Clearing…"
+            onPress={clear}
+            primary
+            styles={styles}
+          />
+          <ActionButton label="Cancel" pendingLabel="Cancel" onPress={keep} styles={styles} />
+        </View>
+      </View>
+    );
   return (
     <View style={styles.messenger.morePanel}>
       <View style={styles.messenger.quickRow}>
@@ -113,6 +144,12 @@ export function ChatMore({
             />
           )}
           {web && <Dictation setText={draft.setText} styles={styles} />}
+          <ActionButton
+            label="Clear chat"
+            pendingLabel="Clear chat"
+            onPress={askClear}
+            styles={styles}
+          />
         </View>
       )}
     </View>

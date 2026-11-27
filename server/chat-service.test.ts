@@ -441,6 +441,19 @@ test("a custom poll pins itself, takes a vote, and another message can replace t
   expect(await h.service.request({ op: "pin", id: "gone" })).toMatchObject({ ok: false });
 });
 
+test("clearing the chat drops every message and the pin for all, and starts it again", async () => {
+  const h = await harness();
+  await h.service.request({ op: "poll", question: "Which release?", options: ["Today", "Later"] });
+  await send(h, "Read the changelog.");
+  expect(h.service.snapshot().pinned).toBeDefined();
+
+  expect(await h.service.request({ op: "clear" })).toEqual({ ok: true });
+  expect(h.changes).toContainEqual({ op: "all", messages: [], pinned: null });
+  expect(h.service.snapshot().pinned).toBeUndefined();
+  // As a new conversation starts: upstream's first line, alone.
+  expect(messages(h).map((m) => m.kind)).toEqual(["sys"]);
+});
+
 test("a mention of an archived agent reports the missing recipient and cannot route to another session", async () => {
   const h = await harness();
   h.service.view(view(agent("a1", "Alice")));

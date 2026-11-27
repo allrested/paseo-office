@@ -267,6 +267,9 @@ instead, each named with what its card would say.
   Select the pinned banner to read it, or use **Search chat** to find an earlier message.
   The member count opens the team directory with each session’s status. **More chat actions**
   opens the lobby board, starts an agent, or takes a group photo when the floor is available.
+  **Clear chat**, also there, removes every message and the pin for everyone after asking, and
+  cannot be undone. Scrolled up, **Jump to latest** in the corner of the list goes to the newest
+  message and counts what arrived; sending a message goes there too.
   **Quick messages** saves reusable drafts on this device. Browsers with speech recognition
   also offer dictation. With an empty composer, the thumbs-up button sends a quick reply. Messages support quoted replies, reactions, pins, search and polls. On web, selecting a recipient also lets you attach images. The chosen session receives the images and the group sees an attachment label. Open the group header to browse members and open a session. **More** contains saved quick messages, the lobby board and the new-agent form. On a live 3D floor, **Take office photo** captures a 480 × 360 view and posts it to the group. The chat keeps the six most recent photos. Compatible browsers offer dictation. Local draft suggestions use upstream’s English and Vietnamese rules and can be undone.
 

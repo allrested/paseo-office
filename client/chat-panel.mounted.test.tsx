@@ -928,6 +928,70 @@ test("while you are at the bottom a new message scrolls to it, and not when you 
   expect(toEnd).toBe(2);
 });
 
+test("scrolled up, Jump to latest counts what arrived and goes to the newest message", async () => {
+  await mount();
+  await snapshot([msg()], [FIX]);
+  const list = () => {
+    if (!scroller) throw new Error("No message list");
+    return scroller;
+  };
+  await act(async () => list().onContentSizeChange?.(300, 500));
+  expect(toEnd).toBe(1);
+  // At the bottom there is nothing to jump to.
+  expect(maybe("Jump to latest")).toBeNull();
+
+  await act(async () => list().onScroll?.(scrollEvent(0, 1000, 300)));
+  expect(labelled("Jump to latest").textContent).toBe("");
+  await chat({ op: "add", message: msg({ at: at(9, 10) }) });
+  await chat({ op: "add", message: msg({ at: at(9, 11) }) });
+  expect(maybe("Jump to latest")).toBeNull();
+  expect(labelled("Jump to latest, 2 new").textContent).toBe("2");
+
+  await press("Jump to latest, 2 new");
+  expect(toEnd).toBe(2);
+  expect(maybe("Jump to latest, 2 new")).toBeNull();
+  expect(maybe("Jump to latest")).toBeNull();
+  // The list follows again.
+  await chat({ op: "add", message: msg({ at: at(9, 12) }) });
+  await act(async () => list().onContentSizeChange?.(300, 1300));
+  expect(toEnd).toBe(3);
+});
+
+test("sending while scrolled up goes to the newest message", async () => {
+  await mount();
+  await snapshot([msg()], [FIX]);
+  const list = () => {
+    if (!scroller) throw new Error("No message list");
+    return scroller;
+  };
+  await act(async () => list().onScroll?.(scrollEvent(0, 1000, 300)));
+  await type("Ship it");
+  await press("Send");
+  expect(toEnd).toBe(1);
+  expect(maybe("Jump to latest")).toBeNull();
+  // Your message arrives and is followed.
+  await chat({ op: "add", message: msg({ from: "me", name: "You", text: "Ship it" }) });
+  await act(async () => list().onContentSizeChange?.(300, 1100));
+  expect(toEnd).toBe(2);
+});
+
+test("Clear chat asks first, and clears only on the second press", async () => {
+  await mount();
+  await snapshot([msg()], [FIX]);
+  await press("More chat actions");
+  await press("Clear chat");
+  expect(container.textContent).toContain("Clear all messages for everyone? This can't be undone.");
+  expect(call).not.toHaveBeenCalled();
+  await press("Cancel");
+  expect(maybe("Clear all messages")).toBeNull();
+  expect(call).not.toHaveBeenCalled();
+
+  await press("Clear chat");
+  await press("Clear all messages");
+  expect(call).toHaveBeenCalledExactlyOnceWith({ op: "clear" });
+  expect(maybe("Close chat actions")).toBeNull();
+});
+
 test("on a wide screen a message's actions show on hover and focus, and stay while the pointer is on them", async () => {
   const said = msg();
   await mount({ compact: false });

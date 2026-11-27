@@ -482,6 +482,8 @@ export const ChatRequestSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("vote"), id: z.string().min(1), index: z.number().int().min(0) }),
   z.object({ op: z.literal("rsvp"), id: z.string().min(1), yes: z.boolean() }),
   z.object({ op: z.literal("recall"), id: z.string().min(1) }),
+  /** Every message and the pin go, for all who have the chat open. */
+  z.object({ op: z.literal("clear") }),
 ]);
 export type ChatRequest = z.output<typeof ChatRequestSchema>;
 
