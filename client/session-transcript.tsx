@@ -1,13 +1,15 @@
 import { type Appearance, AVATARS, shirtColor } from "../shared/appearance.js";
 import { memo, useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./text.js";
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
 import { readLobbyAssignment } from "../shared/lobby-assignment.js";
+import { APP_FRAME_SANDBOX, appPage } from "../shared/app-page.js";
 import { splitUiBlocks, type UiPiece } from "../shared/ui-blocks.js";
 import type { ConversationRow } from "./conversation-model.js";
 import {
   NOTHING_SAID,
+  UI_APP_HINT,
   UI_CARD_HINT,
   UI_CARD_WRITING,
   rowLabel,
@@ -27,6 +29,14 @@ interface RowProps {
   styles: OfficeStyles;
 }
 
+/** A fixed height; a taller page scrolls inside it. */
+const APP_FRAME_STYLE = {
+  width: "100%",
+  height: 360,
+  border: 0,
+  borderRadius: 6,
+} as const;
+
 /** Where a reply holds a block the Generative UI plugin draws in Paseo's own chat. */
 function UiCard({
   piece,
@@ -36,19 +46,36 @@ function UiCard({
   styles: OfficeStyles;
 }) {
   const s = styles.transcript;
+  // Only a browser can open a frame; a phone's page may run no script, so it keeps the title.
+  const live = piece.language === "app" && piece.complete && piece.source !== undefined;
+  const page = live && Platform.OS === "web" ? appPage(piece.source ?? "") : null;
+  let hint = UI_APP_HINT;
+  if (!piece.complete) hint = UI_CARD_WRITING;
+  else if (page === null) hint = UI_CARD_HINT;
   return (
-    <View style={s.uiCard}>
-      <Icon
-        name={piece.language === "app" ? "AppWindow" : "LayoutGrid"}
-        size={16}
-        color={styles.brandIcon.color}
-      />
-      <View style={s.uiCardText}>
-        <Text numberOfLines={2} style={s.stepTitle}>
-          {uiCardTitle(piece)}
-        </Text>
-        <Text style={s.uiCardHint}>{piece.complete ? UI_CARD_HINT : UI_CARD_WRITING}</Text>
+    <View style={page === null ? s.uiCard : s.uiAppCard}>
+      <View style={s.uiCardHead}>
+        <Icon
+          name={piece.language === "app" ? "AppWindow" : "LayoutGrid"}
+          size={16}
+          color={styles.brandIcon.color}
+        />
+        <View style={s.uiCardText}>
+          <Text numberOfLines={2} style={s.stepTitle}>
+            {uiCardTitle(piece)}
+          </Text>
+          <Text style={s.uiCardHint}>{hint}</Text>
+        </View>
       </View>
+      {page !== null && (
+        <iframe
+          title={uiCardTitle(piece)}
+          sandbox={APP_FRAME_SANDBOX}
+          referrerPolicy="no-referrer"
+          srcDoc={page}
+          style={APP_FRAME_STYLE}
+        />
+      )}
     </View>
   );
 }

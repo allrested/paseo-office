@@ -109,6 +109,16 @@ export function transcriptStyles(colors: PluginTheme["colors"], touch: boolean) 
       borderColor: colors.border,
       backgroundColor: colors.surface1,
     },
+    uiAppCard: {
+      minWidth: 0,
+      gap: 8,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface1,
+    },
+    uiCardHead: { minWidth: 0, flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 10 },
     uiCardText: { flex: 1, minWidth: 0, gap: 2 },
     uiCardHint: { color: colors.foregroundMuted, fontSize: 12, lineHeight: 17 },
   });

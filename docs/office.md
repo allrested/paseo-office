@@ -815,11 +815,27 @@ person, to everyone who opens this office. Prompts and replies are never sent ei
 
 **Gen-UI cards** (Settings, host-wide, off by default) is for a host that has the Generative UI
 plugin (`genui`), whose agents write `ui` and `app` code blocks that Paseo's chat draws as
-live cards. The office's own session chat cannot draw them. With the setting on it shows, in
-place of a block's source, a card with the block's title (the first `Card("...")` of a `ui`
-block, the page title of an `app` block) and where the live card is: the workspace chat, one
-press away with **Open in workspace**. A block inside another code block stays source. The
-office cannot tell whether the plugin is installed, so the switch is always listed.
+live cards. With the setting on, the office's session chat shows each block in place of its source:
+
+- A **`ui` block** is a small language only that plugin can run, so the office shows a card with
+  the block's title (the first `Card("...")`) and where the live card is: the workspace chat, one
+  press away with **Open in workspace**. It is never run here.
+- An **`app` block** is a self-contained HTML page. In a browser or the desktop app the office runs
+  it, once the block is complete, in a frame under the card's title: `sandbox="allow-scripts"` and
+  nothing else (the page has its own empty origin, so it cannot read the office's storage or
+  page, and cannot navigate the top window, submit a form or open a popup), `srcdoc`, no referrer,
+  a fixed 360 px height that scrolls. The page starts with a Content-Security-Policy that allows
+  inline script and style and `data:`/`blob:` images, fonts and media, and nothing else: no
+  fetch, no WebSocket, no frame, no `<base>`, no form action. This is the plugin's own policy plus
+  `base-uri` and `form-action`. The frame is inert toward the office: the office listens for no
+  message from it, and the plugin's buttons that send a reply (which `ui` blocks use) do not exist
+  in an `app` page. The plugin's own page tells its host its height and script errors; the office
+  does not read either. A policy cannot stop the page navigating its own frame, so a page can
+  load another site inside the frame; it has nothing of the office to send there.
+- On a phone, and while a block is still streaming, an `app` block is the title card too.
+
+A block inside another code block stays source. The office cannot tell whether the plugin is
+installed, so the switch is always listed.
 
 **Graphics** (Settings → the scene picker, per device) is Auto, Low, Medium or High. Auto picks for
 the device and steps down when frames keep coming late; Low draws no shadows and no post effects at

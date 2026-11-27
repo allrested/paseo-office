@@ -299,6 +299,53 @@ test("a reply's ui block is its source until Gen-UI cards is on, then a card wit
   expect(reply).not.toContain("Table(");
 });
 
+const APP_REPLY = [
+  "A timer.",
+  "",
+  "```app",
+  "<title>Timer</title><script>parent.document.cookie</script><p>go</p>",
+  "```",
+  "",
+  "```app",
+  "<title>Half</title><p>still",
+].join("\n");
+
+test("an app block is drawn in a script-only frame behind a network-blocking policy when Gen-UI cards is on", async () => {
+  conversation = ready([{ kind: "agent", key: "1", text: APP_REPLY }]);
+  await draw();
+  expect(container.querySelector("iframe")).toBeNull();
+  uiCards = true;
+  await draw();
+  const frames = container.querySelectorAll("iframe");
+  // The block still streaming stays a placeholder.
+  expect(frames).toHaveLength(1);
+  const frame = frames[0];
+  expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+  expect(frame.getAttribute("title")).toBe("Timer");
+  const page = frame.getAttribute("srcdoc") ?? "";
+  expect(page).toContain("Content-Security-Policy");
+  expect(page).toContain("<p>go</p>");
+  expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<script>"));
+  const reply = container.textContent ?? "";
+  expect(reply).toContain("Runs here in a sandboxed frame with no network.");
+  expect(reply).toContain("Being written...");
+  expect(reply).not.toContain("parent.document");
+});
+
+test("a ui block is never run: it stays a title card even when it holds script", async () => {
+  uiCards = true;
+  conversation = ready([
+    {
+      kind: "agent",
+      key: "1",
+      text: '```ui\nCard("Plan", [Text("<script>x</script>")])\n```',
+    },
+  ]);
+  await draw();
+  expect(container.querySelector("iframe")).toBeNull();
+  expect(container.textContent).toContain("Drawn in the workspace chat.");
+});
+
 test("chat folds consecutive tool steps, leaves a failed call visible, and keeps the run open during updates", async () => {
   const tools: ConversationRow[] = [
     { kind: "tool", key: "1", text: "shell: npm test" },
