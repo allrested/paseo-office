@@ -34,6 +34,8 @@ export interface IncidentsPorts {
   now(): number;
   log(message: string): void;
   changed(state: IncidentsCheckState): void;
+  /** Told each incident once, as a check opens it. */
+  opened?(incident: Incident): void;
 }
 
 export interface IncidentsCheck {
@@ -124,7 +126,9 @@ export function createIncidentsCheck(ports: IncidentsPorts): IncidentsCheck {
     const taken = fresh.slice(0, MAX_NEW_PER_CHECK);
     for (const issue of taken) {
       mark.seen[issue.key] = now;
-      data.open.push(incident(source, issue, now));
+      const opened = incident(source, issue, now);
+      data.open.push(opened);
+      ports.opened?.(opened);
     }
     // With some left over, the next read starts at the last one opened and finds the rest.
     const leftOver = fresh.length > taken.length;

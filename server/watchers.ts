@@ -24,6 +24,8 @@ export interface WatcherPorts {
   pinnedNotes(): string;
   /** Says the pinned notes to an agent whose conversation was compacted mid-turn. */
   remind(agentId: string, notes: string): void;
+  /** Told each alert once, as it is raised, with the name of the agent it is about. */
+  raised?(alert: Alert, agent: string | null): void;
 }
 
 export interface Watchers {
@@ -130,7 +132,9 @@ export function createWatchers(ports: WatcherPorts): Watchers {
 
   function raise(alert: Omit<Alert, "at">): void {
     if (alerts.has(alert.id) || dismissed.has(alert.id)) return;
-    alerts.set(alert.id, { ...alert, at: ports.now() });
+    const raised = { ...alert, at: ports.now() };
+    alerts.set(alert.id, raised);
+    ports.raised?.(raised, alert.agentId === undefined ? null : (names.get(alert.agentId) ?? null));
   }
   const nameOf = (agentId: string) => names.get(agentId) ?? "An agent";
   const what = (call: Call) => (ports.named() && call.label !== "" ? call.label : call.tool);

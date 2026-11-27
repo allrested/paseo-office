@@ -942,6 +942,16 @@ export const trackersTestRpc = defineRpc({
   output: TrackersResultSchema,
 });
 
+/** Posts one test message to the webhook the settings hold; `problem` says why it did not arrive. */
+export const notifyTestRpc = defineRpc({
+  name: "office.notify.test.request",
+  input: z.object({}),
+  output: z.union([
+    z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
+});
+
 /** Closes the named open incidents, or all of them when none are named. Their keys stay seen. */
 export const incidentsDismissRpc = defineRpc({
   name: "office.incidents.dismiss.request",

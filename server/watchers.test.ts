@@ -37,11 +37,13 @@ const edit = (id: string, filePath: string) => call(id, "completed", { type: "ed
 function setup(options: { named?: boolean; notes?: string } = {}) {
   let now = 0;
   const reminded: string[] = [];
+  const raised: string[] = [];
   const watchers = createWatchers({
     now: () => now,
     named: () => options.named ?? true,
     pinnedNotes: () => options.notes ?? "",
     remind: (agentId, notes) => reminded.push(`${agentId}: ${notes}`),
+    raised: (alert, name) => raised.push(`${alert.id} ${name}`),
   });
   watchers.view({ agents: [agent("a"), agent("b")], workspaces: workspace("success") });
   // The first read of each agent is what was there before the office looked.
@@ -50,6 +52,7 @@ function setup(options: { named?: boolean; notes?: string } = {}) {
   return {
     watchers,
     reminded,
+    raised,
     later(ms: number) {
       now += ms;
     },
@@ -216,4 +219,14 @@ test("what the first read finds is not news, and an agent that left takes its al
   expect(kinds()).toEqual(["port"]);
   watchers.view({ agents: [agent("c")], workspaces: workspace("success") });
   expect(kinds()).toEqual([]);
+});
+
+test("an alert is told once as it is raised, with the name of its agent", () => {
+  const { watchers, raised } = setup();
+  const fail = (id: string) => shell(id, "failed", "exit 1");
+  watchers.tail("a", [fail("n1"), fail("n2"), fail("n3")]);
+  expect(raised).toEqual(["loop:a Agent a"]);
+  // Still looping at the next read: the same alert, not a new one.
+  watchers.tail("a", [fail("n4")]);
+  expect(raised).toEqual(["loop:a Agent a"]);
 });

@@ -58,6 +58,9 @@ import { projectPlanUsage } from "./server/plan-usage.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
 import { createWatchers } from "./server/watchers.js";
+import { createNotifier } from "./server/notify.js";
+import { alertNotice, incidentNotice, testNotice, wanted, type Notice } from "./shared/notify.js";
+import type { NotifyLevel } from "./shared/settings.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
 import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
 import { TIMELINE_KEEP_MS, createTimelineLog, type TimelineLog } from "./server/timeline.js";
@@ -133,6 +136,7 @@ import {
   dutiesSaveRpc,
   dutyActedRpc,
   incidentsDismissRpc,
+  notifyTestRpc,
   notesModesRpc,
   planUsageRpc,
   timelineRpc,
@@ -249,7 +253,19 @@ export function createOfficePlugin(
   let stepsNamed = false;
   // The owner's pinned notes; empty until the settings are read.
   let pinnedNotes = "";
+  // The owner's webhook and the office's name in its messages; nothing is posted until the settings are read.
+  let notifyUrl = "";
+  let notifyLevel: NotifyLevel = "danger";
+  // A message goes out when there is an address and the owner asked for its severity.
+  const tell = (notice: Notice) => {
+    if (notifyUrl !== "" && wanted(notice, notifyLevel)) void notifier.send(notice);
+  };
+  let officeName = "Office 3D";
+  const notifier = createNotifier({ url: () => notifyUrl, fetchFn: deps.fetchFn, log });
   const watchers = createWatchers({
+    raised: (alert, agent) => {
+      tell(alertNotice(alert, agent, officeName));
+    },
     now: () => deps.clock.now(),
     named: () => stepsNamed,
     pinnedNotes: () => pinnedNotes,
@@ -469,6 +485,9 @@ export function createOfficePlugin(
       checked = state;
       pushIncidents();
     },
+    opened: (incident) => {
+      tell(incidentNotice(incident, officeName));
+    },
   });
   incidents
     .start()
@@ -566,6 +585,7 @@ export function createOfficePlugin(
     stepsNamed = false;
     vaultOn = false;
     pinnedNotes = "";
+    notifyUrl = "";
     keepWatching = false;
     followWatching();
     office.setPickupEnabled(false);
@@ -586,6 +606,9 @@ export function createOfficePlugin(
       return;
     }
     hub.setBrand(hostBrand(state.values, deps.env));
+    officeName = hostBrand(state.values, deps.env)?.name ?? "Office 3D";
+    notifyUrl = state.values.notifyUrl.trim();
+    notifyLevel = state.values.notifyLevel;
     roster = rosterOf(state.values);
     hub.setRoster(roster);
     agentToolsOn = state.values.agentTools;
@@ -754,6 +777,7 @@ export function createOfficePlugin(
   });
   // The duty board's day: what is due is posted, and done duties of earlier days leave.
   const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
+  server.handle(notifyTestRpc, () => notifier.send(testNotice(deps.clock.now(), officeName)));
   server.handle(incidentsDismissRpc, ({ ids }) =>
     guarded("incidents dismiss", async () => ({ dismissed: await incidents.dismiss(ids) })),
   );

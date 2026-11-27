@@ -583,6 +583,46 @@ is stored or sent. After a daemon restart the watching starts when the first age
 a turn, or an office is opened: an installed plugin gets the Paseo API only then. The weather, the
 plan limits, the host readings and the street's checks still run only while an office is open.
 
+## Notifications
+
+The plugin SDK gives a plugin's server no notification of its own, so the office posts to an
+address you give it. **Webhook address** (Settings > Services > Notifications) takes one, https
+or plain http on the host itself. The office then sends one `POST` with a JSON body
+(`server/notify.ts`, `shared/notify.ts`) each time it raises an alert below (a loop, a refused
+call, two agents in one file, a taken port, failing checks) and each time an incidents check
+opens an incident:
+
+```json
+{
+  "source": "paseo-office",
+  "text": "Acme Studio: Checkout is stuck in a loop\nBash failed 3 times running",
+  "kind": "loop",
+  "severity": "danger",
+  "title": "Checkout is stuck in a loop",
+  "detail": "Bash failed 3 times running",
+  "agent": "Checkout",
+  "at": 1795770000000
+}
+```
+
+`kind` is `loop`, `refused`, `clash`, `port`, `checks`, `incident` or `test`; `severity` is
+`danger` for a loop and an incident and `warning` for the rest; an incident carries its tracker
+page as `url`. `text` is the whole message as lines, which is what Slack's incoming webhooks show;
+n8n or another relay can pass it on to Telegram or ntfy. The title and detail are the alert's own,
+so with streamer mode on they name the tool and not the file or the command. A prompt or a reply
+is never sent.
+
+**Notify for** chooses what is sent: **Danger only**, the default, is a loop and an incident;
+**Warning and danger** adds the rest.
+
+Each alert and each incident is sent once, as it is raised. A request waits 10 seconds, follows
+no redirect and is not tried again; a failure is one line in the plugin's log, without the
+address. **Send a test** posts one message to the saved address and says what came back. The
+alerts are raised only while the office reads the agents: with no office open that takes
+**Keep watching**. The incidents check runs on its own timer either way. After a daemon restart a
+workspace whose checks still fail is told again. The address is stored in the host's settings as
+typed, key included, and anyone who can open the settings page can read it.
+
 ## What the office notices
 
 Upstream does these with Claude Code hooks. Here the office's server does them from what it reads

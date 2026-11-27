@@ -6,6 +6,7 @@ import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
 import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
+import { NotifyFields, type NotifySetting } from "./notify-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
 import {
   CACHE_CLOCKS,
@@ -61,7 +62,8 @@ type HostSetting =
   | "AWS region"
   | "CloudWatch log groups"
   | "Error pattern"
-  | WeatherSetting;
+  | WeatherSetting
+  | NotifySetting;
 
 /** What the incidents fields need to know from the host: never a token's value. */
 type TrackerState = Pick<
@@ -344,6 +346,8 @@ export function HostSwitches({
             saveProblem={saveProblem}
             styles={styles}
           />
+          <Text style={styles.sheetLabel}>Notifications</Text>
+          <NotifyFields values={stored} change={change} saveProblem={saveProblem} styles={styles} />
           <Text style={styles.sheetLabel}>Weather service</Text>
           <WeatherFields
             values={stored}
