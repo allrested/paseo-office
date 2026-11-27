@@ -9,6 +9,11 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   and `lsof`. Only processes that descend from the agent's own, or that the daemon started or
   launchd holds, count. Clean-up is still not offered there until the readings have been seen on a
   Mac. A Mac where `ps -E` shows no environment keeps the card without a breakdown.
+- On the web, a session's reply box has an **Attach text files** button beside the image one: a
+  log, a CSV, a source file. Paseo's prompt call takes images but no file, and a plugin cannot upload
+  one, so the file's text is added to the message under a header naming it. Up to four files and
+  100 KB together; a file that is not UTF-8 text (a PDF, an archive) is refused. A chip shows the
+  name and size with a Remove, and the files are kept and cleared as the images are.
 - On a phone, **Office settings** opened from the 3D view scrolls: the four section tabs stay at
   the top and the chosen section scrolls under them, so Branding and every field below it can be
   reached. Before, the sheet did not scroll and what did not fit was cut off. The tabs show

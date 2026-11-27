@@ -86,7 +86,7 @@ import {
   sessionTabsOf,
   type SessionContext,
 } from "./session-pane.js";
-import { NO_REPLY_IMAGES } from "./reply-send.js";
+import { NO_REPLY_FILES, NO_REPLY_IMAGES } from "./reply-send.js";
 import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
 import { OfficeCardsDialog, type OfficeCard } from "./office-cards.js";
@@ -1247,6 +1247,8 @@ function ColumnViewPanel({ view, session, ...panel }: ColumnViewPanelProps) {
         setReply={replies.setText}
         replyImages={replies.images.get(view.agentId) ?? NO_REPLY_IMAGES}
         setReplyImages={replies.setImages}
+        replyFiles={replies.files.get(view.agentId) ?? NO_REPLY_FILES}
+        setReplyFiles={replies.setFiles}
         context={context}
         styles={panel.styles}
         layout={panel.layout}

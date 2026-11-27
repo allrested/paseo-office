@@ -19,7 +19,15 @@ import { enterSends } from "./chat-text.js";
 import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
-import { canSendReply, imagesAfterSend, replySend, type ReplyImages } from "./reply-send.js";
+import { FileDrafts, FilePicker } from "./reply-file-picker.js";
+import {
+  canSendReply,
+  filesAfterSend,
+  imagesAfterSend,
+  replySend,
+  type ReplyFiles,
+  type ReplyImages,
+} from "./reply-send.js";
 import { AskCard } from "./ask-card.js";
 import { CommandList, SessionOptions } from "./session-extras-view.js";
 import { UndoTurn } from "./undo-turn.js";
@@ -53,6 +61,8 @@ export interface ReplyDraft {
   setText(next: SetStateAction<string>): void;
   images: ReplyImages;
   setImages(next: SetStateAction<ReplyImages>): void;
+  files: ReplyFiles;
+  setFiles(next: SetStateAction<ReplyFiles>): void;
 }
 
 export interface SessionPanelProps {
@@ -273,7 +283,7 @@ interface ComposerProps {
   draft: ReplyDraft;
   actions: AgentActions;
   touchScreen: boolean;
-  /** Where the image picker works: the team chat offers it on the web only. */
+  /** Where the image and file pickers work: the team chat offers images on the web only. */
   web: boolean;
   styles: OfficeStyles;
   focused: boolean;
@@ -290,7 +300,7 @@ function Composer({
   focused,
   setFocused,
 }: ComposerProps) {
-  const { text, setText, images, setImages } = draft;
+  const { text, setText, images, setImages, files, setFiles } = draft;
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Enter and the Send button can both fire before the first send returns.
@@ -305,22 +315,23 @@ function Composer({
   const agentId = agent.id;
   const send = useCallback(async () => {
     const sent = text.trim();
-    if (!canSendReply(text, images, reading) || sending.current) return;
+    if (!canSendReply(text, images, reading, files) || sending.current) return;
     sending.current = true;
     setPending(true);
     try {
       // A reply to a working agent joins its turn: a plain send makes the daemon interrupt it.
-      const { prompt, options } = replySend(text, images);
+      const { prompt, options } = replySend(text, images, files);
       await actions.send(agentId, prompt, options);
       setError(null);
       setText((current) => textAfterSend(current, sent));
       setImages((current) => imagesAfterSend(current, images));
+      setFiles((current) => filesAfterSend(current, files));
     } catch (failure) {
       setError(failureText("Send", failure));
     }
     sending.current = false;
     setPending(false);
-  }, [text, setText, images, setImages, reading, actions, agentId]);
+  }, [text, setText, images, setImages, files, setFiles, reading, actions, agentId]);
   const stop = useCallback(() => actions.cancel?.(agentId), [actions, agentId]);
   const onKeyPress = useCallback(
     (event: KeyPress) => {
@@ -344,6 +355,7 @@ function Composer({
         styles={styles}
       />
       {images.length > 0 && <ImageDrafts draft={draft} styles={styles} />}
+      {files.length > 0 && <FileDrafts draft={draft} styles={styles} />}
       <View style={shell}>
         <TextInput
           accessibilityLabel="Message"
@@ -362,11 +374,12 @@ function Composer({
           <ActionButton label="Stop" pendingLabel="Stopping..." onPress={stop} styles={styles} />
         )}
         {web && <ImagePicker draft={draft} styles={styles} onReading={setReading} />}
+        {web && <FilePicker draft={draft} styles={styles} onReading={setReading} />}
         <SessionButton
           label={pending ? "Sending..." : "Send"}
           icon={pending ? "Ellipsis" : "ArrowUp"}
           onPress={send}
-          disabled={!canSendReply(text, images, reading) || pending}
+          disabled={!canSendReply(text, images, reading, files) || pending}
           primary
           styles={styles}
         />

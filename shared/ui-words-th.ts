@@ -436,6 +436,13 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Choose a model.": "เลือกโมเดล",
   "Choose a provider.": "เลือก provider",
   "Choose a workspace.": "เลือกพื้นที่ทำงาน",
+  "Attach text files": "แนบไฟล์ข้อความ",
+  "Choose text files": "เลือกไฟล์ข้อความ",
+  "Choose up to four text files.": "เลือกไฟล์ข้อความได้สูงสุดสี่ไฟล์",
+  "The attached files may add up to 100 KB of text.": "ไฟล์ที่แนบรวมกันได้ไม่เกิน 100 KB",
+  "This file is not text, so it cannot be added.": "ไฟล์นี้ไม่ใช่ข้อความ จึงเพิ่มไม่ได้",
+  "The browser could not read this file.": "เบราว์เซอร์อ่านไฟล์นี้ไม่ได้",
+  "The file's text is added to the message.": "ข้อความของไฟล์จะถูกเพิ่มลงในข้อความ",
   "Choose up to four images.": "เลือกรูปภาพได้สูงสุดสี่รูป",
   "Clean up": "ล้างข้อมูล",
   "Cleaning up closes an idle agent, which its next prompt resumes, and stops what a closed agent left behind.":
