@@ -114,6 +114,7 @@ const RULES: readonly Rule[] = [
     /^(.+): (.+) in the last 30 minutes$/,
     (title, range) => `${title}: ${range} dalam 30 menit terakhir`,
   ],
+  [/^(\d+) people on the floor$/, (n) => `${n} orang di lantai`],
   [/^(\d+) times the clock$/, (n) => `${n} kali kecepatan jam`],
   [
     /^1 agent has no desk on this floor\. The list shows everyone\.$/,

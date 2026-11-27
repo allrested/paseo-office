@@ -622,8 +622,10 @@ only: the 3D floor keeps showing the present.
 **Replay on the floor**, beside it while the 3D floor is showing, closes the card and replays the
 range there (`client/floor-replay.ts`, `client/use-floor-replay.tsx`): the people sit, work, wait
 and stop as the timeline saw them, each at the kind of thing it was at for a minute after the
-call was seen, and a bar over the floor has the moment shown, Pause and **Now**. It ends by itself
-at the range's end. An agent the office was not watching at a moment is off the floor then, and
+call was seen, and a bar over the floor says the day and the time shown, to the second, and how many
+people the floor has then. Its track shows where that is in the range, and a press on it moves
+there; the buttons are From the start, ten minutes back or on, Pause or Resume, the speed (10 to
+600 times the clock) and Back to now. It ends by itself at the range's end. An agent the office was not watching at a moment is off the floor then, and
 one archived since cannot be drawn. The lists, the boards and the cards stay today's, and so do
 the staff scenes, the weather and the sound, which follow the device's clock.
 

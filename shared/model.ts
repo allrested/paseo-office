@@ -84,6 +84,8 @@ export interface OfficeModel {
   dutyList: readonly Duty[] | null;
   /** The duty board's posts as the day's duties: today's, and the owed ones. */
   duties: DutyRow[];
+  /** The office as the timeline saw it at a past moment, not as it is: a replay's model. */
+  replayed?: true;
 }
 
 export type DotTone = "running" | "idle" | "starting" | "warning" | "danger";
