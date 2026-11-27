@@ -36,6 +36,7 @@ export function uiCardTitle(piece: { language: "ui" | "app"; title: string | nul
   return piece.title ?? (piece.language === "app" ? "Interactive app" : "Interactive card");
 }
 export const UI_CARD_HINT = "Drawn in the workspace chat.";
+export const UI_APP_HINT = "Runs here in a sandboxed frame with no network.";
 export const UI_CARD_WRITING = "Being written...";
 
 export const LOADING = "Loading...";

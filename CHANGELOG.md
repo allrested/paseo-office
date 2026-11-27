@@ -15,6 +15,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - A session's reply box can attach images on the web, with the team chat's own button and limit of
   four. They go with the reply, a running turn included, and are kept with the typed text until it
   is sent or the tab is closed. Other files still go through **Open in workspace**.
+- With **Gen-UI cards** on, an `app` block of the Generative UI plugin is drawn live in a
+  session's chat in a browser or the desktop app: the agent's HTML page runs in a frame that can
+  run script and nothing else, with no network, under the block's title. A `ui` block, an `app`
+  block still being written, and any block on a phone stay a title card.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

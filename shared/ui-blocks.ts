@@ -11,6 +11,8 @@ export type UiPiece =
       title: string | null;
       /** False while the reply is still streaming the block. */
       complete: boolean;
+      /** An `app` block's HTML page, as written. A `ui` block's source is not kept. */
+      source?: string;
     };
 
 const TITLE_MAX = 80;
@@ -70,7 +72,12 @@ export function splitUiBlocks(text: string): UiPiece[] {
     if (word === "ui" || word === "app") {
       flush();
       const body = lines.slice(index + 1, close).join("\n");
-      pieces.push({ kind: "block", language: word, title: titleOf(word, body), complete });
+      const title = titleOf(word, body);
+      pieces.push(
+        word === "app"
+          ? { kind: "block", language: word, title, complete, source: body }
+          : { kind: "block", language: word, title, complete },
+      );
     } else {
       prose.push(...lines.slice(index, close + 1));
     }
