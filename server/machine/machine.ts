@@ -20,6 +20,8 @@ export interface MachinePorts {
   /** Runs a program on macOS, where the readings are its commands' output; the system's by default. */
   run?: Run;
   now(): number;
+  /** The daemon's pid, which the Mac reading keeps out of an agent's processes; this process's by default. */
+  daemonPid?: number;
   /** The agents with a runtime: starting, idle, running or in error. */
   liveAgents(): Promise<KnownAgent[]>;
   /** An agent in whatever state; null when this daemon does not know the id. */
@@ -46,7 +48,12 @@ export function readDetails(
 
 export function createMachineReader(ports: MachinePorts): MachineReader {
   if (ports.platform === "darwin") {
-    return createMacMachineReader({ now: ports.now, run: ports.run ?? runCommand });
+    return createMacMachineReader({
+      now: ports.now,
+      run: ports.run ?? runCommand,
+      liveAgents: ports.liveAgents,
+      daemonPid: ports.daemonPid ?? process.pid,
+    });
   }
   let cpuBefore: CpuTimes | null = null;
   // An id no agent of this daemon has: asked once, since an agent id is never given out twice.
