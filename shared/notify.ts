@@ -1,5 +1,6 @@
 import type { Alert, AlertKind } from "./alerts.js";
 import type { Incident } from "./contracts.js";
+import { PLAN_OUT_PCT } from "./plan-usage.js";
 import type { NotifyLevel } from "./settings.js";
 
 /** What the office sends to the owner's webhook when it raises something that needs a look. */
@@ -8,7 +9,7 @@ export interface Notice {
   source: "paseo-office";
   /** One line a chat can show as it is. */
   text: string;
-  kind: AlertKind | "incident" | "test";
+  kind: AlertKind | "incident" | "plan" | "host" | "test";
   severity: "warning" | "danger";
   title: string;
   detail: string;
@@ -23,10 +24,13 @@ export interface Notice {
 /** A loop burns a plan until someone stops it; the others wait for a look. */
 const DANGER: ReadonlySet<Notice["kind"]> = new Set(["loop", "incident"]);
 
-function build(fields: Omit<Notice, "source" | "text" | "severity">, office: string): Notice {
+function build(
+  fields: Omit<Notice, "source" | "text" | "severity">,
+  office: string,
+  severity: Notice["severity"] = DANGER.has(fields.kind) ? "danger" : "warning",
+): Notice {
   const { title, detail, url } = fields;
   const text = [`${office}: ${title}`, detail, url].filter((part) => part).join("\n");
-  const severity = DANGER.has(fields.kind) ? "danger" : "warning";
   return { source: "paseo-office", text, severity, ...fields };
 }
 
@@ -42,6 +46,27 @@ export function incidentNotice(incident: Incident, office: string): Notice {
     { kind: "incident", title: `Incident ${key}`, detail: title, url, at: foundAt },
     office,
   );
+}
+
+/** A provider's closest limit has reached 80%, 95% or 100%: the last is danger, as a loop is. */
+export function planNotice(
+  provider: string,
+  limit: string,
+  usedPct: number,
+  at: number,
+  office: string,
+): Notice {
+  const out = usedPct >= PLAN_OUT_PCT;
+  const title = out
+    ? `${provider} is out of its ${limit} limit`
+    : `${provider} is at ${Math.floor(usedPct)}% of its ${limit} limit`;
+  return build({ kind: "plan", title, detail: "", at }, office, out ? "danger" : "warning");
+}
+
+/** The host's memory is at the Host card's danger threshold. */
+export function hostNotice(percent: number, at: number, office: string): Notice {
+  const detail = `${percent}% of memory is in use`;
+  return build({ kind: "host", title: "The host is low on memory", detail, at }, office, "danger");
 }
 
 export function testNotice(at: number, office: string): Notice {

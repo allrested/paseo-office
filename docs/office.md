@@ -646,8 +646,15 @@ those hours out, the vault misses turns, and nothing below is noticed overnight.
 at 5 as soon as an office opens. What is read is what an open office reads: each running agent's
 newest timeline entries, and with the History vault on, what was said after each turn. Nothing new
 is stored or sent. After a daemon restart the watching starts when the first agent opens or ends
-a turn, or an office is opened: an installed plugin gets the Paseo API only then. The weather, the
-plan limits, the host readings and the street's checks still run only while an office is open.
+a turn, or an office is opened: an installed plugin gets the Paseo API only then.
+
+It also does two things for the [webhook](#notifications), which the open office does not need
+from the server. The plan limits are read from Paseo every 5 minutes (`server/plan-watch.ts`),
+and the host is read every minute with no office open (`MACHINE_BACKGROUND_MS` in
+`server/machine/watch.ts`; Linux only), so the Host card's 30 minutes of RAM and CPU have no gap
+when an office opens. An open office reads the host every 10 seconds and the plans every two
+minutes, as before. The weather and the street's checks still run only while an office is open:
+they only draw the scene, and nobody is looking.
 
 ## Notifications
 
@@ -671,15 +678,25 @@ opens an incident:
 }
 ```
 
-`kind` is `loop`, `refused`, `clash`, `port`, `checks`, `incident` or `test`; `severity` is
-`danger` for a loop and an incident and `warning` for the rest; an incident carries its tracker
+`kind` is `loop`, `refused`, `clash`, `port`, `checks`, `incident`, `plan`, `host` or `test`;
+`severity` is `danger` for a loop, an incident, a plan limit used up and memory nearly full, and
+`warning` for the rest; an incident carries its tracker
 page as `url`. `text` is the whole message as lines, which is what Slack's incoming webhooks show;
 n8n or another relay can pass it on to Telegram or ntfy. The title and detail are the alert's own,
 so with streamer mode on they name the tool and not the file or the command. A prompt or a reply
 is never sent.
 
-**Notify for** chooses what is sent: **Danger only**, the default, is a loop and an incident;
-**Warning and danger** adds the rest.
+**Notify for** chooses what is sent: **Danger only**, the default, is a loop, an incident, a plan
+limit used up and memory nearly full; **Warning and danger** adds the rest, among them a plan
+limit at 80% and at 95%.
+
+With **Keep watching** on, the office tells of a plan limit and of the host's memory too
+(`server/plan-watch.ts`, `server/host-alert.ts`). A provider's closest limit sends one `plan`
+message as it reaches 80%, 95% and 100% (used up), and none again until it has fallen, which a
+reset does; a jump from 50% to 97% is one message, for 95%. A provider switched off in the Host
+card's Plan section is left out, and a read that fails sends nothing. Memory at the Host card's
+red (90%) sends one `host` message, and the next only after memory has been under 80% again. The
+state is in memory: after a daemon restart a limit already past a threshold is told once more.
 
 Each alert and each incident is sent once, as it is raised. A request waits 10 seconds, follows
 no redirect and is not tried again; a failure is one line in the plugin's log, without the
@@ -798,7 +815,9 @@ While an office surface is open, the `office.machine` subscription sends a readi
 memory (the daemon's cgroup when it has a cap, else the host's), CPU, and for each agent the
 memory, the process count and the TCP ports of the processes that carry its `PASEO_AGENT_ID`. The
 Host entry in the Attention tab shows the memory in use and opens a card with the agents by memory.
-In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
+In **Host → This instance → Details**, inspect system swap, disk space on the home filesystem, load averages and the largest process groups by resident memory. RAM and CPU history covers up to 30 minutes of Office readings. With **Keep watching** on, the
+host is read every minute with no office open, so that history has no gap, and memory at 90% goes
+to the webhook. The same view lists workspace services, agent listening ports, workspaces with changed lines and measured npm and pip cache sizes. **Refresh** takes another snapshot.
 
 ### Plan limits
 
@@ -810,7 +829,8 @@ listed there and is left out everywhere else: the toolbar's button, the closest 
 floor. A plan nobody pays for reads as used up, so switch that one off (`planHidden` in the host
 settings, shared by every device). The office asks Paseo for them
 (`office.plan.usage.request`, which reads `providers.listUsage()`) when it opens and every two
-minutes after; it stores none of it. A provider that is unavailable or reports no percentage is not
+minutes after; it stores none of it. With **Keep watching** on, the server reads them too, every
+5 minutes, to tell the webhook as they pass 80%, 95% and 100%. A provider that is unavailable or reports no percentage is not
 listed, and a host whose Paseo has no provider usage shows no limits at all.
 
 From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the

@@ -4,6 +4,14 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 
 ## Unreleased
 
+- **Keep watching** now covers the plan limits and the host's memory for the webhook. The plan
+  limits are read every 5 minutes with no office open, and a provider's closest limit sends one
+  message as it reaches 80%, 95% and 100%, once until it resets; a provider switched off in the Host
+  card stays out. The host is read every minute with no office open (Linux), so the Host card's
+  30-minute RAM and CPU history has no gap, and memory at 90%, the Host card's red, sends one
+  message until it is back under 80%. **Notify for** keeps its two choices: a plan limit used up and
+  memory nearly full are danger, the 80% and 95% messages are warnings. The weather and the
+  street's checks still run only while an office is open.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

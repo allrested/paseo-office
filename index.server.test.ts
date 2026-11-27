@@ -1,3 +1,4 @@
+import { PLAN_WATCH_MS } from "./server/plan-watch.js";
 import {
   defineAgentTool,
   type PluginHandlerContext,
@@ -2055,5 +2056,70 @@ test("the plans' limits come from the host's usage, and a host without it says s
       },
     ],
   });
+  await stop();
+});
+
+function usageOf(usedPct: number) {
+  return {
+    providers: [
+      {
+        providerId: "claude",
+        displayName: "Claude",
+        status: "available",
+        windows: [{ id: "5h", label: "5 hours", usedPct, resetsAt: null }],
+      },
+    ],
+  };
+}
+
+test("with Keep watching on, a plan limit reaching a threshold is posted once, with no office open", async () => {
+  const fetchFn = vi.fn(async () => new Response("ok"));
+  const values = {
+    ...ON.values,
+    keepWatching: true,
+    notifyUrl: "https://hooks.test/in/KEY",
+    notifyLevel: "warning" as const,
+  };
+  const { recorded, clock, context, stop } = setup(async () => ({ ...ON, values }), { fetchFn });
+  let used = 85;
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => usageOf(used);
+  // The first call that brings the Paseo API starts the watching.
+  await recorded.handlers.get("office.plan.usage.request")?.({}, context);
+  await settle();
+  const bodies = () =>
+    fetchFn.mock.calls.map((call) =>
+      JSON.parse((call as unknown as [string, RequestInit])[1].body as string),
+    );
+  expect(bodies()).toMatchObject([
+    { kind: "plan", severity: "warning", title: "Claude is at 85% of its 5 hours limit" },
+  ]);
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(fetchFn).toHaveBeenCalledTimes(1);
+  used = 100;
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(bodies().at(-1)).toMatchObject({ kind: "plan", severity: "danger" });
+  expect(fetchFn).toHaveBeenCalledTimes(2);
+  await stop();
+});
+
+test("with Keep watching off, the plan limits are not read with no office open", async () => {
+  const fetchFn = vi.fn(async () => new Response("ok"));
+  const values = { ...ON.values, notifyUrl: "https://hooks.test/in/KEY" };
+  const { recorded, clock, context, stop } = setup(async () => ({ ...ON, values }), { fetchFn });
+  let reads = 0;
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => {
+    reads += 1;
+    return usageOf(100);
+  };
+  await recorded.handlers.get("office.plan.usage.request")?.({}, context);
+  expect(reads).toBe(1);
+  clock.advance(PLAN_WATCH_MS * 3);
+  await settle();
+  expect(reads).toBe(1);
+  expect(fetchFn).not.toHaveBeenCalled();
   await stop();
 });

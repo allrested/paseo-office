@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { Machine, MachineEvent } from "../../shared/contracts.js";
 import { createFakeClock, settle } from "../fake-clock.js";
-import { MACHINE_INTERVAL_MS, createMachineWatch } from "./watch.js";
+import { MACHINE_BACKGROUND_MS, MACHINE_INTERVAL_MS, createMachineWatch } from "./watch.js";
 
 function machine(usedBytes: number): Machine {
   return {
@@ -192,4 +192,62 @@ test("stop ends every subscription and leaves no timer", async () => {
   expect(clock.pending()).toBe(0);
   first.leave();
   await first.done;
+});
+
+test("a host kept watched reads with no subscriber, every background interval", async () => {
+  const { clock, watch, reads } = setup();
+  watch.keep(true);
+  await settle();
+  expect(reads()).toBe(1);
+  clock.advance(MACHINE_INTERVAL_MS);
+  await settle();
+  expect(reads()).toBe(1);
+  clock.advance(MACHINE_BACKGROUND_MS - MACHINE_INTERVAL_MS);
+  await settle();
+  expect(reads()).toBe(2);
+});
+
+test("not kept watched, nothing is read without a subscriber, and turning it off stops the timer", async () => {
+  const { clock, watch, reads } = setup();
+  clock.advance(MACHINE_BACKGROUND_MS * 2);
+  await settle();
+  expect(reads()).toBe(0);
+  watch.keep(true);
+  await settle();
+  watch.keep(false);
+  expect(clock.pending()).toBe(0);
+  clock.advance(MACHINE_BACKGROUND_MS * 2);
+  await settle();
+  expect(reads()).toBe(1);
+});
+
+test("an open office reads every 10 seconds as before, and the background pace comes back when it leaves", async () => {
+  const { clock, watch, subscriber, used, reads } = setup();
+  watch.keep(true);
+  await settle();
+  const office = subscriber();
+  await settle();
+  // It gets the reading at hand, and one of its own at once.
+  expect(used(office.events)).toEqual([1, 2]);
+  clock.advance(MACHINE_INTERVAL_MS);
+  await settle();
+  expect(used(office.events)).toEqual([1, 2, 3]);
+  office.leave();
+  await settle();
+  clock.advance(MACHINE_INTERVAL_MS);
+  await settle();
+  expect(reads()).toBe(3);
+  clock.advance(MACHINE_BACKGROUND_MS - MACHINE_INTERVAL_MS);
+  await settle();
+  expect(reads()).toBe(4);
+});
+
+test("a host that cannot be read is not read again in the background either", async () => {
+  const { clock, watch, reads } = setup(async () => null);
+  watch.keep(true);
+  await settle();
+  clock.advance(MACHINE_BACKGROUND_MS * 3);
+  await settle();
+  expect(clock.pending()).toBe(0);
+  expect(reads()).toBe(0);
 });

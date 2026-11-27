@@ -362,8 +362,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Bawaannya mati. Nyalakan bila plugin Generative UI terpasang: jika balasan berisi blok ui atau app, obrolan sesi di sini menampilkan kartu berjudul blok itu, bukan sumbernya. Kartu aslinya digambar di obrolan workspace.",
   "Off by default. When a worker goes home for the night or after evening drinks, an open 3D floor can archive its idle session on this host. Sessions awaiting approval or a working subagent stay active. Archived sessions leave the active list and keep their history.":
     "Bawaannya mati. Saat pekerja pulang di malam hari atau setelah minum sore, lantai 3D yang terbuka dapat mengarsipkan sesinya yang menganggur di host ini. Sesi yang menunggu persetujuan atau sub-agen yang bekerja tetap aktif. Sesi terarsip keluar dari daftar aktif dan riwayatnya tetap ada.",
-  "Off by default: the office reads the agents only while it is open on some device. On, it goes on reading every 15 seconds with no office open, so the Timeline, This week, the History vault and what the office notices have no gaps.":
-    "Bawaannya mati: kantor membaca agen hanya selama terbuka di suatu perangkat. Jika nyala, kantor terus membaca tiap 15 detik tanpa ada yang membukanya, sehingga Linimasa, Minggu ini, Brankas riwayat, dan pantauan kantor tidak berlubang.",
+  "Off by default: the office reads the agents only while it is open on some device. On, it goes on reading every 15 seconds with no office open, so the Timeline, This week, the History vault and what the office notices have no gaps. It also reads the plan limits every 5 minutes and the memory of the host every minute, to tell the webhook.":
+    "Bawaannya mati: kantor membaca agen hanya selama terbuka di suatu perangkat. Jika nyala, kantor terus membaca tiap 15 detik tanpa ada yang membukanya, sehingga Linimasa, Minggu ini, Brankas riwayat, dan pantauan kantor tidak berlubang. Kantor juga membaca batas paket tiap 5 menit dan memori host tiap menit, untuk memberi tahu webhook.",
   "On by default: the 3D floor names no file, command or site. Off, the bubble over a person names the one they are at, to everyone who opens this office.":
     "Bawaannya nyala: lantai 3D tidak menyebut berkas, perintah, atau situs. Jika mati, gelembung di atas orang menyebut yang sedang dikerjakan, kepada semua yang membuka kantor ini.",
   "On this host": "Di host ini",
@@ -461,8 +461,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Confirm reset": "Konfirmasi reset",
   "Cozy room": "Ruang nyaman",
   "Customize character": "Sesuaikan karakter",
-  "Danger is a loop and an incident. Warning adds a refused call, two agents in one file, a taken port and failing checks.":
-    "Bahaya adalah perulangan dan insiden. Peringatan menambah panggilan yang ditolak, dua agen di satu berkas, port yang terpakai, dan pemeriksaan yang gagal.",
+  "Danger is a loop, an incident, a plan limit used up and memory nearly full. Warning adds a refused call, two agents in one file, a taken port, failing checks and a plan limit at 80% or 95%.":
+    "Bahaya adalah perulangan, insiden, batas paket yang habis, dan memori yang hampir penuh. Peringatan menambah panggilan yang ditolak, dua agen di satu berkas, port yang terpakai, pemeriksaan yang gagal, dan batas paket di 80% atau 95%.",
   "Delete 1 finished to-do?": "Hapus 1 tugas yang selesai?",
   "Describe the goal": "Jelaskan tujuannya",
   "Dictate message": "Dikte pesan",
@@ -650,8 +650,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Kantor tidak dapat mengambil foto. Coba lagi saat lantai 3D siap.",
   "The office does not list this agent: it may be closed, archived or still starting.":
     "Kantor tidak mencantumkan agen ini: mungkin tertutup, terarsip, atau masih memulai.",
-  "The office posts a JSON message here when it raises an alert or opens an incident, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.":
-    "Kantor mengirim pesan JSON ke sini saat memunculkan peringatan atau membuka insiden, sehingga Anda tahu tanpa membuka kantor. https, atau http di host itu sendiri. Siapa pun yang bisa membuka pengaturan ini dapat membaca alamatnya.",
+  "The office posts a JSON message here when it raises an alert, opens an incident, a plan limit runs low or the host runs out of memory, so you hear of it with no office open. https, or http on the host itself. Anyone who can open these settings can read the address.":
+    "Kantor mengirim pesan JSON ke sini saat memunculkan peringatan, membuka insiden, batas paket hampir habis, atau host kehabisan memori, sehingga Anda tahu tanpa membuka kantor. https, atau http di host itu sendiri. Siapa pun yang bisa membuka pengaturan ini dapat membaca alamatnya.",
   "The office's own name for this team. Empty goes back to the workspace's name.":
     "Nama dari kantor untuk tim ini. Kosong berarti kembali ke nama workspace.",
   "The plan goes on: the workspace has the rest.":
