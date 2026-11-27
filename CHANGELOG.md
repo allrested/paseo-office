@@ -16,6 +16,8 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   checks) or opens an incident, so the owner hears of it with no office open. **Send a test**
   tries the address. By default only a loop and an incident are sent; **Notify for** adds the
   warnings.
+- A room's board opened from the lobby's board has **Back to Lobby board**, so the lobby's is one
+  press away and the dialog need not be closed first.
 
 ## 0.2.14 (2026-11-26)
 

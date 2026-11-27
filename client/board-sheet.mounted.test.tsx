@@ -148,6 +148,11 @@ const onOpenBoard = (roomId: string) => {
   opened.push(roomId);
 };
 
+let backs: number;
+const onBack = () => {
+  backs += 1;
+};
+
 const NO_TASKS: AgentTaskGroup[] = [];
 
 interface HarnessProps {
@@ -159,6 +164,8 @@ interface HarnessProps {
   /** The host's sheet has left by the time it reports a close: a phone's, or any on native. */
   sheetLeavesFirst?: boolean;
   wakesPaused?: boolean;
+  /** The board was opened from the lobby's. */
+  fromLobby?: boolean;
 }
 
 function Harness({
@@ -168,6 +175,7 @@ function Harness({
   compact = false,
   sheetLeavesFirst = false,
   wakesPaused = false,
+  fromLobby = false,
 }: HarnessProps) {
   const styles = useOfficeStyles(THEME, compact, false);
   return (
@@ -182,6 +190,7 @@ function Harness({
       styles={styles}
       onSelectAgent={onSelectAgent}
       onOpenBoard={onOpenBoard}
+      onBack={fromLobby ? onBack : undefined}
       onClose={onClose}
     />
   );
@@ -198,6 +207,7 @@ beforeEach(() => {
   closed = 0;
   selected = [];
   opened = [];
+  backs = 0;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -771,6 +781,22 @@ test("from the lobby's board a room's name opens that room's board, and an agent
   expect(selected).toEqual(["3"]);
   // The lobby's own agents are on the board that is open: its name opens nothing.
   expect(container.querySelector('[aria-label="Open Lobby board"]')).toBeNull();
+});
+
+test("a room's board opened from the lobby's has a way back to it", async () => {
+  await mount({ ...office(AT_WORK, READING), fromLobby: true });
+
+  await press("Back to Lobby board");
+  expect(backs).toBe(1);
+  expect(closed).toBe(0);
+});
+
+test("a room's board opened from elsewhere, and the lobby's own, have no way back", async () => {
+  await mount({ ...office(AT_WORK, READING) });
+  expect(container.querySelector('[aria-label="Back to Lobby board"]')).toBeNull();
+
+  await mount({ ...office(AT_WORK, READING), roomId: "lobby", fromLobby: true });
+  expect(container.querySelector('[aria-label="Back to Lobby board"]')).toBeNull();
 });
 
 test("another room's board still shows the posts form", async () => {
