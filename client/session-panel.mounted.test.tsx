@@ -23,6 +23,9 @@ vi.mock("@getpaseo/plugin/client", () => ({
   usePaseo: () => ({ agents: { ref: metadataMock.ref } }),
 }));
 
+// The renderer of ui blocks is still loading here: client/genui-card.mounted.test.tsx draws the live card.
+vi.mock("./genui-kit.js", () => ({ useGenuiKit: () => ({ status: "loading" }) }));
+
 let conversation: Conversation;
 let asked: string[];
 /** The keys of the rows drawn: `rowLabel` runs once each time a row draws. */
