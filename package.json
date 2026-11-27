@@ -28,6 +28,7 @@
     "server",
     "shared",
     "docs/office.md",
+    "vendor/genui/LICENSE",
     "!**/*.test.ts",
     "!**/*.test.tsx",
     "!**/*.test.mjs"
@@ -42,6 +43,8 @@
     "format:check": "oxfmt --check .",
     "build:world": "node scripts/build-world.mjs",
     "check:world": "node scripts/build-world.mjs --check",
+    "build:genui": "node scripts/build-genui.mjs",
+    "check:genui": "node scripts/build-genui.mjs --check",
     "build:icon": "node scripts/make-icon.mjs"
   },
   "devDependencies": {

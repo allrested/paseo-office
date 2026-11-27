@@ -14,6 +14,8 @@ const MONOSPACE = Platform.select({ ios: "Menlo", default: "monospace" });
 export const SESSION_RAIL_MIN = 264;
 
 export interface OfficeStyles {
+  /** The host theme the styles come from: a `ui` card's components read colours from it. */
+  theme: PluginTheme;
   host: ReturnType<typeof hostStyles>;
   sessions: ReturnType<typeof sessionStyles>;
   transcript: ReturnType<typeof transcriptStyles>;
@@ -641,6 +643,7 @@ export function useOfficeStyles(
       overflow: "hidden",
     };
     return {
+      theme,
       fullscreenHeader: {
         ...headerTools,
         justifyContent: "space-between",
