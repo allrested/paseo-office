@@ -21,6 +21,7 @@ import {
   type SessionGroup,
 } from "./sessions-text.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 
 interface AgentRowProps {
   now: number;
@@ -240,12 +241,13 @@ function SectionHeading({
       ? ui.errorText
       : ui.warningText;
   }
+  const t = useT();
   const headingStyle = useMemo(() => [ui.headingText, accent], [ui, accent]);
   const chevron = useMemo(() => [ui.chevron, expanded ? ui.down : ui.right], [ui, expanded]);
   const heading = (
     <>
       <Text accessibilityRole="header" style={headingStyle}>
-        {title}
+        {t(title)}
       </Text>
       <Text style={ui.headingCount}>{rows.length}</Text>
       {group === "resting" ? <View style={chevron} /> : null}
@@ -434,13 +436,14 @@ interface MetricProps {
 }
 function Metric({ group, label, tone, count, chosen, choose, styles }: MetricProps) {
   const press = useCallback(() => choose(chosen ? "all" : group), [chosen, choose, group]);
+  const t = useT();
   const ui = styles.sessions;
   const metricStyle = useMemo(() => [ui.metric, chosen && ui.selectedMetric], [ui, chosen]);
   return (
     <Pressable
       accessibilityRole="tab"
       aria-selected={chosen}
-      accessibilityLabel={`${label}, ${count}`}
+      accessibilityLabel={`${t(label)}, ${count}`}
       onPress={press}
       style={metricStyle}
     >
@@ -448,7 +451,7 @@ function Metric({ group, label, tone, count, chosen, choose, styles }: MetricPro
         <View style={styles.dot[count ? tone : "idle"]} />
         <Text style={ui.count}>{count}</Text>
       </View>
-      <Text style={ui.caption}>{label}</Text>
+      <Text style={ui.caption}>{t(label)}</Text>
     </Pressable>
   );
 }

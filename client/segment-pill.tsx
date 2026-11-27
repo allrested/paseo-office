@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 
 export interface SegmentPillProps<Value> {
   /** What a press hands to `onPress`. */
@@ -29,6 +30,7 @@ export function SegmentPill<Value>({
   styles,
 }: SegmentPillProps<Value>) {
   const press = useCallback(() => onPress(value), [onPress, value]);
+  const t = useT();
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
   const hoverOut = useCallback(() => setHovered(false), []);
@@ -41,7 +43,7 @@ export function SegmentPill<Value>({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={name}
+      accessibilityLabel={t(name)}
       aria-pressed={on}
       disabled={disabled}
       onPress={press}
@@ -52,7 +54,7 @@ export function SegmentPill<Value>({
       style={styles.segment}
     >
       {fill === null ? null : <View style={fill} />}
-      <Text style={on ? styles.segmentTextSelected : styles.segmentText}>{text ?? name}</Text>
+      <Text style={on ? styles.segmentTextSelected : styles.segmentText}>{t(text ?? name)}</Text>
     </Pressable>
   );
 }

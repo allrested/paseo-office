@@ -30,6 +30,8 @@ const deviceValues = vi.hoisted(() => ({
   >,
 }));
 
+// The app's language comes from the surface Paseo mounts a plugin in; these tests mount none.
+vi.mock("./app-locale.js", () => ({ useAppLocale: () => "en" }));
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
   useSettings: (settings: { id: string }) => {

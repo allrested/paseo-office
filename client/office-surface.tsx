@@ -58,6 +58,7 @@ import {
 import { IncidentsCard } from "./incidents-card.js";
 import { weatherEntry } from "./weather-text.js";
 import { incidentLine, incidentsEntry } from "./incidents-text.js";
+import { UiLanguage, useT } from "./ui-language.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
 import { TimelineCard } from "./timeline-card.js";
@@ -580,7 +581,6 @@ interface PanelButtonProps {
  * beside the floor, so it has no chosen state: the side area's header says what is shown.
  */
 function PanelButton({
-  label,
   caption,
   icon,
   screenId,
@@ -589,7 +589,9 @@ function PanelButton({
   count,
   onOpen,
   styles,
+  ...given
 }: PanelButtonProps) {
+  const label = useT()(given.label);
   const press = useCallback(() => onOpen(screenId), [onOpen, screenId]);
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
@@ -1636,7 +1638,11 @@ function useSurfaceLayout(deviceCompact: boolean, styles: OfficeStyles, fullscre
  */
 export function createOfficeSurface(openSettings: () => void, launcher: SidebarLauncher) {
   return function Surface(props: OfficeSurfaceProps) {
-    return <OfficeSurface {...props} onOpenSettings={openSettings} launcher={launcher} />;
+    return (
+      <UiLanguage>
+        <OfficeSurface {...props} onOpenSettings={openSettings} launcher={launcher} />
+      </UiLanguage>
+    );
   };
 }
 

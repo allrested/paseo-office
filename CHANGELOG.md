@@ -34,6 +34,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - The 2D floor: an open incident shows as a banner over the floor that opens the Incidents card,
   roster teams sit together as on the 3D floor, and a desk says when its agent has the
   provider's own sub-agents at work.
+- The office's own interface speaks Indonesian when the 3D office language is Bahasa Indonesia:
+  buttons, fields and their hints, switches, dialog titles, the column's tabs and the Sessions
+  sections. Lines put together from data, and anything without a translation yet, stay English.
 
 ## 0.2.14 (2026-11-26)
 

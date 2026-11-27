@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 interface Props<T extends string> {
   label: string;
   hint: string;
@@ -20,6 +21,7 @@ export function ChoicePills<T extends string>({
   problem,
   styles,
 }: Props<T>) {
+  const t = useT();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -46,10 +48,10 @@ export function ChoicePills<T extends string>({
   const disabled = shown === null || wanted !== null;
   return (
     <View style={styles.headerField}>
-      <Text style={styles.sheetLabel}>{label}</Text>
+      <Text style={styles.sheetLabel}>{t(label)}</Text>
       <View
         role="group"
-        aria-label={label}
+        aria-label={t(label)}
         style={disabled ? styles.notesDaysDisabled : styles.notesDays}
       >
         {options.map(({ value: plan, label: name }) => (
@@ -64,7 +66,7 @@ export function ChoicePills<T extends string>({
           />
         ))}
       </View>
-      <Text style={styles.fieldHint}>{hint}</Text>
+      <Text style={styles.fieldHint}>{t(hint)}</Text>
       {problem === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>
           {problem}

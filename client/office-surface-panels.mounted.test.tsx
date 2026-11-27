@@ -39,6 +39,8 @@ const floor = vi.hoisted(() => ({
   refuse: false,
   props: null as null | { sound?: { set(next: boolean): void } },
 }));
+// The app's language comes from the surface Paseo mounts a plugin in; these tests mount none.
+vi.mock("./app-locale.js", () => ({ useAppLocale: () => "en" }));
 vi.mock("./world/world-view.js", () => ({
   WorldView: (props: { sound?: { set(next: boolean): void } }) => {
     floor.props = props;

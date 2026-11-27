@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 
 export interface ActionButtonProps {
   label: string;
@@ -98,12 +99,13 @@ export function ActionButton({
     ({ pressed }: PressableStateCallbackType) => buttonStyle(styles, primary, dim, pressed),
     [styles, primary, dim],
   );
-  const shown = pending ? pendingLabel : label;
+  const t = useT();
+  const shown = t(pending ? pendingLabel : label);
   return (
     <View style={styles.actionButton}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={pending || name === undefined ? shown : name}
+        accessibilityLabel={pending || name === undefined ? shown : t(name)}
         disabled={dim}
         onPress={press}
         style={style}

@@ -382,6 +382,16 @@ dictionary and finally the English dictionary. It removes decorative emoji and p
 made entirely of emoji. The column, chat, settings, whiteboard and host messages keep their
 existing text. Vietnamese has its own karaoke lyrics. Thai and Indonesian use English lyrics.
 
+### The interface's language
+
+The office's own interface follows the same choice (`client/ui-language.tsx`): with Bahasa
+Indonesia chosen, or Automatic in an app whose language is Indonesian, the buttons, the fields and
+their hints, the switches, the dialogs' titles, the column's tabs and the Sessions list's
+sections are in Indonesian. The words are in `shared/ui-words-id.ts`, by the English they stand
+for, and a text with no entry there is shown in English: so are the lines the office puts
+together from data (an agent's activity, ages, counts, the notes under a card), the team chat, a
+failure's message and host notifications. Vietnamese and Thai show the English interface.
+
 ### Sound
 
 The scene's sounds are my-office's, made in the page with Web Audio, no sound file: all of them
