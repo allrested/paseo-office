@@ -10,7 +10,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent } from "../shared/contracts.js";
 import type { OfficeModel } from "../shared/model.js";
-import { NO_REPLY_IMAGES } from "./reply-send.js";
+import { NO_REPLY_FILES, NO_REPLY_IMAGES } from "./reply-send.js";
 import { SessionPane, sessionOf, type SessionPaneProps } from "./session-pane.js";
 import { useOfficeStyles } from "./styles.js";
 
@@ -79,6 +79,7 @@ type Shown = Pick<SessionPaneProps, "agent" | "room"> & {
 
 const setReply = () => undefined;
 const setReplyImages = () => undefined;
+const setReplyFiles = () => undefined;
 
 function Harness({ reply = "", ...props }: Shown) {
   const styles = useOfficeStyles(THEME, layout.compact, false);
@@ -88,6 +89,8 @@ function Harness({ reply = "", ...props }: Shown) {
     setReply,
     replyImages: NO_REPLY_IMAGES,
     setReplyImages,
+    replyFiles: NO_REPLY_FILES,
+    setReplyFiles,
     context,
     styles,
     layout,

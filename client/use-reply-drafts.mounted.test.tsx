@@ -60,3 +60,17 @@ test("a session that is no longer open loses its images with its text", async ()
   expect(drafts.images.has("a1")).toBe(false);
   expect(drafts.images.get("a2")).toEqual([image(2)]);
 });
+
+test("text files are kept by agent, leave no entry when emptied, and go with a closed session", async () => {
+  const file = (id: number) => ({ id, name: `f${id}.log`, size: 1, text: "x" });
+  await show(["a1", "a2"]);
+  await act(async () => {
+    drafts.setFiles("a1", [file(1)]);
+    drafts.setFiles("a2", [file(2)]);
+  });
+  expect(drafts.files.get("a1")).toEqual([file(1)]);
+  await act(async () => drafts.setFiles("a2", []));
+  expect(drafts.files.has("a2")).toBe(false);
+  await show(["a2"]);
+  expect(drafts.files.has("a1")).toBe(false);
+});

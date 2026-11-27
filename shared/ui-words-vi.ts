@@ -446,6 +446,14 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Choose a model.": "Chọn model.",
   "Choose a provider.": "Chọn provider.",
   "Choose a workspace.": "Chọn không gian làm việc.",
+  "Attach text files": "Đính kèm tệp văn bản",
+  "Choose text files": "Chọn tệp văn bản",
+  "Choose up to four text files.": "Chọn tối đa bốn tệp văn bản.",
+  "The attached files may add up to 100 KB of text.":
+    "Các tệp đính kèm cộng lại tối đa 100 KB văn bản.",
+  "This file is not text, so it cannot be added.": "Tệp này không phải văn bản nên không thể thêm.",
+  "The browser could not read this file.": "Trình duyệt không đọc được tệp này.",
+  "The file's text is added to the message.": "Văn bản của tệp được thêm vào tin nhắn.",
   "Choose up to four images.": "Chọn tối đa bốn ảnh.",
   "Clean up": "Dọn dẹp",
   "Cleaning up closes an idle agent, which its next prompt resumes, and stops what a closed agent left behind.":

@@ -447,6 +447,15 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Choose a model.": "Pilih model.",
   "Choose a provider.": "Pilih penyedia.",
   "Choose a workspace.": "Pilih workspace.",
+  "Attach text files": "Lampirkan berkas teks",
+  "Choose text files": "Pilih berkas teks",
+  "Choose up to four text files.": "Pilih hingga empat berkas teks.",
+  "The attached files may add up to 100 KB of text.":
+    "Berkas yang dilampirkan berjumlah paling banyak 100 KB teks.",
+  "This file is not text, so it cannot be added.":
+    "Berkas ini bukan teks, sehingga tidak dapat ditambahkan.",
+  "The browser could not read this file.": "Browser tidak dapat membaca berkas ini.",
+  "The file's text is added to the message.": "Teks berkas ditambahkan ke pesan.",
   "Choose up to four images.": "Pilih hingga empat gambar.",
   "Clean up": "Bersihkan",
   "Cleaning up closes an idle agent, which its next prompt resumes, and stops what a closed agent left behind.":

@@ -6,7 +6,7 @@ See your Paseo sessions as people at work in a shared office. Each workspace has
 
 Open **Office 3D** from the sidebar and choose **Full screen**. **Sessions** groups agents by status and shows their current activity. When a provider reports checklist progress, the row shows completed items. A bar labeled **Context** measures context-window usage.
 
-Select a row to read the conversation, reply (on the web with up to four images) or answer a permission request. On desktop and web, the **↗** beside the row opens the agent’s Paseo workspace over the floor, including files, diffs and terminals. In **Walk in**, press **E** next to the agent for the same workspace. Minimize it to keep your place, or hide the Sessions and Details sidebars for a wider view.
+Select a row to read the conversation, reply (on the web with up to four images and four text files) or answer a permission request. On desktop and web, the **↗** beside the row opens the agent’s Paseo workspace over the floor, including files, diffs and terminals. In **Walk in**, press **E** next to the agent for the same workspace. Minimize it to keep your place, or hide the Sessions and Details sidebars for a wider view.
 
 Use **Team chat** to talk to the group or address one session. Use the **Lobby board** for work that an available agent can claim. With **Agent tools** and **Wake agents** enabled, idle agents pick up unassigned tasks. Completing a linked workspace task also checks it off in the lobby. The pantry **Duty board** schedules recurring assignments on the days you choose.
 

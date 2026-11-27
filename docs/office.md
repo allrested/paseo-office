@@ -209,10 +209,15 @@ a turn runs on a host that can stop one. A reply joins the running turn (it does
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
 says so. On the web the reply box has an **Attach images** button, the chat's own: up to four
 images, each resized to a JPEG before it is sent, and they go with the reply, a running turn
-included. Images alone are a reply too, and say how many. Other files are not taken here, and a
-native client shows no button; for those choose **Open in workspace**. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
-tab switch or a dismissed sheet keeps it, the attached images with it, and a sent reply or a
-closed tab clears both; a reply that fails to send keeps them. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
+included. Images alone are a reply too, and say how many. A native client shows no
+button. The host's prompt call takes images but no file, and a plugin cannot upload one, so the
+**Attach text files** button beside it adds a text file's text to the message instead: up to four
+files and 100 KB together, each under a header naming it (`--- Attached file: name ---`, then the
+text, then `--- End of name ---`) after what was typed, and a chip shows its name and size with
+a Remove and says the text is added. A file that holds a NUL byte or is not UTF-8 text is
+refused. A PDF, an archive or any other binary stays a job for **Open in workspace**. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
+tab switch or a dismissed sheet keeps it, the attached images and text files with it, and a sent reply or a
+closed tab clears them; a reply that fails to send keeps them. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
 a plan shows its text with the request's own actions, or Approve plan and Keep planning, and a
 line of what to change that goes with a refusal; a question shows its form, the options as
 buttons and a box where another answer is taken, with Send answers once each question has one,

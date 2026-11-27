@@ -91,6 +91,7 @@ const AGENT: OfficeAgent = {
 
 /** The images the reply box starts with: the picker itself needs a browser's canvas. */
 let attached: ReplyDraft["images"];
+let attachedFiles: ReplyDraft["files"];
 const photo = (id: number): ReplyDraft["images"][number] => ({
   id,
   name: `p${id}.jpg`,
@@ -126,10 +127,11 @@ function Harness(props: Partial<SessionPanelProps>) {
   // The surface keeps the reply's text; here the harness does, for as long as it stays mounted.
   const [text, setText] = useState("");
   const [images, setImages] = useState<ReplyDraft["images"]>(attached);
+  const [files, setFiles] = useState<ReplyDraft["files"]>(attachedFiles);
   return createElement(SessionPanel, {
     agent: AGENT,
     agentId: "a1",
-    draft: { text, setText, images, setImages },
+    draft: { text, setText, images, setImages, files, setFiles },
     room: "Acme shop",
     actions: { send, respond, cancel },
     styles,
@@ -147,6 +149,7 @@ beforeEach(() => {
   asked = [];
   drawn = [];
   attached = [];
+  attachedFiles = [];
   uiCards = false;
   conversation = ready([]);
   send = vi.fn(async () => undefined);
@@ -559,6 +562,89 @@ test("a send that fails keeps its images", async () => {
   await press("Send");
   expect(alerts().join()).toContain("offline");
   expect(maybe("Remove p1.jpg")).not.toBeNull();
+});
+
+// jsdom's File has no arrayBuffer(); a browser's does.
+if (!("arrayBuffer" in File.prototype)) {
+  Object.defineProperty(File.prototype, "arrayBuffer", {
+    value(this: File) {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => resolve(reader.result as ArrayBuffer));
+        reader.addEventListener("error", () => reject(reader.error));
+        reader.readAsArrayBuffer(this);
+      });
+    },
+  });
+}
+
+/** Chooses files in the picker, as a browser hands them over. */
+async function choose(label: string, files: File[]): Promise<void> {
+  const input = labelled(label) as HTMLInputElement;
+  Object.defineProperty(input, "files", { value: files, configurable: true });
+  await act(async () => {
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    // The reader answers on a later task than act() waits for.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+}
+const textFile = (name: string, text: string) => new File([text], name, { type: "text/plain" });
+
+test("a text file is chosen, shows its name and size with a Remove, and its text goes with the reply", async () => {
+  await draw();
+  await choose("Choose text files", [textFile("app.log", "boom\nat line 3")]);
+  expect(container.textContent).toContain("app.log · 14 B");
+  expect(container.textContent).toContain("The file's text is added to the message.");
+  await type("Why?");
+  await press("Send");
+  expect(send).toHaveBeenCalledWith(
+    "a1",
+    "Why?\n\n--- Attached file: app.log ---\nboom\nat line 3\n--- End of app.log ---",
+    { activeTurnBehavior: "steer" },
+  );
+  expect(maybe("Remove app.log")).toBeNull();
+});
+
+test("a file alone makes a reply, and a Remove takes it off", async () => {
+  await draw();
+  await choose("Choose text files", [textFile("a.csv", "x,y"), textFile("b.csv", "1,2")]);
+  await press("Remove a.csv");
+  await press("Send");
+  expect(send.mock.calls[0]?.[1]).toBe("--- Attached file: b.csv ---\n1,2\n--- End of b.csv ---");
+});
+
+test("a binary file is refused and attaches nothing", async () => {
+  await draw();
+  await choose("Choose text files", [
+    new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0])], "a.pdf"),
+  ]);
+  expect(alerts()).toContain("This file is not text, so it cannot be added.");
+  expect(maybe("Remove a.pdf")).toBeNull();
+});
+
+test("more than four files, or over 100 KB, is refused", async () => {
+  await draw();
+  await choose(
+    "Choose text files",
+    Array.from({ length: 5 }, (_, i) => textFile(`f${i}.txt`, "x")),
+  );
+  expect(alerts()).toContain("Choose up to four text files.");
+  await choose("Choose text files", [textFile("big.txt", "x".repeat(100 * 1024 + 1))]);
+  expect(alerts()).toContain("The attached files may add up to 100 KB of text.");
+  expect(maybe("Remove big.txt")).toBeNull();
+});
+
+test("a send that fails keeps its files", async () => {
+  attachedFiles = [{ id: 1, name: "a.log", size: 1, text: "x" }];
+  send.mockRejectedValueOnce(new Error("offline"));
+  await draw();
+  await press("Send");
+  expect(maybe("Remove a.log")).not.toBeNull();
+});
+
+test("the file button is offered on the web only", async () => {
+  await draw({ layout: { compact: true, platform: "ios" } as never });
+  expect(maybe("Attach text files")).toBeNull();
 });
 
 test("a streamed piece redraws only the row that changed", async () => {
