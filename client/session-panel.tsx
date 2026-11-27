@@ -17,6 +17,7 @@ import { enterSends } from "./chat-text.js";
 import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
+import { AskCard } from "./ask-card.js";
 import {
   SessionButton,
   SessionDetailTabs,
@@ -248,17 +249,14 @@ function Asks({ agent, actions, canOpenWorkspace, styles }: AsksProps) {
         styles={styles}
       />
     ) : (
-      <View key={permission.id} style={styles.permission}>
-        <Text style={styles.permissionTitle}>{permission.title}</Text>
-        {permission.detail === undefined ? null : (
-          <Text style={styles.permissionDetail} numberOfLines={4}>
-            {permission.detail}
-          </Text>
-        )}
-        <Text style={styles.muted}>
-          {canOpenWorkspace ? ANSWER_IN_WORKSPACE : CANNOT_ANSWER_HERE}
-        </Text>
-      </View>
+      <AskCard
+        key={permission.id}
+        agentId={agent.id}
+        permission={permission}
+        actions={actions}
+        fallback={canOpenWorkspace ? ANSWER_IN_WORKSPACE : CANNOT_ANSWER_HERE}
+        styles={styles}
+      />
     ),
   );
 }

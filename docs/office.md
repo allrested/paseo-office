@@ -208,7 +208,12 @@ The session also shows requests with Approve and Deny, a reply box, and Stop whi
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
 says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
-tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. For a plan, a question, attachments, model changes or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
+tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
+a plan shows its text with the request's own actions, or Approve plan and Keep planning, and a
+line of what to change that goes with a refusal; a question shows its form, the options as
+buttons and a box where another answer is taken, with Send answers once each question has one,
+and Dismiss. The office reads the request from Paseo when the session shows it; a request it
+cannot read, or of a shape it does not know, says to answer it in the workspace. For attachments, model changes or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 Open sessions and the chosen tab last while the office is mounted, not across a reload.
 
