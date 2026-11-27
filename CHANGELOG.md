@@ -58,7 +58,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   moment shown, Pause and Now. Before, a replay moved only inside the card.
 - **Stop repeated failing calls**, a host setting, off by default: a request for the very call
   that just failed three times running is refused, and the agent is told why. Only where the
-  provider asks permission for the call.
+  provider asks permission for the call. Where it asks nothing, the office sends the agent a hint
+  into its turn, and stops the turn if the same call fails again, on a host that can stop a turn;
+  the webhook says when it did. A loop is seen within 5 seconds (15 with Keep watching and no
+  office open).
 - The session panel: open session tabs come back after a reload; typing `/` lists the session's
   slash commands; and **Options** shows what the session's provider lets a client change (a
   model or a mode, where it offers one) and changes it.

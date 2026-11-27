@@ -740,14 +740,30 @@ start a turn.
 **Stop repeated failing calls** (Settings, host-wide, off by default) goes one step further for
 a loop. When an agent asks permission for the very command or file edit that just failed three
 times running, the office refuses the request and tells the agent why, so the fourth try is not
-run (`repeats` in `server/watchers.ts`, on Paseo's `agent.permission.before` hook). It works only
-where the provider asks: a mode that runs calls without asking is not stopped, the loop must have
-been seen (an office open, or Keep watching on), and a tool whose request names neither a command
-nor a file is left alone.
+run (`repeats` in `server/watchers.ts`, on Paseo's `agent.permission.before` hook). It needs the
+loop to have been seen (an office open, or Keep watching on), and a tool whose request names
+neither a command nor a file is left alone.
 
-Not done here: blocking a call that needs no permission, and undoing a turn's edits. Both need
-real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo gives a plugin no
-call that reverts a session.
+Where the provider asks nothing (an auto, full access or bypass mode) there is no request to
+refuse, so with the same setting on the office acts on the loop itself, once per loop. On the
+read after the one that saw the loop, so that a refusal comes first, it sends the agent a fixed
+line into its turn, the same "steer" as Send a hint: the same call failed 3 times running with
+the same error, do not repeat it unchanged. If the very same call then fails once more than it
+had when the hint was sent (the fourth failure, or the fifth when the fourth was already there
+when the loop was first read), and the host can stop a turn, the office stops the turn and the
+card's detail ends "The office stopped its turn: the same call failed again after the hint." On
+a host that cannot stop a turn (stock Paseo 0.16) it sends the hint only, and the card stays as
+it was. Nothing is sent where the office has refused a request for the loop's call, or where the
+card was dismissed, and another call or a success ends the loop. The loop is seen by the 5
+second reads, 15 seconds with Keep watching and no office open, so the hint comes 5 to 10 seconds
+after the third failure (up to 30 seconds with Keep watching alone) and the agent may fail again
+meanwhile; with no office open and Keep watching off nothing is read, and nothing is done. The
+webhook hears of the loop once as it is raised, and again, as the same `loop` kind with the
+extended detail, if the office stopped the turn.
+
+Not done here: blocking a call before it runs where no permission is asked, and undoing a turn's
+edits. Both need real Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo
+gives a plugin no call that reverts a session.
 
 ## Plan and machine tools
 

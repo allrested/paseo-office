@@ -59,6 +59,7 @@ import { createPlanWatch } from "./server/plan-watch.js";
 import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
+import { extra } from "./shared/host-extras.js";
 import { createWatchers } from "./server/watchers.js";
 import { createNotifier } from "./server/notify.js";
 import {
@@ -275,6 +276,22 @@ export function createOfficePlugin(
   const watchers = createWatchers({
     raised: (alert, agent) => {
       tell(alertNotice(alert, agent, officeName));
+    },
+    guarding: () => loopGuard,
+    steer: (agentId, text) => {
+      if (!holder.held()) return;
+      holder
+        .require()
+        .agents.ref(agentId)
+        .send(text, { activeTurnBehavior: "steer" })
+        .catch((error: unknown) => log(`[office] loop hint to ${agentId}: ${errorMessage(error)}`));
+    },
+    stop: async (agentId) => {
+      if (!holder.held()) return false;
+      const cancel = extra(holder.require().agents.ref(agentId), "cancel");
+      if (cancel === null) return false;
+      await cancel();
+      return true;
     },
     now: () => deps.clock.now(),
     named: () => stepsNamed,

@@ -694,8 +694,10 @@ function FloorSettings({
       )}
       <Text style={styles.fieldHint}>
         Off by default. On, when an agent asks permission for the very command or file edit that
-        just failed three times running, the office refuses it and tells the agent why. It works
-        only where the agent asks: a mode that runs calls without asking is not stopped.
+        just failed three times running, the office refuses it and tells the agent why. Where the
+        agent asks nothing, the office sends it a hint, and stops its turn if the same call fails
+        again, on a host that can stop a turn. It sees a loop within 5 seconds, or 15 with Keep
+        watching and no office open.
       </Text>
       {guardProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>
