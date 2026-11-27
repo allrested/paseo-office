@@ -59,6 +59,18 @@ export function incidentsEntry(
   return { title: "Incidents", note: { text, tone: "danger" }, onOpen };
 }
 
+/**
+ * The open incidents in one line, for the 2D floor's banner: the newest by its tracker, key and
+ * title, and how many more are open. Null with none open.
+ */
+export function incidentLine(state: IncidentsState | undefined): string | null {
+  const [newest] = newestFirst(state?.open ?? []);
+  if (newest === undefined || state === undefined) return null;
+  const more = state.open.length - 1;
+  const line = `${SOURCE_LABEL[newest.source]} ${newest.key}: ${newest.title}`;
+  return more === 0 ? line : `${line} · ${more} more open`;
+}
+
 function byNewest(a: Incident, b: Incident): number {
   if (a.foundAt !== b.foundAt) return b.foundAt - a.foundAt;
   if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;

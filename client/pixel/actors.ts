@@ -50,7 +50,8 @@ export type RestPlace = "sofa" | "coffee" | "plant";
  * leaves work for it.
  */
 export function standingOf(
-  session: Pick<WorldSession, "status" | "stuck" | "waitingOn">,
+  session: Pick<WorldSession, "status" | "stuck" | "waitingOn"> &
+    Partial<Pick<WorldSession, "subs">>,
   step: ActivityStep | undefined,
   onBreak: boolean,
   meeting: boolean,
@@ -65,7 +66,9 @@ export function standingOf(
   }
   // Its own turn has ended and it waits on sub-agents: at the desk, with their icon over it.
   if (session.waitingOn !== undefined) return { place: null, icon: "subagent", screen: "code" };
-  if (step === undefined) return { place: null, icon: null, screen: "code" };
+  // The provider's own sub-agents work inside its session: their icon, while no step says more.
+  const helped = (session.subs?.length ?? 0) > 0;
+  if (step === undefined) return { place: null, icon: helped ? "subagent" : null, screen: "code" };
   // A deploy that succeeded stands at the pad, where its rocket flies.
   if (step.kind === "deploy" && step.result === "passed") {
     return { place: "pad", icon: "ship", screen: "code" };

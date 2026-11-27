@@ -11,6 +11,8 @@ export type PlaceKind = "library" | "board" | "racks" | "coffee" | "pad" | "sofa
 
 export interface PlanTeam {
   id: string;
+  /** The room whose board the team's plate opens; the team's own id when absent. */
+  board?: string;
   name: string;
   /** The agents with a desk, in the order they sit. */
   members: readonly string[];
@@ -31,6 +33,8 @@ export interface PlanDesk {
 /** A team's name plate over its desks. */
 export interface PlanTeamPlate {
   id: string;
+  /** The room whose board a press on the plate opens. */
+  board: string;
   name: string;
   count: number;
   x: number;
@@ -164,6 +168,7 @@ export function planFloor(teams: readonly PlanTeam[], widthPx: number): FloorPla
     if (team.members.length === 0) continue;
     plates.push({
       id: team.id,
+      board: team.board ?? team.id,
       name: team.name,
       count: team.members.length,
       x: desksLeft,

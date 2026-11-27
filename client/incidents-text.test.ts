@@ -1,6 +1,12 @@
 import { expect, test } from "vitest";
 import type { Incident, IncidentsState } from "../shared/contracts.js";
-import { incidentProblems, incidentRows, incidentsEntry, newestFirst } from "./incidents-text.js";
+import {
+  incidentLine,
+  incidentProblems,
+  incidentRows,
+  incidentsEntry,
+  newestFirst,
+} from "./incidents-text.js";
 
 const NOW = Date.parse("2026-11-17T09:00:00Z");
 const quiet: IncidentsState = {
@@ -119,4 +125,13 @@ test("each tracker's problem is a line of its own", () => {
   expect(
     incidentProblems({ ...quiet, problems: { jira: "401 Unauthorized", sentry: "Timed out" } }),
   ).toEqual(["Jira: 401 Unauthorized", "Sentry: Timed out"]);
+});
+
+test("the 2D floor's banner names the newest incident and how many more are open", () => {
+  expect(incidentLine(undefined)).toBeNull();
+  expect(incidentLine({ ...quiet, open: [] })).toBeNull();
+  expect(incidentLine({ ...quiet, open: [bug] })).toBe("Jira SHOP-12: Checkout fails on Safari");
+  expect(incidentLine({ ...quiet, open: [old, bug, issue] })).toBe(
+    "Jira SHOP-12: Checkout fails on Safari · 2 more open",
+  );
 });

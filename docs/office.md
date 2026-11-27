@@ -450,7 +450,14 @@ the Host card. A person away from the desk can be tapped too, but only the desk 
 keyboard and a screen reader, and it says what its agent is at. A janitor stands by a cart in the
 lounge, and the two open the Janitor card; when a context empties, the janitor walks to that desk
 and sweeps. With reduced motion nobody walks, nobody takes a break or goes to the stand-up or the
-lounge, and the janitor stays at the cart. The 2D floor has no incident alarm.
+lounge, and the janitor stays at the cart.
+
+The 2D floor seats the teams the 3D floor seats (`client/pixel/teams.ts`): a room, or with the
+roster on a roster team, whose teammates may work in several rooms; such a team's plate opens the
+board of its first member's room. While an incident is open a red banner over the floor names the
+newest and how many more are open, and a press opens the Incidents card: the 2D floor's alarm,
+with no light and no siren. A desk whose agent has the provider's own sub-agents at work shows
+their icon until a step says more, and its name says how many.
 
 ## Boards and wakes
 

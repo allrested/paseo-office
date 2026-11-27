@@ -31,6 +31,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - A plan and a question are answered in the office's session panel: the plan's text with its
   actions and a line of what to change, the question as its form. Before, both sent you to the
   workspace.
+- The 2D floor: an open incident shows as a banner over the floor that opens the Incidents card,
+  roster teams sit together as on the 3D floor, and a desk says when its agent has the
+  provider's own sub-agents at work.
 
 ## 0.2.14 (2026-11-26)
 

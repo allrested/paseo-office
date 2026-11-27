@@ -449,3 +449,17 @@ describe("the janitor's round", () => {
     expect(visitsSwept(visits, "z")).toBe(visits);
   });
 });
+
+it("an agent at work with the provider's own sub-agents shows their icon until a step says more", () => {
+  const helped = { status: "work" as const, stuck: false, subs: [{ id: "s1", type: "Explore" }] };
+  expect(standingOf(helped, undefined, false, false)).toEqual({
+    place: null,
+    icon: "subagent",
+    screen: "code",
+  });
+  expect(standingOf({ ...helped, subs: [] }, undefined, false, false).icon).toBeNull();
+  // A step is where the agent itself is at.
+  expect(standingOf(helped, { kind: "command", key: "c1" }, false, false).icon).not.toBe(
+    "subagent",
+  );
+});
