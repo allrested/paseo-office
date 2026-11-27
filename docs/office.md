@@ -593,6 +593,14 @@ the range at 30, 60 or 120 times the clock, and each lane says what its agent wa
 ("editing", "running tests", "waiting for you"). **Now** ends the replay. The replay is in the card
 only: the 3D floor keeps showing the present.
 
+**Replay on the floor**, beside it while the 3D floor is showing, closes the card and replays the
+range there (`client/floor-replay.ts`, `client/use-floor-replay.tsx`): the people sit, work, wait
+and stop as the timeline saw them, each at the kind of thing it was at for a minute after the
+call was seen, and a bar over the floor has the moment shown, Pause and **Now**. It ends by itself
+at the range's end. An agent the office was not watching at a moment is off the floor then, and
+one archived since cannot be drawn. The lists, the boards and the cards stay today's, and so do
+the staff scenes, the weather and the sound, which follow the device's clock.
+
 **This week** adds the last seven days up: time at work, turns started, edits, commands, cost where
 the provider reports one, the busiest team, and a bar for each 24 hours.
 

@@ -37,6 +37,8 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - The office's own interface speaks Indonesian when the 3D office language is Bahasa Indonesia:
   buttons, fields and their hints, switches, dialog titles, the column's tabs and the Sessions
   sections. Lines put together from data, and anything without a translation yet, stay English.
+- Timeline: **Replay on the floor** replays the chosen range on the 3D floor, with a bar for the
+  moment shown, Pause and Now. Before, a replay moved only inside the card.
 
 ## 0.2.14 (2026-11-26)
 
