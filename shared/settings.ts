@@ -228,7 +228,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * timeline, the vault and what the office notices have no gaps. `loopGuard` on has the office
  * refuse a request for the call an agent just failed three times running. `notifyUrl` is the webhook the
  * office posts to when it raises an alert or opens an incident; empty posts nothing.
- * `notifyLevel` is what is posted: `danger` a loop and an incident only, `warning` the rest too.
+ * `notifyLevel` is what is posted: `danger` a loop, an incident, a plan limit used up and memory nearly full only, `warning` the rest too.
  * `jiraTypes` are the comma separated Jira issue types that ring, Bug when empty. `jiraProjects`
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`

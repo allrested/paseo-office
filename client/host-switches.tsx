@@ -676,7 +676,8 @@ function FloorSettings({
       <Text style={styles.fieldHint}>
         Off by default: the office reads the agents only while it is open on some device. On, it
         goes on reading every 15 seconds with no office open, so the Timeline, This week, the
-        History vault and what the office notices have no gaps.
+        History vault and what the office notices have no gaps. It also reads the plan limits every
+        5 minutes and the memory of the host every minute, to tell the webhook.
       </Text>
       {watchingProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>

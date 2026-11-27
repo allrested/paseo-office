@@ -55,11 +55,21 @@ import {
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
+import { createPlanWatch } from "./server/plan-watch.js";
+import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
 import { createWatchers } from "./server/watchers.js";
 import { createNotifier } from "./server/notify.js";
-import { alertNotice, incidentNotice, testNotice, wanted, type Notice } from "./shared/notify.js";
+import {
+  alertNotice,
+  hostNotice,
+  incidentNotice,
+  planNotice,
+  testNotice,
+  wanted,
+  type Notice,
+} from "./shared/notify.js";
 import type { NotifyLevel } from "./shared/settings.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
 import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
@@ -351,6 +361,10 @@ export function createOfficePlugin(
   });
 
   const samples: HostSample[] = [];
+  // Told only while the owner keeps the office watching; a reading with no office open is one too.
+  const hostAlert = createHostAlert((percent) =>
+    tell(hostNotice(percent, deps.clock.now(), officeName)),
+  );
   const reader = createMachineReader({
     procRoot: deps.machine.procRoot,
     cgroupRoot: deps.machine.cgroupRoot,
@@ -360,9 +374,24 @@ export function createOfficePlugin(
   const machine = createMachineWatch({
     async read() {
       const reading = await reader.read();
-      if (reading) recordSample(samples, reading);
+      if (reading) {
+        recordSample(samples, reading);
+        if (keepWatching) hostAlert.observe(reading);
+      }
       return reading;
     },
+    timers: deps.clock,
+    log,
+  });
+  // The providers whose plan the owner left out; empty until the settings are read.
+  let planHidden: ReadonlySet<string> = new Set();
+  const planWatch = createPlanWatch({
+    async read() {
+      return projectPlanUsage((await holder.require().providers.listUsage()).providers);
+    },
+    counted: (provider) => !planHidden.has(provider),
+    raised: ({ provider, window }) =>
+      tell(planNotice(provider.name, window.label, window.usedPct, deps.clock.now(), officeName)),
     timers: deps.clock,
     log,
   });
@@ -576,7 +605,12 @@ export function createOfficePlugin(
   // Whether a request for a call that just failed three times running is refused; off until the settings say.
   let loopGuard = false;
   // The directory needs the Paseo API, which the first handler or hook brings.
-  const followWatching = () => hub.keepOpen(keepWatching && holder.held());
+  const followWatching = () => {
+    const on = keepWatching && holder.held();
+    hub.keepOpen(on);
+    machine.keep(on);
+    planWatch.keep(on);
+  };
   void holder.wait().then(followWatching);
   // The roster the names follow; off until the settings are read.
   let roster: Roster = NO_ROSTER;
@@ -620,6 +654,7 @@ export function createOfficePlugin(
     chatLines = chatWords(state.values.chatCulture);
     pinnedNotes = state.values.pinnedNotes;
     keepWatching = state.values.keepWatching;
+    planHidden = new Set(state.values.planHidden);
     loopGuard = state.values.loopGuard;
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
@@ -1106,6 +1141,8 @@ export function createOfficePlugin(
     await deps.timelineStore?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
+    planWatch.keep(false);
+    machine.keep(false);
     machine.stop();
     await ssh.stop();
     await office.stop();
