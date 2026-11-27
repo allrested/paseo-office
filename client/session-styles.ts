@@ -151,6 +151,11 @@ export function sessionStyles(colors: PluginTheme["colors"], touch: boolean) {
       color: colors.foreground,
     },
     deskComposer: { ...rail, gap: 6, paddingHorizontal: touch ? 12 : 16, paddingVertical: 10 },
+    // As tall as what they hold: the reply box's column gives the conversation the rest.
+    options: { gap: 6 },
+    option: { gap: 4 },
+    optionList: { flexGrow: 0, maxHeight: 220 },
+    optionListBody: { gap: 10 },
     replyShell: {
       flexDirection: "row",
       alignItems: "flex-end",

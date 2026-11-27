@@ -57,9 +57,19 @@ interface FieldsProps {
   view: ReturnType<typeof useViewChoice>;
   street: ReturnType<typeof useOfficeScene>;
   sound: ReturnType<typeof useSoundSwitch>;
+  /** In a dialog: the sections scroll inside its body. */
+  bounded?: boolean;
 }
 
-function OfficeSettingsFields({ office, styles, actions, view, street, sound }: FieldsProps) {
+function OfficeSettingsFields({
+  office,
+  styles,
+  actions,
+  view,
+  street,
+  sound,
+  bounded,
+}: FieldsProps) {
   const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
   // Frozen data says nothing of the wakes: the switch is then not usable.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
@@ -67,6 +77,7 @@ function OfficeSettingsFields({ office, styles, actions, view, street, sound }: 
   return (
     <OfficeBrandContext.Provider value={office.state.brand}>
       <HostSwitches
+        bounded={bounded}
         rosterHolders={rosterHolders}
         language={language}
         wake={office.loaded && live ? office.state.wake : null}
@@ -108,8 +119,8 @@ export function FullscreenSettings({
 }) {
   return (
     <OfficeModal title="Office settings" size="settings" open={open} onOpenChange={onClose}>
-      <OfficeModal.Content scrollable={false} contentContainerStyle={settingsLayout.flush}>
-        <OfficeSettingsFields {...fields} />
+      <OfficeModal.Content scrollable={false} contentContainerStyle={settingsLayout.body}>
+        <OfficeSettingsFields {...fields} bounded />
       </OfficeModal.Content>
     </OfficeModal>
   );
