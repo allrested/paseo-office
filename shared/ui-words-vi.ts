@@ -477,6 +477,8 @@ export const UI_VI: Readonly<Record<string, string>> = {
     "Đã dừng đọc chính tả. Hãy kiểm tra micro rồi thử lại.",
   "Drag to resize the column": "Kéo để đổi độ rộng cột",
   "Drawn in the workspace chat.": "Được vẽ trong chat của không gian làm việc.",
+  "Could not draw this card here.": "Không thể vẽ thẻ này tại đây.",
+  Copied: "Đã sao chép",
   "Runs here in a sandboxed frame with no network.":
     "Chạy tại đây trong khung sandbox, không có mạng.",
   "Exit full screen": "Thoát toàn màn hình",

@@ -38,6 +38,7 @@ export function uiCardTitle(piece: { language: "ui" | "app"; title: string | nul
 export const UI_CARD_HINT = "Drawn in the workspace chat.";
 export const UI_APP_HINT = "Runs here in a sandboxed frame with no network.";
 export const UI_CARD_WRITING = "Being written...";
+export const UI_CARD_FAILED = "Could not draw this card here.";
 
 export const LOADING = "Loading...";
 export const NOTHING_SAID = "Nothing said yet.";

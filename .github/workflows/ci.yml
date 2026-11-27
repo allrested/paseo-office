@@ -31,6 +31,8 @@ jobs:
       - run: npm run format:check
       - name: The embedded scene is what the build makes
         run: npm run check:world
+      - name: The embedded card renderer is what the build makes
+        run: npm run check:genui
       - run: npm test
       - name: The upstream report's tests
         run: npm run test:scripts

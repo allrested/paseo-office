@@ -240,3 +240,47 @@ upstream added to its start-up list may need a stand-in or a place in `DENY`.
 The city, its population, staff outings, countryside and beach come from the pinned checkout. The alternate landscapes use upstream's `countryside.js`, `beach.js` and `shared.js`. The importer skips the eight chain-specific shop modules and every logo image. Shops use generic fittings and signs drawn in `world/backdrops/paseo-signs.js`. The ATM uses a plain square. Street audio waits for the street and sound switches. The optional Kenney Car Kit (CC0) is recorded in the manifest. The server sends it separately through `office.world.street`.
 
 After an upstream update run the importer, run `node scripts/genericise-street.mjs --check`, review changes in the hand-edited shops, ATM, traffic, audio and outings modules, and rebuild both generated files with `npm run build:world`.
+
+## genui
+
+The Generative UI plugin's renderer, which draws a session's `ui` blocks in the office's chat
+(`client/genui-card.tsx`). Unlike my-office it is bundled for the client, not the 3D frame:
+`scripts/build-genui.mjs` writes `client/genui-kit.generated.ts`.
+
+- Source: https://github.com/anh-chu/paseo-plugin-genui at `cd50b2a6b86583eb48915a17d919fd319f0c30ec`
+  (v0.3.3), itself ported from https://github.com/ComicBit/bb-plugin-genui.
+- Licence: Apache License 2.0 (`genui/LICENSE`, upstream's file). Upstream has no NOTICE file, so
+  there is none to carry. The licence is named in the repository's `LICENSE` and in the bundle's
+  banner.
+- `genui/MANIFEST.json` records the commit and a sha256 for each of the 69 copied files: the parser
+  and evaluator (`shared/core`), the logic and diagram helpers (`shared/logic`, `shared/diagram`),
+  the renderer and its components (`client/render.tsx`, `client/components/`), and the few client
+  files they import. Upstream's tests, gallery, server, `live-ui.tsx` and `loaders.ts` are not
+  copied.
+
+### Changes made to upstream (Apache-2.0 section 4(b))
+
+No copied file is edited. The build changes how they are used:
+
+- `genui/loaders.ts` is the office's stand-in for upstream's `client/loaders.ts`, which reads files,
+  searches the web and calls the plugin's RPCs. Each loader answers "not available"; the office
+  replaces the components that use them with a note before they draw (`shared/genui-placeholders.ts`).
+- `genui/entry.tsx` is the office's entry point: the parser, evaluator, renderer, runtime context and
+  reply composer, and nothing else.
+- The build rewrites imports of `@getpaseo/plugin/client/react-native` (a deprecated entry that only
+  re-exports `client/ui`) to `@getpaseo/plugin/client/ui`, and minifies.
+- `client/genui-card.tsx` is the office's runtime for the components (state, reply queue, sending
+  a reply, opening a link, copying): written for the office, not taken from `live-ui.tsx`.
+
+### Taking a newer upstream
+
+```
+git clone https://github.com/anh-chu/paseo-plugin-genui /tmp/ref-genui
+node scripts/genui-upstream-report.mjs --upstream /tmp/ref-genui
+```
+
+The report names the vendored files that changed or went. Copy them into `genui/` unchanged, add any
+file the build says is missing, update `MANIFEST.json` (the commit, the version and each file's
+sha256), check that `loaders.ts` has every export upstream's loaders give the components and that
+`shared/genui-placeholders.ts` names every component that calls the plugin's RPCs, then run
+`npm run build:genui` and `npm test`.

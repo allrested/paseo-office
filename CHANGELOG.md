@@ -14,6 +14,14 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   one, so the file's text is added to the message under a header naming it. Up to four files and
   100 KB together; a file that is not UTF-8 text (a PDF, an archive) is refused. A chip shows the
   name and size with a Remove, and the files are kept and cleared as the images are.
+- **Gen-UI cards** draw a complete `ui` block live in a session's chat, with the Generative UI
+  plugin's own parser and components, vendored (Apache-2.0, pinned commit) with a script that
+  reports when upstream moves. Before, it showed only the block's title. Buttons that send a reply
+  send it to that agent; components that need the plugin's daemon (`Changes`, `Commits`, `Map`,
+  `Load` and others) show a note instead; a block still being written or one that does not parse
+  keeps the title card, with the first error. The renderer is about 400 KB (120 KB gzipped) and
+  the host's build puts it in the plugin's one file, so installs grow by that much. The spec
+  language has no way to run code.
 - On a phone, **Office settings** opened from the 3D view scrolls: the four section tabs stay at
   the top and the chosen section scrolls under them, so Branding and every field below it can be
   reached. Before, the sheet did not scroll and what did not fit was cut off. The tabs show

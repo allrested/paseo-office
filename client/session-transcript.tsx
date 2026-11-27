@@ -1,15 +1,17 @@
 import { type Appearance, AVATARS, shirtColor } from "../shared/appearance.js";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useContext, useMemo, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./text.js";
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
 import { readLobbyAssignment } from "../shared/lobby-assignment.js";
 import { APP_FRAME_SANDBOX, appPage } from "../shared/app-page.js";
+import { GenuiBlock, GenuiSessionContext } from "./genui-card.js";
 import { splitUiBlocks, type UiPiece } from "../shared/ui-blocks.js";
 import type { ConversationRow } from "./conversation-model.js";
 import {
   NOTHING_SAID,
   UI_APP_HINT,
+  UI_CARD_FAILED,
   UI_CARD_HINT,
   UI_CARD_WRITING,
   rowLabel,
@@ -37,23 +39,23 @@ const APP_FRAME_STYLE = {
   borderRadius: 6,
 } as const;
 
-/** Where a reply holds a block the Generative UI plugin draws in Paseo's own chat. */
-function UiCard({
+/** The card that names a block and says where it is drawn instead, or why it is not drawn here. */
+function TitleCard({
   piece,
+  hint,
+  reason,
+  page,
   styles,
 }: {
   piece: Extract<UiPiece, { kind: "block" }>;
+  hint: string;
+  reason?: string | null;
+  page?: string | null;
   styles: OfficeStyles;
 }) {
   const s = styles.transcript;
-  // Only a browser can open a frame; a phone's page may run no script, so it keeps the title.
-  const live = piece.language === "app" && piece.complete && piece.source !== undefined;
-  const page = live && Platform.OS === "web" ? appPage(piece.source ?? "") : null;
-  let hint = UI_APP_HINT;
-  if (!piece.complete) hint = UI_CARD_WRITING;
-  else if (page === null) hint = UI_CARD_HINT;
   return (
-    <View style={page === null ? s.uiCard : s.uiAppCard}>
+    <View style={page ? s.uiAppCard : s.uiCard}>
       <View style={s.uiCardHead}>
         <Icon
           name={piece.language === "app" ? "AppWindow" : "LayoutGrid"}
@@ -65,9 +67,10 @@ function UiCard({
             {uiCardTitle(piece)}
           </Text>
           <Text style={s.uiCardHint}>{hint}</Text>
+          {reason ? <Text style={s.uiCardHint}>{reason}</Text> : null}
         </View>
       </View>
-      {page !== null && (
+      {page ? (
         <iframe
           title={uiCardTitle(piece)}
           sandbox={APP_FRAME_SANDBOX}
@@ -75,18 +78,68 @@ function UiCard({
           srcDoc={page}
           style={APP_FRAME_STYLE}
         />
-      )}
+      ) : null}
     </View>
   );
+}
+
+/**
+ * Where a reply holds a block the Generative UI plugin draws in Paseo's own chat. A complete `ui`
+ * block is drawn here by the vendored renderer; it keeps the title card while that loads and when
+ * it cannot parse. An `app` block runs in a sandboxed frame in a browser.
+ */
+function UiCard({
+  piece,
+  blockKey,
+  styles,
+}: {
+  piece: Extract<UiPiece, { kind: "block" }>;
+  blockKey: string;
+  styles: OfficeStyles;
+}) {
+  const session = useContext(GenuiSessionContext);
+  const renderTitle = useCallback(
+    (reason: string | null) => (
+      <TitleCard
+        piece={piece}
+        hint={reason === null ? UI_CARD_HINT : UI_CARD_FAILED}
+        reason={reason}
+        styles={styles}
+      />
+    ),
+    [piece, styles],
+  );
+  if (piece.language === "ui" && piece.complete) {
+    const key = `office:${session?.agentId ?? ""}:${blockKey}`;
+    return (
+      <GenuiBlock
+        source={piece.source}
+        blockKey={key}
+        theme={styles.theme}
+        fallback={renderTitle}
+      />
+    );
+  }
+  // Only a browser can open a frame; a phone's page may run no script, so it keeps the title.
+  const page =
+    piece.language === "app" && piece.complete && Platform.OS === "web"
+      ? appPage(piece.source)
+      : null;
+  let hint = UI_APP_HINT;
+  if (!piece.complete) hint = UI_CARD_WRITING;
+  else if (page === null) hint = UI_CARD_HINT;
+  return <TitleCard piece={piece} hint={hint} page={page} styles={styles} />;
 }
 
 /** A reply's text; with `uiCards`, its `ui` and `app` blocks as cards between the prose. */
 function Reply({
   text,
+  rowKey,
   uiCards,
   styles,
 }: {
   text: string;
+  rowKey: string;
   uiCards: boolean;
   styles: OfficeStyles;
 }) {
@@ -101,7 +154,7 @@ function Reply({
           <Markdown key={index}>{piece.text}</Markdown>
         ) : (
           // eslint-disable-next-line react/no-array-index-key
-          <UiCard key={index} piece={piece} styles={styles} />
+          <UiCard key={index} piece={piece} blockKey={`${rowKey}:${index}`} styles={styles} />
         ),
       )}
     </>
@@ -237,7 +290,7 @@ const Row = memo(function Row({ row, name, appearance, uiCards, styles }: RowPro
             </View>
             <Text style={s.name}>{name}</Text>
           </View>
-          <Reply text={row.text} uiCards={uiCards === true} styles={styles} />
+          <Reply text={row.text} rowKey={row.key} uiCards={uiCards === true} styles={styles} />
         </View>
       );
   }

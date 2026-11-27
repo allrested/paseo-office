@@ -466,6 +466,8 @@ export const UI_TH: Readonly<Record<string, string>> = {
     "หยุดการพูดแล้ว ตรวจสอบไมโครโฟนแล้วลองอีกครั้ง",
   "Drag to resize the column": "ลากเพื่อปรับความกว้างของคอลัมน์",
   "Drawn in the workspace chat.": "แสดงในแชตของพื้นที่ทำงาน",
+  "Could not draw this card here.": "ไม่สามารถแสดงการ์ดนี้ที่นี่ได้",
+  Copied: "คัดลอกแล้ว",
   "Runs here in a sandboxed frame with no network.": "ทำงานที่นี่ในเฟรมแบบแซนด์บอกซ์ที่ไม่มีเครือข่าย",
   "Exit full screen": "ออกจากโหมดเต็มหน้าจอ",
   "Expand all": "ขยายทั้งหมด",

@@ -30,3 +30,10 @@ Third-party software in this repository keeps its own licence:
 - vendor/my-office/three/ is three.js, MIT, Copyright © 2010-2023 three.js
   authors. Its licence is vendor/my-office/three/LICENSE.
 - server/world.generated.ts is built from both and carries both notices.
+- vendor/genui/ is the renderer of the Generative UI plugin
+  (https://github.com/anh-chu/paseo-plugin-genui, ported from
+  https://github.com/ComicBit/bb-plugin-genui), Apache License 2.0. Its licence is
+  vendor/genui/LICENSE, which is the licence text; the upstream repository has no NOTICE file.
+  Upstream's files are copied unchanged; the changes made to them are stated in
+  vendor/SOURCES.md and in the banner of client/genui-kit.generated.ts, which is built from
+  vendor/genui/ and carries that notice.

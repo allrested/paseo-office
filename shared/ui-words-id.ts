@@ -479,6 +479,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Dikte berhenti. Periksa mikrofon Anda lalu coba lagi.",
   "Drag to resize the column": "Seret untuk mengubah lebar kolom",
   "Drawn in the workspace chat.": "Digambar di obrolan workspace.",
+  "Could not draw this card here.": "Kartu ini tidak dapat digambar di sini.",
+  Copied: "Disalin",
   "Runs here in a sandboxed frame with no network.":
     "Berjalan di sini dalam bingkai terisolasi tanpa jaringan.",
   "Exit full screen": "Keluar dari layar penuh",
