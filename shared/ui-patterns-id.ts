@@ -11,11 +11,9 @@ import { UI_ID } from "./ui-words-id.js";
  */
 type Rule = readonly [RegExp, (...parts: string[]) => string];
 
-/** A word or a phrase by its entry in the dictionary, else as it is. */
-const word = (text: string) => UI_ID[text] ?? text;
 /** A label as it reads after "Tidak dapat": its Indonesian, in lower case. */
 const lower = (text: string) => {
-  const label = word(`${text.charAt(0).toUpperCase()}${text.slice(1)}`);
+  const label = translatePattern(`${text.charAt(0).toUpperCase()}${text.slice(1)}`);
   return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 };
 
@@ -74,6 +72,139 @@ const RULES: readonly Rule[] = [
   [/^(\d+) process(?:es)? · resident memory$/, (n) => `${n} proses · memori resident`],
   [/^([\d.]+ ?[KMGT]?B) free$/, (size) => `${size} kosong`],
   [/^(\d[\d hdmin]*) at work$/, (time) => `${translatePattern(time)} bekerja`],
+  [/^(.+) does not report its context$/, (name) => `${name} tidak melaporkan konteksnya`],
+  [
+    /^(.+) has no mode "(.+)": the writer starts in (.+)\.$/,
+    (provider, mode, used) =>
+      `${provider} tidak punya mode "${mode}": penulis mulai dalam ${used}.`,
+  ],
+  [
+    /^(.+) writes it and answers on the team's board\.$/,
+    (name) => `${name} menulisnya dan menjawab di papan tim.`,
+  ],
+  [/^(\d+) agents? left something running$/, (n) => `${n} agen meninggalkan sesuatu yang berjalan`],
+  [
+    /^(\d+) skills? on this host, (\d+) in the teams' workspaces\.$/,
+    (host, teams) => `${host} skill di host ini, ${teams} di workspace tim.`,
+  ],
+  [/^(\d+) lines, read at (.+)$/, (n, time) => `${n} baris, dibaca pukul ${time}`],
+  [/^(.+); sub-agents: (.+)$/, (lead, subs) => `${lead}; sub-agen: ${subs}`],
+  [/^(.+) agents are at a skill now\.$/, (who) => `${who} agen sedang memakai skill.`],
+  [/^(.+) is at a skill now\.$/, (who) => `${who} sedang memakai skill.`],
+  [
+    /^(.+) connection from the host's environment; a saved one replaces it$/,
+    (name) => `Koneksi ${name} dari environment host; koneksi tersimpan akan menggantikannya`,
+  ],
+  [/^(.+) connection saved on this host$/, (name) => `Koneksi ${name} tersimpan di host ini`],
+  [/^No (.+) connection on this host$/, (name) => `Belum ada koneksi ${name} di host ini`],
+  [
+    /^(\d+) open, none waiting for a review$/,
+    (n) => `${n} terbuka, tidak ada yang menunggu tinjauan`,
+  ],
+  [/^(\d+) open, (\d+) to review$/, (n, m) => `${n} terbuka, ${m} untuk ditinjau`],
+  [/^(.+) has conflicts$/, (ref) => `${ref} memiliki konflik`],
+  [
+    /^(.+) is idle and gets the request on the team's board\.$/,
+    (name) => `${name} sedang menganggur dan menerima permintaan di papan tim.`,
+  ],
+  [/^(.+): show less$/, (name) => `${name}: tampilkan lebih sedikit`],
+  [/^(.+): show all of what it is for$/, (name) => `${name}: tampilkan seluruh kegunaannya`],
+  [/^(.+) is still starting\.$/, (name) => `${name} masih memulai.`],
+  [
+    /^(.+): (.+) in the last 30 minutes$/,
+    (title, range) => `${title}: ${range} dalam 30 menit terakhir`,
+  ],
+  [/^(\d+) times the clock$/, (n) => `${n} kali kecepatan jam`],
+  [
+    /^1 agent has no desk on this floor\. The list shows everyone\.$/,
+    () => "1 agen tidak punya meja di lantai ini. Daftar menampilkan semuanya.",
+  ],
+  [
+    /^(\d+) agents have no desk on this floor\. The list shows everyone\.$/,
+    (n) => `${n} agen tidak punya meja di lantai ini. Daftar menampilkan semuanya.`,
+  ],
+  [
+    /^1, 5 and 15 min · (\d+) CPUs available to Paseo$/,
+    (n) => `1, 5, dan 15 mnt · ${n} CPU tersedia untuk Paseo`,
+  ],
+  [
+    /^Asked (\d+) agents?\. Each answers on its team's board, and its note shows here\.$/,
+    (n) =>
+      `${n} agen ditanya. Masing-masing menjawab di papan timnya, dan catatannya tampil di sini.`,
+  ],
+  [/^Changes requested on (.+)$/, (ref) => `Perubahan diminta pada ${ref}`],
+  [/^Checks fail on (.+)$/, (ref) => `Pemeriksaan gagal pada ${ref}`],
+  [/^Context (\d+)% full, (.+)$/, (n, rest) => `Konteks ${n}% penuh, ${translatePattern(rest)}`],
+  [/^(.+) of (.+) tokens$/, (used, max) => `${used} dari ${max} token`],
+  [/^Details read at (.+)$/, (time) => `Detail dibaca pukul ${time}`],
+  [
+    /^Host resources\. Plan limit: (.+)$/,
+    (plan) => `Sumber daya host. Batas paket: ${translatePattern(plan)}`,
+  ],
+  [
+    /^Last answer (.+): (.+)\.$/,
+    (age, what) => `Jawaban terakhir ${translatePattern(age)}: ${what}.`,
+  ],
+  [/^Log of (.+)$/, (name) => `Log ${name}`],
+  [/^Needs you, (\d+)$/, (n) => `Butuh Anda, ${n}`],
+  [
+    /^No idle agent, so nobody can be asked, in (.+)\.$/,
+    (teams) => `Tidak ada agen yang menganggur, jadi tidak ada yang bisa diminta, di ${teams}.`,
+  ],
+  [/^No output yet, read at (.+)$/, (time) => `Belum ada keluaran, dibaca pukul ${time}`],
+  [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `${name} habis`],
+  [/^resets in (.+)$/, (time) => `direset dalam ${translatePattern(time)}`],
+  [/^Owed from (.+?)\. (.+)$/, (day, state) => `Terutang sejak ${day}. ${translatePattern(state)}`],
+  [/^The conversation cannot be read: (.+)$/, (why) => `Percakapan tidak dapat dibaca: ${why}`],
+  [/^The report cannot be read: (.+)$/, (why) => `Laporan tidak dapat dibaca: ${why}`],
+  [/^The vault cannot be searched: (.+)$/, (why) => `Brankas tidak dapat dicari: ${why}`],
+  [/^The writer could not start: (.+)$/, (why) => `Penulis tidak dapat dimulai: ${why}`],
+  [
+    /^The writer's modes cannot be listed: (.+)$/,
+    (why) => `Mode penulis tidak dapat didaftar: ${why}`,
+  ],
+  [/^The host has no folder for (.+)\.$/, (teams) => `Host tidak punya folder untuk ${teams}.`],
+  [
+    /^The newest (\d+), read at (.+)\. The terminal has (\d+) more above\.$/,
+    (n, time, more) =>
+      `${n} terbaru, dibaca pukul ${time}. Terminal punya ${more} lagi di atasnya.`,
+  ],
+  [/^This message has (\d+) tasks\.$/, (n) => `Pesan ini berisi ${n} tugas.`],
+  [
+    /^Unable to clean up (\d+) of (\d+)\. The first reason: (.+)$/,
+    (failed, all, why) => `Tidak dapat membersihkan ${failed} dari ${all}. Alasan pertama: ${why}`,
+  ],
+  [/^What a skill of (.+) should teach$/, (team) => `Apa yang perlu diajarkan skill untuk ${team}`],
+  [/^Workspace (.+) · Rename team$/, (name) => `Workspace ${name} · Ganti nama tim`],
+  [/^Your answer to (.+)$/, (header) => `Jawaban Anda untuk ${header}`],
+  [/^ended with an error \(exit (\d+)\)$/, (code) => `berakhir dengan galat (exit ${code})`],
+  [/^from lobby task (.+)$/, (id) => `dari tugas lobi ${id}`],
+  [/^on (.+)'s board$/, (name) => `di papan ${name}`],
+  [
+    /^(.+) text could not be loaded; the scene is in English$/,
+    (language) => `Teks ${language} tidak dapat dimuat; adegan dalam bahasa Inggris`,
+  ],
+  [/^The host sent no (.+) text$/, (language) => `Host tidak mengirim teks ${language}`],
+  [/^Started (.+)$/, (title) => `Memulai ${title}`],
+  [/^Delete task: (.+)$/, (text) => `Hapus tugas: ${text}`],
+  [/^Save the (.+) setting$/, (name) => `Simpan pengaturan ${translatePattern(name)}`],
+  [/^Start an agent to analyze (.+)$/, (key) => `Mulai agen untuk menganalisis ${key}`],
+  [/^Add (.+) to the lobby board$/, (key) => `Tambahkan ${key} ke papan lobi`],
+  [
+    /^For the 3D view\. Company floor has (\d+) desks, Cozy room (\d+), and Headquarters (\d+)\. Headquarters may draw more slowly on a phone\. Changing it starts the 3D view again\.$/,
+    (pro, cozy, hq) =>
+      `Untuk tampilan 3D. Lantai perusahaan punya ${pro} meja, Ruang nyaman ${cozy}, dan Kantor pusat ${hq}. Kantor pusat mungkin lebih lambat digambar di ponsel. Mengubahnya memulai ulang tampilan 3D.`,
+  ],
+  [
+    /^Your notes on the 3D whiteboard, with ; between them\. Up to (\d+), (\d+) characters each\.$/,
+    (most, each) =>
+      `Catatan Anda di papan tulis 3D, dipisahkan dengan ;. Maksimal ${most}, masing-masing ${each} karakter.`,
+  ],
+  [
+    /^An address that answers in open-meteo's shape, for example (\S+)\. https, or http on the host itself\. The host reads it every 15 minutes while an office is open\.$/,
+    (example) =>
+      `Alamat yang menjawab dalam format open-meteo, misalnya ${example}. https, atau http di host itu sendiri. Host membacanya tiap 15 menit selama kantor terbuka.`,
+  ],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,
