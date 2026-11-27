@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
 

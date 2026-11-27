@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Icon, TextInput } from "@getpaseo/plugin/client/ui";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import {
   HINT_MAX,
   checksNote,

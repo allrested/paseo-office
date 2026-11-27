@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import type { OfficeViewChoice } from "../shared/settings.js";
 import type { OfficeStyles } from "./styles.js";
 

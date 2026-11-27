@@ -1,5 +1,6 @@
 import { useCallback, useContext, useMemo, useState, useSyncExternalStore } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { dotTone, type DotTone } from "../shared/model.js";

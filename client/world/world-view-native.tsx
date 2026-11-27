@@ -1,6 +1,7 @@
 import { useSceneBrand } from "../office-brand-context.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../text.js";
 import { worldBrand, type WorldPlan } from "./adapter.js";
 import { kitScriptFrame, type ScriptFrameHandle } from "./script-frame-kit.js";
 import { StreetEvents } from "./street-events.js";

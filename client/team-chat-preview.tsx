@@ -1,6 +1,7 @@
 import { useOfficeBrand } from "./office-brand-context.js";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
+import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { ChatMessage, ChatSnapshot } from "../shared/contracts.js";
 import { isYours, shows, STICKERS } from "./chat-text.js";

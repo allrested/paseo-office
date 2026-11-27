@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { CHAT_TEXT_MAX } from "../shared/contracts.js";
 import { coach, numberTasks, type PromptHint } from "../shared/upstream/prompt-coach.js";
 import type { ChatDraft } from "./office-link.js";

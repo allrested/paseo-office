@@ -1,5 +1,6 @@
 import { useCallback, useContext, useMemo, useState } from "react";
-import { Text, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { Machine, MachineAgent, OfficeAgent, OfficeWorkspace } from "../shared/contracts.js";

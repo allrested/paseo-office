@@ -1,7 +1,8 @@
 import { useSceneBrand } from "../office-brand-context.js";
 import { RegisterWorkspaceDock } from "./workspace-dock.js";
 import { useContext, useEffect, useId, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../text.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { WeatherScene, IncidentsState, Machine } from "../../shared/contracts.js";
 import type { FocusRequest } from "../focus-request.js";

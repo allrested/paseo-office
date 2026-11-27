@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import type { WeatherState } from "../shared/contracts.js";
 import { MANUAL_CHOICES, MANUAL_LABELS, WEATHER_ADDRESS_EXAMPLE } from "../shared/weather.js";
 import type { HostValues } from "./host-switches.js";

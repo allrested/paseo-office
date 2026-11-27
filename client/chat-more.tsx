@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { ActionButton } from "./action-button.js";
 import { ChatIcon } from "./chat-chrome.js";
 import { Dictation } from "./chat-dictation.js";

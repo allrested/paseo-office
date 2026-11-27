@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import {
   trackersSaveRpc,
   trackersTestRpc,

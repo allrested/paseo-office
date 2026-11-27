@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { usePaseo } from "@getpaseo/plugin/client";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import {
   APPEARANCE_KEY,
   savedAppearance,

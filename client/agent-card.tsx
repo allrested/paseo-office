@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { View } from "react-native";
+import { Text } from "./text.js";
+import { TextInput } from "./text.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import type { AgentStatus, OfficeAgent } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";

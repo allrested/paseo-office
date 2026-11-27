@@ -1,12 +1,12 @@
 import { useCallback, useState } from "react";
 import {
   Pressable,
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "./text.js";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { HostNote } from "../shared/machine-text.js";
 import type { AttentionEntry, AttentionReason } from "../shared/model.js";

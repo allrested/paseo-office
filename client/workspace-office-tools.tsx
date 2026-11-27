@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { OfficeRoom } from "../shared/model.js";
 import { WorkspaceOverlay } from "./workspace-overlay.js";

@@ -10,7 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
+import { Pressable, View, type LayoutChangeEvent } from "react-native";
+import { Text } from "./text.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 import {
   useRpc,

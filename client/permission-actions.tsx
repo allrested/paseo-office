@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import type { OfficePermission } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { answerableInOffice } from "../shared/model.js";

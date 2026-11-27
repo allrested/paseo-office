@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useSettings } from "@getpaseo/plugin/client";
 import { LANGUAGE_CHOICES, LANGUAGE_NAMES, type LanguageChoice } from "../shared/scene-language.js";
 import { officeLanguageSettings } from "../shared/settings.js";

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "./text.js";
+import { TextInput } from "./text.js";
 import { ActionButton } from "./action-button.js";
 import { NOBODY, pickerGroups, recipientLabels, showsSearch } from "./agent-picker-text.js";
 import type { DotTone, OfficeRoom } from "../shared/model.js";

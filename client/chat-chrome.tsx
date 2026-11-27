@@ -1,8 +1,10 @@
 import { useOfficeBrand } from "./office-brand-context.js";
 import type { Appearance } from "../shared/appearance.js";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/ui";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
+import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { memberAvatar, type MentionOption } from "./chat-text.js";
 import type { OfficeStyles } from "./styles.js";
 

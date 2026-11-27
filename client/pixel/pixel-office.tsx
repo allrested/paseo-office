@@ -15,13 +15,13 @@ import {
   Easing,
   Platform,
   Pressable,
-  Text,
   View,
   type LayoutChangeEvent,
   type ScrollView as NativeScrollView,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../text.js";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { Machine } from "../../shared/contracts.js";

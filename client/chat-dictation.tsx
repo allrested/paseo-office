@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text } from "react-native";
+import { Text } from "./text.js";
 import { CHAT_TEXT_MAX } from "../shared/contracts.js";
 import type { ChatDraft } from "./office-link.js";
 import type { OfficeStyles } from "./styles.js";

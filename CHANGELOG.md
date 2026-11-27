@@ -34,9 +34,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - The 2D floor: an open incident shows as a banner over the floor that opens the Incidents card,
   roster teams sit together as on the 3D floor, and a desk says when its agent has the
   provider's own sub-agents at work.
-- The office's own interface speaks Indonesian when the 3D office language is Bahasa Indonesia:
-  buttons, fields and their hints, switches, dialog titles, the column's tabs and the Sessions
-  sections. Lines put together from data, and anything without a translation yet, stay English.
+- The office's own interface speaks Indonesian when the 3D office language is Bahasa Indonesia,
+  and English when it is English: buttons, fields with their hints and placeholders, switches,
+  dialogs, cards, the settings page, and the lines built from data (ages, counts, an agent's
+  activity, a failure up to the host's own reason).
 - Timeline: **Replay on the floor** replays the chosen range on the 3D floor, with a bar for the
   moment shown, Pause and Now. Before, a replay moved only inside the card.
 - **Stop repeated failing calls**, a host setting, off by default: a request for the very call

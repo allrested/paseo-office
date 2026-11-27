@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import type { OfficeSnapshot } from "../shared/contracts.js";
 import { buildOfficeModel, type OfficeModel } from "../shared/model.js";
 import type { ReplaySpeed, Timeline } from "../shared/timeline.js";

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { notesModesRpc, type WriterModes } from "../shared/contracts.js";
 import { SegmentPill } from "./segment-pill.js";

@@ -1,6 +1,7 @@
 import { AVATARS, shirtColor } from "../shared/appearance.js";
 import { useCallback, useMemo } from "react";
-import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
+import { Pressable, View, type PressableStateCallbackType } from "react-native";
+import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import type { OfficeAgent } from "../shared/contracts.js";
 import { agentTask, agentTitle, dotTone } from "../shared/model.js";

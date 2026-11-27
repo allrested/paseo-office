@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View, type ViewStyle } from "react-native";
+import { Pressable, View, type ViewStyle } from "react-native";
+import { Text } from "./text.js";
 import { Icon, Markdown, ScrollView } from "@getpaseo/plugin/client/ui";
 import { OfficeModal as Modal } from "./office-modal.js";
 import type { z } from "zod";

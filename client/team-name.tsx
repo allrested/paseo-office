@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
-import { TextInput } from "@getpaseo/plugin/client/ui";
+import { TextInput } from "./text.js";
 import { teamRenameRpc } from "../shared/contracts.js";
 import type { OfficeRoom } from "../shared/model.js";
 import { TEAM_NAME_MAX } from "../shared/team-name.js";
