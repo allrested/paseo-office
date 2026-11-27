@@ -28,6 +28,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   **At home**: the Sessions list keeps it, a reply brings it back, and a lobby task or a duty
   goes to it when no idle agent is free. Before, such sessions were not shown at all, and a task
   waited for a working agent to finish.
+- A plan and a question are answered in the office's session panel: the plan's text with its
+  actions and a line of what to change, the question as its form. Before, both sent you to the
+  workspace.
 
 ## 0.2.14 (2026-11-26)
 

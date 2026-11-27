@@ -564,3 +564,84 @@ test("Customize agent saves the chosen profile and can restore the defaults", as
   await press("Save appearance");
   expect(metadataMock.setMetadata).toHaveBeenLastCalledWith({ "office.appearance": null });
 });
+
+test("a plan is answered in the panel: its text, the request's actions, and what to change", async () => {
+  const pending = vi.fn(async () => ({ kind: "plan", input: { plan: "1. Move the ledger" } }));
+  const answer = vi.fn(async () => undefined);
+  await draw({
+    agent: { ...AGENT, permissions: [PLAN] },
+    actions: { send, respond, cancel, pending, answer },
+  });
+  expect(pending).toHaveBeenCalledWith("a1", "p2");
+  expect(container.textContent).toContain("1. Move the ledger");
+  expect(container.textContent).not.toContain("Answer this in the workspace.");
+
+  const feedback = labelled("What to change in the plan") as HTMLTextAreaElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+      feedback,
+      "Keep the old table",
+    );
+    feedback.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await press("Keep planning");
+  expect(answer).toHaveBeenLastCalledWith("a1", "p2", {
+    behavior: "deny",
+    selectedActionId: "reject",
+    message: "Keep the old table",
+  });
+  await press("Approve plan");
+  expect(answer).toHaveBeenLastCalledWith("a1", "p2", {
+    behavior: "allow",
+    selectedActionId: "accept",
+  });
+});
+
+test("a question is answered in the panel once every question has an answer", async () => {
+  const input = {
+    questions: [
+      {
+        header: "Store",
+        question: "Which store keeps the ledger?",
+        options: [{ label: "Postgres", description: "The one we run" }, { label: "SQLite" }],
+      },
+    ],
+  };
+  const pending = vi.fn(async () => ({ kind: "question", input }));
+  const answer = vi.fn(async () => undefined);
+  const question = { id: "p3", kind: "question" as const, title: "A question" };
+  await draw({
+    agent: { ...AGENT, permissions: [question] },
+    actions: { send, respond, cancel, pending, answer },
+  });
+  expect(container.textContent).toContain("Which store keeps the ledger?");
+  // Nothing chosen yet: the answers cannot be sent.
+  await press("Send answers");
+  expect(answer).not.toHaveBeenCalled();
+
+  await press("Postgres");
+  expect(container.textContent).toContain("The one we run");
+  await press("Send answers");
+  expect(answer).toHaveBeenLastCalledWith("a1", "p3", {
+    behavior: "allow",
+    updatedInput: { ...input, answers: { Store: "Postgres" } },
+  });
+  await press("Dismiss");
+  expect(answer).toHaveBeenLastCalledWith("a1", "p3", {
+    behavior: "deny",
+    message: "Dismissed by user",
+  });
+});
+
+test("a request that cannot be read keeps the words that say where to answer it", async () => {
+  const pending = vi.fn(async () => {
+    throw new Error("offline");
+  });
+  const answer = vi.fn(async () => undefined);
+  await draw({
+    agent: { ...AGENT, permissions: [PLAN] },
+    actions: { send, respond, cancel, pending, answer },
+  });
+  expect(container.textContent).toContain("Answer this in the workspace.");
+  expect(maybe("Approve plan")).toBeNull();
+});
