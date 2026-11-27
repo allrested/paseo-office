@@ -76,10 +76,10 @@ import {
   type FloorPlan,
   type PlaceKind,
   type PlanDesk,
-  type PlanTeam,
   type PlanTeamPlate,
   type Point,
 } from "./floor-plan.js";
+import { helpersText, teamsOf } from "./teams.js";
 import { roomFurniture, roomRects } from "./room.js";
 import { SpriteView } from "./sprite-view.js";
 import { createTicker } from "./ticker.js";
@@ -103,6 +103,9 @@ export interface PixelOfficeProps {
   onOpenJanitor(): void;
   /** The stand-up is open: whoever rests gathers at the whiteboard. */
   meeting: boolean;
+  /** The open incidents in a line, for the banner over the floor; null with none open. */
+  incident?: string | null;
+  onOpenIncidents?(): void;
 }
 
 const NATIVE = Platform.OS !== "web";
@@ -208,6 +211,9 @@ function useFloorLife(people: WorldPeople, still: boolean): FloorLife {
 }
 
 interface PixelStyles {
+  /** The open incidents, over the floor: the 2D floor's alarm, with no light and no siren. */
+  incident: ViewStyle;
+  incidentText: TextStyle;
   floor: ViewStyle;
   scroll: ViewStyle;
   content: ViewStyle;
@@ -273,6 +279,14 @@ function pixelStyles(art: Art, plan: FloorPlan | null): PixelStyles {
     pointerEvents: "none",
   };
   return {
+    incident: {
+      minHeight: TOUCH_TARGET,
+      justifyContent: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: INCIDENT_GROUND,
+    },
+    incidentText: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: INCIDENT_INK },
     floor: { flex: 1, backgroundColor: tones.floor },
     scroll: { flex: 1 },
     content: { alignItems: "center" },
@@ -535,7 +549,7 @@ interface PlateProps {
 
 /** A team's plate over its desks: its name, how many sit there, and a tap for its board. */
 const Plate = memo(function Plate({ plate, art, scale, styles, onOpen }: PlateProps) {
-  const press = useCallback(() => onOpen(plate.id), [onOpen, plate.id]);
+  const press = useCallback(() => onOpen(plate.board), [onOpen, plate.board]);
   const { lit, handlers } = useLit();
   const at = useMemo(
     (): ViewStyle => ({
@@ -1071,14 +1085,31 @@ const Rocket = memo(function Rocket({ at, launch, art, scale, still }: RocketPro
   );
 });
 
-/** The teams with a desk, in the rooms' order, each with the agents that sit there. */
-function teamsOf(rooms: readonly OfficeRoom[], people: WorldPeople): PlanTeam[] {
-  const seated = new Set(people.sessions.map((session) => session.id));
-  return rooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-    members: room.rows.map((row) => row.agent.id).filter((id) => seated.has(id)),
-  }));
+/** White on this red is 5.9:1, in both themes: the banner is the floor's one alarm. */
+const INCIDENT_GROUND = "#B3261E";
+const INCIDENT_INK = "#FFFFFF";
+
+interface IncidentBannerProps {
+  incident: string | null;
+  styles: PixelStyles;
+  onOpen: (() => void) | undefined;
+}
+
+/** The open incidents over the floor, and a press for their card; nothing with none open. */
+function IncidentBanner({ incident, styles, onOpen }: IncidentBannerProps) {
+  if (incident === null) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Incidents: ${incident}`}
+      onPress={onOpen}
+      style={styles.incident}
+    >
+      <Text accessibilityRole="alert" numberOfLines={2} style={styles.incidentText}>
+        {incident}
+      </Text>
+    </Pressable>
+  );
 }
 
 /**
@@ -1102,6 +1133,8 @@ export function PixelOffice({
   janitor,
   onOpenJanitor,
   meeting,
+  incident = null,
+  onOpenIncidents,
 }: PixelOfficeProps) {
   const [widthPx, setWidthPx] = useState(0);
   const measure = useCallback(
@@ -1147,7 +1180,7 @@ export function PixelOffice({
     return new Map(
       people.sessions.map((session) => [
         session.id,
-        `${session.name}: ${boardText(session, activity.get(session.id) ?? null)}`,
+        `${session.name}: ${boardText(session, activity.get(session.id) ?? null)}${helpersText(session.subs.length)}`,
       ]),
     );
   }, [model, people]);
@@ -1187,6 +1220,7 @@ export function PixelOffice({
   const dueDesk = plan?.desks.find((desk) => desk.agentId === dueId);
   return (
     <View style={styles.floor} onLayout={measure}>
+      <IncidentBanner incident={incident} styles={styles} onOpen={onOpenIncidents} />
       {plan === null ? null : (
         <ScrollView ref={scroller} style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.map}>

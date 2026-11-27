@@ -57,7 +57,7 @@ import {
 } from "./column-model.js";
 import { IncidentsCard } from "./incidents-card.js";
 import { weatherEntry } from "./weather-text.js";
-import { incidentsEntry } from "./incidents-text.js";
+import { incidentLine, incidentsEntry } from "./incidents-text.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
 import { TimelineCard } from "./timeline-card.js";
@@ -814,6 +814,8 @@ function SurfaceBody({
         janitor={janitor}
         onOpenJanitor={onOpenJanitor}
         meeting={meeting}
+        incident={incidentLine(incidents)}
+        onOpenIncidents={onOpenIncidents}
       />
     );
   }
