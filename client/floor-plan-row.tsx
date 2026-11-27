@@ -60,7 +60,7 @@ export function FloorPlanRow({ value, onSave, problem, styles }: FloorPlanRowPro
       <View
         role="group"
         aria-label={FLOOR_PLAN_LABEL}
-        style={disabled ? styles.segmentsDisabled : styles.segments}
+        style={disabled ? styles.notesDaysDisabled : styles.notesDays}
       >
         {FLOOR_PLANS.map((plan) => (
           <SegmentPill

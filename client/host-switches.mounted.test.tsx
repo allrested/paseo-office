@@ -542,6 +542,9 @@ const modePills = () =>
 
 test("the writer mode row lists the provider's modes, the office's choice pressed while none is set", async () => {
   await mount();
+  // A provider can offer more modes than a line holds: they wrap, on a row of their own.
+  expect(modeRow().style.flexWrap).toBe("wrap");
+  expect(modeRow().parentElement?.style.flexBasis).toBe("100%");
   expect(modePills()).toEqual([
     "Office's choice true",
     "Accept File Edits false",

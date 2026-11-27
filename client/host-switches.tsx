@@ -728,7 +728,7 @@ function FloorSettings({
         <View
           role="group"
           aria-label="Cache clock"
-          style={stored ? styles.segments : styles.segmentsDisabled}
+          style={stored ? styles.notesDays : styles.notesDaysDisabled}
         >
           {CACHE_CLOCKS.map((value) => (
             <SegmentPill
@@ -758,7 +758,7 @@ function FloorSettings({
         <View
           role="group"
           aria-label="Team chat"
-          style={stored ? styles.segments : styles.segmentsDisabled}
+          style={stored ? styles.notesDays : styles.notesDaysDisabled}
         >
           {CHAT_CULTURES.map((value) => (
             <SegmentPill

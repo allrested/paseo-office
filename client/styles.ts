@@ -96,6 +96,8 @@ export interface OfficeStyles {
   headerFields: ViewStyle;
   /** One text setting: its label, the field, its hint and its failures. */
   headerField: ViewStyle;
+  /** A setting with many choices: a row of its own, so its pills have the whole width to wrap in. */
+  headerFieldWide: ViewStyle;
   /** A line under a field that says what it is for. */
   fieldHint: TextStyle;
   control: ViewStyle;
@@ -845,6 +847,7 @@ export function useOfficeStyles(
         rowGap: 14,
       },
       headerField: { flexGrow: 1, flexBasis: 240, gap: 4 },
+      headerFieldWide: { flexBasis: "100%", gap: 4 },
       fieldHint: { ...small, color: colors.foregroundMuted },
       control,
       controlDisabled: { ...control, opacity: 0.5 },

@@ -10,7 +10,10 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
   their icon over their name on a narrow screen.
 - A session's **Options** button is as tall as itself. Before, it kept 240 pixels of the panel
   for itself and the conversation above was left a sliver, worst on a phone. Opened, the options
-  scroll in a room of their own.
+  are a card over the reply box that scrolls inside itself. Before, each option kept 240 pixels
+  too, and the ones that did not fit were drawn under the reply box.
+- Settings: **Writer mode** has a row of its own and its modes wrap. Before, the modes past the
+  third were cut off at the edge. The floor plan, Team chat and cup pills wrap too.
 - The team chat has **Jump to latest**: scroll up and a button in the corner of the list goes to
   the newest message, with the count of what arrived since. Sending a message also goes to the
   newest one, wherever you were reading.

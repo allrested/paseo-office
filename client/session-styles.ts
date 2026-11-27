@@ -154,8 +154,16 @@ export function sessionStyles(colors: PluginTheme["colors"], touch: boolean) {
     // As tall as what they hold: the reply box's column gives the conversation the rest.
     options: { gap: 6 },
     option: { gap: 4 },
-    optionList: { flexGrow: 0, maxHeight: 220 },
-    optionListBody: { gap: 10 },
+    // A card over the reply box: it scrolls inside itself and never reaches under the box.
+    optionList: {
+      flexGrow: 0,
+      maxHeight: 220,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      backgroundColor: colors.surface1,
+    },
+    optionListBody: { padding: 10, gap: 12 },
     replyShell: {
       flexDirection: "row",
       alignItems: "flex-end",
