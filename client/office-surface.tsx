@@ -59,6 +59,7 @@ import { IncidentsCard } from "./incidents-card.js";
 import { weatherEntry } from "./weather-text.js";
 import { incidentLine, incidentsEntry } from "./incidents-text.js";
 import { UiLanguage, useT } from "./ui-language.js";
+import { FloorReplayBar, useFloorReplay } from "./use-floor-replay.js";
 import { janitorNote, janitorRows } from "./context-text.js";
 import { JanitorCard } from "./janitor-card.js";
 import { TimelineCard } from "./timeline-card.js";
@@ -2027,6 +2028,7 @@ export function OfficeSurface(
   );
   const planUsage = usePlanUsage(live);
   const timeline = useTimelineCard(live);
+
   const history = useTimelineCard(live);
   const alerts = useAlerts(live);
   const board = useBoardSheet(model, live);
@@ -2131,6 +2133,8 @@ export function OfficeSurface(
   );
   const view = officeView({ choice: viewChoice.choice, problem: sceneProblem });
   const floorDrawn = office.loaded && live && (view === "3d" || view === "2d");
+  // The 3D floor alone shows a replay: the lists, the boards and the cards stay today's.
+  const floorReplay = useFloorReplay(office.state, live, view === "3d");
   const kept = keptSelection(selectedId, model.agents, live);
   // A selection whose agent left is dropped, so the card does not reopen if that agent returns.
   useEffect(() => {
@@ -2299,11 +2303,12 @@ export function OfficeSurface(
         ) : null}
         <View testID="office-floor-pane" style={floorStyle}>
           {!panels.controlsAboveFloor && controls}
+          <FloorReplayBar replay={floorReplay} styles={styles} />
           <SurfaceBody
             onPhotoReady={onPhotoReady}
             fullscreen={full.available ? full : undefined}
             office={office}
-            model={model}
+            model={floorReplay.shown(model)}
             rooms={rooms}
             view={view}
             theme={theme}
@@ -2399,7 +2404,12 @@ export function OfficeSurface(
         styles={styles}
         onClose={closeMachine}
       />
-      <TimelineCard open={timeline.open} styles={styles} onClose={timeline.close} />
+      <TimelineCard
+        open={timeline.open}
+        styles={styles}
+        onFloorReplay={floorReplay.start}
+        onClose={timeline.close}
+      />
       <VaultCard open={history.open} styles={styles} onClose={history.close} />
       <AlertCard
         alert={alerts.open}

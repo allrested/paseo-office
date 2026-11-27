@@ -73,9 +73,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function Card({ open = true }: { open?: boolean }) {
+type OnFloor = NonNullable<Parameters<typeof TimelineCard>[0]["onFloorReplay"]>;
+function Card({ open = true, onFloor }: { open?: boolean; onFloor?: OnFloor }) {
   const styles = useOfficeStyles(THEME, false, false);
-  return <TimelineCard open={open} styles={styles} onClose={onClose} />;
+  return <TimelineCard open={open} styles={styles} onFloorReplay={onFloor} onClose={onClose} />;
 }
 const show = () => act(async () => root.render(<Card />));
 const press = (label: string) =>
@@ -139,4 +140,16 @@ test("a host that cannot read the timeline says why", async () => {
   expect(container.querySelector('[role="alert"]')?.textContent).toContain(
     "The timeline cannot be read",
   );
+});
+
+test("Replay on the floor hands the range and the speed over and closes the card; with no 3D floor it is not offered", async () => {
+  await show();
+  expect(container.querySelector('button[aria-label="Replay on the floor"]')).toBeNull();
+
+  const onFloor = vi.fn();
+  await act(async () => root.render(<Card onFloor={onFloor} />));
+  await press("120 times the clock");
+  await press("Replay on the floor");
+  expect(onFloor).toHaveBeenCalledWith(timelineOf(NOW - 60 * MIN, NOW), 120);
+  expect(onClose).toHaveBeenCalledTimes(1);
 });

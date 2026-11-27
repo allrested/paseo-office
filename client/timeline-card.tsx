@@ -277,11 +277,23 @@ interface LanesProps {
   onSpeed(next: ReplaySpeed): void;
   onToggle(): void;
   onStop(): void;
+  /** Replays these lanes on the 3D floor; absent where there is none to replay on. */
+  onFloor: (() => void) | undefined;
   styles: OfficeStyles;
 }
 
 /** The replay's controls over a lane per agent. */
-function Lanes({ timeline, replay, speed, onSpeed, onToggle, onStop, styles }: LanesProps) {
+function Lanes({
+  timeline,
+  replay,
+  speed,
+  onSpeed,
+  onToggle,
+  onStop,
+  onFloor,
+  styles,
+}: LanesProps) {
+  const floor = useCallback(async () => onFloor?.(), [onFloor]);
   let playLabel = "Replay";
   if (replay?.playing) playLabel = "Pause";
   else if (replay !== null && replay.head < timeline.to) playLabel = "Resume";
@@ -298,6 +310,15 @@ function Lanes({ timeline, replay, speed, onSpeed, onToggle, onStop, styles }: L
         />
         {replay !== null && (
           <ActionButton label="Now" pendingLabel="Now" onPress={onStop} styles={styles} />
+        )}
+        {onFloor === undefined ? null : (
+          <ActionButton
+            label="Replay on the floor"
+            pendingLabel="Replay on the floor"
+            onPress={floor}
+            disabled={timeline.lanes.length === 0}
+            styles={styles}
+          />
         )}
         <View role="group" aria-label="Replay speed" style={styles.segments}>
           {REPLAY_SPEEDS.map((value) => (
@@ -387,6 +408,11 @@ function useTimeline(open: boolean, ms: number, fresh: boolean): Read {
 export interface TimelineCardProps {
   open: boolean;
   styles: OfficeStyles;
+  /**
+   * Replays the range on the floor, at the card's speed; the card closes for it. Absent where no
+   * 3D floor is showing, and then no button offers it.
+   */
+  onFloorReplay?(timeline: Timeline, speed: ReplaySpeed): void;
   onClose(): void;
 }
 
@@ -394,7 +420,7 @@ export interface TimelineCardProps {
  * What each agent was at over the last hours, a lane each, replayed at up to 120 times the
  * clock; and the week in figures. It shows what the office saw while it was open.
  */
-export function TimelineCard({ open, styles, onClose }: TimelineCardProps) {
+export function TimelineCard({ open, styles, onFloorReplay, onClose }: TimelineCardProps) {
   const [tab, setTab] = useState<Tab>("1h");
   const [speed, setSpeed] = useState<ReplaySpeed>(60);
   const ms = tab === "week" ? WEEK_MS : (TIMELINE_RANGES.find((r) => r.id === tab)?.ms ?? 0);
@@ -402,6 +428,12 @@ export function TimelineCard({ open, styles, onClose }: TimelineCardProps) {
   const { timeline, problem } = useTimeline(open, ms, !replaying);
   const { replay, toggle, stop } = useReplay(tab === "week" ? null : timeline, speed);
   useEffect(() => setReplaying(replay !== null), [replay]);
+  const replayOnFloor = useCallback(() => {
+    if (timeline === null || onFloorReplay === undefined) return;
+    stop();
+    onClose();
+    onFloorReplay(timeline, speed);
+  }, [timeline, onFloorReplay, stop, onClose, speed]);
   const choose = useCallback(
     (next: Tab) => {
       stop();
@@ -464,6 +496,7 @@ export function TimelineCard({ open, styles, onClose }: TimelineCardProps) {
                 onSpeed={setSpeed}
                 onToggle={toggle}
                 onStop={stop}
+                onFloor={onFloorReplay === undefined ? undefined : replayOnFloor}
                 styles={styles}
               />
             )}
