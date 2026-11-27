@@ -207,8 +207,12 @@ A lobby assignment shows the task and expands to reveal the original instruction
 The session also shows requests with Approve and Deny, a reply box, and Stop while
 a turn runs on a host that can stop one. A reply joins the running turn (it does not interrupt
 it); while a request waits, the daemon denies that request when the reply goes in, and the box
-says so. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
-tab switch or a dismissed sheet keeps it, and a sent reply or a closed tab clears it. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
+says so. On the web the reply box has an **Attach images** button, the chat's own: up to four
+images, each resized to a JPEG before it is sent, and they go with the reply, a running turn
+included. Images alone are a reply too, and say how many. Other files are not taken here, and a
+native client shows no button; for those choose **Open in workspace**. What is half typed in a reply box is the surface's, by agent, as the Chat box is: a
+tab switch or a dismissed sheet keeps it, the attached images with it, and a sent reply or a
+closed tab clears both; a reply that fails to send keeps them. A plan or a question is answered in the session too (`client/ask-card.tsx`, `client/ask-form.ts`):
 a plan shows its text with the request's own actions, or Approve plan and Keep planning, and a
 line of what to change that goes with a refusal; a question shows its form, the options as
 buttons and a box where another answer is taken, with Send answers once each question has one,
@@ -221,7 +225,7 @@ box, shows the session's own options as its provider describes them to Paseo, ea
 row of choices, and a press changes one at once; what a provider refuses to change says why. That
 is how a model or a mode is changed here, for a provider that offers it as an option: Paseo gives
 a plugin no call of its own for either, so a provider that offers neither shows "This session has
-no options to change here." For attachments or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
+no options to change here." For other files or terminal work, choose **Open in workspace**. A session that leaves the directory keeps its tab until you close it. On a compact layout the sheet shows the session with a Back to Sessions button;
 dismissing the sheet leaves the session open, and the Sessions tab on the bar carries the count.
 The open sessions are kept on the device (`sessions` in the `office-column` setting, twelve at most), so a reload opens their tabs again, on the Sessions tab; the chosen tab itself is not kept.
 

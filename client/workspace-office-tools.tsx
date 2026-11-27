@@ -5,6 +5,7 @@ import { ScrollView } from "@getpaseo/plugin/client/ui";
 import type { OfficeRoom } from "../shared/model.js";
 import { WorkspaceOverlay } from "./workspace-overlay.js";
 import { SubagentRow } from "./session-panel-detail.js";
+import { NO_REPLY_IMAGES } from "./reply-send.js";
 import type { SessionContext } from "./session-pane.js";
 import { SessionPane, sessionChildren, sessionOf } from "./session-pane.js";
 import type { OfficeSurfaceProps } from "./office-surface.js";
@@ -48,6 +49,8 @@ function WorkspaceOfficeTools({
           room={selected.room}
           reply={session.replies.texts.get(agentId) ?? ""}
           setReply={session.replies.setText}
+          replyImages={session.replies.images.get(agentId) ?? NO_REPLY_IMAGES}
+          setReplyImages={session.replies.setImages}
           context={context}
           styles={styles}
           layout={layout}
