@@ -42,6 +42,9 @@ Versions are the npm package `paseo-office`. Dates are the day the version was p
 - **Stop repeated failing calls**, a host setting, off by default: a request for the very call
   that just failed three times running is refused, and the agent is told why. Only where the
   provider asks permission for the call.
+- The session panel: open session tabs come back after a reload; typing `/` lists the session's
+  slash commands; and **Options** shows what the session's provider lets a client change (a
+  model or a mode, where it offers one) and changes it.
 
 ## 0.2.14 (2026-11-26)
 

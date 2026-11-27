@@ -285,4 +285,6 @@ export const UI_ID: Readonly<Record<string, string>> = {
   Pause: "Jeda",
   Resume: "Lanjutkan",
   "Stop repeated failing calls": "Hentikan panggilan gagal yang berulang",
+  Options: "Opsi",
+  "Hide options": "Sembunyikan opsi",
 };

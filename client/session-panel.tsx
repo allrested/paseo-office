@@ -18,6 +18,7 @@ import { useFollowEnd } from "./follow-end.js";
 import { hasTouchScreen, readPointer } from "./office-surface.js";
 import { PermissionActions } from "./permission-actions.js";
 import { AskCard } from "./ask-card.js";
+import { CommandList, SessionOptions } from "./session-extras-view.js";
 import {
   SessionButton,
   SessionDetailTabs,
@@ -321,6 +322,14 @@ function Composer({
   );
   return (
     <View style={styles.sessions.deskComposer}>
+      <SessionOptions agentId={agentId} actions={actions} styles={styles} />
+      <CommandList
+        agentId={agentId}
+        text={text}
+        actions={actions}
+        onPick={setText}
+        styles={styles}
+      />
       <View style={shell}>
         <TextInput
           accessibilityLabel="Message"

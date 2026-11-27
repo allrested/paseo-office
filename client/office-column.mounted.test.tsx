@@ -16,7 +16,7 @@ import { useColumn } from "./use-column.js";
 let saves: unknown[];
 /** What the column said of its drag, in order. */
 let dragging: boolean[];
-let storedColumn: { width: number; collapsed: boolean };
+let storedColumn: { width: number; collapsed: boolean; sessions?: string[] };
 
 vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@getpaseo/plugin/client")>()),
@@ -156,13 +156,13 @@ test("Collapse leaves the rail and saves it; a rail press opens that tab again",
   await act(async () => collapse.click());
 
   expect(container.textContent).not.toContain("panel:");
-  expect(saves).toEqual([{ width: 360, collapsed: true }]);
+  expect(saves).toEqual([{ width: 360, collapsed: true, sessions: [] }]);
 
   await act(async () => tab("Chat").click());
   expect(container.textContent).toContain("panel:chat");
   expect(saves).toEqual([
-    { width: 360, collapsed: true },
-    { width: 360, collapsed: false },
+    { width: 360, collapsed: true, sessions: [] },
+    { width: 360, collapsed: false, sessions: [] },
   ]);
 });
 
@@ -251,10 +251,10 @@ test("opening a session opens a collapsed column", async () => {
   await act(async () => control("open a").click());
 
   expect(container.textContent).toContain("panel:session:a");
-  expect(saves).toEqual([{ width: 360, collapsed: false }]);
+  expect(saves).toEqual([{ width: 360, collapsed: false, sessions: ["a"] }]);
 });
 
-test("on a compact surface a session or a fixed tab opens without rewriting the saved column", async () => {
+test("on a compact surface a session or a fixed tab opens and leaves the saved column collapsed", async () => {
   storedColumn = { width: 360, collapsed: true };
   await mount(null, true);
   await act(async () => control("open a").click());
@@ -262,7 +262,8 @@ test("on a compact surface a session or a fixed tab opens without rewriting the 
   await act(async () => tab("Chat").click());
   expect(container.textContent).toContain("chosen:chat");
 
-  expect(saves).toEqual([]);
+  // The open tab is kept for a reload; the wide layout's collapsed stays as it was left.
+  expect(saves).toEqual([{ width: 360, collapsed: true, sessions: ["a"] }]);
   expect(storedColumn.collapsed).toBe(true);
 });
 
@@ -283,4 +284,16 @@ test("a hidden close button shows once the keyboard reaches it", async () => {
 
   await act(async () => control("Close Alpha work").blur());
   expect(closeOpacity("Close Alpha work")).toBe("0");
+});
+
+test("the session tabs a reload left behind are open again, on the Sessions tab", async () => {
+  storedColumn = { width: 360, collapsed: false, sessions: ["a", "b"] };
+  await mount();
+  expect(control("Close Alpha work")).toBeTruthy();
+  expect(tab("Sessions").getAttribute("aria-selected")).toBe("true");
+  expect(saves).toEqual([]);
+
+  // Closing one saves what is left.
+  await act(async () => control("Close Alpha work").click());
+  expect(saves).toEqual([{ width: 360, collapsed: false, sessions: ["b"] }]);
 });
