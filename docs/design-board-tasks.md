@@ -1,4 +1,4 @@
-# Plan for the board's tasks
+# Design: the board's tasks
 
 Nine changes to the boards, after a look at Multica (multica.ai), a shared task board for people
 and coding agents. Paseo already does what Multica's daemon does; what the office lacks is a task
@@ -9,14 +9,14 @@ version bump, tag and npm publish come after the last merges.
 What agents see changes in one place, the three board tools, and only by optional fields, so a
 call that works today still works:
 
-| Tool            | Today                       | Added                                              |
-| --------------- | --------------------------- | -------------------------------------------------- |
-| `office_update` | `claim`, `done`, `reopen`   | action `block`; `note`: the result with `done`, what is needed with `block` |
-| `office_post`   | `kind`, `text`, `to`, `board` | `replyTo` (a task id), `team` (a roster team), `after` (task ids) |
-| `office_read`   | posts, one per line         | results, blockers, replies, teams, what a task waits on |
+| Tool            | Today                         | Added                                                                       |
+| --------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `office_update` | `claim`, `done`, `reopen`     | action `block`; `note`: the result with `done`, what is needed with `block` |
+| `office_post`   | `kind`, `text`, `to`, `board` | `replyTo` (a task id), `team` (a roster team), `after` (task ids)           |
+| `office_read`   | posts, one per line           | results, blockers, replies, teams, what a task waits on                     |
 
 A post gains optional fields only (`shared/contracts.ts` `PostSchema`): `result`, `blocked`,
-`replyTo`, `team`, `after`, `claimedAt`, `costAtClaim`, `spentUsd`. `boards.json` stays version 1:
+`replyTo`, `team`, `after`, `claimedAt`, `doneAt`, `costAtClaim`, `spentUsd`. `boards.json` stays version 1:
 an older plugin reads the file and drops what it does not know at its next save.
 
 ## 1. The lobby as a kanban
@@ -163,8 +163,8 @@ its agent has to go and find what the first one found.
 **Problem.** Nothing says what a task took.
 
 **Change.** At a claim the post keeps `claimedAt` and the agent's reported cost so far
-(`costAtClaim`, from the directory's `costUsd`). At done it keeps `spentUsd`, the difference, when
-both are known and it is not negative. A done card and row say "took 23 min · $0.42", or the time
+(`costAtClaim`, from the directory's `costUsd`). At done it keeps `doneAt`, and `spentUsd`, the
+difference, when both are known and it is not negative. A done card and row say "took 23 min · $0.42", or the time
 alone. A reopen drops them. It is what the agent spent while it held the task: chat with it in that
 time counts too.
 
@@ -177,9 +177,11 @@ board, the words, `docs/office.md`.
 
 **Problem.** Every duty is posted at 8:00.
 
-**Change.** A duty has a time of day, 08:00 unless set, in the notes' zone. It is due on its days
-once that time has passed, so the posting rules stay as they are and only the hour moves. The duty
-board's timer runs at each time a duty has. The duty editor gets a time field.
+**Change.** A duty has a time of day, 08:00 unless set, in the notes' zone, from 08:00 to 23:59:
+the duty board's day begins at 08:00 (`dutyClock`) and that stays, so an earlier time would fall on
+the day before. It is due on its days once that time has passed, so the posting rules stay as they
+are and only the hour moves. The duty board's timer runs at 08:00 and at each later time a duty
+has. The duty editor gets a time field.
 
 **Files.** `shared/contracts.ts` (`DutySchema`), `server/duty-service.ts`,
 `server/local-schedules.ts`, the duty editor, the words, `docs/office.md`.
