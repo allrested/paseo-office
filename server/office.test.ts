@@ -1429,3 +1429,110 @@ test("an agent that stopped on an error settles with the figure of the view", as
   expect(store.current().posts[0]).toMatchObject({ spentUsd: 0.4 });
   await office.stop();
 });
+
+test("the pickup passes over a held lobby task until the owner starts it", async () => {
+  const { office, clock, prompts, store } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Hold it", backlog: true });
+  clock.advance(0);
+  await settle();
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(store.current().posts[0]).toMatchObject({ state: "open", backlog: true });
+  const started = await office.start("p1");
+  expect(started).toMatchObject({ ok: true, post: { id: "p1" } });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("Hold it");
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  expect(store.current().posts[0]).not.toHaveProperty("backlog");
+  await office.stop();
+});
+
+test("a held task for a named agent is neither woken nor handed out until it is started", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "For Bob", to: "b", backlog: true });
+  clock.advance(0);
+  await settle();
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p1");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("The office assigned you lobby task p1");
+  await office.stop();
+});
+
+test("a held task that also waits is handed out only once started and its tasks are done", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "Ship it",
+    after: ["p1"],
+    backlog: true,
+  });
+  await office.update({ id: "p1", action: "done" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p2");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("starting a task that waits keeps it waiting", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "Ship it",
+    after: ["p1"],
+    backlog: true,
+  });
+  await office.start("p2");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("a held task does not block the next task, and leaves the pickup with no work", async () => {
+  const { office, clock, prompts, store } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Hold it", backlog: true });
+  await office.post({ board: "lobby", kind: "task", text: "Do it" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("Do it");
+  expect(store.current().posts.find((p) => p.id === "p1")).toMatchObject({ backlog: true });
+  // Nothing is left to hand out, so no retry is scheduled.
+  await office.update({ id: "p2", action: "done" });
+  clock.advance(0);
+  await settle();
+  const sent = prompts.length;
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(sent);
+  await office.stop();
+});

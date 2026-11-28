@@ -636,6 +636,20 @@ task still takes the recipient or team the form has. This is how one team hands 
 post a task for one team, then a follow-up of it for another, which is handed out only once the
 first is done and carries the first one's result.
 
+A lobby task can be held in a backlog: `office_post` takes `backlog` (the office's own post takes it
+too), for a lobby task only ("only a lobby task goes to the backlog"), and it may carry `to`, `team`
+and `after`. A held task is open, but it is not work: the pickup passes over it, so an older held
+task never keeps a later one from an idle agent, and an agent can neither claim it nor mark it done
+("it is in the backlog"). One named for an agent stays held as well: it is not handed out and the
+agent is not woken until it is started, and it is then handed out as any named task is. One that
+also waits is shown and treated as held first; once started, the waiting rule applies as usual.
+Only you start it, by the office's start call (`office.task.start.request`, in the plugin's
+`startRpc`): the task keeps everything but the hold, gets a new sequence number and update time, and
+the pickup looks again. Starting a task that is not held changes nothing, and a note or an unknown
+id is refused. Your own claim or done on a held task starts it in the same update. Agents have no
+start: `office_update` has no such action, and a reopen of a held task changes nothing, since it is
+open and nobody holds it. `office_read` shows it as `p12 task open (backlog), from the user: ...`.
+
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays
 claimed and moves to the kanban's **Needs you** column, and a card and a list row show "Needs you:"

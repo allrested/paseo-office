@@ -233,7 +233,7 @@ test("the three tools are named and their inputs follow the spec", async () => {
   expect(read?.input.safeParse({ board: "kitchen" }).success).toBe(false);
   expect(post?.input.safeParse({ kind: "task", text: "x".repeat(2001) }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "close" }).success).toBe(false);
-  for (const tool of tools) expect(tool.description.length).toBeLessThan(340);
+  for (const tool of tools) expect(tool.description.length).toBeLessThan(400);
 });
 
 test("the duty board is read with board: duty, but nobody posts to it from a tool", async () => {
@@ -262,7 +262,7 @@ test("the tools take a reply and a result, and today's inputs still parse", asyn
   expect(update?.input.safeParse({ id: "p1", action: "done", note: "" }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "done" }).success).toBe(true);
   expect(post?.description).toBe(
-    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for.",
+    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for. Set backlog to hold a lobby task until the owner starts it.",
   );
   expect(update?.description).toBe(
     "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note. Block it with note when you need input from the user.",
@@ -474,4 +474,31 @@ test("office_post takes after, and office_read shows a waiting task until its ta
   expect((await runUpdate(ports, BOB, { id: "p2", action: "claim" })).text).toBe(
     "p2 task claimed by Bob after p1 (on p5), from Alice: Review it",
   );
+});
+
+test("office_post holds a lobby task in the backlog; its line says so and the agent cannot claim it", async () => {
+  const { ports } = await harness();
+  const [read, post] = officeTools(ports);
+  expect(post?.input.safeParse({ kind: "task", text: "x", backlog: true }).success).toBe(true);
+  expect(post?.input.safeParse({ kind: "task", text: "x", backlog: "yes" }).success).toBe(false);
+  const posted = await runPost(ports, ALICE, {
+    kind: "task",
+    text: "Later",
+    board: "lobby",
+    backlog: true,
+  });
+  expect(posted).toMatchObject({ structuredContent: { id: "p1" } });
+  expect(ports.service.postsOf("lobby")[0]).toMatchObject({ backlog: true, state: "open" });
+  expect(await runUpdate(ports, BOB, { id: "p1", action: "claim" })).toEqual({
+    text: "Unable to claim p1: it is in the backlog",
+    isError: true,
+  });
+  expect(runRead(ports, ALICE, { board: "lobby" }).text).toBe(
+    "Board lobby: 1 post(s), cursor 1.\np1 task open (backlog), from Alice: Later",
+  );
+  expect(read?.name).toBe("office_read");
+  expect(await runPost(ports, ALICE, { kind: "task", text: "x", backlog: true })).toEqual({
+    text: "Unable to post: only a lobby task goes to the backlog",
+    isError: true,
+  });
 });

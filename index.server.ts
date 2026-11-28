@@ -177,6 +177,7 @@ import {
   scriptLogRpc,
   setWakesPausedRpc,
   skillsRpc,
+  startRpc,
   updateRpc,
   sentImageRpc,
   worldLogoRpc,
@@ -839,6 +840,10 @@ export function createOfficePlugin(
   server.handle(updateRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("update", () => office.update(input));
+  });
+  server.handle(startRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("start", () => office.start(input.id));
   });
   server.handle(deleteRpc, (input, context) => {
     holder.remember(context.paseo);

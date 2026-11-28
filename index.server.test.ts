@@ -1000,6 +1000,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.notes.read.request",
     "office.post.request",
     "office.update.request",
+    "office.task.start.request",
     "office.delete.request",
     "office.board.clear_done.request",
     "office.set_wakes_paused.request",

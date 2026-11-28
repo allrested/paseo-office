@@ -53,6 +53,7 @@ export const PostInputSchema = z.object({
   replyTo: z.string().min(1).optional(),
   team: z.string().min(1).optional(),
   after: z.array(z.string().min(1)).optional(),
+  backlog: z.boolean().optional(),
 });
 export type PostInput = z.output<typeof PostInputSchema>;
 
@@ -83,7 +84,8 @@ export function postLine(
   posts: readonly Post[],
 ): string {
   const name = (author: string) => oneLine(label(author));
-  const state = post.state ? ` ${post.state}` : "";
+  const held = post.backlog ? " (backlog)" : "";
+  const state = post.state ? ` ${post.state}${held}` : "";
   const claim = post.claimedBy ? ` by ${name(post.claimedBy)}` : "";
   const team = post.team ? ` for team ${oneLine(teamLabel(post.team))}` : "";
   const waiting = waitingOn(post, posts).length > 0 ? " (waiting)" : "";
@@ -149,6 +151,7 @@ export async function runPost(
     ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
     ...(input.team === undefined ? {} : { team: input.team }),
     ...(input.after === undefined ? {} : { after: input.after }),
+    ...(input.backlog === undefined ? {} : { backlog: input.backlog }),
   });
   if (!result.ok) return { text: result.error, isError: true };
   ports.mentioned(result.post);
@@ -194,7 +197,7 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_post",
       description:
-        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for.",
+        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for. Set backlog to hold a lobby task until the owner starts it.",
       input: PostInputSchema,
       execute: (input, { agent }) => runPost(ports, agent, input),
     }),

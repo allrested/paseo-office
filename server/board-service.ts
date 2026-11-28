@@ -32,6 +32,8 @@ export interface NewPost {
   team?: string;
   /** Task ids, on any board, that a new task waits on. */
   after?: readonly string[];
+  /** A lobby task held until the owner starts it. */
+  backlog?: boolean;
   /** An agent id, or "user". */
   author: string;
 }
@@ -94,6 +96,8 @@ export interface BoardService {
   wakesPaused(): boolean;
   post(input: NewPost): Promise<PostResult>;
   update(input: PostUpdate): Promise<PostResult>;
+  /** Takes a held task out of the backlog; one not held is returned as it is. */
+  startTask(id: string): Promise<PostResult>;
   /**
    * Claims a lobby task or a duty for an automatic assignment. Returns null if the task changed or
    * the agent can no longer pick it up: it holds one already, on either board.
@@ -337,7 +341,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
 
   async function createPost(
     input: NewPost,
-    fields: Pick<Post, "team" | "after">,
+    fields: Pick<Post, "team" | "after" | "backlog">,
   ): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
@@ -401,6 +405,14 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return found === null ? refuse(`no team ${input.team}`) : { ok: true, value: { team: found } };
   }
 
+  /** A new post held in the backlog: only a lobby task is, and it may carry to, team and after. */
+  function backlogFor(input: NewPost): Outcome<Pick<Post, "backlog">> {
+    if (input.backlog !== true) return { ok: true, value: {} };
+    if (input.board !== LOBBY || input.kind !== "task" || input.replyTo !== undefined)
+      return { ok: false, error: "Unable to post: only a lobby task goes to the backlog" };
+    return { ok: true, value: { backlog: true } };
+  }
+
   /**
    * The tasks a new task waits on: trimmed, once each, and each a task on some board. A lobby
    * task's copy stands for its lobby task, which outlives it: the copy goes when the task reopens.
@@ -427,6 +439,18 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const post = data.posts.find((item) => item.id === id);
     const partner = post === undefined || post.board === LOBBY ? undefined : partnerOf(post);
     return partner?.board === LOBBY ? partner.id : id;
+  }
+
+  /** An agent's claim or finish of a held task; the user's own hand clears the hold. */
+  function backlogRefusal(input: PostUpdate): PostResult | null {
+    if ((input.action !== "claim" && input.action !== "done") || input.actor === USER_AUTHOR)
+      return null;
+    const post = data.posts.find((item) => item.id === input.id);
+    if (post?.kind !== "task" || post.backlog !== true) return null;
+    return {
+      ok: false,
+      error: `Unable to ${VERBS[input.action]} ${post.id}: it is in the backlog`,
+    };
   }
 
   /**
@@ -565,6 +589,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       claimedBy: input.actor,
       claimedAt: now(),
     };
+    delete claimed.backlog;
     // The user's claim has no cost to measure; an agent's has, when its provider reports one.
     const cost = input.actor === USER_AUTHOR ? undefined : ports.costOf?.(input.actor);
     if (cost !== undefined) claimed.costAtClaim = cost;
@@ -591,6 +616,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (input.action === "claim") return claimState(post, input);
     if (input.action === "done") {
       const done = { ...post, state: "done" as const, doneAt: now() };
+      delete done.backlog;
       delete done.pickupMessageId;
       delete done.blocked;
       // A turn's cost is reported when the turn ends: done in the middle of one, it is settled then.
@@ -919,12 +945,32 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         const team = await teamFor(input);
         if (!team.ok) return team;
         const after = afterFor(input);
-        return after.ok ? createPost(input, { ...team.value, ...after.value }) : after;
+        if (!after.ok) return after;
+        const backlog = backlogFor(input);
+        if (!backlog.ok) return backlog;
+        return createPost(input, { ...team.value, ...after.value, ...backlog.value });
       }),
     update: (input) =>
       exclusive(
-        async () => waitingRefusal(input) ?? (await teamRefusal(input)) ?? updatePost(input),
+        async () =>
+          backlogRefusal(input) ??
+          waitingRefusal(input) ??
+          (await teamRefusal(input)) ??
+          updatePost(input),
       ),
+    startTask: (id) =>
+      exclusive(async (): Promise<PostResult> => {
+        const post = data.posts.find((item) => item.id === id);
+        if (post === undefined) return { ok: false, error: `Unable to start ${id}: no such post` };
+        if (post.kind !== "task")
+          return { ok: false, error: `Unable to start ${id}: it is a note` };
+        if (post.backlog !== true) return { ok: true, post };
+        const started: Post = { ...post, seq: data.nextSeq, updatedAt: now() };
+        delete started.backlog;
+        const posts = data.posts.map((item) => (item.id === id ? started : item));
+        const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
+        return saved.ok ? { ok: true, post: started } : saved;
+      }),
     claimLobbyTask: (id, agentId, expectedSeq) =>
       exclusive(async () => {
         const pickup = data.posts.filter((post) => PICKUP_BOARDS.has(post.board));
@@ -936,6 +982,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           task.state !== "open" ||
           (task.to !== undefined && (!task.namedPickup || task.to !== agentId)) ||
           task.claimedBy !== undefined ||
+          task.backlog === true ||
           task.author === agentId ||
           waitingOn(task, data.posts).length > 0
         )
