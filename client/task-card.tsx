@@ -5,7 +5,7 @@ import { Icon } from "@getpaseo/plugin/client/ui";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
-import { clearQuestion, resultPreview, todoMeta, type TeamNamer } from "./board-text.js";
+import { afterLine, clearQuestion, resultPreview, todoMeta, type TeamNamer } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -179,6 +179,10 @@ export interface TaskThreadProps {
   /** The notes under the task, oldest first (`repliesOf`). */
   replies: readonly Post[];
   name(author: string): string;
+  /** The posts of every board: the line over the thread says what the task waits on. */
+  all: readonly Post[];
+  /** Follow-up: the form posts a task after this one. */
+  onFollowUp(id: string): void;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -186,13 +190,26 @@ export interface TaskThreadProps {
 /**
  * Under a task, on its card and on a room's list row: what its holder needs while it is blocked,
  * what came of it, the replies, and Reply, which is how the need is answered. The thread stays
- * once the task is done. The field waits behind its button so a card stays short.
+ * once the task is done. The field waits behind its button so a card stays short. Over it all is
+ * the line of what the task is after, and beside Reply is Follow-up.
  */
-export function TaskThread({ task, replies, name, actions, styles }: TaskThreadProps) {
+export function TaskThread({
+  task,
+  replies,
+  name,
+  all,
+  onFollowUp,
+  actions,
+  styles,
+}: TaskThreadProps) {
   const [replying, setReplying] = useState(false);
   const reply = useCallback(() => setReplying(true), []);
+  const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
+  const after = afterLine(task, all);
+  const t = useT();
   return (
     <>
+      {after === null ? null : <Text style={styles.postMeta}>{after}</Text>}
       {task.blocked === undefined ? null : (
         <Text style={styles.standupBlocker}>{`Needs you: ${task.blocked}`}</Text>
       )}
@@ -202,11 +219,20 @@ export function TaskThread({ task, replies, name, actions, styles }: TaskThreadP
           {`${name(note.author)} · ${note.text}`}
         </Text>
       ))}
-      {replying ? (
-        <ReplyField task={task} actions={actions} styles={styles} />
-      ) : (
-        <ThreadButton label="Reply" expanded={false} onPress={reply} styles={styles} />
-      )}
+      {replying ? <ReplyField task={task} actions={actions} styles={styles} /> : null}
+      <View style={styles.actions}>
+        {replying ? null : (
+          <ThreadButton label="Reply" expanded={false} onPress={reply} styles={styles} />
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t(`Follow-up: ${task.text}`)}
+          onPress={followUp}
+          style={styles.taskThreadButton}
+        >
+          <Text style={styles.lobbyDeleteText}>Follow-up</Text>
+        </Pressable>
+      </View>
     </>
   );
 }
@@ -217,6 +243,9 @@ export interface TaskCardProps {
   replies: readonly Post[];
   name(author: string): string;
   teamName: TeamNamer;
+  /** The posts of every board, for the line of what it waits on. */
+  all: readonly Post[];
+  onFollowUp(id: string): void;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -225,7 +254,16 @@ export interface TaskCardProps {
  * A to-do: its checkbox ticks or unticks it, and Delete asks first. Its result and replies are
  * under it. The list draws it as a row, the kanban as a card.
  */
-export function TaskCard({ post, replies, name, teamName, actions, styles }: TaskCardProps) {
+export function TaskCard({
+  post,
+  replies,
+  name,
+  teamName,
+  all,
+  onFollowUp,
+  actions,
+  styles,
+}: TaskCardProps) {
   const done = post.state === "done";
   const meta = todoMeta(post, name, teamName);
   const mounted = useMounted();
@@ -284,7 +322,15 @@ export function TaskCard({ post, replies, name, teamName, actions, styles }: Tas
         </Pressable>
       </View>
       <View style={styles.taskCardThread}>
-        <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
+        <TaskThread
+          task={post}
+          replies={replies}
+          name={name}
+          all={all}
+          onFollowUp={onFollowUp}
+          actions={actions}
+          styles={styles}
+        />
       </View>
       {failure === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>

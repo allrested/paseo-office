@@ -91,11 +91,19 @@ const ACTIONS: BoardActions = {
 const nameOf = (author: string) => author;
 const teamIdOf = (id: string) => id;
 
-function Harness({ posts }: { posts: Post[] }) {
+/** The cards whose Follow-up was pressed. */
+let followed: string[];
+const onFollowUp = (id: string) => {
+  followed.push(id);
+};
+
+function Harness({ posts, all = posts }: { posts: Post[]; all?: Post[] }) {
   const styles = useOfficeStyles(THEME, false, false);
   return (
     <KanbanBoard
       posts={posts}
+      all={all}
+      onFollowUp={onFollowUp}
       name={nameOf}
       teamName={teamIdOf}
       actions={ACTIONS}
@@ -109,6 +117,7 @@ let root: Root;
 
 beforeEach(() => {
   asked = [];
+  followed = [];
   observed = [];
   container = document.createElement("div");
   document.body.append(container);
@@ -120,7 +129,8 @@ afterEach(() => {
   container.remove();
 });
 
-const mount = (posts: Post[]) => act(async () => root.render(<Harness posts={posts} />));
+const mount = (posts: Post[], all?: Post[]) =>
+  act(async () => root.render(<Harness posts={posts} all={all} />));
 const settle = () => act(async () => void (await new Promise((done) => setTimeout(done, 0))));
 
 /** The board's view reports `width`, as a sheet of that width would. */
@@ -174,16 +184,20 @@ test("wide, the columns sit side by side, 280 px each, with their counts and the
     "To do · 2",
     "Rotate keys",
     "Reply",
+    "Follow-up",
     "Write the release notes",
     "Reply",
+    "Follow-up",
     "In progress · 1",
     "Check the build",
     "claimed by a1",
     "Reply",
+    "Follow-up",
     "Done · 1",
     "Clear finished",
     "Update the README",
     "Reply",
+    "Follow-up",
     "Notes · 1",
     "Note · user",
     "The demo is on Thursday",
@@ -217,12 +231,15 @@ test("narrow, and before it is measured, the columns stack with Done folded; a p
     "To do · 2",
     "Rotate keys",
     "Reply",
+    "Follow-up",
     "Write the release notes",
     "Reply",
+    "Follow-up",
     "In progress · 1",
     "Check the build",
     "claimed by a1",
     "Reply",
+    "Follow-up",
     "Done · 1",
     "Clear finished",
     "Notes · 1",
@@ -276,4 +293,22 @@ test("a task's card ticks, unticks and deletes as the list's row does", async ()
   await press("Delete");
 
   expect(asked).toEqual(["markDone p1", "reopen p2", "remove p1"]);
+});
+
+test("a task waiting on another board's task is in Waiting, with its line, and moves when released", async () => {
+  const elsewhere = post(9, { board: "w1", text: "Build the API" });
+  const waits = post(6, { text: "Write the docs", after: ["p9"] });
+  await mount([waits], [elsewhere, waits]);
+  expect(container.textContent).toContain("Waiting · 1");
+  expect(container.textContent).toContain("Waiting on p9");
+  const done = { ...elsewhere, state: "done" as const };
+  await mount([waits], [done, waits]);
+  expect(container.textContent).not.toContain("Waiting · 1");
+  expect(container.textContent).toContain("After p9");
+});
+
+test("Follow-up on a card names its task", async () => {
+  await mount(BOARD);
+  await act(async () => byLabel("Follow-up: Rotate keys").click());
+  expect(followed).toEqual(["p1"]);
 });

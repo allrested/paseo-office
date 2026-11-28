@@ -3,7 +3,7 @@
  */
 // A task's result and its replies, mounted: on the to-do card the lobby and the kanban draw, and
 // on a room's list row. The Reply field sends a note under the task.
-import { act, type ReactNode } from "react";
+import { act, useMemo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -80,11 +80,29 @@ const teamIdOf = (id: string) => id;
 
 const NO_REPLIES: Post[] = [];
 
-function Card({ task = TASK, replies = REPLIES }: { task?: Post; replies?: Post[] }) {
+/** The cards whose Follow-up was pressed. */
+let followed: string[];
+const onFollowUp = (id: string) => {
+  followed.push(id);
+};
+
+function Card({
+  task = TASK,
+  replies = REPLIES,
+  others = NO_REPLIES,
+}: {
+  task?: Post;
+  replies?: Post[];
+  /** The other tasks on the boards, besides this one. */
+  others?: Post[];
+}) {
   const styles = useOfficeStyles(THEME, false, false);
+  const all = useMemo(() => [...others, task], [others, task]);
   return (
     <TaskCard
       post={task}
+      all={all}
+      onFollowUp={onFollowUp}
       replies={replies}
       name={nameOf}
       teamName={teamIdOf}
@@ -94,11 +112,22 @@ function Card({ task = TASK, replies = REPLIES }: { task?: Post; replies?: Post[
   );
 }
 
-function Row({ item, replies = REPLIES }: { item: Post; replies?: Post[] }) {
+function Row({
+  item,
+  replies = REPLIES,
+  others = NO_REPLIES,
+}: {
+  item: Post;
+  replies?: Post[];
+  others?: Post[];
+}) {
   const styles = useOfficeStyles(THEME, false, false);
+  const all = useMemo(() => [...others, item], [others, item]);
   return (
     <PostWithActions
       post={item}
+      all={all}
+      onFollowUp={onFollowUp}
       replies={replies}
       name={nameOf}
       teamName={teamIdOf}
@@ -113,6 +142,7 @@ let root: Root;
 
 beforeEach(() => {
   language.choice = "auto";
+  followed = [];
   replied = [];
   refusal = null;
   answer = null;
@@ -177,6 +207,7 @@ test("a done task's card shows its result, then its replies oldest first, then R
     "Agent a1 · Which tag?",
     "You · v1.4.2",
     "Reply",
+    "Follow-up",
   ]);
   expect(has("More")).toBe(false);
   expect(has("Write a reply")).toBe(false);
@@ -184,7 +215,7 @@ test("a done task's card shows its result, then its replies oldest first, then R
 
 test("a task with no result and no replies has only its Reply button under it", async () => {
   await mount(<Card task={post(1, { text: "Rotate keys" })} replies={NO_REPLIES} />);
-  expect(lines()).toEqual(["Rotate keys", "Reply"]);
+  expect(lines()).toEqual(["Rotate keys", "Reply", "Follow-up"]);
 });
 
 test("a long result shows its start, and More and Less show the whole of it and fold it again", async () => {
@@ -274,6 +305,7 @@ test("a room's list row draws a task's result and replies, and replies under it"
     "Agent a1 · Which tag?",
     "You · v1.4.2",
     "Reply",
+    "Follow-up",
     "Mark done",
     "Delete",
   ]);
@@ -305,6 +337,7 @@ test("a blocked task's card says what it needs above its thread, answered by Rep
     "claimed by Agent a1",
     "Needs you: Which key store?",
     "Reply",
+    "Follow-up",
   ]);
   await press("Reply");
   await type("Write a reply", "The vault");
@@ -318,6 +351,7 @@ test("a blocked task's list row says what it needs above its thread", async () =
   expect(shown.slice(shown.indexOf("Needs you: Which key store?"))).toEqual([
     "Needs you: Which key store?",
     "Reply",
+    "Follow-up",
     "Mark done",
     "Delete",
   ]);
@@ -328,4 +362,62 @@ const CLAIMED = post(5, { text: "Rotate keys", state: "claimed", claimedBy: "a1"
 test("a task that is not blocked has no Needs you line", async () => {
   await mount(<Card task={CLAIMED} replies={NO_REPLIES} />);
   expect(lines().some((line) => line.startsWith("Needs you"))).toBe(false);
+});
+
+const FIRST = post(1, { text: "Build the API" });
+const WAITS = post(2, { text: "Write the docs", after: ["p1"] });
+const OPEN_FIRST = [FIRST];
+const DONE_FIRST = [{ ...FIRST, state: "done" as const }];
+const CLAIMED_WAITS = { ...WAITS, state: "claimed" as const, claimedBy: "a1" };
+const NEEDING = post(3, { state: "claimed", claimedBy: "a1", blocked: "Which tag?" });
+const NOTE = post(4, { kind: "note", state: undefined });
+
+test("a task that waits says on what, on its card and on its row", async () => {
+  await mount(<Card task={WAITS} replies={NO_REPLIES} others={OPEN_FIRST} />);
+  expect(container.textContent).toContain("Waiting on p1");
+  await mount(<Row item={WAITS} replies={NO_REPLIES} others={OPEN_FIRST} />);
+  expect(container.textContent).toContain("Waiting on p1");
+});
+
+test("a released task says After, and a claimed or done one never says Waiting", async () => {
+  await mount(<Card task={WAITS} replies={NO_REPLIES} others={DONE_FIRST} />);
+  expect(container.textContent).toContain("After p1");
+  expect(container.textContent).not.toContain("Waiting on");
+  await mount(<Row item={CLAIMED_WAITS} replies={NO_REPLIES} others={OPEN_FIRST} />);
+  expect(container.textContent).toContain("After p1");
+  expect(container.textContent).not.toContain("Waiting on");
+});
+
+test("a task after none has no such line", async () => {
+  await mount(<Card task={FIRST} replies={NO_REPLIES} />);
+  expect(container.textContent).not.toContain("After");
+  expect(container.textContent).not.toContain("Waiting on");
+});
+
+test("Follow-up is on every task, open, claimed or done, and tells which one", async () => {
+  await mount(<Card task={FIRST} replies={NO_REPLIES} />);
+  await act(async () => byLabel("Follow-up: Build the API").click());
+  expect(followed).toEqual(["p1"]);
+  await mount(<Card task={NEEDING} replies={NO_REPLIES} />);
+  await act(async () => byLabel(`Follow-up: ${NEEDING.text}`).click());
+  await mount(<Row item={TASK} />);
+  await act(async () => byLabel("Follow-up: Ship the release").click());
+  expect(followed).toEqual(["p1", "p3", "p1"]);
+});
+
+test("a note has no Follow-up", async () => {
+  await mount(<Row item={NOTE} replies={NO_REPLIES} />);
+  expect(container.textContent).not.toContain("Follow-up");
+});
+
+test("Follow-up and the lines are in Vietnamese when the interface is", async () => {
+  language.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Card task={WAITS} replies={NO_REPLIES} others={OPEN_FIRST} />
+    </UiLanguage>,
+  );
+  expect(container.textContent).toContain(UI_VI["Follow-up"]);
+  expect(container.textContent).toContain("Đang chờ p1");
+  byLabel(`${UI_VI["Follow-up"]}: Write the docs`);
 });

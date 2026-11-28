@@ -17,8 +17,16 @@ import {
   recipientLabels,
 } from "./agent-picker-text.js";
 import { BoardAgents } from "./board-agents.js";
+import { AfterField, useFollowUp } from "./follow-up.js";
 import { KanbanBoard } from "./board-kanban.js";
-import { orderBoardPosts, repliesOf, roomAgents, topLevel, type TeamNamer } from "./board-text.js";
+import {
+  allPosts,
+  orderBoardPosts,
+  repliesOf,
+  roomAgents,
+  topLevel,
+  type TeamNamer,
+} from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import type { RosterTeam } from "../shared/roster.js";
 import type { BoardLayout } from "../shared/settings.js";
@@ -66,6 +74,9 @@ interface PostActionsProps {
   replies?: readonly Post[];
   name(author: string): string;
   teamName: TeamNamer;
+  /** The posts of every board, for a task's line of what it waits on. */
+  all: readonly Post[];
+  onFollowUp(id: string): void;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -77,6 +88,8 @@ export function PostWithActions({
   replies = NO_REPLIES,
   name,
   teamName,
+  all,
+  onFollowUp,
   actions,
   styles,
 }: PostActionsProps) {
@@ -96,7 +109,15 @@ export function PostWithActions({
       <PostRow post={post} name={name} teamName={teamName} styles={styles} />
       {post.kind === "task" ? (
         <View style={styles.taskThread}>
-          <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
+          <TaskThread
+            task={post}
+            replies={replies}
+            name={name}
+            all={all}
+            onFollowUp={onFollowUp}
+            actions={actions}
+            styles={styles}
+          />
         </View>
       ) : null}
       {asking ? (
@@ -284,6 +305,8 @@ interface DoneSectionProps {
   room: OfficeRoom;
   name(author: string): string;
   teamName: TeamNamer;
+  all: readonly Post[];
+  onFollowUp(id: string): void;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -292,7 +315,7 @@ interface DoneSectionProps {
  * A room's done tasks under its list, folded at first as the kanban's stacked Done is: a press on
  * "Done · 2" unfolds them, each with its result and replies and the buttons a list row has.
  */
-function DoneSection({ room, name, teamName, actions, styles }: DoneSectionProps) {
+function DoneSection({ room, name, teamName, all, onFollowUp, actions, styles }: DoneSectionProps) {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
@@ -320,6 +343,8 @@ function DoneSection({ room, name, teamName, actions, styles }: DoneSectionProps
               replies={repliesOf(post, room.posts)}
               name={name}
               teamName={teamName}
+              all={all}
+              onFollowUp={onFollowUp}
               actions={actions}
               styles={styles}
             />
@@ -348,6 +373,8 @@ export interface SheetBodyProps {
   layout: BoardLayout;
   styles: OfficeStyles;
 }
+
+const NO_AFTER: readonly string[] = [];
 
 function SheetBody({
   room,
@@ -382,14 +409,35 @@ function SheetBody({
   // The kanban takes the done tasks too, for its Done column.
   const board = useMemo(() => [...room.posts, ...room.done], [room.posts, room.done]);
   const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
+  // What a task waits on can be on any board: the cards and the Follow-up form judge by all of them.
+  const everyPost = useMemo(() => allPosts(rooms), [rooms]);
+  const followUp = useFollowUp(everyPost);
+  // Follow-up makes the post a task: only a task waits.
+  const addFollowUp = followUp.add;
+  const onFollowUp = useCallback(
+    (id: string) => {
+      setKind("task");
+      addFollowUp(id);
+    },
+    [addFollowUp],
+  );
+  const after = kind === "task" ? followUp.after : NO_AFTER;
+  const clearFollowUp = followUp.clear;
   const submit = useCallback(async () => {
     const sent = text.trim();
-    await actions.post({ board: room.id, kind, text: sent, ...(to === NOBODY ? {} : { to }) });
+    await actions.post({
+      board: room.id,
+      kind,
+      text: sent,
+      ...(to === NOBODY ? {} : { to }),
+      ...(after.length === 0 ? {} : { after: [...after] }),
+    });
     if (!mounted.current) return;
     // Cleared only if the box still holds what was posted, so later typing stays.
     setText((current) => textAfterSend(current, sent));
     reset();
-  }, [actions, room.id, kind, text, to, reset]);
+    clearFollowUp();
+  }, [actions, room.id, kind, text, to, after, reset, clearFollowUp]);
   const chosen = KINDS.find((option) => option.kind === kind) ?? KINDS[0];
   // The form's state is kept here while the page shows, so the text typed is there on return.
   if (picking) {
@@ -428,7 +476,9 @@ function SheetBody({
           maxLength={POST_TEXT_MAX}
           multiline
           style={styles.input}
+          ref={followUp.field}
         />
+        {kind === "task" ? <AfterField followUp={followUp} styles={styles} /> : null}
       </View>
       <WakeField
         id={fieldId}
@@ -463,6 +513,8 @@ function SheetBody({
           posts={board}
           name={name}
           teamName={teamName}
+          all={everyPost}
+          onFollowUp={onFollowUp}
           actions={actions}
           styles={styles}
         />
@@ -480,6 +532,8 @@ function SheetBody({
               replies={repliesOf(post, room.posts)}
               name={name}
               teamName={teamName}
+              all={everyPost}
+              onFollowUp={onFollowUp}
               actions={actions}
               styles={styles}
             />
@@ -489,6 +543,8 @@ function SheetBody({
               room={room}
               name={name}
               teamName={teamName}
+              all={everyPost}
+              onFollowUp={onFollowUp}
               actions={actions}
               styles={styles}
             />

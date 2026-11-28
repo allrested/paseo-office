@@ -9,6 +9,8 @@ import {
   type OfficeRow,
 } from "../shared/model.js";
 import { tabOf } from "./list-text.js";
+import { isWaiting } from "./kanban-model.js";
+import { waitingOn } from "../shared/board-rules.js";
 
 /** How many posts a room card shows before it counts the rest. The board sheet shows them all. */
 export const CARD_POSTS = 3;
@@ -66,6 +68,27 @@ export function todoMeta(
   const link = linkLabel(post, name);
   if (link !== null) parts.push(link);
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** The posts of every board: what a task that waits needs to find the tasks it waits on. */
+export function allPosts(rooms: readonly OfficeRoom[]): Post[] {
+  const byId = new Map<string, Post>();
+  for (const room of rooms) {
+    for (const post of [...room.posts, ...room.todos, ...room.done]) byId.set(post.id, post);
+  }
+  return [...byId.values()];
+}
+
+/**
+ * The line over a task's thread that says where it stands after another: "Waiting on p12, p13"
+ * (the ones still holding it) while it waits, "After p12, p13" once it is released, so where it
+ * came from stays visible. Null for a task that is after none.
+ */
+export function afterLine(post: Post, all: readonly Post[]): string | null {
+  if (post.after === undefined || post.after.length === 0) return null;
+  return isWaiting(post, all)
+    ? `Waiting on ${waitingOn(post, all).join(", ")}`
+    : `After ${post.after.join(", ")}`;
 }
 
 /** A board's posts without the replies: a reply shows under its task, never on its own. */

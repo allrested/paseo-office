@@ -677,6 +677,7 @@ test("notes show under the list only when there are notes", async () => {
     "Rotate keys",
     "claimed by a1 · for a1",
     "Reply",
+    "Follow-up",
     "Notes",
     "Note · user",
     "The demo is on Thursday",
@@ -706,6 +707,7 @@ test("the lobby's list draws a reply under its to-do, never in Notes", async () 
     "Rotated",
     "a1 · Thanks",
     "Reply",
+    "Follow-up",
     "Agent tasks",
     "No agent tasks",
   ]);
@@ -729,6 +731,7 @@ test("a room's list draws a reply under its task and not as a post of its own", 
     "Ship it",
     "user · Which tag?",
     "Reply",
+    "Follow-up",
     "Mark done",
     "Delete",
     "Note · user",
@@ -757,6 +760,7 @@ test("a room's done tasks wait folded under Done, and unfold with their result a
     "Task · open · user",
     "Ship it",
     "Reply",
+    "Follow-up",
     "Mark done",
     "Delete",
     "Done · 1",
@@ -774,6 +778,7 @@ test("a room's done tasks wait folded under Done, and unfold with their result a
     "Tagged v1.4.2",
     "user · Thanks",
     "Reply",
+    "Follow-up",
     "Reopen",
     "Delete",
   ]);
@@ -816,6 +821,7 @@ test("the lobby as a kanban draws a reply on its task's card, not in Notes", asy
     "Rotate keys",
     "user · Which ones?",
     "Reply",
+    "Follow-up",
     "In progress · 0",
     "Agent tasks",
     "No agent tasks",
@@ -1000,10 +1006,12 @@ test("the lobby as a kanban keeps the form above its columns and Agent tasks und
     "To do · 1",
     "Rotate keys",
     "Reply",
+    "Follow-up",
     "In progress · 1",
     "Check the build",
     "claimed by a1",
     "Reply",
+    "Follow-up",
     "Done · 1",
     "Clear finished",
     "Notes · 1",
@@ -1032,6 +1040,7 @@ test("a room's board as a kanban draws its columns under the form and the agents
     "To do · 1",
     "Ship it",
     "Reply",
+    "Follow-up",
     "In progress · 0",
     "Notes · 1",
     "Note · user",
@@ -1053,6 +1062,7 @@ test("until the device's setting is read the lobby is a kanban and a room's boar
     "Task · open · user",
     "Ship it",
     "Reply",
+    "Follow-up",
     "Mark done",
     "Delete",
   ]);
@@ -1177,4 +1187,106 @@ test("a team task says which team it is for, by name and by id once the team is 
   layouts("kanban", "list");
   await mount({ rooms: lobbyRooms([task]), roomId: "lobby", teams: [QA] });
   expect(container.textContent).toContain("for team QA-PR");
+});
+
+/** The lobby's tasks p1..p`count`, for a Follow-up on each. */
+const lobbyTasks = (count: number) =>
+  Array.from({ length: count }, (_, i) => post(i + 1, { text: `Task ${i + 1}` }));
+
+test("Follow-up on a lobby task sets the form's After and focuses the field", async () => {
+  await mount({ rooms: lobbyRooms([post(12, { text: "Build the API" })]), roomId: "lobby" });
+  expect(container.textContent).not.toContain("After p12");
+  await press("Follow-up: Build the API");
+  expect(container.textContent).toContain("After p12");
+  expect(document.activeElement).toBe(byLabel("Add a to-do"));
+});
+
+test("Follow-up adds to the pending After once each, and Clear removes it", async () => {
+  await mount({ rooms: lobbyRooms(lobbyTasks(3)), roomId: "lobby" });
+  await press("Follow-up: Task 1");
+  await press("Follow-up: Task 3");
+  await press("Follow-up: Task 1");
+  expect(container.textContent).toContain("After p1, p3");
+  await press("Clear");
+  expect(container.textContent).not.toContain("After p1");
+  await type("Add a to-do", "Plain");
+  await press("Add");
+  expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Plain" }]);
+});
+
+test("adding a follow-up posts the task with its after, and the After is clear once it is added", async () => {
+  await mount({ rooms: lobbyRooms(lobbyTasks(2)), roomId: "lobby" });
+  await press("Follow-up: Task 1");
+  await press("Follow-up: Task 2");
+  await type("Add a to-do", "Then this");
+  await press("Add");
+  expect(posted).toEqual([
+    { board: "lobby", kind: "task", text: "Then this", after: ["p1", "p2"] },
+  ]);
+  expect(container.textContent).not.toContain("After p1");
+});
+
+test("a refused follow-up keeps its After for another try", async () => {
+  await mount({ rooms: lobbyRooms(lobbyTasks(1)), roomId: "lobby" });
+  await press("Follow-up: Task 1");
+  await type("Add a to-do", "Then this");
+  refusal = new Error("No");
+  await press("Add");
+  expect(container.textContent).toContain("After p1");
+});
+
+test("a task waits on at most 5 tasks: the sixth Follow-up does nothing and the form says so", async () => {
+  await mount({ rooms: lobbyRooms(lobbyTasks(6)), roomId: "lobby" });
+  for (let n = 1; n <= 5; n += 1) await press(`Follow-up: Task ${n}`);
+  expect(container.textContent).not.toContain("A task waits on at most 5 tasks");
+  await press("Follow-up: Task 6");
+  expect(container.textContent).toContain("A task waits on at most 5 tasks");
+  expect(container.textContent).toContain("After p1, p2, p3, p4, p5");
+  expect(container.textContent).not.toContain("p6,");
+  await press("Clear");
+  expect(container.textContent).not.toContain("A task waits on at most 5 tasks");
+});
+
+test("a task that leaves the boards is dropped from the pending After", async () => {
+  const tasks = lobbyTasks(2);
+  await mount({ rooms: lobbyRooms(tasks), roomId: "lobby" });
+  await press("Follow-up: Task 1");
+  await press("Follow-up: Task 2");
+  expect(container.textContent).toContain("After p1, p2");
+  await mount({ rooms: lobbyRooms([tasks[1] as Post]), roomId: "lobby" });
+  expect(container.textContent).toContain("After p2");
+  expect(container.textContent).not.toContain("After p1");
+  await type("Add a to-do", "Then this");
+  await press("Add");
+  expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Then this", after: ["p2"] }]);
+});
+
+test("the lobby's kanban has Follow-up on its cards and puts a waiting task in Waiting", async () => {
+  layouts("kanban", "list");
+  const first = post(1, { text: "Build the API" });
+  const second = post(2, { text: "Write the docs", after: ["p1"] });
+  await mount({ rooms: lobbyRooms([first, second]), roomId: "lobby" });
+  expect(container.textContent).toContain("Waiting · 1");
+  expect(container.textContent).toContain("Waiting on p1");
+  await press("Follow-up: Build the API");
+  expect(container.textContent).toContain("After p1");
+});
+
+test("a task waits on a task of another board: the room's board judges by every board's posts", async () => {
+  const prerequisite = post(1, { text: "Build the API" });
+  const waits = post(2, { board: "w1", text: "Write the docs", after: ["p1"] });
+  const rooms = officeRooms([], { lobby: [prerequisite], w1: [waits] });
+  await mount({ rooms, roomId: "w1" });
+  expect(container.textContent).toContain("Waiting on p1");
+});
+
+test("a room's board has Follow-up too: it makes the post a task after that one", async () => {
+  const here = post(5, { board: "w1", text: "Fix the build", kind: "task" });
+  await mount({ rooms: officeRooms([], { w1: [here] }), roomId: "w1" });
+  await press("Follow-up: Fix the build");
+  expect(container.textContent).toContain("After p5");
+  await type("Task text", "Then deploy");
+  await press("Post");
+  expect(posted).toEqual([{ board: "w1", kind: "task", text: "Then deploy", after: ["p5"] }]);
+  expect(container.textContent).not.toContain("After p5");
 });
