@@ -6,7 +6,7 @@ import {
   closestLimit,
 } from "../shared/plan-usage.js";
 import { errorMessage } from "./errors.js";
-import type { Timers } from "./timers.js";
+import type { Clock } from "./timers.js";
 
 /**
  * The providers re-read their own usage about every two minutes, and a limit is 5 hours or a
@@ -29,7 +29,12 @@ export interface PlanWatchPorts {
   counted(provider: string): boolean;
   /** Told once for each threshold a provider's closest limit reaches. */
   raised(crossing: PlanCrossing): void;
-  timers: Timers;
+  /**
+   * Told each reading, every provider in it, with the instant it was read; null when watching
+   * stops, so a reading is not taken for fresh after the last read.
+   */
+  observed?(reading: { usage: PlanUsage[]; at: number } | null): void;
+  timers: Clock;
   log(message: string): void;
 }
 
@@ -76,6 +81,7 @@ export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
       if (mine !== generation) return;
       failing = false;
       observe(usage);
+      ports.observed?.({ usage, at: ports.timers.now() });
     } catch (error) {
       if (mine !== generation) return;
       // A host whose Paseo has no provider usage fails every time: say it once.
@@ -102,6 +108,7 @@ export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
       generation += 1;
       cancel?.();
       cancel = null;
+      ports.observed?.(null);
     },
   };
 }

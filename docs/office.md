@@ -661,6 +661,29 @@ id is refused. Your own claim or done on a held task starts it in the same updat
 start: `office_update` has no such action, and a reopen of a held task changes nothing, since it is
 open and nobody holds it. `office_read` shows it as `p12 task open (backlog), from the user: ...`.
 
+The office can also start backlog tasks by itself, since each start spends your plan. The host
+setting `autoStart` is off at first. With it on, the office starts the oldest held task
+(`server/auto-start.ts`) when all three of its numbers allow it:
+
+- every plan limit of every provider counted in the Host card's Plan section, each window and not
+  only the closest, is under `autoStartUnderPct` (70%);
+- fewer than `autoStartAtOnce` (3) lobby tasks are claimed (duties and rooms' tasks do not count);
+- fewer than `autoStartPerDay` (10) were started by the office today. The day is a calendar day
+  from midnight in the notes' zone, not the duty board's 08:00 day, and your own Start presses do
+  not count.
+
+It needs **Keep watching**. The limits come only from the server's plan watch (see Plan limits),
+and a reading older than 15 minutes counts as none. With Keep watching off, before the first read,
+or with no counted provider reporting a limit, nothing starts. A count file the office cannot read
+counts as the day's cap reached: nothing starts until it can be read (fix or delete
+`auto-start.json`). The office checks after each board change, each plan reading, each turn's end
+and each save of the settings, and starts one task per check. That start changes the board, which
+brings the next check, so several can start in a row and each is checked again. A check that
+starts nothing asks for no other, and no timer of its own runs. A start the boards fail to save is
+not counted, and is logged. The office's state for clients carries `autoStart` (on, why it waits:
+`off`, `empty`, `no-reading`, `limit` with the worst window, `at-once` or `per-day`, then the day's
+count and the cap), sent as an `auto-start` event when it changes.
+
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays
 claimed and moves to the kanban's **Needs you** column, and a card and a list row show "Needs you:"
@@ -885,6 +908,10 @@ and the host is read every minute with no office open (`MACHINE_BACKGROUND_MS` i
 when an office opens. An open office reads the host every 10 seconds and the plans every two
 minutes, as before. The weather and the street's checks still run only while an office is open:
 they only draw the scene, and nobody is looking.
+
+The server's plan reading is also what the backlog's auto-start gate looks at, so with Keep
+watching off nothing is started by itself (see [Boards and wakes](#boards-and-wakes)). The open
+office's own reads of the plans are not the gate's: they are not kept on the server.
 
 ## Notifications
 
@@ -1188,7 +1215,8 @@ floor. A plan nobody pays for reads as used up, so switch that one off (`planHid
 settings, shared by every device). The office asks Paseo for them
 (`office.plan.usage.request`, which reads `providers.listUsage()`) when it opens and every two
 minutes after; it stores none of it. With **Keep watching** on, the server reads them too, every
-5 minutes, to tell the webhook as they pass 80%, 95% and 100%. A provider that is unavailable or reports no percentage is not
+5 minutes, to tell the webhook as they pass 80%, 95% and 100%; that reading is also the only one
+the backlog's auto-start gate trusts (see Boards and wakes). A provider that is unavailable or reports no percentage is not
 listed, and a host whose Paseo has no provider usage shows no limits at all.
 
 From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the
@@ -1463,7 +1491,8 @@ the workspace, where it is in the changes to review. The office installs and rem
 ## Data
 
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.json`, `chat.json`,
-`notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger) and `lift.json` (the build last serviced). Its settings are Paseo settings documents
+`notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger), `lift.json` (the build last serviced) and
+`auto-start.json` (`{ version: 1, day, count }`: the backlog tasks the office started by itself that day). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.

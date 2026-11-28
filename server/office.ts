@@ -59,6 +59,8 @@ export interface OfficeDeps {
   hub: OfficeHub;
   agents: OfficeAgentPorts;
   log(message: string): void;
+  /** After the boards are read, any board's change and a turn's end: the auto-start gate looks again. */
+  onChange?(): void;
 }
 
 export interface Office {
@@ -165,6 +167,7 @@ export function createOffice(deps: OfficeDeps): Office {
       // save the pickup makes while it scans does not start another scan.
       pickup?.refresh();
       wakeReleased();
+      deps.onChange?.();
     },
     onBoardRemoved: (board) => {
       hub.removeBoard(board);
@@ -172,6 +175,7 @@ export function createOffice(deps: OfficeDeps): Office {
       // handed out, or its agent told, with no other board changed.
       pickup?.refresh();
       wakeReleased();
+      deps.onChange?.();
     },
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
@@ -282,6 +286,7 @@ export function createOffice(deps: OfficeDeps): Office {
       hub.setBoards(service.boards());
       hub.setWake(queue.state());
       schedulePrune();
+      deps.onChange?.();
     } catch (error) {
       log(`[office] unable to start the boards: ${errorMessage(error)}`);
     }
@@ -374,6 +379,7 @@ export function createOffice(deps: OfficeDeps): Office {
     turnEnded(agentId) {
       queue?.turnEnded(agentId);
       pickup?.refresh();
+      deps.onChange?.();
     },
     async checkCompletion(agentId, lastAnswer) {
       await ready;

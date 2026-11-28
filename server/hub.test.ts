@@ -1628,3 +1628,40 @@ test("a watching host's directory that ends is opened again", async () => {
   await settle();
   expect(harness.directory.opens).toBe(2);
 });
+
+const AUTO_START = { on: true, reason: "at-once" as const, startedToday: 2, perDay: 10 };
+
+test("the gate's state reaches subscribers in the snapshot and as an event, and the same again sends nothing", async () => {
+  const harness = startHarness({ agents: [], workspaces: [] });
+  harness.hub.setAutoStart(AUTO_START);
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  expect(subscriber.events).toEqual([
+    {
+      type: "snapshot",
+      state: {
+        agents: [],
+        workspaces: [],
+        activity: {},
+        doing: {},
+        checklists: {},
+        boards: {},
+        wake: EMPTY_WAKE,
+        autoStart: AUTO_START,
+      },
+    },
+  ]);
+  harness.hub.setAutoStart({ ...AUTO_START });
+  expect(subscriber.events).toHaveLength(1);
+  const limit = {
+    on: true,
+    reason: "limit" as const,
+    detail: { provider: "Claude", window: "5 hours", usedPct: 82 },
+    startedToday: 2,
+    perDay: 10,
+  };
+  harness.hub.setAutoStart(limit);
+  expect(subscriber.events.at(-1)).toEqual({ type: "auto-start", autoStart: limit });
+  subscriber.controller.abort();
+  await subscriber.done;
+});

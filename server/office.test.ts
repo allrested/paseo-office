@@ -89,11 +89,16 @@ function setup(initial?: BoardsFile) {
     ["t2", "QA-PR"],
   ]);
   const seats = new Map<string, string>();
+  // How often the office told the auto-start gate to look again.
+  const changes = { count: 0 };
   const build = (overrides?: Partial<OfficeAgentPorts>) =>
     createOffice({
       store,
       clock,
       hub,
+      onChange: () => {
+        changes.count += 1;
+      },
       agents: {
         lobbyCandidates: async () =>
           [...targets.keys()].filter((id) => targets.get(id) === "wakeable"),
@@ -121,7 +126,7 @@ function setup(initial?: BoardsFile) {
       },
       log: (message) => logs.push(message),
     });
-  return { build, clock, hub, store, targets, prompts, sources, logs, teams, seats };
+  return { build, clock, hub, store, targets, prompts, sources, logs, teams, seats, changes };
 }
 
 function start(initial?: BoardsFile) {
@@ -1594,5 +1599,18 @@ test("a stored held lobby task for an agent is told as a new post once it is sta
   await office.start("p2");
   await settle();
   expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("the gate is told to look again once the boards are read, at each board change and at a turn's end", async () => {
+  const { office, changes } = start();
+  await office.ready;
+  const loaded = changes.count;
+  expect(loaded).toBeGreaterThan(0);
+  await office.post({ board: "lobby", kind: "task", text: "held", backlog: true });
+  expect(changes.count).toBeGreaterThan(loaded);
+  const posted = changes.count;
+  office.turnEnded("b");
+  expect(changes.count).toBe(posted + 1);
   await office.stop();
 });

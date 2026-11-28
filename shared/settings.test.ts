@@ -61,6 +61,10 @@ const COMPANY = {
   notifyUrl: "",
   notifyLevel: "danger",
   teams: [],
+  autoStart: false,
+  autoStartUnderPct: 70,
+  autoStartAtOnce: 3,
+  autoStartPerDay: 10,
   ...WEATHER_DEFAULTS,
 };
 
@@ -100,7 +104,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(13);
+  expect(officeHostSettings.version).toBe(14);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -121,7 +125,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(13);
+  expect(officeHostSettings.version).toBe(14);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -386,5 +390,39 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(13);
+  expect(officeHostSettings.version).toBe(14);
+});
+
+test("starting by itself is off, with its three numbers, and a number out of range is refused", async () => {
+  const defaults = officeHostSettings.schema.parse({});
+  expect(defaults).toMatchObject({
+    autoStart: false,
+    autoStartUnderPct: 70,
+    autoStartAtOnce: 3,
+    autoStartPerDay: 10,
+  });
+  // A version 13 document starts with it off.
+  expect(await upgraded({ agentTools: true, undoTurn: true }, 13)).toMatchObject({
+    undoTurn: true,
+    autoStart: false,
+    autoStartUnderPct: 70,
+  });
+  const schema = officeHostSettings.schema;
+  expect(
+    schema.safeParse({ autoStartUnderPct: 10, autoStartAtOnce: 1, autoStartPerDay: 1 }).success,
+  ).toBe(true);
+  expect(
+    schema.safeParse({ autoStartUnderPct: 100, autoStartAtOnce: 20, autoStartPerDay: 200 }).success,
+  ).toBe(true);
+  for (const bad of [
+    { autoStartUnderPct: 9 },
+    { autoStartUnderPct: 101 },
+    { autoStartUnderPct: 70.5 },
+    { autoStartAtOnce: 0 },
+    { autoStartAtOnce: 21 },
+    { autoStartPerDay: 0 },
+    { autoStartPerDay: 201 },
+  ]) {
+    expect(schema.safeParse(bad).success).toBe(false);
+  }
 });

@@ -104,6 +104,10 @@ const ON: SettingsState = {
     keepWatching: false,
     loopGuard: false,
     undoTurn: false,
+    autoStart: false,
+    autoStartUnderPct: 70,
+    autoStartAtOnce: 3,
+    autoStartPerDay: 10,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -131,6 +135,10 @@ const OFF: SettingsState = {
     keepWatching: false,
     loopGuard: false,
     undoTurn: false,
+    autoStart: false,
+    autoStartUnderPct: 70,
+    autoStartAtOnce: 3,
+    autoStartPerDay: 10,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -484,6 +492,8 @@ function setup(
   const incidentsStore = memoryIncidentsStore();
   const trackerStore = memoryTrackerStore(options.savedTrackers);
   const chatStore = options.chatStore ?? memoryChatStore();
+  // The auto-start gate's day count, as auto-start.json keeps it.
+  const autoStartKept: { value: unknown } = { value: null };
   const clock = createFakeClock(options.start ?? Date.parse("2026-11-11T09:00:00.000Z"));
   const context = fakeContext(statuses, sent, writers, directory);
   const baseServer = fakeServer(recorded, read);
@@ -501,6 +511,12 @@ function setup(
       save: async () => {},
     },
     liftFile: { load: async () => null, save: async () => {} },
+    autoStartFile: {
+      load: async () => structuredClone(autoStartKept.value) as never,
+      save: async (count) => {
+        autoStartKept.value = structuredClone(count);
+      },
+    },
     env: options.env ?? {},
     clock,
     log: (message) => logs.push(message),
@@ -537,6 +553,7 @@ function setup(
     notesStore,
     incidentsStore,
     trackerStore,
+    autoStartKept,
     clock,
     context,
     stop,
@@ -667,6 +684,10 @@ function notesSettings(
       keepWatching: false,
       loopGuard: false,
       undoTurn: false,
+      autoStart: false,
+      autoStartUnderPct: 70,
+      autoStartAtOnce: 3,
+      autoStartPerDay: 10,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1272,6 +1293,10 @@ const NOTES: SettingsState = {
     keepWatching: false,
     loopGuard: false,
     undoTurn: false,
+    autoStart: false,
+    autoStartUnderPct: 70,
+    autoStartAtOnce: 3,
+    autoStartPerDay: 10,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -1397,6 +1422,10 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       keepWatching: false,
       loopGuard: false,
       undoTurn: false,
+      autoStart: false,
+      autoStartUnderPct: 70,
+      autoStartAtOnce: 3,
+      autoStartPerDay: 10,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1861,6 +1890,10 @@ const JIRA_ON: SettingsState = {
     keepWatching: false,
     loopGuard: false,
     undoTurn: false,
+    autoStart: false,
+    autoStartUnderPct: 70,
+    autoStartAtOnce: 3,
+    autoStartPerDay: 10,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -2320,5 +2353,61 @@ test("with Keep watching off, the plan limits are not read with no office open",
   await settle();
   expect(reads).toBe(1);
   expect(fetchFn).not.toHaveBeenCalled();
+  await stop();
+});
+
+/** The gate on with its default numbers, as the daemon reads them from the schema. */
+const GATE = { autoStart: true, autoStartUnderPct: 70, autoStartAtOnce: 3, autoStartPerDay: 10 };
+
+test("with Keep watching on and the gate on, the office starts a held lobby task by itself", async () => {
+  const values = { ...ON.values, ...GATE, agentTools: false, keepWatching: true };
+  const { recorded, context, autoStartKept, stop } = setup(async () => ({ ...ON, values }));
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => usageOf(10);
+  const post = recorded.handlers.get("office.post.request");
+  const posted = (await post?.(
+    { board: "lobby", kind: "task", text: "Held", backlog: true },
+    context,
+  )) as { ok: true; post: { id: string } };
+  // The post brought the Paseo API: the plan watch reads, and the gate looks again.
+  await settle();
+  const office = openOffice(recorded, context);
+  await settle();
+  const shown = boardShown(office.events, "lobby").find((item) => item.id === posted.post.id);
+  expect(shown).toBeDefined();
+  expect(shown?.backlog).toBeUndefined();
+  expect(autoStartKept.value).toEqual({ version: 1, day: "2026-11-11", count: 1 });
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { autoStart?: unknown }
+    | undefined;
+  expect(snapshot?.autoStart).toEqual({ on: true, reason: "empty", startedToday: 1, perDay: 10 });
+  await office.leave();
+  await stop();
+});
+
+test("with Keep watching off the gate has no reading and starts nothing", async () => {
+  const values = { ...ON.values, ...GATE, agentTools: false };
+  const { recorded, context, autoStartKept, stop } = setup(async () => ({ ...ON, values }));
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => usageOf(10);
+  const post = recorded.handlers.get("office.post.request");
+  await post?.({ board: "lobby", kind: "task", text: "Held", backlog: true }, context);
+  // The pill's own read is not the gate's reading.
+  await recorded.handlers.get("office.plan.usage.request")?.({}, context);
+  await settle();
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(boardShown(office.events, "lobby")[0]?.backlog).toBe(true);
+  expect(autoStartKept.value).toBeNull();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { autoStart?: unknown }
+    | undefined;
+  expect(snapshot?.autoStart).toEqual({
+    on: true,
+    reason: "no-reading",
+    startedToday: 0,
+    perDay: 10,
+  });
+  await office.leave();
   await stop();
 });
