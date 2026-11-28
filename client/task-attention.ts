@@ -3,7 +3,7 @@ import type { OfficeModel, OfficeRoom } from "../shared/model.js";
 import { authorName, textPreview } from "./board-text.js";
 
 /** Why a task is on the Tasks card. Each kind has its own words and its own way on. */
-export type TaskAttentionKind = "blocked" | "stalled"; // Change 9 adds "merged"
+export type TaskAttentionKind = "blocked" | "stalled" | "merged";
 
 export interface TaskAttentionRow {
   kind: TaskAttentionKind;
@@ -16,10 +16,12 @@ export interface TaskAttentionRow {
   reason: string | null;
   /** Why a stalled claim is listed: its holder stopped on an error, or has been idle. */
   cause?: "error" | "idle";
+  /** A merged row's pull request as "#42 Fix the ledger total"; absent when the model has neither. */
+  pullRequest?: string;
 }
 
 /** The order of the kinds on the card. */
-const KIND_ORDER: readonly TaskAttentionKind[] = ["blocked", "stalled"];
+const KIND_ORDER: readonly TaskAttentionKind[] = ["blocked", "stalled", "merged"];
 
 /** How long an idle holder may sit on a claim before the card lists it. */
 export const STALL_MS = 120_000;
@@ -48,32 +50,57 @@ function stallCause(
   return status === "idle" && now - Date.parse(post.updatedAt) >= STALL_MS ? "idle" : null;
 }
 
+/**
+ * A claim whose holder's pull request is merged, as "#42 Fix the ledger total": the work is in, so
+ * the task is likely done. Null while the holder is no agent here, sits in the lobby or has none
+ * merged. One workspace can hold several tasks, so this only offers; it never marks anything.
+ */
+function mergedPullRequest(
+  post: Post,
+  model: Pick<OfficeModel, "rooms" | "agents" | "roomOfAgent">,
+): string | null {
+  if (post.kind !== "task" || post.state !== "claimed" || post.claimedBy === undefined) return null;
+  if (!model.agents.has(post.claimedBy)) return null;
+  const roomId = model.roomOfAgent.get(post.claimedBy);
+  const pullRequest = model.rooms.find((room) => room.id === roomId)?.workspace?.pullRequest;
+  if (pullRequest?.state !== "merged") return null;
+  const name = [pullRequest.number === null ? "" : `#${pullRequest.number}`, pullRequest.title]
+    .filter((part) => part !== "")
+    .join(" ");
+  return name;
+}
+
 interface Found {
   room: OfficeRoom;
   post: Post;
   kind: TaskAttentionKind;
   cause?: "error" | "idle";
+  pullRequest?: string;
 }
 
 /**
- * Rows across every board of the model, blocked first, then stalled, each oldest first. A lobby
+ * Rows across every board of the model, blocked first, then stalled, then merged, each oldest first. A lobby
  * task and its copy on the claimer's board carry the same mark, so the copy is left out while its
  * lobby task is listed. `now` is for the kinds that go by age.
  */
 export function taskAttentionRows(
-  model: Pick<OfficeModel, "rooms" | "agents">,
+  model: Pick<OfficeModel, "rooms" | "agents" | "roomOfAgent">,
   now: number,
 ): TaskAttentionRow[] {
   const found = model.rooms.flatMap((room) =>
     room.posts.flatMap((post): Found[] => {
       if (isBlocked(post)) return [{ room, post, kind: "blocked" }];
       const cause = stallCause(post, now, model.agents);
-      return cause === null ? [] : [{ room, post, kind: "stalled", cause }];
+      if (cause !== null) return [{ room, post, kind: "stalled", cause }];
+      const pullRequest = mergedPullRequest(post, model);
+      return pullRequest === null
+        ? []
+        : [{ room, post, kind: "merged", ...(pullRequest === "" ? {} : { pullRequest }) }];
     }),
   );
   const listedInLobby = new Set(found.filter(({ room }) => room.lobby).map(({ post }) => post.id));
   const rows: TaskAttentionRow[] = [];
-  for (const { room, post, kind, cause } of found) {
+  for (const { room, post, kind, cause, pullRequest } of found) {
     if (!room.lobby && post.link !== undefined && listedInLobby.has(post.link)) continue;
     rows.push({
       kind,
@@ -82,6 +109,7 @@ export function taskAttentionRows(
       holder: post.claimedBy === undefined ? null : authorName(post.claimedBy, model.agents),
       reason: post.blocked ?? null,
       ...(cause === undefined ? {} : { cause }),
+      ...(pullRequest === undefined ? {} : { pullRequest }),
     });
   }
   return rows.sort(
@@ -92,14 +120,16 @@ export function taskAttentionRows(
   );
 }
 
-/** The card in a few words, for the strip: "2 need you · 1 stalled"; null when nothing is on it. */
+/** The card in a few words, for the strip: "2 need you · 1 stalled · 2 merged"; null when nothing is on it. */
 export function taskAttentionNote(rows: readonly TaskAttentionRow[]): string | null {
   const count = (kind: TaskAttentionKind) => rows.filter((row) => row.kind === kind).length;
   const blocked = count("blocked");
   const stalled = count("stalled");
+  const merged = count("merged");
   const parts: string[] = [];
   if (blocked > 0) parts.push(blocked === 1 ? "1 needs you" : `${blocked} need you`);
   if (stalled > 0) parts.push(`${stalled} stalled`);
+  if (merged > 0) parts.push(`${merged} merged`);
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
@@ -113,6 +143,12 @@ export function blockedLine(row: Pick<TaskAttentionRow, "holder" | "reason">): s
 export function stalledLine(row: Pick<TaskAttentionRow, "holder" | "cause">): string {
   const holder = row.holder ?? "Nobody";
   return row.cause === "error" ? `${holder} stopped on an error` : `${holder} is idle`;
+}
+
+/** A merged row's line: "Builder's pull request is merged: #42 Fix the ledger total". */
+export function mergedLine(row: Pick<TaskAttentionRow, "holder" | "pullRequest">): string {
+  const line = `${row.holder ?? "Nobody"}'s pull request is merged`;
+  return row.pullRequest === undefined ? line : `${line}: ${row.pullRequest}`;
 }
 
 /** A task's text as the card shows it. */

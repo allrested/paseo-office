@@ -641,6 +641,15 @@ or block with what you need.", which wakes an idle holder (at most six an hour);
 the task for another agent. The clock is read again every 30 seconds while a task is claimed, so
 an idle claim turns up without another event.
 
+Last come the tasks whose work has landed: a claimed task, on any board, whose holder is an agent
+of the office in a workspace whose pull request is merged, if it is not already blocked or stalled
+(a task is on one row, in the kind that comes first). The entry adds "N merged" as its third part,
+as in "1 needs you · 1 stalled · 2 merged". The row says "<agent>'s pull request is merged", with
+the pull request's number and title when the office has them ("#42 Fix the ledger total"), and has
+**Mark done** and **Open board**, and no Answer field. **Mark done** is the same action as on the
+board. The office never marks a task done by itself, since one workspace can hold several tasks
+and a merged pull request does not say which of them it finished; the row only asks.
+
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
 steps of its checklist. What an agent is at is said in the 3D whiteboard's words: its "doing now"

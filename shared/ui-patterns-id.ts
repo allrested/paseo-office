@@ -77,9 +77,15 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) to review$/, (n) => `${n} untuk ditinjau`],
   [/^(\d+) needs? you$/, (n) => `${n} butuh Anda`],
   [/^(\d+) stalled$/, (n) => `${n} macet`],
+  [/^(\d+) merged$/, (n) => `${n} digabung`],
   [
-    /^(\d+ needs? you) · (\d+ stalled)$/,
-    (blocked, stalled) => `${translatePattern(blocked)} · ${translatePattern(stalled)}`,
+    /^(\d+ (?:needs? you|stalled|merged)(?: · \d+ (?:stalled|merged))+)$/,
+    (parts) => parts.split(" · ").map(translatePattern).join(" · "),
+  ],
+  [
+    /^(.+)'s pull request is merged(?:: (.+))?$/,
+    (name, pullRequest) =>
+      `Pull request milik ${name} telah digabung${pullRequest === undefined ? "" : `: ${pullRequest}`}`,
   ],
   [/^(\d+) tool steps$/, (n) => `${n} langkah alat`],
   [/^(\d+) cores?$/, (n) => `${n} inti`],

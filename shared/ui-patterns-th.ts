@@ -77,9 +77,15 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) to review$/, (n) => `รอตรวจ ${n}`],
   [/^(\d+) needs? you$/, (n) => `ต้องการคุณ ${n}`],
   [/^(\d+) stalled$/, (n) => `${n} ค้าง`],
+  [/^(\d+) merged$/, (n) => `${n} รวมแล้ว`],
   [
-    /^(\d+ needs? you) · (\d+ stalled)$/,
-    (blocked, stalled) => `${translatePattern(blocked)} · ${translatePattern(stalled)}`,
+    /^(\d+ (?:needs? you|stalled|merged)(?: · \d+ (?:stalled|merged))+)$/,
+    (parts) => parts.split(" · ").map(translatePattern).join(" · "),
+  ],
+  [
+    /^(.+)'s pull request is merged(?:: (.+))?$/,
+    (name, pullRequest) =>
+      `pull request ของ ${name} ถูกรวมแล้ว${pullRequest === undefined ? "" : `: ${pullRequest}`}`,
   ],
   [/^(\d+) tool steps$/, (n) => `${n} ขั้นตอนของเครื่องมือ`],
   [/^(\d+) cores?$/, (n) => `${n} คอร์`],

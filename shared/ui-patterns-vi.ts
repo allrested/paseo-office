@@ -78,9 +78,15 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) to review$/, (n) => `${n} cần xem xét`],
   [/^(\d+) needs? you$/, (n) => `${n} cần bạn`],
   [/^(\d+) stalled$/, (n) => `${n} bị kẹt`],
+  [/^(\d+) merged$/, (n) => `${n} đã gộp`],
   [
-    /^(\d+ needs? you) · (\d+ stalled)$/,
-    (blocked, stalled) => `${translatePattern(blocked)} · ${translatePattern(stalled)}`,
+    /^(\d+ (?:needs? you|stalled|merged)(?: · \d+ (?:stalled|merged))+)$/,
+    (parts) => parts.split(" · ").map(translatePattern).join(" · "),
+  ],
+  [
+    /^(.+)'s pull request is merged(?:: (.+))?$/,
+    (name, pullRequest) =>
+      `Pull request của ${name} đã được gộp${pullRequest === undefined ? "" : `: ${pullRequest}`}`,
   ],
   [/^(\d+) tool steps$/, (n) => `${n} bước dùng công cụ`],
   [/^(\d+) cores?$/, (n) => `${n} nhân`],
