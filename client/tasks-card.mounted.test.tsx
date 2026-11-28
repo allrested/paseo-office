@@ -499,3 +499,21 @@ test("a row of a task handed over says not for the provider, by id here", async 
   await mount(<Harness rows={NOT_FOR_ROWS} />);
   expect(lines()).toContain("not for codex");
 });
+
+test("the question is for one holder: a new holder closes it, and no holder means no button", async () => {
+  const stalled = (fields: Partial<TaskAttentionRow>): TaskAttentionRow[] => [
+    { ...(STALLED[1] as TaskAttentionRow), ...fields },
+  ];
+  await mount(<Harness rows={stalled({})} />);
+  await press("Hand over");
+  expect(allLabelled("Keep it")).toHaveLength(1);
+
+  await mount(<Harness rows={stalled({ holder: "Tester", post: post(6, { claimedBy: "a2" }) })} />);
+  expect(allLabelled("Keep it")).toHaveLength(0);
+  await press("Hand over");
+  expect(lines().some((line) => line.includes("Tester loses it"))).toBe(true);
+  expect(sent.calls).toEqual([]);
+
+  await mount(<Harness rows={stalled({ holder: null })} />);
+  expect(allLabelled("Hand over")).toHaveLength(0);
+});

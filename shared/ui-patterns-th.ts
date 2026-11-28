@@ -1,3 +1,4 @@
+import { translateMetaLine } from "./ui-meta-line.js";
 import { UI_TH } from "./ui-words-th.js";
 
 /**
@@ -313,6 +314,14 @@ export const RULES: readonly Rule[] = [
 
 /** The line in Thai when a rule fits it, else the line as it is. */
 export function translatePattern(text: string): string {
+  const known = UI_TH[text];
+  if (known !== undefined) return known;
+  const meta = translateMetaLine(text, translateWhole, (name) => `สำหรับ ${name}`);
+  return meta ?? translateWhole(text);
+}
+
+/** A line as one piece: its words, else the first rule that fits it. */
+function translateWhole(text: string): string {
   const known = UI_TH[text];
   if (known !== undefined) return known;
   for (const [shape, write] of RULES) {

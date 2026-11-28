@@ -185,3 +185,32 @@ test("a done task's time and cost line takes the language, its dollar amount as 
   // Only the exact line: a post that starts with the word is left alone.
   expect(translatePattern("took the bus to work")).toBe("took the bus to work");
 });
+
+test("a meta line joined with · is translated part by part, whatever follows the claim", () => {
+  const lines: [string, string][] = [
+    [
+      "claimed by Planner · for team QA-PR · not for Codex · on Planner's board",
+      "diambil oleh Planner · untuk tim QA-PR · bukan untuk Codex · di papan Planner",
+    ],
+    [
+      "claimed by Planner · for Planner · for team QA-PR · not for Codex",
+      "diambil oleh Planner · untuk Planner · untuk tim QA-PR · bukan untuk Codex",
+    ],
+    [
+      "Task · claimed by Planner · You → Planner · for team QA-PR · not for Codex · from lobby task p12",
+      "Tugas · diambil oleh Planner · You → Planner · untuk tim QA-PR · bukan untuk Codex · dari tugas lobi p12",
+    ],
+    ["claimed by Planner · not for Codex", "diambil oleh Planner · bukan untuk Codex"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+});
+
+test("a line with · that is not a meta line is left to the other rules", () => {
+  for (const said of [
+    "Fix the build · for the demo",
+    "for me · not now",
+    "Task · fix the build · now",
+  ]) {
+    expect(translatePattern(said)).toBe(said);
+  }
+});

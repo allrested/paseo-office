@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback } from "react";
 import { View } from "react-native";
 import { Text } from "./text.js";
 import { OfficeModal as Modal } from "./office-modal.js";
@@ -13,7 +13,7 @@ import {
   type TaskAttentionRow,
 } from "./task-attention.js";
 import { canHandOver } from "./board-text.js";
-import { HandOverQuestion, ReplyField, ThreadButton } from "./task-card.js";
+import { HandOverQuestion, ReplyField, ThreadButton, useHandOverAsk } from "./task-card.js";
 import { useProviderName } from "./use-plan-usage.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -45,10 +45,9 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
   const { kind } = row;
   const stalled = kind === "stalled";
   const providerName = useProviderName();
-  const [handing, setHanding] = useState(false);
-  const askHandOver = useCallback(() => setHanding(true), []);
-  const keepIt = useCallback(() => setHanding(false), []);
-  const handable = stalled && canHandOver(post);
+  const handOver = useHandOverAsk(post);
+  // Named as the row names the holder; with none there is nobody to take it from.
+  const handable = stalled && canHandOver(post) && row.holder !== null;
   return (
     <View style={styles.reviewRow}>
       <Text accessibilityRole="header" style={styles.sheetText}>
@@ -78,11 +77,11 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
               onPress={reopen}
               styles={styles}
             />
-            {handable && !handing ? (
+            {handable && !handOver.asking ? (
               <ThreadButton
                 label="Hand over"
                 expanded={false}
-                onPress={askHandOver}
+                onPress={handOver.ask}
                 styles={styles}
               />
             ) : null}
@@ -103,12 +102,12 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
           styles={styles}
         />
       </View>
-      {handable && handing ? (
+      {handable && handOver.asking && row.holder !== null ? (
         <HandOverQuestion
           task={post}
-          holder={row.holder ?? "Nobody"}
+          holder={row.holder}
           actions={actions}
-          onKeep={keepIt}
+          onKeep={handOver.close}
           styles={styles}
         />
       ) : null}

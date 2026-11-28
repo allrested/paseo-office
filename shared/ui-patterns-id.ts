@@ -1,3 +1,4 @@
+import { translateMetaLine } from "./ui-meta-line.js";
 import { UI_ID } from "./ui-words-id.js";
 
 /**
@@ -345,6 +346,14 @@ export const RULES: readonly Rule[] = [
 
 /** The line in Indonesian when a rule fits it, else the line as it is. */
 export function translatePattern(text: string): string {
+  const known = UI_ID[text];
+  if (known !== undefined) return known;
+  const meta = translateMetaLine(text, translateWhole, (name) => `untuk ${name}`);
+  return meta ?? translateWhole(text);
+}
+
+/** A line as one piece: its words, else the first rule that fits it. */
+function translateWhole(text: string): string {
   const known = UI_ID[text];
   if (known !== undefined) return known;
   for (const [shape, write] of RULES) {

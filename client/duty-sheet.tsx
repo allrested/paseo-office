@@ -19,7 +19,13 @@ import { OfficeModal as Modal } from "./office-modal.js";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
 import { canHandOver } from "./board-text.js";
-import { HandOverQuestion, ReplyField, TaskFacts, ThreadButton } from "./task-card.js";
+import {
+  HandOverQuestion,
+  ReplyField,
+  TaskFacts,
+  ThreadButton,
+  useHandOverAsk,
+} from "./task-card.js";
 import type { BoardActions } from "./use-board-actions.js";
 import type { DutyActions } from "./use-duty-actions.js";
 
@@ -104,9 +110,7 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
   const { id } = row.post;
   const reopen = useCallback(() => actions.reopen(id), [actions, id]);
   const markDone = useCallback(() => actions.markDone(id), [actions, id]);
-  const [handing, setHanding] = useState(false);
-  const askHandOver = useCallback(() => setHanding(true), []);
-  const keepIt = useCallback(() => setHanding(false), []);
+  const handOver = useHandOverAsk(row.post);
   const handable = canHandOver(row.post);
   return (
     <View style={styles.dutyCard}>
@@ -128,8 +132,8 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
             styles={styles}
           />
         ) : null}
-        {handable && !handing ? (
-          <ThreadButton label="Hand over" expanded={false} onPress={askHandOver} styles={styles} />
+        {handable && !handOver.asking ? (
+          <ThreadButton label="Hand over" expanded={false} onPress={handOver.ask} styles={styles} />
         ) : null}
         {done ? null : (
           <ActionButton
@@ -141,12 +145,12 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
           />
         )}
       </View>
-      {handable && handing ? (
+      {handable && handOver.asking ? (
         <HandOverQuestion
           task={row.post}
           holder={name(row.post.claimedBy ?? "")}
           actions={board}
-          onKeep={keepIt}
+          onKeep={handOver.close}
           styles={styles}
         />
       ) : null}

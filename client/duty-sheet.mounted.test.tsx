@@ -371,3 +371,14 @@ test("Hand over is not on an open duty, a done one or one the owner holds", asyn
   await mount(LIST, [post(1, "cups"), post(2, "build")]);
   expect(container.querySelector('[aria-label="Hand over"]')).toBeNull();
 });
+
+test("a duty's question is for one holder: when another agent has it, it closes and asks by name", async () => {
+  await mount(LIST, [post(1, "cups"), post(2, "build", { state: "claimed", claimedBy: "a2" })]);
+  await press("Hand over");
+  expect(text()).toContain("Builder loses it");
+  await mount(LIST, [post(1, "cups"), post(2, "build", { state: "claimed", claimedBy: "a1" })]);
+  expect(text()).not.toContain("loses it");
+  await press("Hand over");
+  expect(text()).toContain("Planner loses it");
+  expect(handedOver).toEqual([]);
+});

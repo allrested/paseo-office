@@ -76,7 +76,10 @@ interface HandOverQuestionProps {
  * handed over the board no longer offers it, and the question goes with it.
  */
 export function HandOverQuestion({ task, holder, actions, onKeep, styles }: HandOverQuestionProps) {
-  const handOver = useCallback(() => actions.handOver(task.id), [actions, task.id]);
+  const handOver = useCallback(async () => {
+    await actions.handOver(task.id);
+    onKeep();
+  }, [actions, task.id, onKeep]);
   return (
     <>
       <Text style={styles.sheetText}>
@@ -93,6 +96,27 @@ export function HandOverQuestion({ task, holder, actions, onKeep, styles }: Hand
       </View>
     </>
   );
+}
+
+export interface HandOverAsk {
+  asking: boolean;
+  ask(): void;
+  close(): void;
+}
+
+/**
+ * Whether the hand-over question is open. It is put to one holder of one claim: once the task's
+ * holder or state changes (a hand-over reopens it, and another agent may claim it at once) it is
+ * closed, so a press never confirms the hand-over of a claim the question was not about. Reset
+ * during render (React's "state from the previous render"), so it never shows for a frame.
+ */
+export function useHandOverAsk(task: Post): HandOverAsk {
+  const claim = `${task.state ?? ""}\n${task.claimedBy ?? ""}`;
+  const [asked, setAsked] = useState<{ claim: string; open: boolean }>({ claim, open: false });
+  if (asked.claim !== claim) setAsked({ claim, open: false });
+  const ask = useCallback(() => setAsked({ claim, open: true }), [claim]);
+  const close = useCallback(() => setAsked({ claim, open: false }), [claim]);
+  return { asking: asked.claim === claim && asked.open, ask, close };
 }
 
 interface ThreadButtonProps {
@@ -279,9 +303,7 @@ export function TaskThread({
 }: TaskThreadProps) {
   const [replying, setReplying] = useState(false);
   const reply = useCallback(() => setReplying(true), []);
-  const [handing, setHanding] = useState(false);
-  const askHandOver = useCallback(() => setHanding(true), []);
-  const keepIt = useCallback(() => setHanding(false), []);
+  const handOver = useHandOverAsk(task);
   const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
   const start = useCallback(() => actions.start(task.id), [actions, task.id]);
   const after = afterLine(task, all);
@@ -312,16 +334,16 @@ export function TaskThread({
         >
           <Text style={styles.lobbyDeleteText}>Follow-up</Text>
         </Pressable>
-        {canHandOver(task) && !handing ? (
-          <ThreadButton label="Hand over" expanded={false} onPress={askHandOver} styles={styles} />
+        {canHandOver(task) && !handOver.asking ? (
+          <ThreadButton label="Hand over" expanded={false} onPress={handOver.ask} styles={styles} />
         ) : null}
       </View>
-      {canHandOver(task) && handing ? (
+      {canHandOver(task) && handOver.asking ? (
         <HandOverQuestion
           task={task}
           holder={name(task.claimedBy ?? "")}
           actions={actions}
-          onKeep={keepIt}
+          onKeep={handOver.close}
           styles={styles}
         />
       ) : null}

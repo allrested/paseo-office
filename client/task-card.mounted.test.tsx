@@ -731,6 +731,35 @@ describe("Hand over", () => {
     expect(has("Keep it")).toBe(true);
   });
 
+  test("the question is for one holder: when the holder changes it closes and asks again by name", async () => {
+    await mount(<Card task={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    await press("Hand over");
+    expect(lines().some((line) => line.includes("Agent a1 loses it"))).toBe(true);
+
+    await mount(<Card task={post(12, { ...HANDABLE, claimedBy: "a2" })} replies={NO_REPLIES} />);
+    expect(has("Keep it")).toBe(false);
+    expect(lines().some((line) => line.includes("loses it"))).toBe(false);
+    await press("Hand over");
+    expect(handedOver).toEqual([]);
+    expect(lines().some((line) => line.includes("Agent a2 loses it"))).toBe(true);
+  });
+
+  test("after a hand-over the task reopens and a new claim does not bring the question back", async () => {
+    const view = (fields: Partial<Post>) => (
+      <Card task={post(12, { ...HANDABLE, ...fields })} replies={NO_REPLIES} />
+    );
+    await mount(view({}));
+    await press("Hand over");
+    await press("Hand over");
+    expect(handedOver).toEqual(["p12"]);
+    await mount(view({ state: "open", claimedBy: undefined }));
+    expect(has("Hand over")).toBe(false);
+    await mount(view({ claimedBy: "a2" }));
+    expect(has("Keep it")).toBe(false);
+    expect(handedOver).toEqual(["p12"]);
+    expect(has("Hand over")).toBe(true);
+  });
+
   test("the question and its buttons are translated", async () => {
     language.choice = "vi";
     await mount(
