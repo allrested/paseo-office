@@ -534,11 +534,13 @@ export type ChatResult = z.output<typeof ChatResultSchema>;
 /** Why the office does not start a backlog task by itself now, in the order it looks. */
 export const AUTO_START_REASONS = [
   "off",
+  "no-pickup",
   "empty",
   "no-reading",
   "limit",
   "at-once",
   "per-day",
+  "no-count",
 ] as const;
 export const AutoStartReasonSchema = z.enum(AUTO_START_REASONS);
 export type AutoStartReason = z.output<typeof AutoStartReasonSchema>;
@@ -551,12 +553,16 @@ export const AutoStartLimitSchema = z.object({
 });
 export type AutoStartLimit = z.output<typeof AutoStartLimitSchema>;
 
+/** The lobby's work already committed (claimed, or started and waiting), that stopped the gate. */
+export const AutoStartCommittedSchema = z.object({ count: z.number().int().nonnegative() });
+export type AutoStartCommitted = z.output<typeof AutoStartCommittedSchema>;
+
 /** The auto-start gate: on, why it waits (null while open) and the day's count. */
 export const AutoStartStateSchema = z.object({
   on: z.boolean(),
   reason: AutoStartReasonSchema.nullable(),
-  /** With `limit`: the worst window. */
-  detail: AutoStartLimitSchema.optional(),
+  /** With `limit`: the worst window; with `at-once`: the committed work's count. */
+  detail: z.union([AutoStartLimitSchema, AutoStartCommittedSchema]).optional(),
   startedToday: z.number().int().nonnegative(),
   perDay: z.number().int().nonnegative(),
 });

@@ -1,15 +1,17 @@
 import { expect, test } from "vitest";
-import type { Post, PostResult } from "../shared/contracts.js";
+import type { Post } from "../shared/contracts.js";
 import type { PlanUsage } from "../shared/plan-usage.js";
 import {
   READING_STALE_MS,
   createAutoStart,
   gateDecision,
   type AutoStartCount,
+  type AutoStartPorts,
   type AutoStartSettings,
   type AutoStartState,
   type GateInput,
 } from "./auto-start.js";
+import type { StartResult } from "./board-service.js";
 import { createFakeClock, settle } from "./fake-clock.js";
 
 function plan(provider: string, ...pcts: number[]): PlanUsage {
@@ -40,8 +42,9 @@ function open(overrides: Partial<GateInput> = {}): GateInput {
       planHidden: [],
     },
     reading: { at: NOW - 60_000, usage: [plan("claude", 10, 20)] },
+    pickup: true,
     held: 1,
-    claimed: 0,
+    committed: 0,
     startedToday: 0,
     ...overrides,
   };
@@ -60,16 +63,23 @@ test("off: the setting is off, before anything else", () => {
     gateDecision(
       open({
         settings: settings({ autoStart: false }),
+        pickup: false,
         held: 0,
         reading: null,
-        claimed: 9,
+        committed: 9,
         startedToday: null,
       }),
     ),
   ).toEqual({ open: false, reason: "off" });
 });
 
-test("empty: no held task, before the reading", () => {
+test("no-pickup: nobody could take the work, right after off", () => {
+  expect(gateDecision(open({ pickup: false, held: 0, reading: null, startedToday: null }))).toEqual(
+    { open: false, reason: "no-pickup" },
+  );
+});
+
+test("empty: no held task ready, before the reading", () => {
   expect(gateDecision(open({ held: 0, reading: null, startedToday: null }))).toEqual({
     open: false,
     reason: "empty",
@@ -77,7 +87,7 @@ test("empty: no held task, before the reading", () => {
 });
 
 test("no-reading: none yet, before the limits and the counts", () => {
-  expect(gateDecision(open({ reading: null, claimed: 9, startedToday: null }))).toEqual({
+  expect(gateDecision(open({ reading: null, committed: 9, startedToday: null }))).toEqual({
     open: false,
     reason: "no-reading",
   });
@@ -173,26 +183,30 @@ test("limit: follows the setting's percent", () => {
 test("limit comes before the counts", () => {
   expect(
     gateDecision(
-      open({ reading: { at: NOW, usage: [plan("claude", 80)] }, claimed: 9, startedToday: null }),
+      open({ reading: { at: NOW, usage: [plan("claude", 80)] }, committed: 9, startedToday: null }),
     ),
   ).toMatchObject({ open: false, reason: "limit" });
 });
 
-test("at-once: as many claimed as the setting, before the day's count", () => {
-  expect(gateDecision(open({ claimed: 2 }))).toEqual({ open: true });
-  expect(gateDecision(open({ claimed: 3, startedToday: null }))).toEqual({
+test("at-once: as much committed work as the setting, before the day's count, with the count", () => {
+  expect(gateDecision(open({ committed: 2 }))).toEqual({ open: true });
+  expect(gateDecision(open({ committed: 3, startedToday: null }))).toEqual({
     open: false,
     reason: "at-once",
+    detail: { count: 3 },
   });
 });
 
-test("per-day: as many started today as the setting, or a count that could not be read", () => {
+test("per-day: as many started today as the setting", () => {
   expect(gateDecision(open({ startedToday: 9 }))).toEqual({ open: true });
   expect(gateDecision(open({ startedToday: 10 }))).toEqual({ open: false, reason: "per-day" });
-  expect(gateDecision(open({ startedToday: null }))).toEqual({ open: false, reason: "per-day" });
   expect(
     gateDecision(open({ settings: settings({ autoStartPerDay: 1 }), startedToday: 1 })),
   ).toEqual({ open: false, reason: "per-day" });
+});
+
+test("no-count: a count that could not be read, last", () => {
+  expect(gateDecision(open({ startedToday: null }))).toEqual({ open: false, reason: "no-count" });
 });
 
 // The service.
@@ -215,8 +229,15 @@ function task(id: string, overrides: Partial<Post> = {}): Post {
   };
 }
 
-function held(id: string, createdAt: string): Post {
-  return task(id, { backlog: true, createdAt });
+function held(id: string, createdAt: string, overrides: Partial<Post> = {}): Post {
+  return task(id, { backlog: true, createdAt, ...overrides });
+}
+
+/** Held tasks p1, p2, ... oldest first. */
+function heldTasks(n: number): Post[] {
+  return Array.from({ length: n }, (_, i) =>
+    held(`p${i + 1}`, `2026-11-${String(10 + i).padStart(2, "0")}T10:00:00.000Z`),
+  );
 }
 
 const SETTINGS: AutoStartSettings = {
@@ -237,9 +258,10 @@ function setup(
     posts?: Post[];
     kept?: AutoStartCount | null | Error;
     start?: number;
-    /** What the board does when told to start a task; by default it starts it. */
+    /** The board's answer to a start; by default it starts the task. */
     failStart?: boolean;
-    claimOnStart?: boolean;
+    /** Every save of the count file fails. */
+    failSave?: boolean;
   } = {},
 ) {
   const clock = createFakeClock(options.start ?? NOW);
@@ -248,26 +270,32 @@ function setup(
   const started: string[] = [];
   const states: AutoStartState[] = [];
   const logs: string[] = [];
+  // What the count file held as each start was asked for.
+  const keptAtStart: unknown[] = [];
   let loads = 0;
   let evaluations = 0;
-  const board = {
+  let pickup = true;
+  let gate: Promise<void> | null = null;
+  const board: AutoStartPorts["board"] = {
     lobbyPosts: (): readonly Post[] | null => posts,
-    async start(id: string): Promise<PostResult> {
+    allPosts: (): readonly Post[] | null => posts,
+    pickupOpen: () => pickup,
+    async startHeld(id: string, expectedSeq: number): Promise<StartResult> {
+      keptAtStart.push(structuredClone(kept.value));
       const post = posts.find((item) => item.id === id);
       if (post === undefined) return { ok: false, error: `no ${id}` };
       if (options.failStart) return { ok: false, error: "Unable to save the boards: disk full" };
+      if (post.seq !== expectedSeq || post.backlog !== true) {
+        return { ok: true, post, started: false };
+      }
       nextSeq += 1;
       const next: Post = { ...post, seq: nextSeq };
       delete next.backlog;
-      if (options.claimOnStart) {
-        next.state = "claimed";
-        next.claimedBy = `agent-${id}`;
-      }
       posts = posts.map((item) => (item.id === id ? next : item));
       started.push(id);
       // The office tells the gate of the board's change, as onBoard does.
       service.boardChanged();
-      return { ok: true, post: next };
+      return { ok: true, post: next, started: true };
     },
   };
   const service = createAutoStart({
@@ -275,10 +303,12 @@ function setup(
     file: {
       async load() {
         loads += 1;
+        if (gate !== null) await gate;
         if (kept.value instanceof Error) throw kept.value;
         return kept.value === null ? null : structuredClone(kept.value);
       },
       async save(count) {
+        if (options.failSave) throw new Error("read-only folder");
         kept.value = structuredClone(count);
       },
     },
@@ -292,6 +322,7 @@ function setup(
   return {
     clock,
     kept,
+    keptAtStart,
     service,
     started,
     states,
@@ -299,6 +330,18 @@ function setup(
     board,
     setPosts: (next: Post[]) => void (posts = next),
     posts: () => posts,
+    setPickup: (on: boolean) => void (pickup = on),
+    /** Holds the count file's next load until the returned function is called. */
+    holdLoad: () => {
+      let release = () => {};
+      gate = new Promise<void>((resolve) => {
+        release = () => {
+          gate = null;
+          resolve();
+        };
+      });
+      return () => release();
+    },
     loads: () => loads,
     evaluations: () => evaluations,
   };
@@ -309,48 +352,132 @@ const fresh = (clock: { now(): number }, usage = [plan("claude", 10)]) => ({
   at: clock.now(),
 });
 
+function finish(s: ReturnType<typeof setup>, id: string): void {
+  const post = s.posts().find((item) => item.id === id) as Post;
+  s.setPosts([{ ...post, state: "done" }, ...s.posts().filter((item) => item !== post)]);
+}
+
 test("starts the oldest held task and raises the day's count", async () => {
   const s = setup({
-    posts: [
-      held("p3", "2026-11-27T10:00:00.000Z"),
-      held("p2", "2026-11-26T10:00:00.000Z"),
-      task("p4"),
-    ],
-    claimOnStart: true,
+    posts: [held("p3", "2026-11-27T10:00:00.000Z"), held("p2", "2026-11-26T10:00:00.000Z")],
   });
   s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 1 });
   s.service.planRead(fresh(s.clock));
   await settle();
   expect(s.started).toEqual(["p2"]);
   expect(s.kept.value).toEqual({ version: 1, day: "2026-11-28", count: 1 });
+  // The started task waits for an agent: it is work already committed.
   expect(s.states.at(-1)).toEqual({
     on: true,
     reason: "at-once",
+    detail: { count: 1 },
     startedToday: 1,
     perDay: 10,
   });
 });
 
-test("starts several in a row, each looked at again, until at-once stops it", async () => {
-  const s = setup({
-    posts: ["p1", "p2", "p3", "p4", "p5"].map((id, i) => held(id, `2026-11-2${i}T10:00:00.000Z`)),
-    claimOnStart: true,
-  });
+test("with 10 held and at-once 3, exactly 3 start, and the rest wait until some finish", async () => {
+  const s = setup({ posts: heldTasks(10) });
   s.service.planRead(fresh(s.clock));
   s.service.settingsChanged(SETTINGS);
   await settle();
   expect(s.started).toEqual(["p1", "p2", "p3"]);
+  expect(
+    s
+      .posts()
+      .filter((post) => post.backlog)
+      .map((post) => post.id),
+  ).toEqual(["p4", "p5", "p6", "p7", "p8", "p9", "p10"]);
   expect(s.kept.value).toMatchObject({ count: 3 });
-  expect(s.states.at(-1)).toMatchObject({ reason: "at-once", startedToday: 3 });
+  // Looking again with nothing finished starts nothing.
+  s.service.boardChanged();
+  s.service.turnEnded();
+  await settle();
+  expect(s.started).toHaveLength(3);
+  finish(s, "p2");
+  s.service.boardChanged();
+  await settle();
+  expect(s.started).toEqual(["p1", "p2", "p3", "p4"]);
 });
 
-test("starts several in a row until per-day stops it", async () => {
+test("at-once counts the lobby's claimed tasks and its open ones not held, not duties nor rooms", async () => {
   const s = setup({
-    posts: ["p1", "p2", "p3"].map((id, i) => held(id, `2026-11-2${i}T10:00:00.000Z`)),
-    kept: { version: 1, day: "2026-11-28", count: 8 },
+    posts: [
+      task("c1", { state: "claimed", claimedBy: "a" }),
+      task("o1"),
+      task("d1", { state: "done" }),
+      task("n1", { kind: "note", state: undefined }),
+      task("r1", { board: "w1", state: "claimed", claimedBy: "b" }),
+      task("u1", { board: "duty", state: "open" }),
+      held("p5", "2026-11-20T10:00:00.000Z"),
+    ],
+  });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 2 });
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ reason: "at-once", detail: { count: 2 } });
+  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 3 });
+  await settle();
+  expect(s.started).toEqual(["p5"]);
+});
+
+test("no-pickup: with the pickup off or wakes paused nothing starts, and it is said first after off", async () => {
+  const s = setup({ posts: heldTasks(1), kept: new Error("bad") });
+  s.setPickup(false);
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ on: true, reason: "no-pickup" });
+  s.kept.value = null;
+  s.setPickup(true);
+  s.service.planRead(fresh(s.clock));
+  await settle();
+  expect(s.started).toEqual(["p1"]);
+});
+
+test("a held task that still waits on another is passed over for a later one that is ready", async () => {
+  const s = setup({
+    posts: [
+      task("w0"),
+      held("p1", "2026-11-10T10:00:00.000Z", { after: ["w0"] }),
+      held("p2", "2026-11-11T10:00:00.000Z"),
+    ],
+  });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 5 });
+  await settle();
+  expect(s.started).toEqual(["p2"]);
+});
+
+test("empty: every held task still waits", async () => {
+  const s = setup({
+    posts: [task("w0", { board: "w1" }), held("p1", "2026-11-10T10:00:00.000Z", { after: ["w0"] })],
   });
   s.service.planRead(fresh(s.clock));
   s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ reason: "empty" });
+  // Its task on a room's board is done: it is ready.
+  finish(s, "w0");
+  s.service.boardChanged();
+  await settle();
+  expect(s.started).toEqual(["p1"]);
+});
+
+test("a held task named for an agent is started like any other", async () => {
+  const s = setup({ posts: [held("p1", "2026-11-10T10:00:00.000Z", { to: "agent-b" })] });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.started).toEqual(["p1"]);
+});
+
+test("starts several in a row until per-day stops it", async () => {
+  const s = setup({ posts: heldTasks(3), kept: { version: 1, day: "2026-11-28", count: 8 } });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 20 });
   await settle();
   expect(s.started).toEqual(["p1", "p2"]);
   expect(s.kept.value).toEqual({ version: 1, day: "2026-11-28", count: 10 });
@@ -358,33 +485,32 @@ test("starts several in a row until per-day stops it", async () => {
 });
 
 test("the day's count survives a restart", async () => {
-  const first = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+  const gate = { ...SETTINGS, autoStartPerDay: 2, autoStartAtOnce: 20 };
+  const first = setup({ posts: heldTasks(1) });
   first.service.planRead(fresh(first.clock));
-  first.service.settingsChanged({ ...SETTINGS, autoStartPerDay: 2 });
+  first.service.settingsChanged(gate);
   await settle();
   expect(first.started).toEqual(["p1"]);
   // A new server reads the same file.
   const second = setup({
-    posts: [held("p2", "2026-11-21T10:00:00.000Z"), held("p3", "2026-11-22T10:00:00.000Z")],
+    posts: [held("q1", "2026-11-21T10:00:00.000Z"), held("q2", "2026-11-22T10:00:00.000Z")],
     kept: first.kept.value as AutoStartCount,
   });
   second.service.planRead(fresh(second.clock));
-  second.service.settingsChanged({ ...SETTINGS, autoStartPerDay: 2 });
+  second.service.settingsChanged(gate);
   await settle();
-  expect(second.started).toEqual(["p2"]);
+  expect(second.started).toEqual(["q1"]);
   expect(second.states.at(-1)).toMatchObject({ reason: "per-day", startedToday: 2 });
 });
 
 test("a new day in the notes' zone resets the count, at midnight there and not in UTC", async () => {
   // 20:59 UTC on the 28th is 23:59 in Riyadh (UTC+3); the file's day is Riyadh's 28th.
-  const start = Date.parse("2026-11-28T20:59:00.000Z");
   const s = setup({
-    posts: [held("p1", "2026-11-20T10:00:00.000Z"), held("p2", "2026-11-21T10:00:00.000Z")],
+    posts: heldTasks(2),
     kept: { version: 1, day: "2026-11-28", count: 10 },
-    start,
+    start: Date.parse("2026-11-28T20:59:00.000Z"),
   });
-  const riyadh = { ...SETTINGS, zone: "Asia/Riyadh" };
-  s.service.settingsChanged(riyadh);
+  s.service.settingsChanged({ ...SETTINGS, zone: "Asia/Riyadh" });
   s.service.planRead(fresh(s.clock));
   await settle();
   expect(s.started).toEqual([]);
@@ -397,17 +523,14 @@ test("a new day in the notes' zone resets the count, at midnight there and not i
   expect(s.kept.value).toEqual({ version: 1, day: "2026-11-29", count: 2 });
 });
 
-test("a count file that cannot be read starts nothing, says per-day, and is not written", async () => {
-  const s = setup({
-    posts: [held("p1", "2026-11-20T10:00:00.000Z")],
-    kept: new Error("unexpected shape"),
-  });
+test("no-count: a count file that cannot be read starts nothing and is not written", async () => {
+  const s = setup({ posts: heldTasks(1), kept: new Error("unexpected shape") });
   s.service.settingsChanged(SETTINGS);
   s.service.planRead(fresh(s.clock));
   await settle();
   expect(s.started).toEqual([]);
   expect(s.kept.value).toBeInstanceOf(Error);
-  expect(s.states.at(-1)).toMatchObject({ on: true, reason: "per-day" });
+  expect(s.states.at(-1)).toEqual({ on: true, reason: "no-count", startedToday: 0, perDay: 10 });
   expect(s.logs.filter((line) => line.includes("auto-start.json"))).toHaveLength(1);
   // Once it can be read again, the gate follows it.
   s.kept.value = { version: 1, day: "2026-11-28", count: 4 };
@@ -417,8 +540,78 @@ test("a count file that cannot be read starts nothing, says per-day, and is not 
   expect(s.kept.value).toMatchObject({ count: 5 });
 });
 
+test("the count is saved before the start, so a crash between errs toward starting less", async () => {
+  const s = setup({ posts: heldTasks(2), kept: { version: 1, day: "2026-11-28", count: 4 } });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 20 });
+  await settle();
+  expect(s.keptAtStart).toEqual([
+    { version: 1, day: "2026-11-28", count: 5 },
+    { version: 1, day: "2026-11-28", count: 6 },
+  ]);
+});
+
+test("a count that cannot be saved before the start starts nothing", async () => {
+  const s = setup({ posts: heldTasks(1), failSave: true });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.keptAtStart).toEqual([]);
+  expect(s.started).toEqual([]);
+  expect(s.logs.filter((line) => line.includes("read-only folder"))).toHaveLength(1);
+});
+
+test("a start that fails puts the count back, and is said once", async () => {
+  const s = setup({
+    posts: heldTasks(1),
+    failStart: true,
+    kept: { version: 1, day: "2026-11-28", count: 2 },
+  });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  s.service.boardChanged();
+  await settle();
+  expect(s.keptAtStart).toEqual([
+    { version: 1, day: "2026-11-28", count: 3 },
+    { version: 1, day: "2026-11-28", count: 3 },
+  ]);
+  expect(s.kept.value).toEqual({ version: 1, day: "2026-11-28", count: 2 });
+  expect(s.states.at(-1)).toMatchObject({ startedToday: 2 });
+  expect(s.logs.filter((line) => line.includes("disk full"))).toHaveLength(1);
+});
+
+test("a task the owner started first is not counted, and the count is put back", async () => {
+  const s = setup({ posts: heldTasks(1) });
+  // The owner's Start lands between the gate's look and its start: no hold is removed.
+  s.board.startHeld = async (id) => {
+    s.keptAtStart.push(structuredClone(s.kept.value));
+    const post = s.posts().find((item) => item.id === id) as Post;
+    return { ok: true, post: { ...post, backlog: undefined, seq: post.seq + 1 }, started: false };
+  };
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.keptAtStart).toEqual([{ version: 1, day: "2026-11-28", count: 1 }]);
+  expect(s.kept.value).toEqual({ version: 1, day: "2026-11-28", count: 0 });
+  expect(s.states.at(-1)).toMatchObject({ startedToday: 0 });
+});
+
+test("the settings are read again after the count's load: a switch-off meanwhile is honoured", async () => {
+  const s = setup({ posts: heldTasks(1) });
+  s.service.planRead(fresh(s.clock));
+  const release = s.holdLoad();
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  s.service.settingsChanged({ ...SETTINGS, autoStart: false });
+  release();
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ on: false, reason: "off" });
+});
+
 test("no reading starts nothing, and a reading older than 15 minutes is none", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+  const s = setup({ posts: heldTasks(1) });
   s.service.settingsChanged(SETTINGS);
   await settle();
   expect(s.started).toEqual([]);
@@ -434,8 +627,8 @@ test("no reading starts nothing, and a reading older than 15 minutes is none", a
   expect(s.states.at(-1)).toMatchObject({ reason: "no-reading" });
 });
 
-test("a reading goes stale with time: a later board change starts nothing", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+test("a reading goes stale with time: a later look starts nothing", async () => {
+  const s = setup({ posts: heldTasks(1) });
   s.service.settingsChanged({ ...SETTINGS, autoStart: false });
   s.service.planRead(fresh(s.clock));
   await settle();
@@ -447,7 +640,7 @@ test("a reading goes stale with time: a later board change starts nothing", asyn
 });
 
 test("a save of the settings looks again", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+  const s = setup({ posts: heldTasks(1) });
   s.service.planRead(fresh(s.clock));
   s.service.settingsChanged({ ...SETTINGS, autoStart: false });
   await settle();
@@ -459,7 +652,7 @@ test("a save of the settings looks again", async () => {
 });
 
 test("settings that cannot be read are off", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+  const s = setup({ posts: heldTasks(1) });
   s.service.planRead(fresh(s.clock));
   s.service.settingsChanged(null);
   await settle();
@@ -477,34 +670,14 @@ test("a turn's end and a board change look again", async () => {
   s.service.boardChanged();
   await settle();
   expect(s.states.at(-1)).toMatchObject({ reason: "at-once" });
-  const p0 = s.posts().find((post) => post.id === "p0") as Post;
-  s.setPosts([{ ...p0, state: "done" }, ...s.posts().filter((post) => post !== p0)]);
+  finish(s, "p0");
   s.service.turnEnded();
   await settle();
   expect(s.started).toEqual(["p1"]);
 });
 
-test("at-once counts only the lobby's claimed tasks, and the held passes over notes and done tasks", async () => {
-  const s = setup({
-    posts: [
-      task("p1", { state: "claimed", claimedBy: "a" }),
-      task("p2", { state: "done" }),
-      task("p3", { kind: "note", state: undefined, backlog: true }),
-      task("p4", { board: "w1", state: "claimed", claimedBy: "b" }),
-      held("p5", "2026-11-20T10:00:00.000Z"),
-    ],
-  });
-  s.service.planRead(fresh(s.clock));
-  s.service.settingsChanged({ ...SETTINGS, autoStartAtOnce: 2 });
-  await settle();
-  expect(s.started).toEqual(["p5"]);
-});
-
-test("no loop: an evaluation that starts nothing schedules nothing", async () => {
-  const s = setup({
-    posts: [held("p1", "2026-11-20T10:00:00.000Z")],
-    kept: { version: 1, day: "2026-11-28", count: 10 },
-  });
+test("no loop: a look that starts nothing schedules nothing", async () => {
+  const s = setup({ posts: heldTasks(1), kept: { version: 1, day: "2026-11-28", count: 10 } });
   s.service.planRead(fresh(s.clock));
   s.service.settingsChanged(SETTINGS);
   await settle();
@@ -517,8 +690,8 @@ test("no loop: an evaluation that starts nothing schedules nothing", async () =>
   expect(s.clock.pending()).toBe(0);
 });
 
-test("evaluations asked for while one runs are one more run, not one each", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
+test("looks asked for while one runs are one more look, not one each", async () => {
+  const s = setup({ posts: heldTasks(1) });
   s.service.settingsChanged({ ...SETTINGS, autoStart: false });
   await settle();
   const before = s.evaluations();
@@ -528,32 +701,6 @@ test("evaluations asked for while one runs are one more run, not one each", asyn
   s.service.turnEnded();
   await settle();
   expect(s.evaluations() - before).toBe(2);
-});
-
-test("a start that fails is not counted, and is said once", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")], failStart: true });
-  s.service.planRead(fresh(s.clock));
-  s.service.settingsChanged(SETTINGS);
-  await settle();
-  s.service.boardChanged();
-  await settle();
-  expect(s.kept.value).toBeNull();
-  expect(s.states.at(-1)).toMatchObject({ startedToday: 0 });
-  expect(s.logs.filter((line) => line.includes("disk full"))).toHaveLength(1);
-});
-
-test("a task the owner started first is not counted", async () => {
-  const s = setup({ posts: [held("p1", "2026-11-20T10:00:00.000Z")] });
-  // The owner's Start lands between the gate's look and its start: the board returns the task as
-  // it is, with the seq the gate saw.
-  s.board.start = async (id) => {
-    const post = s.posts().find((item) => item.id === id) as Post;
-    return { ok: true, post: { ...post, backlog: undefined } };
-  };
-  s.service.planRead(fresh(s.clock));
-  s.service.settingsChanged(SETTINGS);
-  await settle();
-  expect(s.kept.value).toBeNull();
 });
 
 test("the state is pushed only when it changed", async () => {

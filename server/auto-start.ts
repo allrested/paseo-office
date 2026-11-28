@@ -1,14 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
+import { waitingOn } from "../shared/board-rules.js";
 import {
   LOBBY,
+  type AutoStartCommitted,
   type AutoStartLimit,
   type AutoStartReason,
   type AutoStartState,
   type Post,
-  type PostResult,
 } from "../shared/contracts.js";
 import type { PlanUsage } from "../shared/plan-usage.js";
+import type { StartResult } from "./board-service.js";
 import { errorMessage } from "./errors.js";
 import { createLifeFile } from "./life-store.js";
 import { zoneDate } from "./notes-schedule.js";
@@ -42,17 +44,19 @@ export interface GateInput {
   now: number;
   settings: GateSettings;
   reading: PlanReading | null;
-  /** The lobby's backlog tasks. */
+  /** Whether a pickup could take the work: it is on and wakes are not paused. */
+  pickup: boolean;
+  /** The lobby's backlog tasks that wait on nothing. */
   held: number;
-  /** The lobby's claimed tasks. */
-  claimed: number;
+  /** The lobby's work already committed: claimed, or open and not held (waiting for an agent or a task). */
+  committed: number;
   /** Started by the office today; null when its count cannot be read. */
   startedToday: number | null;
 }
 
 export type GateDecision =
   | { open: true }
-  | { open: false; reason: AutoStartReason; detail?: AutoStartLimit };
+  | { open: false; reason: AutoStartReason; detail?: AutoStartLimit | AutoStartCommitted };
 
 /** The worst window of the providers the plan pill counts; null when none of them reports one. */
 function worstWindow(
@@ -73,11 +77,13 @@ function worstWindow(
 
 /**
  * Whether the office may start a backlog task now, and why not. It spends the owner's plan, so
- * what it cannot see counts against it: an old reading is none, an unread count is the cap.
+ * what it cannot see counts against it: an old reading is none, an unread count starts nothing.
  */
 export function gateDecision(input: GateInput): GateDecision {
   const { settings, reading } = input;
   if (!settings.autoStart) return { open: false, reason: "off" };
+  // Started work nobody can take would only pile up, and count against the day.
+  if (!input.pickup) return { open: false, reason: "no-pickup" };
   if (input.held === 0) return { open: false, reason: "empty" };
   if (reading === null || input.now - reading.at > READING_STALE_MS) {
     return { open: false, reason: "no-reading" };
@@ -88,10 +94,13 @@ export function gateDecision(input: GateInput): GateDecision {
   if (worst.usedPct >= settings.autoStartUnderPct) {
     return { open: false, reason: "limit", detail: worst };
   }
-  if (input.claimed >= settings.autoStartAtOnce) return { open: false, reason: "at-once" };
-  if (input.startedToday === null || input.startedToday >= settings.autoStartPerDay) {
+  if (input.committed >= settings.autoStartAtOnce) {
+    return { open: false, reason: "at-once", detail: { count: input.committed } };
+  }
+  if (input.startedToday !== null && input.startedToday >= settings.autoStartPerDay) {
     return { open: false, reason: "per-day" };
   }
+  if (input.startedToday === null) return { open: false, reason: "no-count" };
   return { open: true };
 }
 
@@ -134,7 +143,10 @@ export interface AutoStartPorts {
   board: {
     /** Null until the boards are read. */
     lobbyPosts(): readonly Post[] | null;
-    start(id: string): Promise<PostResult>;
+    /** Every board's posts, for what a held task waits on; null until the boards are read. */
+    allPosts(): readonly Post[] | null;
+    pickupOpen(): boolean;
+    startHeld(id: string, expectedSeq: number): Promise<StartResult>;
   };
   file: AutoStartCountFile;
   now(): number;
@@ -189,23 +201,23 @@ export function createAutoStart(ports: AutoStartPorts): AutoStart {
   let again = false;
   let stopped = false;
 
-  async function startedOn(day: string): Promise<number | null> {
-    if (!loaded) {
-      try {
-        count = await ports.file.load();
-        loaded = true;
-        unreadableSaid = false;
-      } catch (error) {
-        if (!unreadableSaid) {
-          ports.log(
-            `[office] auto-start.json cannot be read (${errorMessage(error)}): nothing is started by itself until it can`,
-          );
-        }
-        unreadableSaid = true;
-        return null;
+  /** Reads the count file until it has been read well; false while it cannot be. */
+  async function countLoaded(): Promise<boolean> {
+    if (loaded) return true;
+    try {
+      count = await ports.file.load();
+      loaded = true;
+      unreadableSaid = false;
+      return true;
+    } catch (error) {
+      if (!unreadableSaid) {
+        ports.log(
+          `[office] auto-start.json cannot be read (${errorMessage(error)}): nothing is started by itself until it can`,
+        );
       }
+      unreadableSaid = true;
+      return false;
     }
-    return count !== null && count.day === day ? count.count : 0;
   }
 
   function publish(decision: GateDecision, started: number, perDay: number): void {
@@ -222,53 +234,85 @@ export function createAutoStart(ports: AutoStartPorts): AutoStart {
     ports.changed(state);
   }
 
-  async function look(): Promise<void> {
-    if (stopped) return;
-    ports.evaluated?.();
-    const current = settings ?? null;
-    const gate = current ?? OFF;
-    const day = current === null ? null : zoneDate(ports.now(), current.zone);
-    const started = day === null ? 0 : await startedOn(day);
-    const now = ports.now();
+  /** Writes the day's count; false (and logged) when it cannot be written. */
+  async function saveCount(next: AutoStartCount): Promise<boolean> {
+    try {
+      await ports.file.save(next);
+      count = next;
+      return true;
+    } catch (error) {
+      ports.log(`[office] auto-start.json could not be saved: ${errorMessage(error)}`);
+      return false;
+    }
+  }
+
+  /** The lobby's held tasks that wait on nothing, and its work already committed. */
+  function lobbyWork(): { ready: Post[]; committed: number } {
+    const everything = ports.board.allPosts() ?? [];
     const posts = (ports.board.lobbyPosts() ?? []).filter(
       (post) => post.board === LOBBY && post.kind === "task",
     );
-    const held = posts.filter((post) => post.backlog === true && post.state === "open");
-    const claimed = posts.filter((post) => post.state === "claimed").length;
+    // A held task that still waits would use a start, then be handed out later with no plan check.
+    const ready = posts.filter(
+      (post) =>
+        post.backlog === true && post.state === "open" && waitingOn(post, everything).length === 0,
+    );
+    const committed = posts.filter(
+      (post) => post.state === "claimed" || (post.state === "open" && post.backlog !== true),
+    ).length;
+    return { ready, committed };
+  }
+
+  async function look(): Promise<void> {
+    if (stopped) return;
+    ports.evaluated?.();
+    const readable = settings === null ? false : await countLoaded();
+    // Read after the load: a switch-off saved meanwhile holds for this look.
+    const current = settings ?? null;
+    const gate = current ?? OFF;
+    const now = ports.now();
+    const day = current === null ? null : zoneDate(now, current.zone);
+    let started: number | null = null;
+    if (readable && day !== null) started = count !== null && count.day === day ? count.count : 0;
+    const { ready, committed } = lobbyWork();
     const decision = gateDecision({
       now,
       settings: gate,
       reading,
-      held: held.length,
-      claimed,
-      startedToday: started,
+      pickup: ports.board.pickupOpen(),
+      held: ready.length,
+      committed,
+      startedToday: current === null ? 0 : started,
     });
-    // A count that cannot be read is shown as the cap, which is what it is taken for.
-    publish(decision, started ?? gate.autoStartPerDay, gate.autoStartPerDay);
-    const oldest = held.sort(oldestFirst)[0];
+    publish(decision, started ?? 0, gate.autoStartPerDay);
+    const oldest = ready.sort(oldestFirst)[0];
     if (!decision.open || day === null || started === null || oldest === undefined) return;
-    const result = await ports.board.start(oldest.id);
+    await startOne(oldest, day, started, gate.autoStartPerDay);
+  }
+
+  /** Starts `oldest`, counted first and put back unless this start took its hold off. */
+  async function startOne(oldest: Post, day: string, started: number, perDay: number) {
+    // Counted before the start: a crash between the two errs toward starting less.
+    const before: AutoStartCount = { version: 1, day, count: started };
+    const after: AutoStartCount = { version: 1, day, count: started + 1 };
+    if (!(await saveCount(after))) return;
+    const result = await ports.board.startHeld(oldest.id, oldest.seq);
+    if (result.ok && result.started) {
+      failureSaid = null;
+      ports.log(`[office] started ${oldest.id} from the backlog by itself (${after.count} today)`);
+      publish({ open: true }, after.count, perDay);
+      return;
+    }
+    // Not the office's start: a save that failed, or the owner's Start got there first.
+    await saveCount(before);
     if (!result.ok) {
-      // The board's change would bring the next try; a save that fails brings none, so no loop.
+      // A board's change would bring the next try; a save that fails brings none, so no loop.
       if (failureSaid !== result.error) {
         ports.log(`[office] auto-start of ${oldest.id} failed: ${result.error}`);
       }
       failureSaid = result.error;
-      return;
     }
-    failureSaid = null;
-    // The same revision back: the owner started it first, and it is not the office's start.
-    if (result.post.seq === oldest.seq) return;
-    const next: AutoStartCount = { version: 1, day, count: started + 1 };
-    count = next;
-    try {
-      await ports.file.save(next);
-    } catch (error) {
-      // Kept in memory: the count only ever errs on the side of fewer starts.
-      ports.log(`[office] auto-start.json could not be saved: ${errorMessage(error)}`);
-    }
-    ports.log(`[office] started ${oldest.id} from the backlog by itself (${next.count} today)`);
-    publish({ open: true }, next.count, gate.autoStartPerDay);
+    publish({ open: true }, started, perDay);
   }
 
   function evaluate(): Promise<void> {

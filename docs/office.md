@@ -662,27 +662,34 @@ start: `office_update` has no such action, and a reopen of a held task changes n
 open and nobody holds it. `office_read` shows it as `p12 task open (backlog), from the user: ...`.
 
 The office can also start backlog tasks by itself, since each start spends your plan. The host
-setting `autoStart` is off at first. With it on, the office starts the oldest held task
-(`server/auto-start.ts`) when all three of its numbers allow it:
+setting `autoStart` is off at first. With it on, the office starts the oldest held task that waits
+on nothing (`server/auto-start.ts`; a held task that still waits on another is passed over, and one
+named for an agent is started like any other), when the pickup could hand it out (Agent tools on and
+wakes not paused) and all three of its numbers allow it:
 
 - every plan limit of every provider counted in the Host card's Plan section, each window and not
   only the closest, is under `autoStartUnderPct` (70%);
-- fewer than `autoStartAtOnce` (3) lobby tasks are claimed (duties and rooms' tasks do not count);
+- fewer than `autoStartAtOnce` (3) lobby tasks are work already committed: claimed, or open and not
+  held (started or posted, and waiting for an agent or for other tasks). Duties and rooms' tasks do
+  not count;
 - fewer than `autoStartPerDay` (10) were started by the office today. The day is a calendar day
   from midnight in the notes' zone, not the duty board's 08:00 day, and your own Start presses do
   not count.
 
 It needs **Keep watching**. The limits come only from the server's plan watch (see Plan limits),
 and a reading older than 15 minutes counts as none. With Keep watching off, before the first read,
-or with no counted provider reporting a limit, nothing starts. A count file the office cannot read
-counts as the day's cap reached: nothing starts until it can be read (fix or delete
-`auto-start.json`). The office checks after each board change, each plan reading, each turn's end
-and each save of the settings, and starts one task per check. That start changes the board, which
-brings the next check, so several can start in a row and each is checked again. A check that
-starts nothing asks for no other, and no timer of its own runs. A start the boards fail to save is
-not counted, and is logged. The office's state for clients carries `autoStart` (on, why it waits:
-`off`, `empty`, `no-reading`, `limit` with the worst window, `at-once` or `per-day`, then the day's
-count and the cap), sent as an `auto-start` event when it changes.
+or with no counted provider reporting a limit, nothing starts. If the office cannot read its count
+file, nothing starts until it can (fix or delete `auto-start.json`). The office checks after each
+board change, each plan reading, each turn's end, each save of the settings and each change of the
+pickup or of the wakes' pause, and starts one task per check. The count is raised in the file before
+the start and put back if the start fails or the owner started the task first, so a crash in between
+errs toward starting less. A start changes the board, which brings the next check, so several can
+start in a row, each checked again, and the task started counts as committed work at once. A check
+that starts nothing asks for no other, and no timer of its own runs. The office's state for clients
+carries `autoStart`: on, why it waits, the day's count and the cap. It is sent as an `auto-start`
+event when it changes. The reasons, in the order they are checked: `off`, `no-pickup`, `empty` (no
+held task ready), `no-reading`, `limit` (with the worst window), `at-once` (with the committed
+count), `per-day` and `no-count` (the count file cannot be read; the day's count then reads 0).
 
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays

@@ -241,7 +241,7 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * name a profile of the host's AWS CLI whose CloudWatch alarms are checked too, `awsLogGroups` the
  * comma separated log groups read for lines that match `awsLogPattern`. `autoStart` on has the
  * office start the oldest backlog task by itself while every counted plan limit is under
- * `autoStartUnderPct`, fewer than `autoStartAtOnce` lobby tasks are claimed and fewer than
+ * `autoStartUnderPct`, fewer than `autoStartAtOnce` lobby tasks are claimed or started and fewer than
  * `autoStartPerDay` were started by it today; it needs `keepWatching`, which reads the limits.
  */
 export const officeHostSettings = defineSettings({

@@ -2360,7 +2360,7 @@ test("with Keep watching off, the plan limits are not read with no office open",
 const GATE = { autoStart: true, autoStartUnderPct: 70, autoStartAtOnce: 3, autoStartPerDay: 10 };
 
 test("with Keep watching on and the gate on, the office starts a held lobby task by itself", async () => {
-  const values = { ...ON.values, ...GATE, agentTools: false, keepWatching: true };
+  const values = { ...ON.values, ...GATE, keepWatching: true };
   const { recorded, context, autoStartKept, stop } = setup(async () => ({ ...ON, values }));
   const providers = context.paseo.providers as unknown as Record<string, unknown>;
   providers.listUsage = async () => usageOf(10);
@@ -2386,7 +2386,7 @@ test("with Keep watching on and the gate on, the office starts a held lobby task
 });
 
 test("with Keep watching off the gate has no reading and starts nothing", async () => {
-  const values = { ...ON.values, ...GATE, agentTools: false };
+  const values = { ...ON.values, ...GATE };
   const { recorded, context, autoStartKept, stop } = setup(async () => ({ ...ON, values }));
   const providers = context.paseo.providers as unknown as Record<string, unknown>;
   providers.listUsage = async () => usageOf(10);
@@ -2405,6 +2405,31 @@ test("with Keep watching off the gate has no reading and starts nothing", async 
   expect(snapshot?.autoStart).toEqual({
     on: true,
     reason: "no-reading",
+    startedToday: 0,
+    perDay: 10,
+  });
+  await office.leave();
+  await stop();
+});
+
+test("with Agent tools off nobody could take the work, and the gate says so", async () => {
+  const values = { ...ON.values, ...GATE, agentTools: false, keepWatching: true };
+  const { recorded, context, autoStartKept, stop } = setup(async () => ({ ...ON, values }));
+  const providers = context.paseo.providers as unknown as Record<string, unknown>;
+  providers.listUsage = async () => usageOf(10);
+  const post = recorded.handlers.get("office.post.request");
+  await post?.({ board: "lobby", kind: "task", text: "Held", backlog: true }, context);
+  await settle();
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(boardShown(office.events, "lobby")[0]?.backlog).toBe(true);
+  expect(autoStartKept.value).toBeNull();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { autoStart?: unknown }
+    | undefined;
+  expect(snapshot?.autoStart).toEqual({
+    on: true,
+    reason: "no-pickup",
     startedToday: 0,
     perDay: 10,
   });

@@ -2147,4 +2147,34 @@ describe("the backlog", () => {
     });
     expect(store.saved).toHaveLength(saves);
   });
+
+  test("the gate's start takes only the revision it saw off hold, and says whether it did", async () => {
+    const { service, store } = await harness();
+    await service.post(held("First"));
+    await service.post(held("Second"));
+    const first = find(service, "p1") as Post;
+    const started = await service.startHeld("p1", first.seq);
+    expect(started).toMatchObject({ ok: true, started: true });
+    expect(find(service, "p1")).not.toHaveProperty("backlog");
+    // Already started: nothing is removed, nothing saved.
+    const saves = store.saved.length;
+    expect(await service.startHeld("p1", first.seq)).toEqual({
+      ok: true,
+      post: find(service, "p1"),
+      started: false,
+    });
+    // Changed since the gate looked: left as it is.
+    const second = find(service, "p2") as Post;
+    expect(await service.startHeld("p2", second.seq - 1)).toEqual({
+      ok: true,
+      post: second,
+      started: false,
+    });
+    expect(find(service, "p2")).toMatchObject({ backlog: true });
+    expect(store.saved).toHaveLength(saves);
+    expect(await service.startHeld("p9", 1)).toEqual({
+      ok: false,
+      error: "Unable to start p9: no such post",
+    });
+  });
 });

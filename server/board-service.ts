@@ -89,6 +89,9 @@ export interface DutySync {
   dayOf(at: number): string;
 }
 
+/** A start by the auto-start gate: `started` only when this call took the hold off. */
+export type StartResult = { ok: true; post: Post; started: boolean } | { ok: false; error: string };
+
 export interface BoardService {
   start(): Promise<void>;
   boards(): Record<string, Post[]>;
@@ -98,6 +101,11 @@ export interface BoardService {
   update(input: PostUpdate): Promise<PostResult>;
   /** Takes a held task out of the backlog; one not held is returned as it is. */
   startTask(id: string): Promise<PostResult>;
+  /**
+   * Takes the task off hold only if it is still held at `expectedSeq`, the revision the gate looked
+   * at; otherwise it is returned as it is, with `started` false.
+   */
+  startHeld(id: string, expectedSeq: number): Promise<StartResult>;
   /**
    * Claims a lobby task or a duty for an automatic assignment. Returns null if the task changed or
    * the agent can no longer pick it up: it holds one already, on either board.
@@ -291,6 +299,21 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     data = hold(next);
     for (const board of new Set(touched)) tell(() => ports.onBoard(board, postsOf(board)));
     return { ok: true, value: null };
+  }
+
+  /** Takes a task off hold, inside the queue; with `expectedSeq`, only that revision. */
+  async function unhold(id: string, expectedSeq: number | null): Promise<StartResult> {
+    const post = data.posts.find((item) => item.id === id);
+    if (post === undefined) return { ok: false, error: `Unable to start ${id}: no such post` };
+    if (post.kind !== "task") return { ok: false, error: `Unable to start ${id}: it is a note` };
+    if (post.backlog !== true || (expectedSeq !== null && post.seq !== expectedSeq)) {
+      return { ok: true, post, started: false };
+    }
+    const started: Post = { ...post, seq: data.nextSeq, updatedAt: now() };
+    delete started.backlog;
+    const posts = data.posts.map((item) => (item.id === id ? started : item));
+    const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
+    return saved.ok ? { ok: true, post: started, started: true } : saved;
   }
 
   function validText(text: string): Outcome<string> {
@@ -960,17 +983,10 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       ),
     startTask: (id) =>
       exclusive(async (): Promise<PostResult> => {
-        const post = data.posts.find((item) => item.id === id);
-        if (post === undefined) return { ok: false, error: `Unable to start ${id}: no such post` };
-        if (post.kind !== "task")
-          return { ok: false, error: `Unable to start ${id}: it is a note` };
-        if (post.backlog !== true) return { ok: true, post };
-        const started: Post = { ...post, seq: data.nextSeq, updatedAt: now() };
-        delete started.backlog;
-        const posts = data.posts.map((item) => (item.id === id ? started : item));
-        const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
-        return saved.ok ? { ok: true, post: started } : saved;
+        const result = await unhold(id, null);
+        return result.ok ? { ok: true, post: result.post } : result;
       }),
+    startHeld: (id, expectedSeq) => exclusive(() => unhold(id, expectedSeq)),
     claimLobbyTask: (id, agentId, expectedSeq) =>
       exclusive(async () => {
         const pickup = data.posts.filter((post) => PICKUP_BOARDS.has(post.board));
