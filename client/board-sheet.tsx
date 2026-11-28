@@ -436,7 +436,8 @@ function SheetBody({
     // Cleared only if the box still holds what was posted, so later typing stays.
     setText((current) => textAfterSend(current, sent));
     reset();
-    clearFollowUp();
+    // A note sent none of it: the pending After waits for the next task.
+    if (kind === "task") clearFollowUp();
   }, [actions, room.id, kind, text, to, after, reset, clearFollowUp]);
   const chosen = KINDS.find((option) => option.kind === kind) ?? KINDS[0];
   // The form's state is kept here while the page shows, so the text typed is there on return.

@@ -1290,3 +1290,38 @@ test("a room's board has Follow-up too: it makes the post a task after that one"
   expect(posted).toEqual([{ board: "w1", kind: "task", text: "Then deploy", after: ["p5"] }]);
   expect(container.textContent).not.toContain("After p5");
 });
+
+/** The kind chip of a room's form with this text: "Task" or "Note". */
+async function chooseKind(kind: string): Promise<void> {
+  const chip = [...byLabel("Kind of post").querySelectorAll<HTMLElement>('[role="radio"]')].find(
+    (item) => item.textContent === kind,
+  );
+  if (!chip) throw new Error(`No kind chip says "${kind}"`);
+  await act(async () => chip.click());
+  await settle();
+}
+
+test("in a room's form Follow-up while on Note switches the form to Task", async () => {
+  const here = post(5, { board: "w1", text: "Fix the build" });
+  await mount({ rooms: officeRooms([], { w1: [here] }), roomId: "w1" });
+  await chooseKind("Note");
+  expect(container.querySelector('[aria-label="Note text"]')).not.toBeNull();
+  await press("Follow-up: Fix the build");
+  expect(container.querySelector('[aria-label="Task text"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Note text"]')).toBeNull();
+  expect(container.textContent).toContain("After p5");
+});
+
+test("a room's Note carries no follow-up and hides the line, which comes back with Task", async () => {
+  const here = post(5, { board: "w1", text: "Fix the build" });
+  await mount({ rooms: officeRooms([], { w1: [here] }), roomId: "w1" });
+  await press("Follow-up: Fix the build");
+  await chooseKind("Note");
+  expect(container.textContent).not.toContain("After p5");
+  await type("Note text", "Remember this");
+  await press("Post");
+  expect(posted).toEqual([{ board: "w1", kind: "note", text: "Remember this" }]);
+  expect(posted[0]).not.toHaveProperty("after");
+  await chooseKind("Task");
+  expect(container.textContent).toContain("After p5");
+});

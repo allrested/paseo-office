@@ -10,6 +10,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Post } from "../shared/contracts.js";
 import { PostWithActions } from "./board-sheet.js";
 import { useOfficeStyles } from "./styles.js";
+import { AfterField, type FollowUp } from "./follow-up.js";
 import { TaskCard } from "./task-card.js";
 import { UiLanguage } from "./ui-language.js";
 import { UI_VI } from "../shared/ui-words-vi.js";
@@ -110,6 +111,19 @@ function Card({
       styles={styles}
     />
   );
+}
+
+const PENDING: FollowUp = {
+  after: ["p1"],
+  full: false,
+  field: { current: null },
+  add: () => undefined,
+  clear: () => undefined,
+};
+
+function PendingAfter() {
+  const styles = useOfficeStyles(THEME, false, false);
+  return <AfterField followUp={PENDING} styles={styles} />;
 }
 
 function Row({
@@ -420,4 +434,11 @@ test("Follow-up and the lines are in Vietnamese when the interface is", async ()
   expect(container.textContent).toContain(UI_VI["Follow-up"]);
   expect(container.textContent).toContain("Đang chờ p1");
   byLabel(`${UI_VI["Follow-up"]}: Write the docs`);
+  await mount(
+    <UiLanguage>
+      <PendingAfter />
+    </UiLanguage>,
+  );
+  expect(has(UI_VI.Clear)).toBe(true);
+  expect(has("Clear")).toBe(false);
 });

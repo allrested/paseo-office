@@ -3,6 +3,7 @@ import { Pressable, View, type TextInput as NativeTextInput } from "react-native
 import { AFTER_MAX, type Post } from "../shared/contracts.js";
 import type { OfficeStyles } from "./styles.js";
 import { Text } from "./text.js";
+import { useT } from "./ui-language.js";
 
 export interface FollowUp {
   /** The tasks the next post waits on: the ones still on the boards, in the order they were added. */
@@ -60,6 +61,7 @@ interface AfterFieldProps {
 /** Under the form's field while it has an `after`: "After p12, p13" and Clear; and the limit. */
 export function AfterField({ followUp, styles }: AfterFieldProps) {
   const { after, full, clear } = followUp;
+  const t = useT();
   if (after.length === 0 && !full) return null;
   return (
     <View>
@@ -70,7 +72,7 @@ export function AfterField({ followUp, styles }: AfterFieldProps) {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Clear"
+            accessibilityLabel={t("Clear")}
             onPress={clear}
             style={styles.lobbyDelete}
           >
