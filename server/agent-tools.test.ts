@@ -220,7 +220,7 @@ test("the three tools are named and their inputs follow the spec", async () => {
   expect(read?.input.safeParse({ board: "kitchen" }).success).toBe(false);
   expect(post?.input.safeParse({ kind: "task", text: "x".repeat(2001) }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "close" }).success).toBe(false);
-  for (const tool of tools) expect(tool.description.length).toBeLessThan(200);
+  for (const tool of tools) expect(tool.description.length).toBeLessThan(260);
 });
 
 test("the duty board is read with board: duty, but nobody posts to it from a tool", async () => {
@@ -235,4 +235,67 @@ test("the duty board is read with board: duty, but nobody posts to it from a too
   expect(runRead(ports, ALICE, { board: "duty" })).toEqual({
     text: "Board duty: 0 post(s), cursor 0.",
   });
+});
+
+test("the tools take a reply and a result, and today's inputs still parse", async () => {
+  const { ports } = await harness();
+  const [, post, update] = officeTools(ports);
+  expect(post?.input.safeParse({ kind: "note", text: "x", replyTo: "p1" }).success).toBe(true);
+  expect(post?.input.safeParse({ kind: "note", text: "x", replyTo: "" }).success).toBe(false);
+  expect(post?.input.safeParse({ kind: "task", text: "x", to: "b", board: "lobby" }).success).toBe(
+    true,
+  );
+  expect(update?.input.safeParse({ id: "p1", action: "done", note: "Fixed." }).success).toBe(true);
+  expect(update?.input.safeParse({ id: "p1", action: "done", note: "" }).success).toBe(false);
+  expect(update?.input.safeParse({ id: "p1", action: "done" }).success).toBe(true);
+  expect(post?.description).toBe(
+    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply.",
+  );
+  expect(update?.description).toBe(
+    "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note.",
+  );
+});
+
+test("a reply lands under its task, wakes the holder, and a result reads back", async () => {
+  const { ports, mentions } = await harness();
+  await runPost(ports, ALICE, { kind: "task", text: "Write tests" });
+  await runUpdate(ports, BOB, { id: "p1", action: "claim" });
+  const reply = await runPost(ports, ALICE, { kind: "note", text: "Use vitest", replyTo: "p1" });
+  expect(reply).toEqual({
+    text: "Posted p3 under p1. Bob gets it as a prompt when idle and wakes are on.",
+    structuredContent: { id: "p3" },
+  });
+  expect(mentions.at(-1)).toBe("p3->b");
+  expect(await runPost(ports, ALICE, { kind: "note", text: "x", replyTo: "p99" })).toEqual({
+    text: "Unable to post: no task p99",
+    isError: true,
+  });
+  const done = await runUpdate(ports, BOB, { id: "p1", action: "done", note: "  All green.  " });
+  expect(done.text).toBe("p1 task done by Bob, from Alice: Write tests\n  result: All green.");
+  expect(runRead(ports, BOB, {}).text).toBe(
+    [
+      "Board w1: 2 post(s), cursor 4.",
+      "p3 note re p1, from Alice to Bob: Use vitest",
+      "p1 task done by Bob, from Alice: Write tests",
+      "  result: All green.",
+    ].join("\n"),
+  );
+});
+
+test("a post line gains re and result only when the post has them", () => {
+  const post: Post = {
+    id: "p14",
+    seq: 14,
+    board: "w1",
+    kind: "note",
+    text: "line one\nline two",
+    author: "a",
+    replyTo: "p12",
+    result: "Fine.\nReally.",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  expect(postLine(post, (author) => author)).toBe(
+    "p14 note re p12, from a: line one\n  line two\n  result: Fine.\n  Really.",
+  );
 });

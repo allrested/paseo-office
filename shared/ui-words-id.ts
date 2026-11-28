@@ -327,12 +327,14 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Green is at work, amber waiting for you, red stopped on an error, grey resting. A gap is a time the office was closed. The marks are tool calls.":
     "Hijau sedang bekerja, kuning menunggu Anda, merah berhenti karena galat, abu-abu istirahat. Celah berarti kantor sedang ditutup. Tanda-tandanya adalah pemanggilan alat.",
   "Last 30 minutes": "30 menit terakhir",
+  Less: "Ringkas",
   Live: "Langsung",
   "Loading the 3D view...": "Memuat tampilan 3D...",
   "Loading the duty list...": "Memuat daftar piket...",
   "Local resource readings are unavailable on this host.":
     "Pembacaan sumber daya lokal tidak tersedia di host ini.",
   Models: "Model",
+  More: "Selengkapnya",
   "New messages": "Pesan baru",
   "New poll": "Polling baru",
   "No SSH hosts configured on this server.": "Belum ada host SSH yang dikonfigurasi di server ini.",
@@ -380,6 +382,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Reading the prompts...": "Membaca prompt...",
   "Reading the timeline...": "Membaca linimasa...",
   Requests: "Permintaan",
+  Result: "Hasil",
   Run: "Jalankan",
   Scripts: "Skrip",
   "Send a prompt": "Kirim prompt",
@@ -404,6 +407,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "What it should teach": "Apa yang perlu diajarkan",
   "Who writes it": "Siapa yang menulisnya",
   Workspace: "Workspace",
+  "Write a reply": "Tulis balasan",
   You: "Anda",
   "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.":
     "Piket tanpa instruksi hanya pura-pura: kantor 3D memperagakannya dan tidak ada agen yang diminta. Piket dengan instruksi diberikan ke agen yang menganggur pada tiap harinya, mulai 08.00 di zona waktu catatan.",

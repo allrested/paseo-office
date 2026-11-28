@@ -55,6 +55,42 @@ export function todoMeta(post: Post, name: (author: string) => string): string |
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+/** A board's posts without the replies: a reply shows under its task, never on its own. */
+export function topLevel(posts: readonly Post[]): Post[] {
+  return posts.filter((post) => post.replyTo === undefined);
+}
+
+/** The notes under a task, oldest first. */
+export function repliesOf(task: Post, posts: readonly Post[]): Post[] {
+  return posts
+    .filter((post) => post.kind === "note" && post.replyTo === task.id)
+    .sort((left, right) => left.seq - right.seq);
+}
+
+/** A result's start, as a card shows it until More: the first three lines and 160 characters. */
+export const RESULT_LINES = 3;
+export const RESULT_CHARS = 160;
+
+export interface ResultPreview {
+  /** What the card shows; ends with "…" when some of the result is left out. */
+  shown: string;
+  /** Some was left out, so the card offers More. */
+  cut: boolean;
+}
+
+/**
+ * The start of a result, cut by its text rather than clamped by the layout: what is left out is
+ * always behind More, and More shows only when something is.
+ */
+export function resultPreview(result: string): ResultPreview {
+  const lines = result.split("\n");
+  const head = lines.slice(0, RESULT_LINES).join("\n");
+  if (lines.length <= RESULT_LINES && head.length <= RESULT_CHARS) {
+    return { shown: result, cut: false };
+  }
+  return { shown: `${head.slice(0, RESULT_CHARS).trimEnd()}…`, cut: true };
+}
+
 /** What "Clear finished" asks before it deletes the done to-dos. */
 export function clearQuestion(count: number): string {
   return count === 1 ? "Delete 1 finished to-do?" : `Delete ${count} finished to-dos?`;
@@ -81,10 +117,14 @@ export interface BoardPreview {
   more: number;
 }
 
-/** What a room card shows of its board: the first posts in board order, and how many are left. */
+/**
+ * What a room card shows of its board: the first posts in board order, and how many are left.
+ * Replies are counted with their task, so they are neither shown nor counted.
+ */
 export function boardPreview(posts: readonly Post[], max: number = CARD_POSTS): BoardPreview {
-  const shown = orderBoardPosts(posts).slice(0, max);
-  return { shown, more: posts.length - shown.length };
+  const top = topLevel(posts);
+  const shown = orderBoardPosts(top).slice(0, max);
+  return { shown, more: top.length - shown.length };
 }
 
 /** What the lobby's card shows of its to-dos: the first unfinished ones, and how many are left. */

@@ -7,11 +7,28 @@ export function completionLine(claim: Claim): string {
   return `Completed office task ${claim.id} (assignment ${claim.seq}).`;
 }
 
-export function assignmentFooter(claim: Claim): string {
+function footerOf(claim: Claim, work: string): string {
   return [
-    `Work on this task. When it is complete, use office_update with id "${claim.id}" and action "done". If you need input, leave it claimed and explain what you need.`,
+    work,
     `If the tool is unavailable and you have finished, put this exact line at the end of your reply: ${completionLine(claim)}`,
   ].join("\n");
+}
+
+export function assignmentFooter(claim: Claim): string {
+  return footerOf(
+    claim,
+    `Work on this task. When it is complete, use office_update with id "${claim.id}", action "done" and a short result in note. If you need input, leave it claimed and explain what you need.`,
+  );
+}
+
+/** Footers an earlier plugin version sent: a session that opened before an upgrade still holds one. */
+export function legacyFooters(claim: Claim): string[] {
+  return [
+    footerOf(
+      claim,
+      `Work on this task. When it is complete, use office_update with id "${claim.id}" and action "done". If you need input, leave it claimed and explain what you need.`,
+    ),
+  ];
 }
 
 const HEADING =
@@ -27,7 +44,9 @@ export function readLobbyAssignment(
   const id = found?.[1] ?? found?.[2];
   const seq = /\(assignment (\d+)\)\.$/.exec(lines.at(-1) ?? "")?.[1];
   if (!id || !seq || lines.length < 3) return null;
-  if (lines.splice(-2).join("\n") !== assignmentFooter({ id, seq: Number(seq) })) return null;
+  const claim = { id, seq: Number(seq) };
+  const footer = lines.splice(-2).join("\n");
+  if (footer !== assignmentFooter(claim) && !legacyFooters(claim).includes(footer)) return null;
   if (!lines.every((line) => line.startsWith("  "))) return null;
   const body = lines.map((line) => line.slice(2)).join("\n");
   return { id, body, kind: found?.[2] ? "duty" : "lobby" };

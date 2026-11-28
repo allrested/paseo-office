@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Post } from "../shared/contracts.js";
-import { columnOf, kanbanColumns, kanbanWide } from "./kanban-model.js";
+import { columnOf, kanbanColumns, kanbanWide, type KanbanColumn } from "./kanban-model.js";
 
 const post = (id: string, extra: Partial<Post> = {}): Post => ({
   id,
@@ -14,6 +14,9 @@ const post = (id: string, extra: Partial<Post> = {}): Post => ({
   updatedAt: "2026-11-28T00:00:00.000Z",
   ...extra,
 });
+
+/** Each column's id and its posts' ids. */
+const layout = (columns: KanbanColumn[]) => columns.map((c) => [c.id, c.posts.map((p) => p.id)]);
 
 describe("kanban columns", () => {
   it("puts each kind of post in its column", () => {
@@ -36,6 +39,22 @@ describe("kanban columns", () => {
   it("keeps board order inside a column", () => {
     const columns = kanbanColumns([post("p9"), post("p2")]);
     expect(columns[0]?.posts.map((p) => p.id)).toEqual(["p2", "p9"]);
+  });
+  it("leaves a reply out of Notes: it shows under its task", () => {
+    const posts = [
+      post("p1"),
+      post("p2", { kind: "note", state: undefined, replyTo: "p1" }),
+      post("p3", { kind: "note", state: undefined }),
+    ];
+    const columns = kanbanColumns(posts);
+    expect(layout(columns)).toEqual([
+      ["todo", ["p1"]],
+      ["progress", []],
+      ["notes", ["p3"]],
+    ]);
+    expect(
+      kanbanColumns([post("p1"), post("p2", { kind: "note", replyTo: "p1" })]).map((c) => c.id),
+    ).toEqual(["todo", "progress"]);
   });
   it("is wide from 720", () => {
     expect([kanbanWide(719), kanbanWide(720)]).toEqual([false, true]);

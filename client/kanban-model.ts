@@ -32,9 +32,12 @@ export function columnOf(post: Post, _posts: readonly Post[]): KanbanColumnId {
   return "todo";
 }
 
-/** The board's columns in order; empty ones left out except To do and In progress. */
+/**
+ * The board's columns in order; empty ones left out except To do and In progress. A reply is in
+ * none of them: it shows on its task's card.
+ */
 export function kanbanColumns(posts: readonly Post[]): KanbanColumn[] {
-  const bySeq = [...posts].sort((a, b) => a.seq - b.seq);
+  const bySeq = posts.filter((post) => post.replyTo === undefined).sort((a, b) => a.seq - b.seq);
   const grouped = new Map<KanbanColumnId, Post[]>();
   for (const post of bySeq) {
     const id = columnOf(post, posts);

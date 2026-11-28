@@ -261,6 +261,27 @@ test("a room shows open and claimed tasks and notes, not done tasks or unknown b
   expect(model.rooms.some((room) => room.id === "w9")).toBe(false);
 });
 
+test("a room keeps its done tasks apart, oldest first; the lobby's are its to-dos", () => {
+  const at = (minute: number) => `2026-11-11T08:0${minute}:00.000Z`;
+  const model = buildOfficeModel(
+    snapshot({
+      boards: {
+        lobby: [post("p1", { board: "lobby", seq: 1, state: "done", createdAt: at(1) })],
+        w1: [
+          post("p4", { seq: 4, state: "done", createdAt: at(4) }),
+          post("p2", { seq: 2, state: "done", createdAt: at(2) }),
+          post("p3", { seq: 3, createdAt: at(3) }),
+          post("p5", { seq: 5, kind: "note", state: undefined, replyTo: "p2", createdAt: at(5) }),
+        ],
+      },
+    }),
+  );
+  expect(roomOf(model, "w1").done.map((item) => item.id)).toEqual(["p2", "p4"]);
+  // The posts, which the room's card shows and counts, stay as they were.
+  expect(roomOf(model, "w1").posts.map((item) => item.id)).toEqual(["p3", "p5"]);
+  expect(roomOf(model, "lobby").done).toEqual([]);
+});
+
 test("the lobby's to-dos include done ones in to-do order; other rooms have none", () => {
   const at = (minute: number) => `2026-11-11T08:0${minute}:00.000Z`;
   const model = buildOfficeModel(

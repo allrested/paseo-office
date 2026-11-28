@@ -10,10 +10,13 @@ import {
   postMeta,
   postStateLabel,
   queuedWakes,
+  repliesOf,
+  resultPreview,
   roomAgents,
   stepMark,
   todoMeta,
   todoPreview,
+  topLevel,
   wakeSummary,
   workText,
 } from "./board-text.js";
@@ -105,6 +108,58 @@ test("a room card shows the first three posts of its board and counts the rest",
     more: 0,
   });
   expect(boardPreview([])).toEqual({ shown: [], more: 0 });
+});
+
+test("a task's replies are the notes under it, oldest first; a task's result is no reply", () => {
+  const task = post(1, { result: "Shipped" });
+  const other = post(2, {});
+  const later = post(5, { kind: "note", state: undefined, replyTo: "p1", text: "Thanks" });
+  const first = post(3, { kind: "note", state: undefined, replyTo: "p1", text: "Which branch?" });
+  const elsewhere = post(4, { kind: "note", state: undefined, replyTo: "p2" });
+  const loose = post(6, { kind: "note", state: undefined });
+  const posts = [task, other, later, first, elsewhere, loose];
+  expect(repliesOf(task, posts).map((item) => item.id)).toEqual(["p3", "p5"]);
+  expect(repliesOf(other, posts).map((item) => item.id)).toEqual(["p4"]);
+  expect(repliesOf(loose, posts)).toEqual([]);
+});
+
+test("replies show under their task, so the top level and a card's count leave them out", () => {
+  const posts = [
+    post(1, {}),
+    post(2, { kind: "note", state: undefined, replyTo: "p1" }),
+    post(3, { kind: "note", state: undefined }),
+    post(4, { kind: "note", state: undefined, replyTo: "p1" }),
+  ];
+  expect(topLevel(posts).map((item) => item.id)).toEqual(["p1", "p3"]);
+  expect(boardPreview(posts)).toEqual({ shown: [posts[0], posts[2]], more: 0 });
+  expect(boardPreview(posts, 1)).toEqual({ shown: [posts[0]], more: 1 });
+});
+
+test("a result shows its first three lines and 160 characters, and says when it left some out", () => {
+  expect(resultPreview("Shipped in 1.4.2")).toEqual({ shown: "Shipped in 1.4.2", cut: false });
+  expect(resultPreview("one\ntwo\nthree")).toEqual({ shown: "one\ntwo\nthree", cut: false });
+  const full = "x".repeat(160);
+  expect(resultPreview(full)).toEqual({ shown: full, cut: false });
+  expect(resultPreview(`${full}y`)).toEqual({ shown: `${full}…`, cut: true });
+  expect(resultPreview("one\ntwo\nthree\nfour")).toEqual({ shown: "one\ntwo\nthree…", cut: true });
+  const words = "The build passed on every target. ".repeat(10);
+  const long = resultPreview(words);
+  expect(long.cut).toBe(true);
+  expect(long.shown).toBe(`${words.slice(0, 160).trimEnd()}…`);
+  expect(long.shown.length).toBeLessThanOrEqual(161);
+});
+
+test("a room's card counts the same posts with done tasks on the board", () => {
+  const model = buildOfficeModel({
+    agents: [],
+    workspaces: [{ id: "w1", name: "shop-api", projectName: "shop" }],
+    activity: {},
+    boards: { w1: [post(1, {}), post(2, { state: "done" }), post(3, { state: "done" })] },
+    wake: { paused: false, queued: {} },
+  });
+  const room = model.rooms.find((candidate) => candidate.id === "w1");
+  expect(room?.done.map((item) => item.id)).toEqual(["p2", "p3"]);
+  expect(boardPreview(room?.posts ?? [])).toEqual({ shown: [post(1, {})], more: 0 });
 });
 
 test("the wake count says how many posts wait, and nothing when none do", () => {

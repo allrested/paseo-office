@@ -66,6 +66,7 @@ function shop(rows: OfficeRow[]): OfficeRoom {
     rows,
     posts: [],
     todos: [],
+    done: [],
   };
 }
 
@@ -79,6 +80,7 @@ function lobby(rows: OfficeRow[]): OfficeRoom {
     rows,
     posts: [],
     todos: [],
+    done: [],
   };
 }
 

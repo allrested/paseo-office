@@ -18,11 +18,13 @@ import {
 } from "./agent-picker-text.js";
 import { BoardAgents } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
-import { orderBoardPosts, roomAgents } from "./board-text.js";
+import { orderBoardPosts, repliesOf, roomAgents, topLevel } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import type { BoardLayout } from "../shared/settings.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
+import { ClearFinished, TaskThread } from "./task-card.js";
+import { useT } from "./ui-language.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -59,12 +61,22 @@ export function Chip({ label, value, selected, onSelect, styles }: ChipProps) {
 
 interface PostActionsProps {
   post: Post;
+  /** A task's notes under it, oldest first (`repliesOf`); a note has none. */
+  replies?: readonly Post[];
   name(author: string): string;
   actions: BoardActions;
   styles: OfficeStyles;
 }
 
-export function PostWithActions({ post, name, actions, styles }: PostActionsProps) {
+const NO_REPLIES: readonly Post[] = [];
+
+export function PostWithActions({
+  post,
+  replies = NO_REPLIES,
+  name,
+  actions,
+  styles,
+}: PostActionsProps) {
   const finished = post.state === "done";
   const toggleDone = useCallback(
     () => (finished ? actions.reopen(post.id) : actions.markDone(post.id)),
@@ -79,6 +91,11 @@ export function PostWithActions({ post, name, actions, styles }: PostActionsProp
   return (
     <View style={styles.boardPost}>
       <PostRow post={post} name={name} styles={styles} />
+      {post.kind === "task" ? (
+        <View style={styles.taskThread}>
+          <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
+        </View>
+      ) : null}
       {asking ? (
         <>
           <Text style={styles.sheetText}>Delete this post?</Text>
@@ -239,6 +256,53 @@ export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }
   );
 }
 
+interface DoneSectionProps {
+  room: OfficeRoom;
+  name(author: string): string;
+  actions: BoardActions;
+  styles: OfficeStyles;
+}
+
+/**
+ * A room's done tasks under its list, folded at first as the kanban's stacked Done is: a press on
+ * "Done · 2" unfolds them, each with its result and replies and the buttons a list row has.
+ */
+function DoneSection({ room, name, actions, styles }: DoneSectionProps) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const t = useT();
+  const heading = `Done · ${room.done.length}`;
+  return (
+    <View style={styles.lobbySection}>
+      <View style={styles.kanbanHeading}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t(heading)}
+          aria-expanded={open}
+          onPress={toggle}
+          style={styles.kanbanFold}
+        >
+          <Icon name={open ? "ChevronDown" : "ChevronRight"} size={16} color={styles.iconColor} />
+          <Text style={styles.lobbyHeading}>{heading}</Text>
+        </Pressable>
+        <ClearFinished board={room.id} done={room.done.length} actions={actions} styles={styles} />
+      </View>
+      {open
+        ? room.done.map((post) => (
+            <PostWithActions
+              key={post.id}
+              post={post}
+              replies={repliesOf(post, room.posts)}
+              name={name}
+              actions={actions}
+              styles={styles}
+            />
+          ))
+        : null}
+    </View>
+  );
+}
+
 export interface SheetBodyProps {
   room: OfficeRoom;
   rooms: readonly OfficeRoom[];
@@ -284,7 +348,10 @@ function SheetBody({
     (value: string) => setKind(value === "note" ? "note" : "task"),
     [],
   );
-  const posts = useMemo(() => orderBoardPosts(room.posts), [room.posts]);
+  // A reply shows under its task, a done one's in the Done section.
+  const posts = useMemo(() => orderBoardPosts(topLevel(room.posts)), [room.posts]);
+  // The kanban takes the done tasks too, for its Done column.
+  const board = useMemo(() => [...room.posts, ...room.done], [room.posts, room.done]);
   const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
   const submit = useCallback(async () => {
     const sent = text.trim();
@@ -363,7 +430,7 @@ function SheetBody({
         )}
       </View>
       {layout === "kanban" ? (
-        <KanbanBoard posts={room.posts} name={name} actions={actions} styles={styles} />
+        <KanbanBoard posts={board} name={name} actions={actions} styles={styles} />
       ) : (
         <View style={styles.boardPosts}>
           {posts.length === 0 ? (
@@ -375,11 +442,15 @@ function SheetBody({
             <PostWithActions
               key={post.id}
               post={post}
+              replies={repliesOf(post, room.posts)}
               name={name}
               actions={actions}
               styles={styles}
             />
           ))}
+          {room.done.length > 0 ? (
+            <DoneSection room={room} name={name} actions={actions} styles={styles} />
+          ) : null}
         </View>
       )}
     </View>

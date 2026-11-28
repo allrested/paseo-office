@@ -2,6 +2,7 @@ import type { AgentToolDefinition } from "@getpaseo/plugin/server";
 import {
   DUTY,
   LOBBY,
+  POST_TEXT_MAX,
   USER_AUTHOR,
   type DeleteResult,
   type Duty,
@@ -54,8 +55,14 @@ export interface Office {
   lobbyPosts(): readonly Post[] | null;
   tools: AgentToolDefinition[];
   noteAgent(agent: ToolAgent): void;
-  post(input: { board: string; kind: PostKind; text: string; to?: string }): Promise<PostResult>;
-  update(input: { id: string; action: UpdateAction }): Promise<PostResult>;
+  post(input: {
+    board: string;
+    kind: PostKind;
+    text: string;
+    to?: string;
+    replyTo?: string;
+  }): Promise<PostResult>;
+  update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
   remove(id: string): Promise<DeleteResult>;
   clearDone(board: string): Promise<DeleteResult>;
   setWakesPaused(paused: boolean): Promise<WakeState>;
@@ -142,6 +149,7 @@ export function createOffice(deps: OfficeDeps): Office {
       author: post.author,
       authorLabel: wakeAuthorLabel(post.author, titles.get(post.author)),
       text: post.text,
+      ...(post.replyTo === undefined ? {} : { replyTo: post.replyTo }),
     });
   }
 
@@ -209,7 +217,8 @@ export function createOffice(deps: OfficeDeps): Office {
     noteAgent,
     async post(input) {
       await ready;
-      if (input.board === DUTY) {
+      // A reply goes to its task's board, so the duty board takes it though it takes no other post.
+      if (input.board === DUTY && input.replyTo === undefined) {
         return {
           ok: false,
           error: "Unable to post: the duty board takes its duties from the duty list",
@@ -275,7 +284,10 @@ export function createOffice(deps: OfficeDeps): Office {
       const text = await lastAnswer();
       const line = text?.trimEnd().split("\n").at(-1)?.trim();
       const claim = claims.find((p) => completionLine(p) === line);
-      if (claim) await service.finishLobbyClaim(claim);
+      if (!claim) return;
+      // What the reply says before the line is the task's result.
+      const result = (text ?? "").trimEnd().split("\n").slice(0, -1).join("\n").trim();
+      await service.finishLobbyClaim(claim, result.slice(0, POST_TEXT_MAX) || undefined);
     },
     agentGone(agentId) {
       queue?.agentGone(agentId);

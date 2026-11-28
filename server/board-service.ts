@@ -24,6 +24,8 @@ export interface NewPost {
   kind: PostKind;
   text: string;
   to?: string;
+  /** The task this answers: the post becomes a note on that task's board, for its holder. */
+  replyTo?: string;
   /** An agent id, or "user". */
   author: string;
 }
@@ -32,6 +34,8 @@ export interface PostUpdate {
   id: string;
   action: UpdateAction;
   actor: string;
+  /** With `done`: what came of the task; kept as its result. */
+  note?: string;
 }
 
 export interface ReadResult {
@@ -82,7 +86,7 @@ export interface BoardService {
   /** Reopens only this revision of the claim after its dispatch failed. */
   releaseLobbyTask(claim: Post): Promise<void>;
   confirmLobbyDelivery(claim: Post): Promise<void>;
-  finishLobbyClaim(claim: Post): Promise<void>;
+  finishLobbyClaim(claim: Post, result?: string): Promise<void>;
   remove(id: string): Promise<DeleteResult>;
   /** Deletes every done task of `board`. */
   clearDone(board: string): Promise<DeleteResult>;
@@ -131,6 +135,7 @@ function withoutClaim(post: Post): Post {
   if (post.namedPickup) next.namedPickup = true;
   if (post.state !== undefined) next.state = post.state;
   if (post.duty !== undefined) next.duty = post.duty;
+  // A reopened task has no result: the next finish brings its own.
   return next;
 }
 
@@ -206,10 +211,23 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return { ...next, posts };
   }
 
+  /** Drops each reply whose task is gone, and adds the boards of the posts it drops. */
+  function withoutOrphanReplies(next: BoardsFile, touched: string[]): BoardsFile {
+    let posts = next.posts;
+    for (;;) {
+      const ids = new Set(posts.map((item) => item.id));
+      const orphans = posts.filter((item) => item.replyTo !== undefined && !ids.has(item.replyTo));
+      if (orphans.length === 0) break;
+      for (const item of orphans) touched.push(item.board);
+      posts = posts.filter((item) => !orphans.includes(item));
+    }
+    return posts === next.posts ? next : { ...next, posts };
+  }
+
   /** Saves `next`, then makes it current and announces the touched boards. */
   async function commit(proposed: BoardsFile, changed: readonly string[]): Promise<Outcome<null>> {
     const touched = [...changed];
-    const next = withoutDeadLinks(proposed, touched);
+    const next = withoutOrphanReplies(withoutDeadLinks(proposed, touched), touched);
     try {
       await ports.store.save(next);
     } catch (error) {
@@ -230,33 +248,66 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return { ok: true, value: trimmed };
   }
 
+  /** The task a reply answers: past other replies, and from a copy to its lobby task. */
+  function rootOf(id: string): Post | undefined {
+    let target = data.posts.find((item) => item.id === id);
+    // Bounded, so a loop in a hand-edited file ends.
+    for (let step = 0; target !== undefined && step <= data.posts.length; step++) {
+      if (target.replyTo !== undefined) {
+        target = data.posts.find((item) => item.id === target?.replyTo);
+        continue;
+      }
+      if (target.kind !== "task") return undefined;
+      const partner = partnerOf(target);
+      return partner?.board === LOBBY ? partner : target;
+    }
+    return undefined;
+  }
+
   async function createPost(input: NewPost): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
+    const root = input.replyTo === undefined ? undefined : rootOf(input.replyTo);
+    if (input.replyTo !== undefined && root === undefined)
+      return { ok: false, error: `Unable to post: no task ${input.replyTo}` };
+    const board = root?.board ?? input.board;
+    const kind = root === undefined ? input.kind : "note";
     const seq = data.nextSeq;
     const stamp = now();
     const created: Post = {
       id: `p${seq}`,
       seq,
-      board: input.board,
-      kind: input.kind,
+      board,
+      kind,
       text: text.value,
       author: input.author,
       createdAt: stamp,
       updatedAt: stamp,
     };
-    if (input.to !== undefined) created.to = input.to;
-    if (input.kind === "task") created.state = "open";
-    if (input.board === LOBBY && input.kind === "task" && input.to && input.to !== input.author)
+    if (root !== undefined) {
+      created.replyTo = root.id;
+      // The holder is woken by a mention; a reply never names a lobby pickup.
+      const holder = root.claimedBy;
+      if (holder !== undefined && holder !== USER_AUTHOR && holder !== input.author)
+        created.to = holder;
+    } else if (input.to !== undefined) created.to = input.to;
+    if (kind === "task") created.state = "open";
+    if (board === LOBBY && kind === "task" && input.to && input.to !== input.author)
       created.namedPickup = true;
     // Make room among the existing posts, so the new one is never the one dropped.
-    const kept = trimBoard(postsOf(input.board), BOARD_POST_MAX - 1);
+    // A reply's task and that task's replies stay: the reply would go with them.
+    const held = postsOf(board).filter(
+      (item) => root !== undefined && (item.id === root.id || item.replyTo === root.id),
+    );
+    const heldIds = new Set(held.map((item) => item.id));
+    const rest = postsOf(board).filter((item) => !heldIds.has(item.id));
+    const kept = [...trimBoard(rest, BOARD_POST_MAX - 1 - held.length), ...held];
     if (kept.length >= BOARD_POST_MAX) {
       return { ok: false, error: "Unable to post: the board holds 200 open or claimed tasks" };
     }
-    const others = data.posts.filter((item) => item.board !== input.board);
+    const others = data.posts.filter((item) => item.board !== board);
     const posts = [...others, ...kept, created];
-    const saved = await commit({ ...data, nextSeq: seq + 1, posts }, [input.board]);
+    const saved = await commit({ ...data, nextSeq: seq + 1, posts }, [board]);
     return saved.ok ? { ok: true, post: created } : saved;
   }
 
@@ -332,11 +383,21 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (input.action === "done") {
       const done = { ...post, state: "done" as const };
       delete done.pickupMessageId;
+      const result = input.note?.trim();
+      if (result) done.result = result;
       return post.state === "done" ? { ok: true, value: null } : { ok: true, value: done };
     }
     // Like a repeated claim: an open task that nobody holds is not changed by a reopen.
     if (post.state === "open" && post.claimedBy === undefined) return { ok: true, value: null };
     return { ok: true, value: { ...withoutClaim(post), state: "open" } };
+  }
+
+  /** `partner` finished along with `post`, with the same result. */
+  function doneAs(partner: Post, post: Post, seq: number): Post {
+    const done: Post = { ...partner, state: "done", seq, updatedAt: now() };
+    delete done.pickupMessageId;
+    if (post.result !== undefined) done.result = post.result;
+    return done;
   }
 
   async function updatePost(input: PostUpdate, pickupMessageId?: string): Promise<PostResult> {
@@ -365,8 +426,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       posts = posts.filter((item) => item.id !== partner.id);
       touched.push(partner.board);
     } else if (partner !== undefined && changed.state === "done" && partner.state !== "done") {
-      const done: Post = { ...partner, state: "done", seq: seq++, updatedAt: now() };
-      delete done.pickupMessageId;
+      const done = doneAs(partner, changed, seq++);
       posts = posts.map((item) => (item.id === partner.id ? done : item));
       touched.push(partner.board);
     } else if (room !== null) {
@@ -556,7 +616,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         if (ports.refuse?.(task, { id, actor: agentId, action: "claim" })) return null;
         return updateForPickup({ id, actor: agentId, action: "claim" }, randomUUID());
       }),
-    finishLobbyClaim: (claim) =>
+    finishLobbyClaim: (claim, result) =>
       exclusive(async () => {
         const current = data.posts.find((p) => p.id === claim.id && PICKUP_BOARDS.has(p.board));
         if (
@@ -565,7 +625,12 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           current.claimedBy &&
           current.claimedBy === claim.claimedBy
         ) {
-          await updateForPickup({ id: current.id, action: "done", actor: current.claimedBy });
+          await updateForPickup({
+            id: current.id,
+            action: "done",
+            actor: current.claimedBy,
+            ...(result === undefined ? {} : { note: result }),
+          });
         }
       }),
     confirmLobbyDelivery: (claim) =>

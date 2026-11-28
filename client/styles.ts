@@ -316,6 +316,14 @@ export interface OfficeStyles {
   lobbyDelete: ViewStyle;
   lobbyDeleteText: TextStyle;
   lobbyConfirm: ViewStyle;
+  /** Under a task: its result, its replies and the Reply button or field. */
+  taskThread: ViewStyle;
+  /** The same on a to-do's card, whose sides are padded and whose foot is not. */
+  taskCardThread: ViewStyle;
+  /** "Reply", "More" and "Less": small words, a control's height to press. */
+  taskThreadButton: ViewStyle;
+  /** The Reply field and its Send button on one line. */
+  taskReplyRow: ViewStyle;
   /** A board as a kanban: its columns, stacked when narrow. */
   kanban: ViewStyle;
   /** Wide, the columns side by side in a scroller; it reaches out by a focus ring, as chips do. */
@@ -1366,6 +1374,16 @@ export function useOfficeStyles(
       },
       lobbyDeleteText: { ...small, fontWeight: "500", color: colors.foregroundMuted },
       lobbyConfirm: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 10, gap: 8 },
+      taskThread: { gap: 4 },
+      taskCardThread: { gap: 4, paddingBottom: 8 },
+      taskThreadButton: {
+        minHeight: controlHeight,
+        alignSelf: "flex-start",
+        justifyContent: "center",
+        borderRadius: 6,
+        paddingHorizontal: 4,
+      },
+      taskReplyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
       kanban: { gap: 16 },
       kanbanScroll: { marginHorizontal: -FOCUS_RING },
       kanbanColumns: {
