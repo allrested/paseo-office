@@ -153,6 +153,9 @@ when the roster had nobody left for it. Up to 0.2.13 a team went to a workspace 
 `office.roster.team` was stored there; it is no longer read or written. Where 0.2.13 gave one
 teammate to agents of two workspaces, the oldest keeps it and the other is named again.
 
+A lobby task can be given to a team: only its teammates' agents are handed it (see Boards and
+wakes).
+
 ## Views
 
 The office has three views: a 3D floor, a 2D floor and the list. A switch over the floor's top
@@ -536,6 +539,17 @@ the lobby's to-do list with its notes under it, and a room's posts in one list. 
 its finished tasks in a **Done** section at the bottom, shown once a task is done: its heading says
 how many, as in "Done · 2", starts folded and unfolds with a press, and has **Clear finished**
 beside it. A room's card still shows and counts only open and claimed tasks and notes.
+
+A lobby task can go to a team of the roster (see Team roster): it is handed out by the rules of
+Any idle agent, so it needs **Agent tools** and **Wake agents** as they do, but only to an idle
+agent that holds a teammate of that team. While only agents of other teams are idle it stays open.
+A named task goes before it, and among the rest the oldest goes first, as it does for any task. An
+agent of another team cannot claim it by hand either ("it is for team QA-PR"); you can claim any.
+The task keeps its team when it is reopened. It is stored with the team's id, so a renamed team
+keeps its tasks; if the team is removed or the roster switched off, the task goes to any idle agent
+instead of waiting for nobody. `office_post` takes `team`, a roster team's name in any case or its
+id, for a lobby task only and never with `to`; `office_read` shows it as `p7 task open for team
+QA-PR`.
 
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 

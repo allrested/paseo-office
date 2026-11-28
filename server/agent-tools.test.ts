@@ -45,6 +45,8 @@ async function harness(): Promise<Harness> {
   const mentions: string[] = [];
   const seen: string[] = [];
   const label = (author: string) => names.get(author) ?? author;
+  // The roster has one team, QA-PR, and Bob holds a teammate of it.
+  const teamName = (id: string) => (id === "t2" ? "QA-PR" : null);
   const service = createBoardService({
     store: memoryStore(),
     clock: createFakeClock(Date.parse("2026-11-11T09:00:00.000Z")),
@@ -54,6 +56,10 @@ async function harness(): Promise<Harness> {
     onBoardRemoved: () => undefined,
     workspaceOf: async (id) =>
       [ALICE, BOB, LONER].find((agent) => agent.id === id)?.workspaceId ?? null,
+    teamOf: async (id) => (id === "b" ? "t2" : null),
+    findTeam: async (nameOrId) =>
+      nameOrId === "t2" || nameOrId.trim().toLowerCase() === "qa-pr" ? "t2" : null,
+    teamName,
   });
   await service.start();
   const ports: OfficeToolPorts = {
@@ -65,6 +71,7 @@ async function harness(): Promise<Harness> {
       if (agent.title) names.set(agent.id, agent.title);
     },
     label,
+    teamLabel: (id) => teamName(id) ?? id,
   };
   return { ports, mentions, seen };
 }
@@ -221,7 +228,7 @@ test("the three tools are named and their inputs follow the spec", async () => {
   expect(read?.input.safeParse({ board: "kitchen" }).success).toBe(false);
   expect(post?.input.safeParse({ kind: "task", text: "x".repeat(2001) }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "close" }).success).toBe(false);
-  for (const tool of tools) expect(tool.description.length).toBeLessThan(260);
+  for (const tool of tools) expect(tool.description.length).toBeLessThan(300);
 });
 
 test("the duty board is read with board: duty, but nobody posts to it from a tool", async () => {
@@ -250,7 +257,7 @@ test("the tools take a reply and a result, and today's inputs still parse", asyn
   expect(update?.input.safeParse({ id: "p1", action: "done", note: "" }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "done" }).success).toBe(true);
   expect(post?.description).toBe(
-    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply.",
+    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team.",
   );
   expect(update?.description).toBe(
     "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note. Block it with note when you need input from the user.",
@@ -319,4 +326,72 @@ test("a post line shows what a blocked task needs, one entry", () => {
     "p12 task claimed by a, from user: Migrate\n  needs: Which database?\n  Postgres or MySQL?",
   );
   expect(UpdateInputSchema.safeParse({ id: "p12", action: "block", note: "x" }).success).toBe(true);
+});
+
+test("office_post takes a roster team by name for a lobby task; its line names the team", async () => {
+  const { ports, mentions } = await harness();
+  const [, post] = officeTools(ports);
+  expect(post?.input.safeParse({ kind: "task", text: "x", team: "QA-PR" }).success).toBe(true);
+  expect(post?.input.safeParse({ kind: "task", text: "x", team: "" }).success).toBe(false);
+  const posted = await runPost(ports, ALICE, {
+    kind: "task",
+    text: "Test the release",
+    board: "lobby",
+    team: "qa-pr",
+  });
+  expect(posted).toEqual({ text: "Posted p1.", structuredContent: { id: "p1" } });
+  expect(mentions).toEqual(["p1->"]);
+  expect(ports.service.postsOf("lobby")[0]).toMatchObject({ team: "t2" });
+  expect(runRead(ports, ALICE, { board: "lobby" }).text).toBe(
+    "Board lobby: 1 post(s), cursor 1.\np1 task open for team QA-PR, from Alice: Test the release",
+  );
+  expect(await runUpdate(ports, ALICE, { id: "p1", action: "claim" })).toEqual({
+    text: "Unable to claim p1: it is for team QA-PR",
+    isError: true,
+  });
+  expect(await runUpdate(ports, BOB, { id: "p1", action: "claim" })).toEqual({
+    text: "p1 task claimed by Bob for team QA-PR (on p3), from Alice: Test the release",
+  });
+});
+
+test("office_post refuses a team with to, off the lobby, on a note, and one the roster lacks", async () => {
+  const { ports } = await harness();
+  const refused = (text: string) => ({ text, isError: true });
+  // An unknown agent in to is never looked up: the pair is refused first.
+  expect(
+    await runPost(ports, ALICE, { kind: "task", text: "x", board: "lobby", to: "zz", team: "t2" }),
+  ).toEqual(refused("Unable to post: give to or team, not both"));
+  expect(
+    await runPost(ports, ALICE, { kind: "task", text: "x", board: "lobby", to: "b", team: "t2" }),
+  ).toEqual(refused("Unable to post: give to or team, not both"));
+  expect(await runPost(ports, ALICE, { kind: "task", text: "x", team: "t2" })).toEqual(
+    refused("Unable to post: only a lobby task goes to a team"),
+  );
+  expect(
+    await runPost(ports, ALICE, { kind: "note", text: "x", board: "lobby", team: "t2" }),
+  ).toEqual(refused("Unable to post: only a lobby task goes to a team"));
+  expect(
+    await runPost(ports, ALICE, { kind: "task", text: "x", board: "lobby", team: "Ops" }),
+  ).toEqual(refused("Unable to post: no team Ops"));
+  expect(ports.service.postsOf("lobby")).toEqual([]);
+});
+
+test("a post line names a team by its name, or by its id once the team is gone", () => {
+  const post: Post = {
+    id: "p4",
+    seq: 4,
+    board: "lobby",
+    kind: "task",
+    state: "open",
+    text: "Test",
+    author: "user",
+    team: "t2",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  const label = (author: string) => (author === "user" ? "the user" : author);
+  expect(postLine(post, label, (id) => (id === "t2" ? "QA-PR" : id))).toBe(
+    "p4 task open for team QA-PR, from the user: Test",
+  );
+  expect(postLine(post, label, (id) => id)).toBe("p4 task open for team t2, from the user: Test");
 });

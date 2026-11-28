@@ -56,6 +56,38 @@ interface Listeners {
   onBoard?: (board: string, posts: readonly Post[]) => void;
   onBoardRemoved?: (board: string) => void;
   refuse?: BoardServicePorts["refuse"];
+  teams?: TeamPorts;
+}
+
+type TeamPorts = Pick<BoardServicePorts, "teamOf" | "findTeam" | "teamName">;
+
+/** The roster's teams by id, and the team each agent's teammate is of: Alice in PR-DEV, Bob in QA-PR. */
+const SEATS = new Map([
+  ["a", "t1"],
+  ["b", "t2"],
+]);
+
+function teamPorts(teams: Map<string, string>): TeamPorts {
+  return {
+    teamOf: async (agentId) => {
+      const team = SEATS.get(agentId);
+      return team !== undefined && teams.has(team) ? team : null;
+    },
+    findTeam: async (nameOrId) =>
+      teams.has(nameOrId)
+        ? nameOrId
+        : ([...teams].find(
+            ([, name]) => name.toLowerCase() === nameOrId.trim().toLowerCase(),
+          )?.[0] ?? null),
+    teamName: (id) => teams.get(id) ?? null,
+  };
+}
+
+function rosterTeams(): Map<string, string> {
+  return new Map([
+    ["t1", "PR-DEV"],
+    ["t2", "QA-PR"],
+  ]);
 }
 
 type WorkspaceOf = (agentId: string) => Promise<string | null>;
@@ -79,6 +111,7 @@ function build(
       ((board, posts) => events.push(`board ${board} ${posts.map((item) => item.id).join(",")}`)),
     onBoardRemoved: listeners.onBoardRemoved ?? ((board) => events.push(`removed ${board}`)),
     ...(listeners.refuse ? { refuse: listeners.refuse } : {}),
+    ...listeners.teams,
     workspaceOf,
   });
   return { service, store, clock, events };
@@ -1287,4 +1320,115 @@ describe("releaseClaims", () => {
     expect(find(service, "p2")).toBeUndefined();
     expect(find(service, "p1")).toMatchObject({ state: "open" });
   });
+});
+
+test("a lobby task for a team keeps the team's id, found by its id or its name in any case", async () => {
+  const { service } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+  const byName = await service.post({
+    board: "lobby",
+    kind: "task",
+    text: "Test the release",
+    author: "user",
+    team: " qa-pr ",
+  });
+  expect(byName.ok && byName.post).toMatchObject({ id: "p1", state: "open", team: "t2" });
+  expect(byName.ok && byName.post).not.toHaveProperty("to");
+  expect(byName.ok && byName.post).not.toHaveProperty("namedPickup");
+  const byId = await service.post({
+    board: "lobby",
+    kind: "task",
+    text: "Build it",
+    author: "a",
+    team: "t1",
+  });
+  expect(byId.ok && byId.post).toMatchObject({ id: "p2", team: "t1" });
+});
+
+test("a team takes only a lobby task, never with to, and only one the roster has", async () => {
+  const { service, store } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+  await service.post({ board: "lobby", kind: "task", text: "Root", author: "user" });
+  const saves = store.saved.length;
+  const refused = async (input: Parameters<BoardService["post"]>[0]) => {
+    const result = await service.post(input);
+    return result.ok ? "" : result.error;
+  };
+  const base = { board: "lobby", kind: "task" as const, text: "x", author: "user", team: "QA-PR" };
+  expect(await refused({ ...base, to: "b" })).toBe("Unable to post: give to or team, not both");
+  expect(await refused({ ...base, kind: "note" })).toBe(
+    "Unable to post: only a lobby task goes to a team",
+  );
+  expect(await refused({ ...base, board: "w1" })).toBe(
+    "Unable to post: only a lobby task goes to a team",
+  );
+  expect(await refused({ ...base, replyTo: "p1" })).toBe(
+    "Unable to post: only a lobby task goes to a team",
+  );
+  expect(await refused({ ...base, team: "Ops" })).toBe("Unable to post: no team Ops");
+  expect(store.saved).toHaveLength(saves);
+});
+
+test("with the roster off, or no roster lookup at all, no team is found", async () => {
+  const { service } = await harness(undefined, { teams: teamPorts(new Map()) });
+  const input = { board: "lobby", kind: "task" as const, text: "x", author: "user", team: "t2" };
+  expect(await service.post(input)).toEqual({ ok: false, error: "Unable to post: no team t2" });
+  const bare = await harness();
+  expect(await bare.service.post(input)).toEqual({
+    ok: false,
+    error: "Unable to post: no team t2",
+  });
+});
+
+test("an agent claims a team's task only from that team; the user claims any", async () => {
+  const { service } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+  await service.post({ board: "lobby", kind: "task", text: "Test", author: "user", team: "t2" });
+  await service.post({ board: "lobby", kind: "task", text: "More", author: "user", team: "t2" });
+  expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toEqual({
+    ok: false,
+    error: "Unable to claim p1: it is for team QA-PR",
+  });
+  expect(await service.update({ id: "p1", action: "claim", actor: "b" })).toMatchObject({
+    ok: true,
+    post: { state: "claimed", claimedBy: "b" },
+  });
+  expect(await service.update({ id: "p2", action: "claim", actor: "user" })).toMatchObject({
+    ok: true,
+    post: { state: "claimed", claimedBy: "user" },
+  });
+});
+
+test("a task whose team left the roster is anyone's, by hand and by the pickup", async () => {
+  const teams = rosterTeams();
+  const { service } = await harness(undefined, { teams: teamPorts(teams) });
+  await service.post({ board: "lobby", kind: "task", text: "Test", author: "user", team: "t2" });
+  await service.post({ board: "lobby", kind: "task", text: "More", author: "user", team: "t2" });
+  teams.delete("t2");
+  expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toMatchObject({
+    ok: true,
+    post: { claimedBy: "a", team: "t2" },
+  });
+  expect(await service.claimLobbyTask("p2", "c", 2)).toMatchObject({ claimedBy: "c" });
+});
+
+test("the pickup's claim of a team's task refuses an agent of another team", async () => {
+  const { service } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+  await service.post({ board: "lobby", kind: "task", text: "Test", author: "user", team: "t2" });
+  expect(await service.claimLobbyTask("p1", "a", 1)).toBeNull();
+  expect(await service.claimLobbyTask("p1", "c", 1)).toBeNull();
+  expect(await service.claimLobbyTask("p1", "b", 1)).toMatchObject({
+    state: "claimed",
+    claimedBy: "b",
+    team: "t2",
+  });
+});
+
+test("a reopened team task is still the team's", async () => {
+  const { service } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+  await service.post({ board: "lobby", kind: "task", text: "Test", author: "user", team: "t2" });
+  await service.update({ id: "p1", action: "claim", actor: "b" });
+  const reopened = await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(reopened.ok && reopened.post).toMatchObject({ state: "open", team: "t2" });
+  expect(reopened.ok && reopened.post).not.toHaveProperty("claimedBy");
+  await service.update({ id: "p1", action: "claim", actor: "b" });
+  expect(await service.releaseClaims("b")).toEqual(["p1"]);
+  expect(service.postsOf("lobby")[0]).toMatchObject({ state: "open", team: "t2" });
 });

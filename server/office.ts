@@ -37,6 +37,12 @@ export interface OfficeAgentPorts {
   workspaceOf(agentId: string): Promise<string | null>;
   /** `source` is the agent whose posts the prompt carries, or null for a prompt as from the user. */
   send(agentId: string, prompt: string, source: string | null, messageId?: string): Promise<void>;
+  /** The roster team, by id, of the teammate the agent holds; null with the roster off or none held. */
+  teamOf(agentId: string): Promise<string | null>;
+  /** The id of the roster team an id or a name (any case) names; null for none or the roster off. */
+  findTeam(nameOrId: string): Promise<string | null>;
+  /** A roster team's name by its id; null once it is gone or the roster is off. */
+  teamName(teamId: string): string | null;
 }
 
 export type OfficeHub = Pick<Hub, "setBoards" | "setBoard" | "removeBoard" | "setWake">;
@@ -61,6 +67,7 @@ export interface Office {
     text: string;
     to?: string;
     replyTo?: string;
+    team?: string;
   }): Promise<PostResult>;
   update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
   remove(id: string): Promise<DeleteResult>;
@@ -100,6 +107,7 @@ export function createOffice(deps: OfficeDeps): Office {
 
   const label = (author: string) =>
     author === USER_AUTHOR ? "the user" : (titles.get(author) ?? author);
+  const teamLabel = (teamId: string) => deps.agents.teamName(teamId) ?? teamId;
 
   /** A duty post whose duty has instructions; a duty that left the list has none. */
   function instructed(post: Post): boolean {
@@ -136,6 +144,9 @@ export function createOffice(deps: OfficeDeps): Office {
     onBoardRemoved: (board) => hub.removeBoard(board),
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
+    teamOf: (agentId) => deps.agents.teamOf(agentId),
+    findTeam: (nameOrId) => deps.agents.findTeam(nameOrId),
+    teamName: (teamId) => deps.agents.teamName(teamId),
   });
 
   function noteAgent(agent: ToolAgent): void {
@@ -215,6 +226,7 @@ export function createOffice(deps: OfficeDeps): Office {
       mentioned,
       seen: noteAgent,
       label,
+      teamLabel,
     }),
     noteAgent,
     async post(input) {

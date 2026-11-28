@@ -30,6 +30,8 @@ export interface OfficeToolPorts {
   /** Remembers the caller's title for labels. */
   seen(agent: ToolAgent): void;
   label(author: string): string;
+  /** A roster team's name by its id, or the id once the team is gone. */
+  teamLabel(teamId: string): string;
 }
 
 const BoardChoiceSchema = z.enum(["room", "lobby"]);
@@ -48,6 +50,7 @@ export const PostInputSchema = z.object({
   to: z.string().min(1).optional(),
   board: BoardChoiceSchema.optional(),
   replyTo: z.string().min(1).optional(),
+  team: z.string().min(1).optional(),
 });
 export type PostInput = z.output<typeof PostInputSchema>;
 
@@ -68,26 +71,32 @@ export function boardFor(
 }
 
 /** One post as one entry: its further lines are indented and every name is on one line. */
-export function postLine(post: Post, label: (author: string) => string): string {
+export function postLine(
+  post: Post,
+  label: (author: string) => string,
+  teamLabel: (teamId: string) => string = (teamId) => teamId,
+): string {
   const name = (author: string) => oneLine(label(author));
   const state = post.state ? ` ${post.state}` : "";
   const claim = post.claimedBy ? ` by ${name(post.claimedBy)}` : "";
+  const team = post.team ? ` for team ${oneLine(teamLabel(post.team))}` : "";
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
   const re = post.replyTo ? ` re ${post.replyTo}` : "";
   const needs = post.blocked ? `\n  needs: ${indented(post.blocked)}` : "";
   const result = post.result ? `\n  result: ${indented(post.result)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
+  return `${post.id} ${post.kind}${state}${claim}${team}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
 }
 
 export function readText(
   board: string,
   result: ReadResult,
   label: (author: string) => string,
+  teamLabel?: (teamId: string) => string,
 ): string {
   const more = result.more ? ", more after it" : "";
   const header = `Board ${board}: ${result.posts.length} post(s), cursor ${result.cursor}${more}.`;
-  return [header, ...result.posts.map((post) => postLine(post, label))].join("\n");
+  return [header, ...result.posts.map((post) => postLine(post, label, teamLabel))].join("\n");
 }
 
 export function runRead(
@@ -97,7 +106,8 @@ export function runRead(
 ): AgentToolResult {
   ports.seen(agent);
   const board = boardFor(agent, input.board);
-  return { text: readText(board, ports.service.read(board, input.since ?? null), ports.label) };
+  const result = ports.service.read(board, input.since ?? null);
+  return { text: readText(board, result, ports.label, ports.teamLabel) };
 }
 
 export async function runPost(
@@ -106,11 +116,11 @@ export async function runPost(
   input: PostInput,
 ): Promise<AgentToolResult> {
   ports.seen(agent);
-  // A reply is addressed by the service: its root task's holder, not a `to` of the caller's.
-  const to =
-    input.to === undefined || input.replyTo !== undefined
-      ? undefined
-      : await ports.resolveAgent(input.to);
+  // A reply is addressed by the service: its root task's holder, not a `to` of the caller's. With
+  // a team, `to` goes as it is, for the service to refuse the pair.
+  let to: string | null | undefined;
+  if (input.to !== undefined && input.replyTo === undefined)
+    to = input.team === undefined ? await ports.resolveAgent(input.to) : input.to;
   if (to === null) return { text: `Unable to post: no agent ${input.to}`, isError: true };
   const result = await ports.service.post({
     board: boardFor(agent, input.board),
@@ -119,6 +129,7 @@ export async function runPost(
     author: agent.id,
     ...(to === undefined ? {} : { to }),
     ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+    ...(input.team === undefined ? {} : { team: input.team }),
   });
   if (!result.ok) return { text: result.error, isError: true };
   ports.mentioned(result.post);
@@ -147,7 +158,7 @@ export async function runUpdate(
     ...(input.note === undefined ? {} : { note: input.note }),
   });
   if (!result.ok) return { text: result.error, isError: true };
-  return { text: postLine(result.post, ports.label) };
+  return { text: postLine(result.post, ports.label, ports.teamLabel) };
 }
 
 export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
@@ -162,7 +173,7 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_post",
       description:
-        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply.",
+        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team.",
       input: PostInputSchema,
       execute: (input, { agent }) => runPost(ports, agent, input),
     }),

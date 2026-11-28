@@ -4,9 +4,11 @@ import {
   NO_ROSTER,
   ROSTER_MEMBER_KEY,
   RosterTeamsSchema,
+  findRosterTeam,
   nextEdition,
   refuseBadTeams,
   rosterOf,
+  rosterTeamById,
   shownTeamName,
   storedRosterMark,
   seatOf,
@@ -50,6 +52,26 @@ test("a teammate is found by id with its team, and only while the roster is on",
   expect(seatOf(ON, 1)).toBeNull();
   expect(seatOf(ON, undefined)).toBeNull();
   expect(seatOf({ ...ON, on: false }, "m3")).toBeNull();
+});
+
+test("a team is found by its id, else by its name in any case, and only while the roster is on", () => {
+  expect(findRosterTeam(ON, "t2")).toBe(QA);
+  expect(findRosterTeam(ON, "pr-qa")).toBe(QA);
+  expect(findRosterTeam(ON, "  PR-DEV ")).toBe(DEV);
+  expect(findRosterTeam(ON, "Rosalyn")).toBeNull();
+  expect(findRosterTeam(ON, "m3")).toBeNull();
+  expect(findRosterTeam({ ...ON, on: false }, "t2")).toBeNull();
+  expect(findRosterTeam({ ...ON, on: false }, "PR-QA")).toBeNull();
+  // An id goes before a name: a team named after another's id is found by the id's team.
+  const named: RosterTeam = { id: "t3", name: "t2", members: [] };
+  expect(findRosterTeam({ ...ON, teams: [DEV, QA, named] }, "t2")).toBe(QA);
+});
+
+test("a team is looked up by id alone, and only while the roster is on", () => {
+  expect(rosterTeamById(ON, "t1")).toBe(DEV);
+  expect(rosterTeamById(ON, "PR-DEV")).toBeNull();
+  expect(rosterTeamById(ON, "gone")).toBeNull();
+  expect(rosterTeamById({ ...ON, on: false }, "t1")).toBeNull();
 });
 
 test("the settings' three values read as one roster", () => {

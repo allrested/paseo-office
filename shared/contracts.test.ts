@@ -270,3 +270,22 @@ test("a post carries a block reason, and block is an update action for the tool 
     true,
   );
 });
+
+test("a lobby task carries its roster team's id, and the post rpc takes one", () => {
+  const task = {
+    id: "p1",
+    seq: 1,
+    board: "lobby",
+    kind: "task",
+    text: "Test it",
+    author: "user",
+    state: "open",
+    team: "t2",
+    createdAt: "2026-11-11T00:00:00.000Z",
+    updatedAt: "2026-11-11T00:00:00.000Z",
+  };
+  expect(PostSchema.parse(task)).toEqual(task);
+  const input = { board: "lobby", kind: "task", text: "x" };
+  expect(postRpc.input.parse({ ...input, team: "t2" })).toEqual({ ...input, team: "t2" });
+  expect(postRpc.input.safeParse({ ...input, team: "" }).success).toBe(false);
+});

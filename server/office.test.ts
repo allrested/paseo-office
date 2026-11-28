@@ -82,6 +82,12 @@ function setup(initial?: BoardsFile) {
   const prompts: string[] = [];
   const sources: (string | null)[] = [];
   const logs: string[] = [];
+  // The roster's teams by id, and the team each agent holds a teammate of.
+  const teams = new Map([
+    ["t1", "PR-DEV"],
+    ["t2", "QA-PR"],
+  ]);
+  const seats = new Map<string, string>();
   const build = (overrides?: Partial<OfficeAgentPorts>) =>
     createOffice({
       store,
@@ -98,11 +104,21 @@ function setup(initial?: BoardsFile) {
           prompts.push(`${agentId}: ${prompt}`);
           sources.push(source);
         },
+        teamOf: async (agentId) => {
+          const team = seats.get(agentId);
+          return team !== undefined && teams.has(team) ? team : null;
+        },
+        findTeam: async (nameOrId) =>
+          teams.has(nameOrId)
+            ? nameOrId
+            : ([...teams].find(([, name]) => name.toLowerCase() === nameOrId.toLowerCase())?.[0] ??
+              null),
+        teamName: (id) => teams.get(id) ?? null,
         ...overrides,
       },
       log: (message) => logs.push(message),
     });
-  return { build, clock, hub, store, targets, prompts, sources, logs };
+  return { build, clock, hub, store, targets, prompts, sources, logs, teams, seats };
 }
 
 function start(initial?: BoardsFile) {
@@ -844,4 +860,97 @@ test("the user never blocks a task, whoever holds it", async () => {
     toolContext({ id: "a", title: null }),
   );
   expect(blocked?.isError).not.toBe(true);
+});
+
+test("a team's lobby task waits for agent tools, then goes only to an idle agent of that team", async () => {
+  const { build, clock, targets, store, prompts, seats } = setup();
+  seats.set("b", "t1");
+  const office = build();
+  await office.ready;
+  // The picker sends the team's id.
+  expect(
+    await office.post({ board: "lobby", kind: "task", text: "Test it", team: "t2" }),
+  ).toMatchObject({ ok: true, post: { team: "t2" } });
+  targets.set("c", "wakeable");
+  seats.set("c", "t2");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  // Only PR-DEV is idle: the task stays open.
+  targets.set("c", "busy");
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(store.current().posts[0]).toMatchObject({ state: "open" });
+  targets.set("c", "wakeable");
+  office.turnEnded("c");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "c", team: "t2" });
+  expect(prompts).toEqual([expect.stringContaining("c: The office assigned you lobby task p1")]);
+  await office.stop();
+});
+
+test("a team's task whose team left the roster goes to any idle agent", async () => {
+  const { build, clock, store, teams, seats } = setup();
+  seats.set("b", "t1");
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Test it", team: "t2" });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "open" });
+  teams.delete("t2");
+  office.turnEnded("b");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  await office.stop();
+});
+
+test("an agent's own named task goes before an older one for its team", async () => {
+  const { build, clock, store, prompts, seats } = setup();
+  seats.set("b", "t2");
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "For the team", team: "t2" });
+  await office.post({ board: "lobby", kind: "task", text: "For Bob", to: "b" });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts.find((p) => p.id === "p2")).toMatchObject({ claimedBy: "b" });
+  expect(store.current().posts.find((p) => p.id === "p1")).toMatchObject({ state: "open" });
+  expect(prompts).toEqual([expect.stringContaining("For Bob")]);
+  await office.stop();
+});
+
+test("the user's post to a team is checked as the tool's is", async () => {
+  const { office } = start();
+  await office.ready;
+  const task = { kind: "task" as const, text: "x", team: "t2" };
+  expect(await office.post({ ...task, board: "w1" })).toEqual({
+    ok: false,
+    error: "Unable to post: only a lobby task goes to a team",
+  });
+  expect(await office.post({ ...task, board: "lobby", to: "b" })).toEqual({
+    ok: false,
+    error: "Unable to post: give to or team, not both",
+  });
+  expect(await office.post({ ...task, board: "lobby", team: "t9" })).toEqual({
+    ok: false,
+    error: "Unable to post: no team t9",
+  });
+  await office.stop();
+});
+
+test("an office tool's read names a team task's team", async () => {
+  const { office } = start();
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "Test it", team: "t2" });
+  const read = office.tools.find((tool) => tool.name === "office_read");
+  const result = await read?.execute({ board: "lobby" }, toolContext({ id: "a", title: "Alice" }));
+  expect(result?.text).toContain("p1 task open for team QA-PR, from the user: Test it");
+  await office.stop();
 });
