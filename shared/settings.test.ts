@@ -502,3 +502,25 @@ test("GitHub repositories are owner/repo with no leading dash, at most 10, none 
     true,
   );
 });
+
+test("a GitHub search that names a repository, organisation or user is refused", () => {
+  const refused = ["githubIntakeSearch: the search cannot name a repository: list it above"];
+  for (const search of [
+    "label:agent repo:acme/api",
+    "REPO:acme/api label:x",
+    "label:x org:acme",
+    "user:me is:open",
+    "label:x -repo:acme/api",
+    "(repo:acme/api OR label:x)",
+  ]) {
+    expect(hostIssues({ githubIntakeSearch: search }), search).toEqual(refused);
+  }
+  for (const search of [
+    "label:agent is:open",
+    "label:repo:x",
+    "title:myrepo:thing",
+    "in:title user",
+  ]) {
+    expect(hostIssues({ githubIntakeSearch: search }), search).toEqual([]);
+  }
+});

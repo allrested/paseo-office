@@ -30,13 +30,19 @@ export class TrackerProblem extends Error {
   readonly withoutWords: string;
   /** The tracker did not answer in time: a request that changes something may have been done. */
   readonly timedOut: boolean;
+  /** Trying again cannot work: a request that changes something is not repeated. */
+  readonly final: boolean;
 
   /** `words` are the tracker's own, put after the message; they can quote what was asked. */
-  constructor(message: string, options: { words?: string; timedOut?: boolean } = {}) {
+  constructor(
+    message: string,
+    options: { words?: string; timedOut?: boolean; final?: boolean } = {},
+  ) {
     super(options.words ? `${message}: ${options.words}` : message);
     this.name = "TrackerProblem";
     this.withoutWords = message;
     this.timedOut = options.timedOut ?? false;
+    this.final = options.final ?? false;
   }
 }
 

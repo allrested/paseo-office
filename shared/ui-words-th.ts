@@ -825,4 +825,6 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "The search must not start with a dash": "การค้นหาต้องไม่ขึ้นต้นด้วยขีดกลาง",
   "GitHub: not set up. Add a repository.": "GitHub: ยังไม่ได้ตั้งค่า เพิ่มรีโพซิทอรี",
   "GitHub: not read yet.": "GitHub: ยังไม่ได้อ่าน",
+  "The search cannot name a repository: list it above":
+    "การค้นหาต้องไม่ระบุรีโพซิทอรี: ให้ใส่ไว้ในรายการด้านบน",
 };

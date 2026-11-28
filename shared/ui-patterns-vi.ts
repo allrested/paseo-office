@@ -298,6 +298,14 @@ export const RULES: readonly Rule[] = [
     (n, entry) => `Dòng ${n}: "${entry}" không phải owner/repo`,
   ],
   [/^Line (\d+): "(.+)" is there twice$/, (n, entry) => `Dòng ${n}: "${entry}" xuất hiện hai lần`],
+  [
+    /^(\S+): the first 20 matches are already imported: narrow the search$/,
+    (repo) => `${repo}: 20 kết quả đầu đã được nhập: hãy thu hẹp tìm kiếm`,
+  ],
+  [
+    /^(\S+) is no longer read: not commented$/,
+    (repo) => `${repo} không còn được đọc: không bình luận`,
+  ],
   [/^Open (\S+) in Jira$/, (key) => `Mở ${key} trong Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `Mở ${key} trên GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.

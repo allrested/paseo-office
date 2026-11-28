@@ -23,8 +23,14 @@ function fakeGh(answer: (args: string[]) => GhRun | Promise<GhRun>) {
 const ok = (body: unknown): GhRun => ({ code: 0, stdout: JSON.stringify(body), stderr: "" });
 const failed = (stderr: string, code: GhRun["code"] = 1): GhRun => ({ code, stdout: "", stderr });
 
-function found(number: unknown, title: unknown = "A title", body: unknown = "A body") {
-  return { number, title, body, url: "https://evil.example/phish" };
+/** An issue as gh prints it, its url as GitHub would give it for `repo`. */
+function found(
+  number: unknown,
+  title: unknown = "A title",
+  body: unknown = "A body",
+  repo = "acme/web",
+) {
+  return { number, title, body, url: `https://github.com/${repo}/issues/${String(number)}` };
 }
 
 async function problemOf(promise: Promise<unknown>): Promise<TrackerProblem> {
@@ -78,12 +84,12 @@ test("a read runs exactly gh issue list for each repository, the search as one a
   ]);
 });
 
-test("the key uses the repository as configured and the number, the link is built, never taken from the output", async () => {
-  const { run } = fakeGh(() => ok([found(12, "Fix it", "Steps")]));
+test("the key uses the repository, lower-cased, and the number, the link is built, never taken from the output", async () => {
+  const { run } = fakeGh(() => ok([found(12, "Fix it", "Steps", "Acme/Web.app")]));
   const read = await readGithubIssues(["Acme/Web.app"], SEARCH, run);
   expect(read.issues).toEqual([
     {
-      key: "Acme/Web.app#12",
+      key: "acme/web.app#12",
       url: "https://github.com/Acme/Web.app/issues/12",
       title: "Fix it",
       body: "Steps",
@@ -116,7 +122,11 @@ test("hostile text is cleaned like Jira's: one line, no control characters, cut"
 
 test("a missing or null title and body read as empty, other types skip the issue", async () => {
   const { run } = fakeGh(() =>
-    ok([{ number: 1, title: null, body: null }, { number: 2, title: 5, body: "x" }, { number: 3 }]),
+    ok([
+      { ...found(1), title: null, body: null },
+      { ...found(2), title: 5 },
+      { number: 3, url: found(3).url },
+    ]),
   );
   const read = await readGithubIssues(["acme/web"], SEARCH, run);
   expect(read.issues.map((issue) => [issue.key, issue.title, issue.body])).toEqual([
@@ -164,7 +174,9 @@ test("each problem is a short sentence from the exit and the stderr, and never q
 
 test("a repository that fails does not stop the others, and the problems are told", async () => {
   const { run, calls } = fakeGh((args) =>
-    args[3] === "acme/gone" ? failed("HTTP 404") : ok([found(args[3] === "acme/web" ? 1 : 2)]),
+    args[3] === "acme/gone"
+      ? failed("HTTP 404")
+      : ok([found(args[3] === "acme/web" ? 1 : 2, "t", "b", args[3])]),
   );
   const read = await readGithubIssues(["acme/web", "acme/gone", "acme/api"], SEARCH, run);
   expect(read.issues.map((issue) => issue.key)).toEqual(["acme/web#1", "acme/api#2"]);
@@ -257,7 +269,83 @@ test("a comment that gh refused is a problem, a timeout is marked as one", async
 
 test("the source's comment goes through the same runner", async () => {
   const { run, calls } = fakeGh(() => ok({}));
-  const source = createGithubSource({ repos: () => [], search: () => SEARCH, run });
+  const source = createGithubSource({ repos: () => ["acme/web"], search: () => SEARCH, run });
   await source.comment?.("acme/web#2", "hello");
   expect(calls[0]?.slice(0, 3)).toEqual(["issue", "comment", "2"]);
+});
+
+test("an issue whose url is not its repository's is skipped and counted, though its number is fine", async () => {
+  // A search naming another repository brings its issues into this read.
+  const { run } = fakeGh(() =>
+    ok([
+      found(7, "Other", "b", "acme/api"),
+      { number: 8, title: "No url", body: "b" },
+      { ...found(9), url: "https://evil.example/acme/web/issues/9" },
+      { ...found(10), url: "HTTPS://GITHUB.COM/ACME/WEB/ISSUES/10" },
+      found(11),
+    ]),
+  );
+  const read = await readGithubIssues(["acme/web"], SEARCH, run);
+  expect(read.issues.map((issue) => issue.key)).toEqual(["acme/web#10", "acme/web#11"]);
+  expect(read.issues[0]?.url).toBe("https://github.com/acme/web/issues/10");
+  expect(read.skipped).toBe(3);
+});
+
+test("20 matches that are all seen say the search is crowded; fewer, or one unseen, say nothing", async () => {
+  const twenty = Array.from({ length: 20 }, (_, index) => found(index + 1));
+  const { run } = fakeGh(() => ok(twenty));
+  const crowded = await readGithubIssues(["acme/web"], SEARCH, run, () => true);
+  expect(crowded.problems).toEqual([
+    "acme/web: the first 20 matches are already imported: narrow the search",
+  ]);
+  const one = await readGithubIssues(["acme/web"], SEARCH, run, (key) => key !== "acme/web#7");
+  expect(one.problems).toEqual([]);
+  const few = fakeGh(() => ok(twenty.slice(0, 19)));
+  expect((await readGithubIssues(["acme/web"], SEARCH, few.run, () => true)).problems).toEqual([]);
+  expect((await readGithubIssues(["acme/web"], SEARCH, run)).problems).toEqual([]);
+});
+
+test("the source gives the service's seen test to the read", async () => {
+  const twenty = Array.from({ length: 20 }, (_, index) => found(index + 1));
+  const source = createGithubSource({
+    repos: () => ["acme/web"],
+    search: () => SEARCH,
+    run: async () => ok(twenty),
+  });
+  const read = await source.read(() => true);
+  expect(read.problems).toEqual([
+    "acme/web: the first 20 matches are already imported: narrow the search",
+  ]);
+  expect(read.issues).toHaveLength(20);
+});
+
+test("the same issue read as Acme/Web and as acme/web has one key, the link and the arguments keep the spelling", async () => {
+  const keys: string[] = [];
+  const seenArgs: string[] = [];
+  for (const repo of ["Acme/Web", "acme/web"]) {
+    const { run, calls } = fakeGh(() => ok([found(12, "t", "b", repo)]));
+    const read = await readGithubIssues([repo], SEARCH, run);
+    keys.push(read.issues[0]?.key ?? "");
+    seenArgs.push(calls[0]?.[3] ?? "", read.issues[0]?.url ?? "");
+  }
+  expect(keys).toEqual(["acme/web#12", "acme/web#12"]);
+  expect(seenArgs).toEqual([
+    "Acme/Web",
+    "https://github.com/Acme/Web/issues/12",
+    "acme/web",
+    "https://github.com/acme/web/issues/12",
+  ]);
+});
+
+test("a comment on a repository no longer in the settings is refused with a fixed sentence, whatever the case, and gh does not run", async () => {
+  const { run, calls } = fakeGh(() => ok({}));
+  let repos = ["Acme/Web"];
+  const source = createGithubSource({ repos: () => repos, search: () => SEARCH, run });
+  await source.comment?.("acme/web#2", "hello");
+  expect(calls[0]).toEqual(["issue", "comment", "2", "--repo", "Acme/Web", "--body", "hello"]);
+  repos = ["acme/api"];
+  const error = await problemOf(source.comment?.("acme/web#2", "hello") ?? Promise.resolve());
+  expect(error.message).toBe("acme/web is no longer read: not commented");
+  expect(error.final).toBe(true);
+  expect(calls).toHaveLength(1);
 });

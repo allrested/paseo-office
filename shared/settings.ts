@@ -96,6 +96,8 @@ export const JQL_MAX = 1_000;
  * as an option of the `gh` it is passed to.
  */
 export const GITHUB_REPO = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/;
+/** A search qualifier that names where to look: the repository comes from the list, not the search. */
+export const GITHUB_SEARCH_PLACE = /(?:^|[\s(])-?(?:repo|org|user):/i;
 export const GITHUB_REPOS_MAX = 10;
 export const GITHUB_SEARCH_MAX = 200;
 /** Where a ticket the intake posts lands: held in the backlog, or To do at once. */
@@ -235,6 +237,13 @@ function refuseBadGithubValues(values: HostValues, context: z.RefinementCtx): vo
       code: "custom",
       path: ["githubIntakeSearch"],
       message: "githubIntakeSearch: must not start with a dash",
+    });
+  }
+  if (GITHUB_SEARCH_PLACE.test(values.githubIntakeSearch)) {
+    context.addIssue({
+      code: "custom",
+      path: ["githubIntakeSearch"],
+      message: "githubIntakeSearch: the search cannot name a repository: list it above",
     });
   }
 }

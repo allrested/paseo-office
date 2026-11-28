@@ -313,6 +313,14 @@ export const RULES: readonly Rule[] = [
     (n, entry) => `Baris ${n}: "${entry}" bukan owner/repo`,
   ],
   [/^Line (\d+): "(.+)" is there twice$/, (n, entry) => `Baris ${n}: "${entry}" muncul dua kali`],
+  [
+    /^(\S+): the first 20 matches are already imported: narrow the search$/,
+    (repo) => `${repo}: 20 hasil pertama sudah diimpor: persempit pencarian`,
+  ],
+  [
+    /^(\S+) is no longer read: not commented$/,
+    (repo) => `${repo} tidak lagi dibaca: tidak dikomentari`,
+  ],
   [/^Open (\S+) in Jira$/, (key) => `Buka ${key} di Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `Buka ${key} di GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.

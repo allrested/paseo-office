@@ -2570,7 +2570,14 @@ test("with a repository the GitHub intake's timer is kept, and run now reads wit
     calls.push(args);
     return {
       code: 0,
-      stdout: JSON.stringify([{ number: 7, title: "Checkout fails", body: "It fails.", url: "x" }]),
+      stdout: JSON.stringify([
+        {
+          number: 7,
+          title: "Checkout fails",
+          body: "It fails.",
+          url: "https://github.com/acme/web/issues/7",
+        },
+      ]),
       stderr: "",
     };
   };

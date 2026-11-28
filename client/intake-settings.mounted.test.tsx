@@ -269,6 +269,10 @@ test("the search saves trimmed, and one that starts with a dash is refused befor
   expect(saved).toEqual([{ githubIntakeSearch: "label:agent -label:in-office" }]);
   await type(search(), "-label:x");
   expect(alerts()).toEqual(["The search must not start with a dash"]);
+  await type(search(), " -label:x");
+  expect(alerts()).toEqual(["The search must not start with a dash"]);
+  await type(search(), "label:agent repo:acme/api");
+  expect(alerts()).toEqual(["The search cannot name a repository: list it above"]);
   expect(saved).toHaveLength(1);
 });
 

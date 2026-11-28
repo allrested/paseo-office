@@ -855,4 +855,6 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "The search must not start with a dash": "Pencarian tidak boleh diawali tanda hubung",
   "GitHub: not set up. Add a repository.": "GitHub: belum diatur. Tambahkan repositori.",
   "GitHub: not read yet.": "GitHub: belum dibaca.",
+  "The search cannot name a repository: list it above":
+    "Pencarian tidak boleh menyebut repositori: daftarkan di atas",
 };

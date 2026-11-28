@@ -3,7 +3,13 @@ import { View } from "react-native";
 import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { intakeRunRpc, type IntakeState } from "../shared/contracts.js";
-import { GITHUB_REPO, GITHUB_REPOS_MAX, GITHUB_SEARCH_MAX, JQL_MAX } from "../shared/settings.js";
+import {
+  GITHUB_REPO,
+  GITHUB_REPOS_MAX,
+  GITHUB_SEARCH_MAX,
+  GITHUB_SEARCH_PLACE,
+  JQL_MAX,
+} from "../shared/settings.js";
 import { ActionButton } from "./action-button.js";
 import { ChoicePills } from "./choice-pills.js";
 import type { HostValues } from "./host-switches.js";
@@ -103,9 +109,13 @@ function GithubFields({
   );
   const saveSearch = useCallback(
     async (next: string) => {
-      const refused = next.startsWith("-");
-      setSearchRefused(refused ? "The search must not start with a dash" : null);
-      if (refused) return false;
+      let refused: string | null = null;
+      if (next.trimStart().startsWith("-")) refused = "The search must not start with a dash";
+      else if (GITHUB_SEARCH_PLACE.test(next)) {
+        refused = "The search cannot name a repository: list it above";
+      }
+      setSearchRefused(refused);
+      if (refused !== null) return false;
       return change("GitHub search", { githubIntakeSearch: next });
     },
     [change],

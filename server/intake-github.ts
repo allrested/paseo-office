@@ -37,7 +37,20 @@ export const runGh: RunGh = (args) =>
       execFile(
         "gh",
         args,
-        { env: { ...process.env, PATH: path }, timeout: TIMEOUT_MS, maxBuffer: 8_000_000 },
+        {
+          // github.com whatever the daemon's environment says (the links are built for it), no
+          // prompt, and the home directory, so a config in the working directory is not read.
+          env: {
+            ...process.env,
+            PATH: path,
+            GH_HOST: "github.com",
+            GH_PROMPT_DISABLED: "1",
+            GH_NO_UPDATE_NOTIFIER: "1",
+          },
+          cwd: homedir(),
+          timeout: TIMEOUT_MS,
+          maxBuffer: 8_000_000,
+        },
         (error, stdout, stderr) => {
           if (error === null) return resolve({ code: 0, stdout, stderr });
           const code = error.code === TOO_MUCH || !error.killed ? (error.code ?? null) : null;
@@ -56,6 +69,7 @@ const IssueSchema = z.object({
   number: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   title: z.string().nullish(),
   body: z.string().nullish(),
+  url: z.string(),
 });
 
 const NOT_INSTALLED = "the gh CLI is not installed on the host";
@@ -102,6 +116,7 @@ export async function readGithubIssues(
   repos: readonly string[],
   search: string,
   run: RunGh,
+  seen: (key: string) => boolean = () => false,
 ): Promise<IntakeRead & { problems: string[] }> {
   const issues: IntakeIssue[] = [];
   const problems: string[] = [];
@@ -134,19 +149,32 @@ export async function readGithubIssues(
       if (isHostWide(problem)) break;
       continue;
     }
+    const mine: IntakeIssue[] = [];
     for (const found of list.slice(0, INTAKE_READ_MAX)) {
       const parsed = IssueSchema.safeParse(found);
-      if (!parsed.success) {
+      const url = `https://github.com/${repo}/issues/${parsed.data?.number}`;
+      // A search that names another repository brings its issues into this read: one whose own
+      // address is not this repository's is not this repository's issue. The address is only
+      // compared, never used.
+      if (!parsed.success || parsed.data.url.toLowerCase() !== url.toLowerCase()) {
         skipped += 1;
         continue;
       }
       const { number, title, body } = parsed.data;
-      issues.push({
-        key: `${repo}#${number}`,
-        url: `https://github.com/${repo}/issues/${number}`,
+      mine.push({
+        // Lower case, so a setting edited only in case does not bring the issue again.
+        key: `${repo.toLowerCase()}#${number}`,
+        url,
         title: ticketTitle(title ?? ""),
         body: ticketBody(body ?? ""),
       });
+    }
+    issues.push(...mine);
+    // No paging: when the 20 it reads are all imported, nothing newer is ever reached.
+    if (mine.length === INTAKE_READ_MAX && mine.every((issue) => seen(issue.key))) {
+      problems.push(
+        `${repo}: the first ${INTAKE_READ_MAX} matches are already imported: narrow the search`,
+      );
     }
   }
   return { issues, skipped, problems };
@@ -177,14 +205,23 @@ export function createGithubSource(ports: {
   return {
     kind: "github",
     configured: () => ports.repos().length > 0 && ports.search().trim() !== "",
-    read: async (_seen) => {
-      const read = await readGithubIssues(ports.repos(), ports.search().trim(), run);
+    read: async (seen) => {
+      const read = await readGithubIssues(ports.repos(), ports.search().trim(), run, seen);
       // Nothing came and something failed: the run says why, as a failed read does.
       if (read.issues.length === 0 && read.skipped === 0 && read.problems.length > 0) {
         throw new TrackerProblem(read.problems.join("; "));
       }
       return read;
     },
-    comment: async (key, text) => commentOnGithub(key, text, run),
+    comment: async (key, text) => {
+      const [repo = "", number = ""] = key.split("#");
+      // The repository as the settings spell it, and only while they still list it: one the owner
+      // removed is not written to.
+      const listed = ports.repos().find((entry) => entry.toLowerCase() === repo.toLowerCase());
+      if (listed === undefined) {
+        throw new TrackerProblem(`${repo} is no longer read: not commented`, { final: true });
+      }
+      await commentOnGithub(`${listed}#${number}`, text, run);
+    },
   };
 }

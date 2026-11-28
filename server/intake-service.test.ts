@@ -5,6 +5,7 @@ import { createBoardService, type BoardService } from "./board-service.js";
 import { createFakeClock, settle } from "./fake-clock.js";
 import { fakeSchedules } from "./fake-schedules.js";
 import { TrackerProblem } from "./incidents-http.js";
+import { createGithubSource } from "./intake-github.js";
 import {
   createIntake,
   INTAKE_SCHEDULE,
@@ -45,6 +46,8 @@ interface FakeSource extends IntakeSource {
   comments: [string, string][];
   /** Problems the read reports beside its issues. */
   problems: string[];
+  /** The next comment fails with this, whatever the count. */
+  commentFailure: Error | null;
   /** How many of the next comments fail. */
   commentFailures: number;
   /** Holds each read until the returned function is called. */
@@ -64,6 +67,7 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
     failure: null,
     comments: [],
     problems: [],
+    commentFailure: null,
     commentFailures: 0,
     holdReads() {
       let release: () => void = () => undefined;
@@ -87,6 +91,7 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
     },
     comment: async (key, text) => {
       source.comments.push([key, text]);
+      if (source.commentFailure !== null) throw source.commentFailure;
       if (source.commentFailures > 0) {
         source.commentFailures -= 1;
         throw new TrackerProblem("Jira answered HTTP 500");
@@ -790,4 +795,48 @@ test("a done task from a GitHub issue is commented on its issue, once, with Jira
   await settle();
   expect(github.comments).toEqual([["acme/web#7", "Done in the office by Rani: Fixed."]]);
   expect(service.postsOf("lobby")[0]?.wroteBack).toBe(true);
+});
+
+test("a write back that can never work is tried once, shows its problem, and is not tried at the next run", async () => {
+  const github = fakeSource([repoIssue(7)], "github");
+  github.commentFailure = new TrackerProblem("acme/web is no longer read: not commented", {
+    final: true,
+  });
+  const { intake, service } = await harness({ sources: [github], settings: WRITE_BACK });
+  const id = await claimed(service, intake);
+  await service.update({ id, action: "done", actor: "a", note: "Fixed." });
+  await settle();
+  expect(github.comments).toHaveLength(1);
+  expect(intake.state().github.problem).toBe(
+    "Unable to comment on acme/web#7: acme/web is no longer read: not commented",
+  );
+  await intake.run();
+  expect(github.comments).toHaveLength(1);
+});
+
+test("the same issue read under another case of its repository is posted once", async () => {
+  let repo = "Acme/Web";
+  const source = createGithubSource({
+    repos: () => [repo],
+    search: () => "label:agent",
+    run: async () => ({
+      code: 0,
+      stdout: JSON.stringify([
+        { number: 12, title: "T", body: "B", url: `https://github.com/${repo}/issues/12` },
+      ]),
+      stderr: "",
+    }),
+  });
+  const { intake, lobby, file } = await harness({ sources: [source] });
+  await intake.run();
+  repo = "acme/web";
+  const again = await intake.run();
+  expect(lobby()).toHaveLength(1);
+  expect(again.github.imported).toBe(0);
+  expect(lobby()[0]?.source).toEqual({
+    kind: "github",
+    key: "acme/web#12",
+    url: "https://github.com/Acme/Web/issues/12",
+  });
+  expect(Object.keys(file.kept?.seen ?? {})).toEqual(["github:acme/web#12"]);
 });

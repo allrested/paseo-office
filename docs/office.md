@@ -1534,7 +1534,8 @@ GitHub issues come in the same way, from a second source. Two host settings set 
 `githubIntakeRepos`, up to 10 repositories as `owner/repo` (none twice, whatever the case; neither
 part may start with a dash, which keeps an entry from being read as an option), and
 `githubIntakeSearch`, up to 200 characters, `label:agent is:open` at first, which may not start
-with a dash. With no repository the source is off and, with Jira off too, there is no timer. Under
+with a dash or name a place (`repo:`, `org:` or `user:`: "the search cannot name a repository:
+list it above"). With no repository the source is off and, with Jira off too, there is no timer. Under
 Services, **Intake**, below the Jira field: "GitHub repositories to bring in from" (one per line;
 the field names the line it will not take, for example `Line 2: "-evil/x" is not owner/repo`, and
 saves nothing until every line is right) and "GitHub search" (one line), with the hint "Read with
@@ -1550,8 +1551,11 @@ number,title,body,url`, each value one argument, so neither a setting nor an iss
   become an option. A repository that fails does not stop the others; the problems are joined in
   the state.
 - **The key and the link.** An issue's key is `<repo>#<number>` with the repository as written in
-  the settings and the number from `gh` (a positive integer, else the issue is skipped and counted),
-  for example `acme/web#12`. The link is built, `https://github.com/acme/web/issues/12`, never
+  the settings, lower-cased (so editing a setting's case does not bring the issues again), and the
+  number from `gh` (a positive integer, else the issue is skipped and counted), for example
+  `acme/web#12`. An issue whose own `url` from `gh` is not `https://github.com/<repo>/issues/<number>`
+  (compared without case) is skipped and counted too: GitHub's search could otherwise bring in
+  another repository's issue. The link is built, `https://github.com/acme/web/issues/12`, never
   taken from `gh`'s output. The task reads `acme/web#12 title`, the link, a blank line and the body,
   cleaned and cut as Jira's are, and an agent handed it reads `The office assigned you lobby task
 p12 from GitHub acme/web#12.`
@@ -1560,7 +1564,8 @@ p12 from GitHub acme/web#12.`
   `github:<key>`). At most 20 are posted per source per run, and the cap of 50 open imported
   tasks is shared with Jira. So write a search that leaves imported issues out, for example
   `label:agent is:open -label:in-office`, with `in-office` a label the team adds once the issue is
-  in the office; otherwise, once the first 20 matches are imported, nothing newer is reached.
+  in the office; otherwise, once the first 20 matches are imported, nothing newer is reached, and the problem says
+  so ("acme/web: the first 20 matches are already imported: narrow the search").
 - **Problems**, each one short sentence and never the CLI's own words: "the gh CLI is not installed
   on the host", "gh is not signed in on the host", "acme/web: not found, or gh's account cannot
   read it", "acme/web: gh did not answer in 30 seconds", "acme/web: gh answered with something
@@ -1569,7 +1574,10 @@ p12 from GitHub acme/web#12.`
 comment <number> --repo <repo> --body <text>`, the same text and the same cut as Jira's, the text
   one argument after `--body` (a result that starts with `--` is still only the body). One attempt
   at done, one more at the next run, none after a timeout. `gh`'s account must be allowed to
-  comment on the repository.
+  comment on the repository. A repository the owner removed from the settings is not commented on
+  ("acme/web is no longer read: not commented"), and that task is not tried again. `gh` is run
+  from the home directory with `GH_HOST=github.com` and no prompts, whatever the daemon's
+  environment says.
 
 The state for clients (`intake` in the office's state) has, for each of Jira and GitHub, whether it
 is set up, the last run's problem (a short safe text, logged once each time it changes; Jira's own words are kept

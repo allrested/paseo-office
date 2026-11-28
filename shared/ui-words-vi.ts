@@ -850,4 +850,6 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "The search must not start with a dash": "Tìm kiếm không được bắt đầu bằng dấu gạch ngang",
   "GitHub: not set up. Add a repository.": "GitHub: chưa thiết lập. Hãy thêm một kho.",
   "GitHub: not read yet.": "GitHub: chưa đọc.",
+  "The search cannot name a repository: list it above":
+    "Tìm kiếm không được nêu tên kho: hãy liệt kê ở trên",
 };

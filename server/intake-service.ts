@@ -519,7 +519,11 @@ export function createIntake(ports: IntakePorts): Intake {
       const before = `Unable to comment on ${key}: `;
       // Refused, or the host not reached: the comment did not arrive, and is tried once more. A
       // timeout, or anything else, may have been taken: it is not sent twice.
-      if (error instanceof TrackerProblem && !error.timedOut) {
+      if (error instanceof TrackerProblem && error.final) {
+        // Never to work (the repository is no longer read): once, and its problem stays.
+        tries.set(id, WRITE_BACK_TRIES);
+        writeBackProblems.set(kind, problemFrom(error, "", before));
+      } else if (error instanceof TrackerProblem && !error.timedOut) {
         const count = (tries.get(id) ?? 0) + 1;
         tries.set(id, count);
         if (count >= WRITE_BACK_TRIES) writeBackProblems.set(kind, problemFrom(error, "", before));

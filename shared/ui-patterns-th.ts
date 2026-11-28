@@ -284,6 +284,11 @@ export const RULES: readonly Rule[] = [
     (n, entry) => `บรรทัด ${n}: "${entry}" ไม่ใช่ owner/repo`,
   ],
   [/^Line (\d+): "(.+)" is there twice$/, (n, entry) => `บรรทัด ${n}: "${entry}" ซ้ำกัน`],
+  [
+    /^(\S+): the first 20 matches are already imported: narrow the search$/,
+    (repo) => `${repo}: 20 รายการแรกนำเข้าแล้ว: ให้จำกัดการค้นหาให้แคบลง`,
+  ],
+  [/^(\S+) is no longer read: not commented$/, (repo) => `${repo} ไม่ได้อ่านแล้ว: ไม่ได้คอมเมนต์`],
   [/^Open (\S+) in Jira$/, (key) => `เปิด ${key} ใน Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `เปิด ${key} บน GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
