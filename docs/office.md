@@ -617,7 +617,8 @@ The board shows what waits. A task that waits sits in a **Waiting** column left 
 claimed or done task is never in Waiting, whatever its `after`. A task that is after others says
 so on its card and its list row, over its thread: "Waiting on p12, p13" while it waits, and "After
 p12, p13" once it is released or taken by hand, so where it came from stays visible. Only ids are
-shown. A board judges this by the tasks of every board, since a task can wait on one of another's.
+shown. A board judges this by the tasks of every board, the duty board's duties included, since a
+task can wait on one of another's.
 
 **Follow-up** on a card or a list row, open, claimed or done, makes the next task a follow-up of it:
 it adds that task to the form's pending `after` (once each, five at most) and moves the focus to the
@@ -639,7 +640,9 @@ when you reopen it. The **Tasks** entry is in the Attention tab while a task is 
 "2 need you", and counts in the tab's count. Its card lists the blocked tasks of every board,
 oldest first, a lobby task and its copy once: each task's text, "<agent> needs: <reason>", its
 board, an **Answer** field and **Open board**. Enter or **Send** posts the answer as a reply under
-the task; the row goes once the board has it.
+the task; the row goes once the board has it. A duty an agent holds is on the card by the same
+rules as a task, blocked, stalled or merged: its row names its board as "Duty board", its Answer
+and its Nudge are replies under the duty, and its **Open board** opens the duty board.
 
 The card also lists claims nobody works on, after the blocked ones, oldest first: a claimed task
 that is not blocked and whose holder, an agent of the office, stopped on an error ("<agent> stopped
@@ -728,8 +731,21 @@ task or duty at a time per agent, the wake limits, **Wake agents** and **Agent t
 starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
 completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
 a duty with `office_update`. An agent finishes or reopens only a duty it holds; from the duty board
-you mark any. Nobody posts to the duty board, not even from the office. A duty is never addressed
-to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
+you mark any. No task or note is posted to the duty board, not even from the office: its duties
+come from the list. A reply is the one post it takes (`office_post` with `replyTo`, or yours from
+the office): it sits on the duty board under its duty and wakes the duty's holder, as on any
+board. A duty is never addressed to one agent, and unlike a lobby to-do, a claimed duty gets no
+copy on its agent's workspace board.
+
+An agent blocks a duty it holds as it blocks a task, with `office_update`, `block` and what it
+needs, and finishes it with a result in `note`. Since the duty board is no room's, both show in
+two places. The **Tasks** card lists a blocked duty with its Answer field, and a claimed duty
+nobody works on or whose holder's pull request is merged, under "Duty board" (see Boards and
+wakes). On the duty board, today's row of a duty says "Needs you: <reason>" while it is blocked
+and, once it is done, shows its result ("Result", cut with **More** as a task's is) and what it
+took; the replies under the duty are listed there too, oldest first, and while an agent has the
+duty **Reply** opens a one-line field that posts one. A reply from anyone but the holder clears
+the block.
 
 A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor finish
 it. On the 3D floor a person acts it out as soon as it is idle (resting at its desk with nothing
@@ -742,10 +758,11 @@ With no 3D office open, or nobody idle, before its day ends, it stays open and i
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
-It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
-Reopen (a duty is freed on its own when its agent is archived, so Reopen is for one an agent
-still holds but is not working on, at home or not), and the list with each duty's name,
-instructions and day buttons and time, saved whole. The time field takes `H:MM` or `HH:MM` and keeps it as `HH:MM`;
+It shows today's duties with who has each, what a holder needs and what came of a done one (see
+above), with Mark done and, for one someone has or that is done, Reopen (a duty is freed on its
+own when its agent is archived, so Reopen is for one an agent still holds but is not working on,
+at home or not), and the list with each duty's name, instructions and day buttons and time, saved
+whole. The time field takes `H:MM` or `HH:MM` and keeps it as `HH:MM`;
 empty is 08:00, and Save waits while a time is outside 08:00 to 23:59. Today's duties show a time
 that is not 08:00 after the name ("Take out the bin · 14:30"). Unticking today's day on a duty takes
 its open post of today off the board when you save; a claimed one stays until it is done, as for a

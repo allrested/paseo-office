@@ -100,6 +100,32 @@ const AT_HOME: TaskAttentionRow[] = [
     cause: "home",
   },
 ];
+const DUTY_ROWS: TaskAttentionRow[] = [
+  {
+    kind: "blocked",
+    post: post(9, {
+      board: "duty",
+      text: "Build\n\nRun the build",
+      duty: { id: "build", day: "2026-11-28" },
+      blocked: "Which branch?",
+    }),
+    board: "Duty board",
+    holder: "Builder",
+    reason: "Which branch?",
+  },
+  {
+    kind: "stalled",
+    post: post(10, {
+      board: "duty",
+      text: "Tidy\n\nPrune old branches",
+      duty: { id: "tidy", day: "2026-11-28" },
+    }),
+    board: "Duty board",
+    holder: "Tester",
+    reason: null,
+    cause: "idle",
+  },
+];
 const MERGED: TaskAttentionRow[] = [
   {
     kind: "merged",
@@ -377,4 +403,47 @@ test("a merged row's words are in the interface's language", async () => {
   expect(allLabelled(UI_VI["Mark done"])).toHaveLength(2);
   expect(lines()).not.toContain("2 merged");
   expect(lines().filter((line) => line.includes("pull request is merged"))).toEqual([]);
+});
+
+test("a duty's row names the duty board, and its Answer and Nudge post replies under the duty", async () => {
+  await mount(<Harness rows={DUTY_ROWS} />);
+  expect(lines()).toEqual([
+    "1 needs you · 1 stalled",
+    "Build…",
+    "Builder needs: Which branch?",
+    "Duty board",
+    "Send",
+    "Open board",
+    "Tidy…",
+    "Tester is idle",
+    "Duty board",
+    "Nudge",
+    "Reopen",
+    "Open board",
+  ]);
+  await type("Answer", "main");
+  await press("Send");
+  await press("Nudge");
+  expect(sent.calls).toEqual([
+    { board: "duty", kind: "note", text: "main", replyTo: "p9" },
+    {
+      board: "duty",
+      kind: "note",
+      text: "Status check: finish with office_update done and a short result, or block with what you need.",
+      replyTo: "p10",
+    },
+  ]);
+  await press("Open board", 0);
+  expect(opened).toEqual(["duty"]);
+});
+
+test("a duty's row names the duty board in the interface's language", async () => {
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={DUTY_ROWS} />
+    </UiLanguage>,
+  );
+  expect(lines()).not.toContain("Duty board");
+  expect(lines().filter((line) => line === UI_VI["Duty board"])).toHaveLength(2);
 });

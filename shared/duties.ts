@@ -77,16 +77,20 @@ export interface DutyRow {
   duty: Duty | null;
   /** Not done on its day: it stays on the board, owed. */
   owed: boolean;
+  /** The notes under the duty, oldest first: its holder's and the answers to it. */
+  replies: Post[];
 }
 
 /**
  * The day's duty board: one row per duty post, in the list's order, then the posts whose duty
  * left the list, oldest first. A post open or claimed from an earlier day than the board's is owed.
+ * The board's notes are replies: each is on the row of the duty it is under.
  */
 export function dutyRows(board: DutyBoard | undefined, posts: readonly Post[]): DutyRow[] {
   if (board === undefined) return [];
   const order = new Map(board.duties.map((duty, index) => [duty.id, index]));
   const rank = (post: Post) => order.get(post.duty?.id ?? "") ?? board.duties.length;
+  const notes = posts.filter((post) => post.board === DUTY && post.kind === "note");
   return posts
     .filter((post) => post.board === DUTY && post.kind === "task" && post.duty !== undefined)
     .sort((left, right) => rank(left) - rank(right) || left.seq - right.seq)
@@ -97,6 +101,9 @@ export function dutyRows(board: DutyBoard | undefined, posts: readonly Post[]): 
         post.state !== "done" &&
         board.day !== null &&
         (post.duty?.day ?? board.day).localeCompare(board.day) < 0,
+      replies: notes
+        .filter((note) => note.replyTo === post.id)
+        .sort((left, right) => left.seq - right.seq),
     }));
 }
 

@@ -118,6 +118,7 @@ export interface LobbyBodyProps extends SheetBodyProps {
 export function LobbyBody({
   room,
   rooms,
+  duties,
   name,
   agentTasks,
   teams: rosterTeams,
@@ -140,7 +141,7 @@ export function LobbyBody({
   });
   const mounted = useMounted();
   // What a task waits on can be on any board: the cards and the form judge by all of them.
-  const every = useMemo(() => allPosts(rooms), [rooms]);
+  const every = useMemo(() => allPosts(rooms, duties), [rooms, duties]);
   const followUp = useFollowUp(every);
   const { after, clear: clearFollowUp } = followUp;
   // Enter adds as well as the button, so the form keeps its own pending state and failure.

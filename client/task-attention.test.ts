@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OfficeAgent, Post } from "../shared/contracts.js";
+import type { DutyRow } from "../shared/duties.js";
 import type { OfficeModel, OfficeRoom } from "../shared/model.js";
 import {
   blockedLine,
@@ -16,10 +17,13 @@ import {
 const NOW = Date.parse("2026-11-28T12:00:00.000Z");
 
 type Input = Pick<OfficeModel, "rooms" | "agents"> &
-  Partial<Pick<OfficeModel, "roomOfAgent" | "home">>;
-/** The rows of a model; one without `roomOfAgent` has every agent in the lobby, without `home` none at home. */
+  Partial<Pick<OfficeModel, "roomOfAgent" | "home" | "duties">>;
+/**
+ * The rows of a model; one without `roomOfAgent` has every agent in the lobby, without `home` none
+ * at home, and without `duties` an empty duty board.
+ */
 const taskAttentionRows = (model: Input, now: number) =>
-  rowsOfModel({ roomOfAgent: new Map(), home: new Map(), ...model }, now);
+  rowsOfModel({ roomOfAgent: new Map(), home: new Map(), duties: [], ...model }, now);
 
 function post(seq: number, fields: Partial<Post> = {}): Post {
   const at = `2026-11-28T09:00:${String(seq).padStart(2, "0")}.000Z`;
@@ -231,6 +235,89 @@ describe("stalled rows", () => {
       ],
     };
     expect(ids(taskAttentionRows(model, NOW))).toEqual(["p7", "p9", "p2", "p4"]);
+  });
+});
+
+describe("duty rows", () => {
+  /** A duty of the duty board, held by a1 unless the fields say otherwise. */
+  const duty = (seq: number, fields: Partial<Post> = {}): DutyRow => ({
+    post: post(seq, {
+      board: "duty",
+      text: `Duty ${seq}\n\nDo it well`,
+      duty: { id: `d${seq}`, day: "2026-11-28" },
+      ...fields,
+    }),
+    duty: null,
+    owed: false,
+    replies: [],
+  });
+
+  it("lists a blocked duty with what its holder needs, on the duty board", () => {
+    const model = {
+      agents,
+      rooms: [room("lobby", "Lobby", [])],
+      duties: [duty(3, { blocked: "Which branch?" })],
+    };
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "blocked",
+      board: "Duty board",
+      holder: "Builder",
+      reason: "Which branch?",
+    });
+    expect(rows[0]?.post.board).toBe("duty");
+  });
+
+  it("lists a duty nobody works on by the rules of any claim: error, idle for two minutes, at home", () => {
+    const old = stalledAt(STALL_MS);
+    const fresh = stalledAt(STALL_MS - 1);
+    const rooms = [room("lobby", "Lobby", [])];
+    const causes = (model: Input) => taskAttentionRows(model, NOW).map((row) => row.cause);
+    expect(causes({ agents: withStatus(["a1", "error"]), rooms, duties: [duty(1)] })).toEqual([
+      "error",
+    ]);
+    const idle = withStatus(["a1", "idle"]);
+    expect(causes({ agents: idle, rooms, duties: [duty(1, { updatedAt: fresh })] })).toEqual([]);
+    expect(causes({ agents: idle, rooms, duties: [duty(1, { updatedAt: old })] })).toEqual([
+      "idle",
+    ]);
+    const home = new Map([["a1", { id: "a1", title: "Builder", status: "closed" } as OfficeAgent]]);
+    expect(
+      causes({ agents: new Map(), home, rooms, duties: [duty(1, { updatedAt: fresh })] }),
+    ).toEqual(["home"]);
+  });
+
+  it("lists a duty whose holder's pull request is merged", () => {
+    const model = {
+      agents,
+      roomOfAgent: new Map([["a1", "w1"]]),
+      rooms: [room("lobby", "Lobby", []), room("w1", "Checkout", [], { state: "merged" } as never)],
+      duties: [duty(1)],
+    };
+    expect(taskAttentionRows(model, NOW)).toMatchObject([{ kind: "merged", board: "Duty board" }]);
+  });
+
+  it("gives no row for an open or a done duty, nor one its holder is at", () => {
+    const model = {
+      agents: withStatus(["a1", "running"]),
+      rooms: [room("lobby", "Lobby", [])],
+      duties: [
+        duty(1, { state: "open", claimedBy: undefined }),
+        duty(2, { state: "done", result: "Built" }),
+        duty(3),
+      ],
+    };
+    expect(taskAttentionRows(model, NOW)).toEqual([]);
+  });
+
+  it("sorts duties among the other boards' tasks, by kind and then age", () => {
+    const model = {
+      agents: withStatus(["a1", "error"]),
+      rooms: [room("lobby", "Lobby", [post(4, { blocked: "Late?" }), post(2)])],
+      duties: [duty(3, { blocked: "Early?" }), duty(1)],
+    };
+    expect(ids(taskAttentionRows(model, NOW))).toEqual(["p3", "p4", "p1", "p2"]);
   });
 });
 

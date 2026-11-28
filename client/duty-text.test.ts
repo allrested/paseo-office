@@ -23,6 +23,7 @@ function row(patch: Partial<Post>, duty: DutyRow["duty"] = PRETEND, owed = false
     },
     duty,
     owed,
+    replies: [],
   };
 }
 const name = (id: string) => (id === "a1" ? "Release notes writer" : id);

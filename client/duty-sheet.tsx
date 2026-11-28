@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import { TextInput } from "./text.js";
-import type { Duty } from "../shared/contracts.js";
+import type { Duty, Post } from "../shared/contracts.js";
 import {
   DUTY_INSTRUCTIONS_MAX,
   DUTY_MAX,
@@ -18,6 +18,8 @@ import { DAY_NAMES } from "./notes-days.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
+import { ReplyField, TaskFacts, ThreadButton } from "./task-card.js";
+import type { BoardActions } from "./use-board-actions.js";
 import type { DutyActions } from "./use-duty-actions.js";
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -55,22 +57,46 @@ function sent({ id, name, instructions, days, time }: Draft): DutyDraft {
   return kept === "" ? duty : { ...duty, time: kept };
 }
 
+/** How a reply is posted under a duty: the boards' own reply, a note that wakes the duty's holder. */
+type DutyBoardActions = Pick<BoardActions, "reply">;
+
+interface DutyReplyProps {
+  task: Post;
+  board: DutyBoardActions;
+  styles: OfficeStyles;
+}
+
+/** Under a duty an agent has: Reply opens a one-line field, as it does under a task on a board. */
+function DutyReply({ task, board, styles }: DutyReplyProps) {
+  const [replying, setReplying] = useState(false);
+  const reply = useCallback(() => setReplying(true), []);
+  return replying ? (
+    <ReplyField task={task} actions={board} styles={styles} />
+  ) : (
+    <ThreadButton label="Reply" expanded={false} onPress={reply} styles={styles} />
+  );
+}
+
 interface TodayRowProps {
   row: DutyRow;
   name(author: string): string;
   actions: DutyActions;
+  board: DutyBoardActions;
   styles: OfficeStyles;
 }
 
 /**
  * A duty due today, who has it, and the owner's hand: Mark done until it is done, and Reopen once
- * someone has it or it is done, so a duty held by an agent that has gone is not stuck.
+ * someone has it or it is done, so a duty held by an agent that has gone is not stuck. Under who
+ * has it is what a task shows under itself: what the holder needs while the duty is blocked, what
+ * came of it, and the replies. Reply, while an agent has it, is how the need is answered here.
  */
-function TodayRow({ row, name, actions, styles }: TodayRowProps) {
+function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
   const title = dutyRowTitle(row);
   const time = row.duty === null ? null : dutyTimeText(row.duty);
   const done = row.post.state === "done";
-  const held = done || row.post.state === "claimed";
+  const claimed = row.post.state === "claimed";
+  const held = done || claimed;
   const { id } = row.post;
   const reopen = useCallback(() => actions.reopen(id), [actions, id]);
   const markDone = useCallback(() => actions.markDone(id), [actions, id]);
@@ -81,6 +107,8 @@ function TodayRow({ row, name, actions, styles }: TodayRowProps) {
           {time === null ? title : `${title} · ${time}`}
         </Text>
         <Text style={styles.postMeta}>{dutyStateText(row, name)}</Text>
+        <TaskFacts task={row.post} replies={row.replies} name={name} styles={styles} />
+        {claimed ? <DutyReply task={row.post} board={board} styles={styles} /> : null}
       </View>
       <View style={styles.actions}>
         {held ? (
@@ -333,15 +361,27 @@ export interface DutySheetProps {
   rows: readonly DutyRow[];
   name(author: string): string;
   actions: DutyActions;
+  /** Posts a reply under a duty. */
+  board: DutyBoardActions;
   styles: OfficeStyles;
   onClose(): void;
 }
 
 /**
- * The duty board: today's duties with who has each, and the list the host posts them from. A
- * duty with instructions goes to an idle agent; one without is acted out in the 3D office.
+ * The duty board: today's duties with who has each, what a holder needs and what came of each,
+ * and the list the host posts them from. A duty with instructions goes to an idle agent; one
+ * without is acted out in the 3D office.
  */
-export function DutySheet({ open, list, rows, name, actions, styles, onClose }: DutySheetProps) {
+export function DutySheet({
+  open,
+  list,
+  rows,
+  name,
+  actions,
+  board,
+  styles,
+  onClose,
+}: DutySheetProps) {
   const change = useCallback(
     (next: boolean) => {
       if (!next) onClose();
@@ -362,7 +402,14 @@ export function DutySheet({ open, list, rows, name, actions, styles, onClose }: 
             </Text>
             {rows.length === 0 ? <Text style={styles.muted}>No duty is due today.</Text> : null}
             {rows.map((row) => (
-              <TodayRow key={row.post.id} row={row} name={name} actions={actions} styles={styles} />
+              <TodayRow
+                key={row.post.id}
+                row={row}
+                name={name}
+                actions={actions}
+                board={board}
+                styles={styles}
+              />
             ))}
           </View>
           {list === null ? (

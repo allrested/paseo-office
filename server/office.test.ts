@@ -860,6 +860,36 @@ test("a reply to a duty is taken on the duty board, while an ordinary post there
   await office.stop();
 });
 
+test("a duty's holder blocks it, your reply under the duty answers and wakes it, and its done keeps the result", async () => {
+  const { office, clock, store, prompts } = start();
+  await office.ready;
+  office.setDuties([BUILD]);
+  office.setPickupEnabled(true);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ board: "duty", claimedBy: "b" });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const asBuilder = toolContext({ id: "b", title: "Builder" });
+  await update?.execute({ id: "p1", action: "block", note: "Which branch?" }, asBuilder);
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", blocked: "Which branch?" });
+  // The Tasks card's Answer and the duty board's Reply post this.
+  expect(
+    await office.post({ board: "duty", kind: "note", text: "main", replyTo: "p1" }),
+  ).toMatchObject({ ok: true, post: { board: "duty", replyTo: "p1", to: "b" } });
+  await settle();
+  expect(store.current().posts.find((item) => item.id === "p1")).not.toHaveProperty("blocked");
+  expect(prompts.at(-1)).toBe(
+    "b: Office board: 1 post(s) for you.\n- Reply to task p1 from the user: main",
+  );
+  await update?.execute({ id: "p1", action: "done", note: "Built from main" }, asBuilder);
+  expect(store.current().posts.find((item) => item.id === "p1")).toMatchObject({
+    state: "done",
+    result: "Built from main",
+  });
+  await office.stop();
+});
+
 test("a completion line keeps the reply's text before it as the task's result", async () => {
   const { office, clock, store } = start();
   await office.ready;

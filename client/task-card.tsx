@@ -66,7 +66,7 @@ interface ThreadButtonProps {
 }
 
 /** "Reply", "More", "Less": small words that open something under them. */
-function ThreadButton({ label, expanded, onPress, styles }: ThreadButtonProps) {
+export function ThreadButton({ label, expanded, onPress, styles }: ThreadButtonProps) {
   const t = useT();
   return (
     <Pressable
@@ -104,7 +104,7 @@ function TaskResult({ result, styles }: { result: string; styles: OfficeStyles }
 
 interface ReplyFieldProps {
   task: Post;
-  actions: BoardActions;
+  actions: Pick<BoardActions, "reply">;
   styles: OfficeStyles;
   /** The field's name and placeholder: "Write a reply" under a task, "Answer" on the Tasks card. */
   label?: string;
@@ -181,6 +181,36 @@ export function ReplyField({
   );
 }
 
+export interface TaskFactsProps {
+  task: Post;
+  /** The notes under it, oldest first. */
+  replies: readonly Post[];
+  name(author: string): string;
+  styles: OfficeStyles;
+}
+
+/**
+ * What stands under a task, and under a duty on the duty board: what its holder needs while it is
+ * blocked, what came of it and what it took, and the replies.
+ */
+export function TaskFacts({ task, replies, name, styles }: TaskFactsProps) {
+  const spent = taskSpent(task);
+  return (
+    <>
+      {task.blocked === undefined ? null : (
+        <Text style={styles.standupBlocker}>{`Needs you: ${task.blocked}`}</Text>
+      )}
+      {task.result === undefined ? null : <TaskResult result={task.result} styles={styles} />}
+      {spent === null ? null : <Text style={styles.postMeta}>{spent}</Text>}
+      {replies.map((note) => (
+        <Text key={note.id} style={styles.postText}>
+          {`${name(note.author)} · ${note.text}`}
+        </Text>
+      ))}
+    </>
+  );
+}
+
 export interface TaskThreadProps {
   task: Post;
   /** The notes under the task, oldest first (`repliesOf`). */
@@ -213,21 +243,11 @@ export function TaskThread({
   const reply = useCallback(() => setReplying(true), []);
   const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
   const after = afterLine(task, all);
-  const spent = taskSpent(task);
   const t = useT();
   return (
     <>
       {after === null ? null : <Text style={styles.postMeta}>{after}</Text>}
-      {task.blocked === undefined ? null : (
-        <Text style={styles.standupBlocker}>{`Needs you: ${task.blocked}`}</Text>
-      )}
-      {task.result === undefined ? null : <TaskResult result={task.result} styles={styles} />}
-      {spent === null ? null : <Text style={styles.postMeta}>{spent}</Text>}
-      {replies.map((note) => (
-        <Text key={note.id} style={styles.postText}>
-          {`${name(note.author)} · ${note.text}`}
-        </Text>
-      ))}
+      <TaskFacts task={task} replies={replies} name={name} styles={styles} />
       {replying ? <ReplyField task={task} actions={actions} styles={styles} /> : null}
       <View style={styles.actions}>
         {replying ? null : (

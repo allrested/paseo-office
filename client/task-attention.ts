@@ -1,5 +1,5 @@
 import type { Post } from "../shared/contracts.js";
-import type { OfficeModel, OfficeRoom } from "../shared/model.js";
+import type { OfficeModel } from "../shared/model.js";
 import { authorName, textPreview } from "./board-text.js";
 
 /** Why a task is on the Tasks card. Each kind has its own words and its own way on. */
@@ -8,7 +8,7 @@ export type TaskAttentionKind = "blocked" | "stalled" | "merged";
 export interface TaskAttentionRow {
   kind: TaskAttentionKind;
   post: Post;
-  /** The board it is on, by name: the room's, or "Lobby". */
+  /** The board it is on, by name: the room's, "Lobby", or "Duty board" for a duty. */
   board: string;
   /** Who holds the task, by name; null when nobody does. */
   holder: string | null;
@@ -22,8 +22,17 @@ export interface TaskAttentionRow {
 
 export type StallCause = "error" | "idle" | "home";
 
-/** What the rows are worked out from: the boards, and who holds what, in the office or at home. */
-export type TaskAttentionModel = Pick<OfficeModel, "rooms" | "agents" | "home" | "roomOfAgent">;
+/**
+ * What the rows are worked out from: the rooms' boards and the duty board, and who holds what, in
+ * the office or at home.
+ */
+export type TaskAttentionModel = Pick<
+  OfficeModel,
+  "rooms" | "duties" | "agents" | "home" | "roomOfAgent"
+>;
+
+/** What a duty's row calls its board: the duty board is no room, and has no name of its own. */
+export const DUTY_BOARD_NAME = "Duty board";
 
 /** The order of the kinds on the card. */
 const KIND_ORDER: readonly TaskAttentionKind[] = ["blocked", "stalled", "merged"];
@@ -80,8 +89,15 @@ function mergedPullRequest(
   return name;
 }
 
+/** A board whose posts are looked through: a room's, or the duty board's duties. */
+interface Board {
+  name: string;
+  lobby: boolean;
+  posts: readonly Post[];
+}
+
 interface Found {
-  room: OfficeRoom;
+  board: Board;
   post: Post;
   kind: TaskAttentionKind;
   cause?: StallCause;
@@ -89,32 +105,38 @@ interface Found {
 }
 
 /**
- * Rows across every board of the model, blocked first, then stalled, then merged, each oldest first. A lobby
- * task and its copy on the claimer's board carry the same mark, so the copy is left out while its
- * lobby task is listed. `now` is for the kinds that go by age.
+ * Rows across every board of the model, the duty board included, blocked first, then stalled, then
+ * merged, each oldest first. A lobby task and its copy on the claimer's board carry the same mark,
+ * so the copy is left out while its lobby task is listed. `now` is for the kinds that go by age.
  */
 export function taskAttentionRows(model: TaskAttentionModel, now: number): TaskAttentionRow[] {
   // A holder at home is named as it is in the office.
   const holderName = (id: string) => authorName(id, model.home.has(id) ? model.home : model.agents);
-  const found = model.rooms.flatMap((room) =>
-    room.posts.flatMap((post): Found[] => {
-      if (isBlocked(post)) return [{ room, post, kind: "blocked" }];
+  const boards: Board[] = [
+    ...model.rooms.map((room) => ({ name: room.name, lobby: room.lobby, posts: room.posts })),
+    { name: DUTY_BOARD_NAME, lobby: false, posts: model.duties.map((row) => row.post) },
+  ];
+  const found = boards.flatMap((board) =>
+    board.posts.flatMap((post): Found[] => {
+      if (isBlocked(post)) return [{ board, post, kind: "blocked" }];
       const cause = stallCause(post, now, model);
-      if (cause !== null) return [{ room, post, kind: "stalled", cause }];
+      if (cause !== null) return [{ board, post, kind: "stalled", cause }];
       const pullRequest = mergedPullRequest(post, model);
       return pullRequest === null
         ? []
-        : [{ room, post, kind: "merged", ...(pullRequest === "" ? {} : { pullRequest }) }];
+        : [{ board, post, kind: "merged", ...(pullRequest === "" ? {} : { pullRequest }) }];
     }),
   );
-  const listedInLobby = new Set(found.filter(({ room }) => room.lobby).map(({ post }) => post.id));
+  const listedInLobby = new Set(
+    found.filter(({ board }) => board.lobby).map(({ post }) => post.id),
+  );
   const rows: TaskAttentionRow[] = [];
-  for (const { room, post, kind, cause, pullRequest } of found) {
-    if (!room.lobby && post.link !== undefined && listedInLobby.has(post.link)) continue;
+  for (const { board, post, kind, cause, pullRequest } of found) {
+    if (!board.lobby && post.link !== undefined && listedInLobby.has(post.link)) continue;
     rows.push({
       kind,
       post,
-      board: room.name,
+      board: board.name,
       holder: post.claimedBy === undefined ? null : holderName(post.claimedBy),
       reason: post.blocked ?? null,
       ...(cause === undefined ? {} : { cause }),

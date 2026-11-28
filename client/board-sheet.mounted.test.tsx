@@ -11,6 +11,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
+import type { DutyRow } from "../shared/duties.js";
 import type { RosterTeam } from "../shared/roster.js";
 import { BoardSheet } from "./board-sheet.js";
 import { buildOfficeModel, type AgentTaskGroup, type OfficeRoom } from "../shared/model.js";
@@ -181,9 +182,12 @@ interface HarnessProps {
   fullscreen?: boolean;
   /** The roster's teams the lobby's form offers; none by default (a roster that is off). */
   teams?: RosterTeam[];
+  /** The duty board's rows; none by default. */
+  duties?: DutyRow[];
 }
 
 const NO_TEAMS: RosterTeam[] = [];
+const NO_DUTIES: DutyRow[] = [];
 
 function Harness({
   rooms,
@@ -195,6 +199,7 @@ function Harness({
   fromLobby = false,
   fullscreen = false,
   teams = NO_TEAMS,
+  duties = NO_DUTIES,
 }: HarnessProps) {
   const styles = useOfficeStyles(THEME, compact, false);
   const teamName = useCallback(
@@ -206,6 +211,7 @@ function Harness({
       <BoardSheet
         room={rooms.find((room) => room.id === roomId) ?? null}
         rooms={rooms}
+        duties={duties}
         agentTasks={agentTasks}
         name={nameOf}
         teams={teams}
@@ -1329,6 +1335,27 @@ test("a task waits on a task of another board: the room's board judges by every 
   const rooms = officeRooms([], { lobby: [prerequisite], w1: [waits] });
   await mount({ rooms, roomId: "w1" });
   expect(container.textContent).toContain("Waiting on p1");
+});
+
+test("a task that waits on a duty is Waiting on the lobby's kanban and says so on a room's list", async () => {
+  const duty = post(1, {
+    board: "duty",
+    text: "Build",
+    state: "claimed",
+    claimedBy: "a1",
+    duty: { id: "build", day: "2026-11-17" },
+  });
+  const duties: DutyRow[] = [{ post: duty, duty: null, owed: false, replies: [] }];
+  const rooms = officeRooms([], {
+    lobby: [post(2, { text: "Review the build", after: ["p1"] })],
+    w1: [post(3, { board: "w1", text: "Write the notes", after: ["p1"] })],
+  });
+  layouts("kanban", "list");
+  await mount({ rooms, roomId: "lobby", duties });
+  expect(lines()).toContain("Waiting · 1");
+  expect(lines()).toContain("Waiting on p1");
+  await mount({ rooms, roomId: "w1", duties });
+  expect(lines()).toContain("Waiting on p1");
 });
 
 test("a room's board has Follow-up too: it makes the post a task after that one", async () => {

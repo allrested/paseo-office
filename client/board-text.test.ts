@@ -126,6 +126,44 @@ test("a task's replies are the notes under it, oldest first; a task's result is 
   expect(repliesOf(loose, posts)).toEqual([]);
 });
 
+test("allPosts takes the duty board's duties too: a task can wait on a duty", () => {
+  const at = "2026-11-28T00:00:00.000Z";
+  const base = { seq: 1, kind: "task", author: "user", createdAt: at, updatedAt: at } as const;
+  const duty: Post = {
+    ...base,
+    id: "p1",
+    board: "duty",
+    text: "Build",
+    state: "claimed",
+    claimedBy: "a1",
+    duty: { id: "build", day: "2026-11-28" },
+  };
+  const waits: Post = {
+    ...base,
+    id: "p2",
+    board: "lobby",
+    text: "Review",
+    state: "open",
+    after: ["p1"],
+  };
+  const model = buildOfficeModel({
+    agents: [],
+    workspaces: [],
+    activity: {},
+    boards: { lobby: [waits], duty: [duty] },
+    duties: {
+      duties: [{ id: "build", name: "Build", instructions: "Run it", days: [6] }],
+      day: "2026-11-28",
+    },
+    wake: { paused: false, queued: {} },
+  });
+  const every = allPosts(model.rooms, model.duties);
+  expect(every.map((item) => item.id).sort()).toEqual(["p1", "p2"]);
+  expect(afterLine(waits, every)).toBe("Waiting on p1");
+  // Without the duty board the duty looks deleted, and the task free.
+  expect(afterLine(waits, allPosts(model.rooms, []))).toBe("After p1");
+});
+
 test("a copy's replies are its lobby task's, found among every board's posts", () => {
   const task = post(1, { board: "lobby", state: "claimed", claimedBy: "a1", link: "p2" });
   const copy = post(2, { board: "w1", state: "claimed", claimedBy: "a1", link: "p1" });
@@ -402,7 +440,7 @@ test("allPosts gathers every board's posts once, done tasks too", () => {
     wake: { paused: false, queued: {} },
   });
   expect(
-    allPosts(model.rooms)
+    allPosts(model.rooms, model.duties)
       .map((p) => p.id)
       .sort(),
   ).toEqual(["p1", "p2", "p3", "p4"]);

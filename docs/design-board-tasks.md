@@ -99,6 +99,10 @@ you need". The board then shows "claimed", and the question is only in the agent
   Answer field. It counts in the Attention count.
 - The kanban's **Needs you** column; a row's "Needs you" badge.
 - The footer says to block with what is needed.
+- A duty carries the same footer, and the duty board is no room's board. So the Tasks card lists
+  the duty board's claimed duties by the same rules, as "Duty board", with Open board leading to
+  the duty board; and the duty board's row for a duty shows what its holder needs, its result
+  once done, and the replies under it.
 
 **Files.** `shared/contracts.ts`, `server/board-service.ts`, `server/agent-tools.ts`,
 `shared/lobby-assignment.ts`, `client/tasks-card.tsx` (new), the attention entries, the board, the

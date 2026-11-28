@@ -2080,7 +2080,7 @@ export function OfficeSurface(
     showBoard: board.open,
   });
   const library = useLibrary({ model, post: boardActions.post, live, showBoard: board.open });
-  const tasks = useTaskAttention({ model, live, showBoard: board.open });
+  const tasks = useTaskAttention({ model, live, showBoard: board.open, showDuties: openDuties });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sceneProblem, setSceneProblem] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
@@ -2527,6 +2527,7 @@ export function OfficeSurface(
       <BoardSheet
         room={board.room}
         rooms={model.rooms}
+        duties={model.duties}
         agentTasks={model.agentTasks}
         name={name}
         teams={rosterTeams}
@@ -2546,6 +2547,7 @@ export function OfficeSurface(
         rows={model.duties}
         name={name}
         actions={dutyActions}
+        board={boardActions}
         styles={styles}
         onClose={dutyCard.close}
       />
