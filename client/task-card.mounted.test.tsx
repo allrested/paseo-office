@@ -58,6 +58,8 @@ const REPLIES = [
 
 /** The replies sent, as "p1: text". */
 let replied: string[];
+/** The tasks started, by id. */
+let started: string[];
 /** Set to make the host refuse the reply. */
 let refusal: Error | null;
 /** While set, a reply waits for it: the host has not answered yet. */
@@ -67,6 +69,11 @@ const ACTIONS: BoardActions = {
   post: async () => undefined,
   reply: async (task, text) => {
     replied.push(`${task.id}: ${text}`);
+    await answer;
+    if (refusal) throw refusal;
+  },
+  start: async (id) => {
+    started.push(id);
     await answer;
     if (refusal) throw refusal;
   },
@@ -158,6 +165,7 @@ beforeEach(() => {
   language.choice = "auto";
   followed = [];
   replied = [];
+  started = [];
   refusal = null;
   answer = null;
   container = document.createElement("div");
@@ -228,7 +236,7 @@ test("a done task's card shows its result, then its replies oldest first, then R
 });
 
 test("a task with no result and no replies has only its Reply button under it", async () => {
-  await mount(<Card task={post(1, { text: "Rotate keys" })} replies={NO_REPLIES} />);
+  await mount(<Card task={PLAIN} replies={NO_REPLIES} />);
   expect(lines()).toEqual(["Rotate keys", "Reply", "Follow-up"]);
 });
 
@@ -491,4 +499,52 @@ test("the line takes the interface's language, its dollar amount as it is", asyn
     </UiLanguage>,
   );
   expect(lines()).toContain("mất 23 phút · $0.42");
+});
+
+const HELD = post(1, { text: "Rotate keys", backlog: true });
+const PLAIN = post(1, { text: "Rotate keys" });
+const HELD_DONE = post(1, { text: "Rotate keys", backlog: true, state: "done" });
+const HELD_WAITING = post(1, { text: "Rotate keys", backlog: true, after: ["p2"] });
+const BLOCKER = [post(2, { text: "Build the API" })];
+
+test("a held task's card has Start with its action line, and keeps its box, Delete and thread", async () => {
+  await mount(<Card task={HELD} replies={NO_REPLIES} />);
+  expect(lines()).toEqual(["Rotate keys", "Start", "Reply", "Follow-up"]);
+  expect(byLabel("Rotate keys").getAttribute("role")).toBe("checkbox");
+  byLabel("Delete task: Rotate keys");
+  // A task that is not held has no Start, and neither has a held one that is claimed or done.
+  await mount(<Card task={PLAIN} replies={NO_REPLIES} />);
+  expect(has("Start task: Rotate keys")).toBe(false);
+  await mount(<Card task={HELD_DONE} replies={NO_REPLIES} />);
+  expect(has("Start task: Rotate keys")).toBe(false);
+});
+
+test("Start starts the task by its id and shows Starting... while it waits", async () => {
+  let release: () => void = () => undefined;
+  answer = new Promise((done) => {
+    release = done;
+  });
+  await mount(<Card task={HELD} replies={NO_REPLIES} />);
+  await press("Start task: Rotate keys");
+  expect(started).toEqual(["p1"]);
+  expect(lines()).toContain("Starting...");
+  expect(lines()).not.toContain("Start");
+  release();
+  await settle();
+  expect(lines()).toContain("Start");
+});
+
+test("a refused Start shows why under the button, like the other actions", async () => {
+  refusal = new Error("Unable to start: it is not in the backlog");
+  await mount(<Card task={HELD} replies={NO_REPLIES} />);
+  await press("Start task: Rotate keys");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+    "Unable to start: it is not in the backlog",
+  );
+});
+
+test("a held task that also waits still says what it waits on", async () => {
+  await mount(<Card task={HELD_WAITING} replies={NO_REPLIES} others={BLOCKER} />);
+  expect(lines()).toContain("Waiting on p2");
+  expect(has("Start task: Rotate keys")).toBe(true);
 });

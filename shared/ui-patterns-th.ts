@@ -59,7 +59,7 @@ export const RULES: readonly Rule[] = [
   [/^All sessions · (\d+)$/, (n) => `session ทั้งหมด · ${n}`],
   // A kanban column's heading: its title, then how many it holds.
   [
-    /^(To do|In progress|Needs you|Waiting|Done|Notes) · (\d+)$/,
+    /^(Backlog|To do|In progress|Needs you|Waiting|Done|Notes) · (\d+)$/,
     (title, n) => `${translatePattern(title)} · ${n}`,
   ],
   [/^(\d+)\/(\d+) tasks$/, (done, all) => `${done}/${all} งาน`],
@@ -218,6 +218,7 @@ export const RULES: readonly Rule[] = [
   [/^The host sent no (.+) text$/, (language) => `host ไม่ได้ส่งข้อความ${language}`],
   [/^Started (.+)$/, (title) => `เริ่ม ${title}`],
   [/^Delete task: (.+)$/, (text) => `ลบงาน: ${text}`],
+  [/^Start task: (.+)$/, (text) => `เริ่มงาน: ${text}`],
   [/^Follow-up: (.+)$/, (text) => `งานต่อเนื่อง: ${text}`],
   [/^Waiting on (p\d+(?:, p\d+)*)$/, (ids) => `รอ ${ids}`],
   [/^After (p\d+(?:, p\d+)*)$/, (ids) => `หลังจาก ${ids}`],

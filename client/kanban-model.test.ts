@@ -103,3 +103,23 @@ describe("kanban columns", () => {
     expect([kanbanWide(719), kanbanWide(720)]).toEqual([false, true]);
   });
 });
+
+describe("the backlog column", () => {
+  it("is first, and holds an open held task, also one that waits", () => {
+    const other = post("p1", { board: "w1" });
+    const held = post("p2", { backlog: true });
+    const heldAndWaiting = post("p3", { backlog: true, after: ["p1"] });
+    const plain = post("p4");
+    const all = [other, held, heldAndWaiting, plain];
+    expect(all.map((p) => columnOf(p, all))).toEqual(["todo", "backlog", "backlog", "todo"]);
+    expect(layout(kanbanColumns([held, heldAndWaiting, plain], all))).toEqual([
+      ["backlog", ["p2", "p3"]],
+      ["todo", ["p4"]],
+      ["progress", []],
+    ]);
+  });
+  it("is dropped when empty", () => {
+    expect(kanbanColumns([post("p1")]).map((c) => c.id)).toEqual(["todo", "progress"]);
+    expect(kanbanColumns([post("p1", { backlog: true })])[0]?.title).toBe("Backlog");
+  });
+});

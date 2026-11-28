@@ -105,6 +105,7 @@ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
 const ACTIONS = {
+  start: async () => undefined,
   setWakesPaused: async () => undefined,
 } as unknown as BoardActions;
 const WAKE = { paused: false, queued: {} };

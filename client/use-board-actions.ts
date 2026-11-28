@@ -5,6 +5,7 @@ import {
   deleteRpc,
   postRpc,
   setWakesPausedRpc,
+  startRpc,
   updateRpc,
   type Post,
   type PostKind,
@@ -21,9 +22,13 @@ export interface BoardActions {
     replyTo?: string;
     /** The tasks this one waits on (at most AFTER_MAX); the server holds it back until they are done. */
     after?: string[];
+    /** A lobby task held until Start: the office does not hand it out. */
+    backlog?: boolean;
   }): Promise<void>;
   /** A note under the task, on the task's board; the server wakes the task's holder. */
   reply(task: Post, text: string): Promise<void>;
+  /** Takes a held task out of the backlog, so the office hands it out. */
+  start(id: string): Promise<void>;
   markDone(id: string): Promise<void>;
   reopen(id: string): Promise<void>;
   remove(id: string): Promise<void>;
@@ -35,6 +40,7 @@ export interface BoardActions {
 /** Each action rejects with the server's message, which ActionButton shows under the button. */
 export function useBoardActions(): BoardActions {
   const post = useRpc(postRpc);
+  const start = useRpc(startRpc);
   const update = useRpc(updateRpc);
   const remove = useRpc(deleteRpc);
   const clearDone = useRpc(clearDoneRpc);
@@ -47,6 +53,10 @@ export function useBoardActions(): BoardActions {
       },
       async reply(task, text) {
         const result = await post({ board: task.board, kind: "note", text, replyTo: task.id });
+        if (!result.ok) throw new Error(result.error);
+      },
+      async start(id) {
+        const result = await start({ id });
         if (!result.ok) throw new Error(result.error);
       },
       async markDone(id) {
@@ -69,6 +79,6 @@ export function useBoardActions(): BoardActions {
         await pause({ paused });
       },
     }),
-    [post, update, remove, clearDone, pause],
+    [post, start, update, remove, clearDone, pause],
   );
 }

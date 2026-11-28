@@ -86,6 +86,7 @@ const ACTIONS: BoardActions = {
   remove: (id) => change(`remove ${id}`),
   reply: (task, text) => change(`reply ${task.id} ${text}`),
   clearDone: (board) => change(`clearDone ${board}`),
+  start: (id) => change(`start ${id}`),
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => author;
@@ -311,4 +312,39 @@ test("Follow-up on a card names its task", async () => {
   await mount(BOARD);
   await act(async () => byLabel("Follow-up: Rotate keys").click());
   expect(followed).toEqual(["p1"]);
+});
+
+const HELD: Post[] = [post(6, { text: "Plan the audit", backlog: true }), ...BOARD];
+
+test("wide, Backlog is the first column, with Start on its cards, and is left out when empty", async () => {
+  await mount(HELD);
+  await sizeBoard(900);
+  expect(lines().slice(0, 5)).toEqual([
+    "Backlog · 1",
+    "Plan the audit",
+    "Start",
+    "Reply",
+    "Follow-up",
+  ]);
+  expect(column("Backlog · 1").textContent).toContain("Plan the audit");
+  expect(column("To do · 2").textContent).not.toContain("Plan the audit");
+
+  await press("Start task: Plan the audit");
+  expect(asked).toEqual(["start p6"]);
+
+  await mount(BOARD);
+  expect(lines()).not.toContain("Backlog · 1");
+});
+
+test("narrow, Backlog starts folded like Done, and a press unfolds it", async () => {
+  await mount(HELD);
+  expect(sideways()).toBe(false);
+  expect(byLabel("Backlog · 1").getAttribute("aria-expanded")).toBe("false");
+  expect(lines()[0]).toBe("Backlog · 1");
+  expect(lines()[1]).toBe("To do · 2");
+  expect(lines()).not.toContain("Plan the audit");
+
+  await press("Backlog · 1");
+  expect(byLabel("Backlog · 1").getAttribute("aria-expanded")).toBe("true");
+  expect(lines()).toContain("Plan the audit");
 });

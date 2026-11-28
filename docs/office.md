@@ -528,16 +528,16 @@ is handed out: a block, its answer and a reply change the task and leave the num
 still finishes it after them. A reopened task loses the number and gets a new one when it is
 handed out again.
 
-The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
-(claimed), **Needs you** (claimed and blocked), **Done** and **Notes**. To do and In progress are
-always there; Needs you, Done and Notes show only when they hold something. Each heading says how
+The lobby's board is a kanban: its to-dos and notes in columns, **Backlog** (held), **Waiting**,
+**To do** (open), **In progress** (claimed), **Needs you** (claimed and blocked), **Done** and
+**Notes**. To do and In progress are always there; the others show only when they hold something. Each heading says how
 many the column holds, as in "To do · 3". A task is a card with the list's checkbox and delete
 button, and a note keeps its Delete button. A card changes column through those buttons; nothing
 is dragged. **Clear finished** is in Done's heading.
 When the board is 720 px wide or more, the columns sit side by side, 280 px each, and scroll
 sideways when they do not fit; in fullscreen a kanban's board opens in the wide dialog to make
 room for them. Narrower, as on a phone, they are stacked sections: a press on a heading folds or
-unfolds its section, and Done starts folded. The form stays above the columns and **Agent tasks**
+unfolds its section, and Backlog and Done start folded. The form stays above the columns and **Agent tasks**
 under them.
 
 **Boards** in the settings chooses each board's layout on this device: **Lobby board** Kanban (the
@@ -547,6 +547,17 @@ the lobby's to-do list with its notes under it, and a room's posts in one list. 
 its finished tasks in a **Done** section at the bottom, shown once a task is done: its heading says
 how many, as in "Done · 2", starts folded and unfolds with a press, and has **Clear finished**
 beside it. A room's card still shows and counts only open and claimed tasks and notes.
+
+A lobby task can be held in the **Backlog**: it stays open but is not handed out, and no agent can
+claim it, until you press **Start** on its card or row, which takes it out (it then waits on
+what it is after, as any task does). The lobby's form has **Add to backlog** beside **Add**: it
+posts exactly what Add would (the text, the agent or team chosen, the follow-up) and holds it, and
+is off under the same conditions as Add; Enter in the field still adds. A held task is in Backlog
+as a column, even when it also waits on others, and its card still says "Waiting on p12"; in the
+list it is in a **Backlog · 2** section above the to-dos, folded at first like a room's Done
+section and unfolded with a press, and is not also listed among the to-dos. A held task keeps its
+checkbox, **Delete**, **Follow-up** and **Reply**, and **Start** sits on the same line. Only the
+lobby has a backlog: a room's board and form are as they were.
 
 A lobby task can go to a team of the roster (see Team roster): it is handed out by the rules of
 Any idle agent, so it needs **Agent tools** and **Wake agents** as they do, but only to an idle

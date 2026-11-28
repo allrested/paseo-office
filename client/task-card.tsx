@@ -228,7 +228,8 @@ export interface TaskThreadProps {
  * Under a task, on its card and on a room's list row: what its holder needs while it is blocked,
  * what came of it and what it took, the replies, and Reply, which is how the need is answered. The thread stays
  * once the task is done. The field waits behind its button so a card stays short. Over it all is
- * the line of what the task is after, and beside Reply is Follow-up.
+ * the line of what the task is after, and beside Reply is Follow-up, and Start while it is held in
+ * the backlog.
  */
 export function TaskThread({
   task,
@@ -242,6 +243,7 @@ export function TaskThread({
   const [replying, setReplying] = useState(false);
   const reply = useCallback(() => setReplying(true), []);
   const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
+  const start = useCallback(() => actions.start(task.id), [actions, task.id]);
   const after = afterLine(task, all);
   const t = useT();
   return (
@@ -250,6 +252,15 @@ export function TaskThread({
       <TaskFacts task={task} replies={replies} name={name} styles={styles} />
       {replying ? <ReplyField task={task} actions={actions} styles={styles} /> : null}
       <View style={styles.actions}>
+        {task.state === "open" && task.backlog === true ? (
+          <ActionButton
+            label="Start"
+            pendingLabel="Starting..."
+            name={`Start task: ${task.text}`}
+            onPress={start}
+            styles={styles}
+          />
+        ) : null}
         {replying ? null : (
           <ThreadButton label="Reply" expanded={false} onPress={reply} styles={styles} />
         )}

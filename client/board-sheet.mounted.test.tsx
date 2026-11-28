@@ -9,7 +9,7 @@
 import { act, createElement, useCallback, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import type { DutyRow } from "../shared/duties.js";
 import type { RosterTeam } from "../shared/roster.js";
@@ -147,6 +147,7 @@ const ACTIONS: BoardActions = {
   reopen: (id) => change(`reopen ${id}`),
   remove: (id) => change(`remove ${id}`),
   clearDone: (board) => change(`clearDone ${board}`),
+  start: (id) => change(`start ${id}`),
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => author;
@@ -1402,4 +1403,117 @@ test("a room's Note carries no follow-up and hides the line, which comes back wi
   expect(posted[0]).not.toHaveProperty("after");
   await chooseKind("Task");
   expect(container.textContent).toContain("After p5");
+});
+
+describe("the lobby's backlog", () => {
+  const held = (seq: number, fields: Partial<Post> = {}) =>
+    post(seq, { text: `Held ${seq}`, backlog: true, ...fields });
+
+  test("the list folds held tasks in Backlog above the to-dos, which do not list them", async () => {
+    await mount({
+      rooms: lobbyRooms([held(1), post(2, { text: "Rotate keys" }), held(3)]),
+      roomId: "lobby",
+    });
+    expect(byLabel("Backlog · 2").getAttribute("aria-expanded")).toBe("false");
+    const shown = lines();
+    expect(shown.indexOf("Backlog · 2")).toBeLessThan(shown.indexOf("To-do"));
+    expect(shown).not.toContain("Held 1");
+    expect(checkboxes().map((box) => box.getAttribute("aria-label"))).toEqual(["Rotate keys"]);
+
+    await press("Backlog · 2");
+    expect(byLabel("Backlog · 2").getAttribute("aria-expanded")).toBe("true");
+    expect(checkboxes().map((box) => box.getAttribute("aria-label"))).toEqual([
+      "Held 1",
+      "Held 3",
+      "Rotate keys",
+    ]);
+    expect(linesFrom("Backlog · 2").slice(0, 6)).toEqual([
+      "Backlog · 2",
+      "Held 1",
+      "Start",
+      "Reply",
+      "Follow-up",
+      "Held 3",
+    ]);
+    await press("Start task: Held 3");
+    expect(asked).toEqual(["start p3"]);
+  });
+
+  test("the list has no Backlog section without held tasks, and a done one is not held", async () => {
+    await mount({
+      rooms: lobbyRooms([post(1, { text: "Rotate keys" }), held(2, { state: "done" })]),
+      roomId: "lobby",
+    });
+    expect(lines().some((line) => line.startsWith("Backlog"))).toBe(false);
+    expect(checkboxes()).toHaveLength(2);
+  });
+
+  test("the kanban has the Backlog column", async () => {
+    layouts("kanban", "list");
+    await mount({ rooms: lobbyRooms([held(1)]), roomId: "lobby" });
+    byLabel("Backlog · 1");
+  });
+
+  test("Add to backlog posts what Add would, with backlog, and resets the form", async () => {
+    const agents = [agent("2", { title: "Builder", workspaceId: null })];
+    await mount({ rooms: lobbyRooms(lobbyTasks(1), agents), roomId: "lobby", teams: [QA] });
+    expect(isOff("Add to backlog")).toBe(true);
+    await type("Add a to-do", "   ");
+    expect(isOff("Add to backlog")).toBe(true);
+
+    await type("Add a to-do", "Later");
+    expect(isOff("Add to backlog")).toBe(false);
+    await press("Add to backlog");
+    expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Later", backlog: true }]);
+    expect(fieldText("Add a to-do")).toBe("");
+
+    await press("Follow-up: Task 1");
+    await type("Add a to-do", "Then later");
+    await press("Send task to: Any idle agent");
+    await press("QA-PR: 2 teammates");
+    await press("Add to backlog");
+    expect(posted[1]).toEqual({
+      board: "lobby",
+      kind: "task",
+      text: "Then later",
+      team: "t1",
+      after: ["p1"],
+      backlog: true,
+    });
+    expect(container.textContent).not.toContain("After p1");
+    byLabel("Send task to: Any idle agent");
+
+    await type("Add a to-do", "For Builder");
+    await press("Send task to: Any idle agent");
+    await press("Builder: Lobby · Idle");
+    await press("Add to backlog");
+    expect(posted[2]).toEqual({
+      board: "lobby",
+      kind: "task",
+      text: "For Builder",
+      to: "2",
+      backlog: true,
+    });
+  });
+
+  test("Enter in the field still adds, without backlog", async () => {
+    await mount({ rooms: lobbyRooms([]), roomId: "lobby" });
+    await type("Add a to-do", "Now");
+    await enter("Add a to-do");
+    expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Now" }]);
+  });
+
+  test("a refused Add to backlog keeps the text and says why", async () => {
+    refusal = new Error("Unable to add: the board is full");
+    await mount({ rooms: lobbyRooms([]), roomId: "lobby" });
+    await type("Add a to-do", "Later");
+    await press("Add to backlog");
+    expect(container.textContent).toContain("Unable to add: the board is full");
+    expect(fieldText("Add a to-do")).toBe("Later");
+  });
+
+  test("a room's form has no Add to backlog", async () => {
+    await mount({ rooms: officeRooms([]), roomId: "w1" });
+    expect(container.querySelector('[aria-label="Add to backlog"]')).toBeNull();
+  });
 });

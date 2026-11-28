@@ -115,9 +115,12 @@ function SideColumn({ column, all, onFollowUp, name, teamName, actions, styles }
   );
 }
 
-/** Narrow: a section whose heading folds it. Done starts folded: what is finished waits below. */
+/**
+ * Narrow: a section whose heading folds it. Done starts folded, since what is finished waits
+ * below, and so does Backlog, since what is held is not for now.
+ */
 function StackedColumn({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
-  const [open, setOpen] = useState(column.id !== "done");
+  const [open, setOpen] = useState(column.id !== "done" && column.id !== "backlog");
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
   const heading = headingOf(column);
