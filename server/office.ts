@@ -19,6 +19,7 @@ import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
 import { createMentionQueue, type MentionQueue, type WakeTarget } from "./mention-queue.js";
+import { waitingOn } from "../shared/board-rules.js";
 import { completionLine } from "../shared/lobby-assignment.js";
 import { createLobbyPickup, type LobbyPickup } from "./lobby-pickup.js";
 import { oneLine } from "./prompt-text.js";
@@ -120,6 +121,8 @@ export function createOffice(deps: OfficeDeps): Office {
   let stopped = false;
   let cancelPrune: (() => void) | null = null;
   let duties: readonly Duty[] = [];
+  // Tasks that name an agent and still wait on others, by id: each wakes its agent at its release.
+  const held = new Set<string>();
 
   const label = (author: string) =>
     author === USER_AUTHOR ? "the user" : (titles.get(author) ?? author);
@@ -158,8 +161,13 @@ export function createOffice(deps: OfficeDeps): Office {
       // Any board: a lobby task can wait on a room's task, and is handed out once that is done. A
       // save the pickup makes while it scans does not start another scan.
       pickup?.refresh();
+      wakeReleased();
     },
-    onBoardRemoved: (board) => hub.removeBoard(board),
+    onBoardRemoved: (board) => {
+      hub.removeBoard(board);
+      // The board's tasks are gone, and a task that is gone holds no other.
+      wakeReleased();
+    },
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
     teamOf: (agentId) => deps.agents.teamOf(agentId),
@@ -175,15 +183,55 @@ export function createOffice(deps: OfficeDeps): Office {
     if (title) titles.set(agent.id, title);
   }
 
-  function mentioned(post: Post): void {
-    if (post.to === undefined || post.namedPickup || queue === null) return;
-    queue.enqueue(post.to, {
+  /** Every board's posts: a task waits while a task of its `after`, on any board, is not done. */
+  const allPosts = () => Object.values(service.boards()).flat();
+
+  /** A task for an agent whose wake is held: open, nobody's yet, and still waiting on another. */
+  function waitsForRelease(post: Post, posts: readonly Post[]): boolean {
+    return (
+      post.kind === "task" &&
+      post.to !== undefined &&
+      !post.namedPickup &&
+      post.state === "open" &&
+      post.claimedBy === undefined &&
+      waitingOn(post, posts).length > 0
+    );
+  }
+
+  function wakeFor(agentId: string, post: Post): void {
+    queue?.enqueue(agentId, {
       postId: post.id,
       author: post.author,
       authorLabel: wakeAuthorLabel(post.author, titles.get(post.author)),
       text: post.text,
       ...(post.replyTo === undefined ? {} : { replyTo: post.replyTo }),
     });
+  }
+
+  function mentioned(post: Post): void {
+    if (post.to === undefined || post.namedPickup || queue === null) return;
+    // The agent cannot claim a task that still waits: it is told when nothing holds the task.
+    if (waitsForRelease(post, allPosts())) {
+      held.add(post.id);
+      return;
+    }
+    wakeFor(post.to, post);
+  }
+
+  /**
+   * After any board's change: each held task that no longer waits wakes its agent. One that was
+   * deleted, claimed or done first is only dropped.
+   */
+  function wakeReleased(): void {
+    if (held.size === 0) return;
+    const posts = allPosts();
+    for (const id of held) {
+      const post = posts.find((item) => item.id === id);
+      if (post !== undefined && waitsForRelease(post, posts)) continue;
+      held.delete(id);
+      const free = post?.state === "open" && post.claimedBy === undefined;
+      if (post?.to !== undefined && free) wakeFor(post.to, post);
+    }
   }
 
   function schedulePrune(): void {
@@ -211,6 +259,10 @@ export function createOffice(deps: OfficeDeps): Office {
         },
         service.wakesPaused(),
       );
+      // What waited when the office stopped still waits: its wake goes out at its release. A task
+      // already free was told before, and is not held.
+      const loaded = allPosts();
+      for (const post of loaded) if (waitsForRelease(post, loaded)) held.add(post.id);
       pickup = createLobbyPickup({
         service,
         agents: deps.agents,

@@ -1069,6 +1069,125 @@ test("a task whose tasks are all deleted is handed out without the block", async
   await office.stop();
 });
 
+const WAKE_FOR_REVIEW = "b: Office board: 1 post(s) for you.\n- p2 from the user: Review it";
+
+test("a room's task for an agent that waits on another wakes the agent when that one is done, not before", async () => {
+  const { office, hub, prompts } = start();
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+  await settle();
+  // The agent could not claim it yet ("waiting on p1"), so it is not told yet either.
+  expect(prompts).toEqual([]);
+  expect(hub.events.findLast((event) => event.startsWith("wake"))).toBe("wake false {}");
+  await office.update({ id: "p1", action: "claim" });
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([WAKE_FOR_REVIEW]);
+  // Told once: a later change of the boards does not send it again.
+  await office.post({ board: "w1", kind: "note", text: "Later" });
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("an agent's own post of a task that waits holds the wake the same way", async () => {
+  const { office, prompts, sources } = start();
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  const post = office.tools.find((tool) => tool.name === "office_post");
+  await post?.execute(
+    { kind: "task", text: "Review it", to: "b", after: ["p1"] },
+    toolContext({ id: "a", title: "Planner" }),
+  );
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([
+    "b: Office board: 1 post(s) for you.\n- p2 from Planner (a): Review it",
+  ]);
+  expect(sources).toEqual(["a"]);
+  await office.stop();
+});
+
+test("a held task is released when the task it waits on is deleted, or its board goes", async () => {
+  for (const how of ["deleted", "board removed"]) {
+    const { office, prompts } = start();
+    await office.ready;
+    await office.post({ board: "w9", kind: "task", text: "Build it" });
+    await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    if (how === "deleted") await office.remove("p1");
+    else await office.workspaceArchived("w9");
+    await settle();
+    expect(prompts, how).toEqual([WAKE_FOR_REVIEW]);
+    await office.stop();
+  }
+});
+
+test("a held task that is deleted, claimed or done before its release wakes nobody", async () => {
+  for (const how of ["deleted", "claimed", "done"]) {
+    const { office, prompts } = start();
+    await office.ready;
+    await office.post({ board: "w1", kind: "task", text: "Build it" });
+    await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+    await settle();
+    // The user's hand is not held by what the task waits on.
+    if (how === "deleted") await office.remove("p2");
+    else await office.update({ id: "p2", action: how === "claimed" ? "claim" : "done" });
+    await office.update({ id: "p1", action: "done" });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    // Reopened after that, it is a task like any other: its wake is not kept for later.
+    if (how !== "deleted") await office.update({ id: "p2", action: "reopen" });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    await office.stop();
+  }
+});
+
+test("a task still waiting when the office starts wakes its agent at its release; one already free is not sent again", async () => {
+  const at = "2026-11-11T08:00:00.000Z";
+  const task = (id: string, fields: Partial<Post>): Post => ({
+    id,
+    seq: Number(id.slice(1)),
+    board: "w1",
+    kind: "task",
+    text: `Task ${id}`,
+    author: "user",
+    state: "open",
+    createdAt: at,
+    updatedAt: at,
+    ...fields,
+  });
+  const { office, prompts } = start({
+    ...EMPTY_BOARDS,
+    nextSeq: 6,
+    posts: [
+      task("p1", { text: "Build it" }),
+      task("p2", { text: "Review it", to: "b", after: ["p1"] }),
+      task("p3", { text: "Draw it", state: "done" }),
+      // Free before the restart: its agent was told then.
+      task("p4", { text: "Print it", to: "b", after: ["p3"] }),
+      // A lobby task for a named agent is the pickup's, and is not woken for.
+      task("p5", { board: "lobby", text: "Ship it", to: "b", namedPickup: true, after: ["p1"] }),
+    ],
+  });
+  await office.ready;
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts.filter((prompt) => prompt.startsWith("b: Office board"))).toEqual([
+    WAKE_FOR_REVIEW,
+  ]);
+  await office.stop();
+});
+
 test("the user's post takes after as the tool's does", async () => {
   const { office } = start();
   await office.ready;

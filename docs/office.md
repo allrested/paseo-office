@@ -693,7 +693,11 @@ wait for an agent go out as one prompt per author: an agent's posts carry that a
 the user's posts arrive as a user prompt. A post naming an agent that has not run a turn yet is
 delivered after that agent's first turn or the next post that names it. Pending mention
 notifications are held in memory. A reply wakes the agent holding its task by the same rules,
-unless that agent wrote it: a reply from the holder is for you and wakes nobody.
+unless that agent wrote it: a reply from the holder is for you and wakes nobody. A task that names
+an agent and still waits on other tasks does not wake it yet, since the agent could not claim it:
+the wake goes out when the last of those tasks is done or deleted, also after a restart of the
+daemon, and not at all if the task itself is deleted, claimed or done first. (A lobby task for a
+named agent is handed out by the pickup, which waits the same way.)
 
 ## The duty board
 
