@@ -829,9 +829,10 @@ function FloorSettings({
       )}
       <Text style={styles.fieldHint}>
         Off by default. On, the office saves the state of the files of a repository when the turn of
-        an agent starts, as objects in that repository (its index, branches and stash are not
-        touched), so a session can undo the files that turn edited or wrote. A change a shell
-        command made is not undone, and the last turn is the only one kept, until the host restarts.
+        an agent starts and when it ends, as objects in that repository (its index, branches and
+        stash are not touched), so a session shows what each of its last ten turns changed, shell
+        commands included, and can undo them one turn at a time. They are kept until the host
+        restarts.
       </Text>
       {undoProblem && (
         <Text accessibilityRole="alert" style={styles.actionError}>

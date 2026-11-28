@@ -1,41 +1,75 @@
-import { copyFile, lstat, mkdtemp, realpath, rm, stat, unlink, utimes } from "node:fs/promises";
+import {
+  copyFile,
+  lstat,
+  mkdtemp,
+  realpath,
+  rm,
+  rmdir,
+  stat,
+  unlink,
+  utimes,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { UndoSkip } from "../shared/contracts.js";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import type { Checkpoint, CheckpointFile, UndoSkip } from "../shared/contracts.js";
 import type { Exec } from "./repo-age.js";
 
 /** The longest each git call may take; a snapshot that needs more is no snapshot. */
 export const UNDO_GIT_TIMEOUT_MS = 15_000;
+/** The turns kept for each agent; the oldest is dropped. */
+export const CHECKPOINTS_KEPT = 10;
+/** The files a checkpoint lists; the rest are counted. */
+export const CHECKPOINT_FILES = 200;
 
-/** A file as a tree holds it, `<mode> <blob>`; null where the tree has none. */
-type Entry = string | null;
-
-/** What a turn's undo is made of: the files its edit calls named, as the two trees held them. */
-interface Turn {
+/** A kept turn as git holds it: two trees of the work tree, no ref. */
+export interface Snapshots {
   top: string;
-  /** The tree before the turn, to restore from. */
+  turnId: string;
   before: string;
-  /** Each file git can restore, with what it was before and at the turn's end. */
-  files: { path: string; before: Entry; end: Entry }[];
-  /** The files the turn's edit calls named that git cannot restore, and why. */
-  refused: UndoSkip[];
+  end: string;
+  /** When the turn began (ms): a folder born after it is the turn's. Without it no folder is removed. */
+  beganAt?: number;
+}
+
+interface Kept extends Snapshots {
+  endedAt: string;
+  files: CheckpointFile[];
+  more: number;
 }
 
 export interface UndoResult {
+  turnId: string;
   restored: number;
   skipped: { reason: UndoSkip; count: number }[];
 }
 
+export interface UndoStatus {
+  /** The turns kept, newest first. */
+  turns: Checkpoint[];
+  /** Why the list was emptied, when a turn could not be snapshotted; null since the last good one. */
+  gap: string | null;
+}
+
 export interface Undo {
-  /** A turn starts: the work tree is snapshotted when the setting is on, else the last snapshot is dropped. */
+  /** A turn starts: the work tree is snapshotted when the setting is on, else the checkpoints are dropped. */
   begin(agentId: string, folder: string): Promise<void>;
-  /** The turn ended: the files its edit calls named (a relative one is of the agent's folder), as the work tree holds them now. */
-  end(agentId: string, folder: string, files: readonly string[]): Promise<void>;
-  /** How many files an undo would put back; 0 for a turn with no undo, and while it runs. */
-  available(agentId: string): number;
-  /** Puts the last turn's edits back, and forgets the turn; null when there is nothing to undo. */
-  undo(agentId: string): Promise<UndoResult | null>;
+  /** The turn ended: kept with a second snapshot when it changed something. */
+  end(agentId: string, turnId: string | null): Promise<void>;
+  status(agentId: string): Promise<UndoStatus>;
+  /**
+   * Puts back the turn the owner was shown, which must still be the newest. Refused while this
+   * agent, or another in the same work tree, is in a turn, or when git pruned its snapshot.
+   */
+  undo(agentId: string, turnId: string): Promise<UndoResult>;
   forget(agentId: string): void;
+}
+
+/** What an undo may be told from outside: whether to stop before its next act, and a folder's times. */
+export interface UndoOptions {
+  /** Why the undo must stop before its next act (an agent began a turn); null to go on. */
+  halt?: () => UndoSkip | null;
+  /** A folder's birth and change time (ms); the file system's by default. */
+  times?: (path: string) => Promise<{ birth: number; change: number }>;
 }
 
 export interface UndoPorts {
@@ -48,13 +82,28 @@ export interface UndoPorts {
 interface Taken {
   top: string;
   tree: string;
+  beganAt: number;
 }
 
-/** The agent's turn: still being snapshotted, running, or ended with what it can undo. */
-interface Slot {
-  taking: Promise<Taken | null>;
-  turn: Turn | null;
+/**
+ * An agent's checkpoints, the snapshot of the turn it is in, the folder it works in (and that
+ * folder's work tree once known), whether a gap emptied its list, and the queue its git work waits in.
+ */
+interface Agent {
+  kept: Kept[];
+  taken: Taken | null;
+  working: boolean;
+  folder: string | null;
+  place: { folder: string; top: string | null } | null;
+  gap: boolean;
+  queue: Promise<unknown>;
 }
+
+const GONE = "this checkpoint's snapshot is gone";
+const WORKING = "the agent is working: undo when its turn has ended";
+const NOT_NEWEST = "that turn is no longer the newest: look again";
+const OTHERS = "another agent is working in this folder: undo when it has stopped";
+const GAP = "the last turn could not be snapshotted: earlier checkpoints were dropped";
 
 function baseEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -83,6 +132,12 @@ async function git(
     env: baseEnv(extra),
   });
   return stdout;
+}
+
+/** Whether a git call was killed (its time ran out) rather than refusing. */
+function killed(error: unknown): boolean {
+  const { killed: was, signal } = error as { killed?: unknown; signal?: unknown };
+  return was === true || (typeof signal === "string" && signal !== "");
 }
 
 /** A temporary index file in a folder of its own, gone after `work`. The repository's index is never touched. */
@@ -122,68 +177,181 @@ async function snapshot(exec: Exec, top: string): Promise<string> {
   });
 }
 
-/** The work tree's folder when `folder` is inside one; null for any other folder. */
+/**
+ * The work tree's folder when `folder` is inside one; null only when git says it is in no
+ * repository. Any other failure (a timeout, git not starting, an answer that is no folder) throws:
+ * the folder's work tree is then unknown, which is never taken to mean "elsewhere".
+ */
 async function workTree(exec: Exec, folder: string): Promise<string | null> {
+  let out: string;
   try {
-    const top = (await git(exec, folder, ["rev-parse", "--show-toplevel"])).trim();
-    return top === "" ? null : await realpath(top);
+    // In git's own words, whatever the host's language: its answer is read below.
+    out = await git(exec, folder, ["rev-parse", "--show-toplevel"], { LC_ALL: "C", LANGUAGE: "C" });
+  } catch (error) {
+    const said = String((error as { stderr?: unknown }).stderr ?? "");
+    if (!killed(error) && said.includes("not a git repository")) return null;
+    throw error;
+  }
+  const top = out.trim();
+  if (top === "") throw new Error("git named no work tree");
+  return realpath(top);
+}
+
+/** Whether git still has both trees: loose objects with no ref, which `git gc` may prune. */
+async function usable(exec: Exec, snapshots: Snapshots): Promise<boolean> {
+  try {
+    for (const tree of [snapshots.before, snapshots.end]) {
+      await git(exec, snapshots.top, ["cat-file", "-e", `${tree}^{tree}`]);
+    }
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
-/** The entries of a tree for these paths, by path. */
-async function entries(
-  exec: Exec,
-  top: string,
-  tree: string,
-  paths: readonly string[],
-): Promise<Map<string, Entry>> {
-  const found = new Map<string, Entry>();
-  if (paths.length === 0) return found;
-  const out = await git(exec, top, ["ls-tree", "-r", "-z", tree, "--", ...paths]);
-  for (const record of out.split("\0")) {
-    const tab = record.indexOf("\t");
-    if (tab < 0) continue;
-    const [mode, , blob] = record.slice(0, tab).split(" ");
-    found.set(record.slice(tab + 1), `${mode} ${blob}`);
+/** One path of a turn's diff, with its entry in each tree (`<mode> <blob>`, null where none). */
+interface Change {
+  path: string;
+  before: string | null;
+  end: string | null;
+}
+
+/** Every path that differs between the two trees, read NUL-separated so any name comes through whole. */
+async function changes(exec: Exec, snapshots: Snapshots): Promise<Change[]> {
+  const out = await git(exec, snapshots.top, [
+    "diff-tree",
+    "-r",
+    "--no-renames",
+    "--no-abbrev",
+    "-z",
+    "--raw",
+    snapshots.before,
+    snapshots.end,
+    "--",
+  ]);
+  const fields = out.split("\0");
+  const found: Change[] = [];
+  for (let at = 0; at + 1 < fields.length; at += 2) {
+    const meta = fields[at] ?? "";
+    const path = fields[at + 1] ?? "";
+    // `:<mode> <mode> <blob> <blob> <status>`
+    const [srcMode, dstMode, srcBlob, dstBlob] = meta.replace(/^:/, "").split(" ");
+    if (srcMode === undefined || dstMode === undefined || path === "") continue;
+    found.push({
+      path,
+      before: /^0+$/.test(srcMode) ? null : `${srcMode} ${srcBlob}`,
+      end: /^0+$/.test(dstMode) ? null : `${dstMode} ${dstBlob}`,
+    });
   }
   return found;
 }
 
-/**
- * Where a file is in the work tree, as git names it (relative, with `/`); null when it is not in
- * it. The folder it is in is resolved first, so a `..` or a link out of the tree cannot reach a
- * file beyond it; `.git` is never a place to restore to.
- */
-async function placeIn(top: string, folder: string, file: string): Promise<string | null> {
-  const absolute = resolve(folder, file);
-  let dir = dirname(absolute);
-  const rest = [basename(absolute)];
-  for (;;) {
-    try {
-      dir = await realpath(dir);
-      break;
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) return null;
-      rest.unshift(basename(dir));
-      dir = parent;
-    }
+/** What a turn changed, for the list: the first files with their added and removed lines, and how many more. */
+async function listed(
+  exec: Exec,
+  snapshots: Snapshots,
+  all: readonly Change[],
+): Promise<{ files: CheckpointFile[]; more: number }> {
+  const out = await git(exec, snapshots.top, [
+    "diff-tree",
+    "-r",
+    "--no-renames",
+    "-z",
+    "--numstat",
+    snapshots.before,
+    snapshots.end,
+    "--",
+  ]);
+  const counts = new Map<string, { added: number | null; removed: number | null }>();
+  for (const record of out.split("\0")) {
+    // `<added>\t<removed>\t<path>`, a binary file's counts `-`; the path may hold a tab itself.
+    const first = record.indexOf("\t");
+    const second = record.indexOf("\t", first + 1);
+    if (first < 0 || second < 0) continue;
+    const count = (text: string) => (/^\d+$/.test(text) ? Number(text) : null);
+    counts.set(record.slice(second + 1), {
+      added: count(record.slice(0, first)),
+      removed: count(record.slice(first + 1, second)),
+    });
   }
-  const place = relative(top, join(dir, ...rest));
-  if (place === "" || isAbsolute(place) || place === ".." || place.startsWith(`..${sep}`)) {
-    return null;
-  }
-  const parts = place.split(sep);
-  return parts[0] === ".git" ? null : parts.join("/");
+  const files = all.slice(0, CHECKPOINT_FILES).map((change): CheckpointFile => {
+    const lines = counts.get(change.path);
+    return {
+      path: change.path,
+      kind: kindOf(change),
+      added: lines?.added ?? null,
+      removed: lines?.removed ?? null,
+    };
+  });
+  return { files, more: Math.max(0, all.length - CHECKPOINT_FILES) };
 }
 
-/** Whether git ignores a path: for it a snapshot has no file, so an absence there proves nothing. */
+function kindOf(change: Change): CheckpointFile["kind"] {
+  if (change.before === null) return "added";
+  return change.end === null ? "deleted" : "modified";
+}
+
+const modeOf = (entry: string | null) => entry?.split(" ")[0] ?? null;
+
+/**
+ * Why a path of the diff is not the undo's to touch, read from the path and the folders above it
+ * alone; null when it may be. Resolved first, so a `..` or a link above cannot lead out of the tree.
+ */
+async function refusal(top: string, change: Change): Promise<UndoSkip | null> {
+  const absolute = resolve(top, change.path);
+  const place = relative(top, absolute);
+  if (place === "" || isAbsolute(place) || place === ".." || place.startsWith(`..${sep}`)) {
+    return "outside";
+  }
+  const parts = place.split(sep);
+  if (parts.some((part) => part.toLowerCase() === ".git")) return "git";
+  let dir = top;
+  for (const part of parts.slice(0, -1)) {
+    dir = join(dir, part);
+    let info: Awaited<ReturnType<typeof lstat>>;
+    try {
+      info = await lstat(dir);
+    } catch {
+      break;
+    }
+    if (info.isSymbolicLink()) return "linkedFolder";
+    // Something made since where a folder was: `checkout-index -f` would delete it to put the folder back.
+    if (!info.isDirectory()) return "changed";
+  }
+  // The folder that exists, resolved: whatever sits above it, it must still be in the tree.
+  let existing = dirname(absolute);
+  for (;;) {
+    try {
+      existing = await realpath(existing);
+      break;
+    } catch {
+      existing = dirname(existing);
+    }
+  }
+  const resolved = relative(top, existing);
+  if (isAbsolute(resolved) || resolved === ".." || resolved.startsWith(`..${sep}`)) {
+    return "outside";
+  }
+  const modes = new Set([modeOf(change.before), modeOf(change.end)]);
+  if (modes.has("160000")) return "submodule";
+  if (modes.has("120000")) return "link";
+  try {
+    if ((await lstat(absolute)).isSymbolicLink()) return "link";
+  } catch {
+    // Not there: nothing to be a link.
+  }
+  return null;
+}
+
+/**
+ * Whether git ignores a path. One call a path, read by its exit status: the paths it prints are
+ * quoted, and `-z` needs a standard input the calls here do not have. The path goes as `./<path>`,
+ * so a name such as `:!x` or `:(top)x` is a name and not pathspec magic.
+ */
 async function ignores(exec: Exec, top: string, path: string): Promise<boolean> {
   try {
-    // It takes a path as a path, and refuses the literal-pathspec setting the other calls have.
-    await git(exec, top, ["check-ignore", "-q", "--", path], { GIT_LITERAL_PATHSPECS: "0" });
+    // It refuses the literal-pathspec setting the other calls have; the `./` keeps the path a path.
+    await git(exec, top, ["check-ignore", "-q", "--", `./${path}`], { GIT_LITERAL_PATHSPECS: "0" });
     return true;
   } catch (error) {
     // Exit status 1 is "not ignored"; any other failure is a git that cannot say.
@@ -192,187 +360,481 @@ async function ignores(exec: Exec, top: string, path: string): Promise<boolean> 
   }
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function isLink(path: string): Promise<boolean> {
-  try {
-    return (await lstat(path)).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
-/** The turn's undo: its files placed, sorted into what git can restore and what it cannot. */
-async function readTurn(
-  exec: Exec,
-  taken: Taken,
-  folder: string,
-  files: readonly string[],
-): Promise<Turn> {
-  const { top } = taken;
-  const refused: UndoSkip[] = [];
-  const places = new Set<string>();
-  for (const file of files) {
-    const place = await placeIn(top, folder, file);
-    if (place === null) refused.push("outside");
-    else places.add(place);
-  }
-  const wanted: string[] = [];
-  for (const place of places) {
-    if (await ignores(exec, top, place)) refused.push("ignored");
-    else if (await isLink(join(top, place))) refused.push("link");
-    else wanted.push(place);
-  }
-  const end = await snapshot(exec, top);
-  const before = await entries(exec, top, taken.tree, wanted);
-  const after = await entries(exec, top, end, wanted);
-  return {
-    top,
-    before: taken.tree,
-    files: wanted.map((path) => ({
-      path,
-      before: before.get(path) ?? null,
-      end: after.get(path) ?? null,
-    })),
-    refused,
-  };
-}
-
-/** Puts back the files whose work tree entry is still what the turn left, and says what it did not. */
-async function restore(exec: Exec, turn: Turn): Promise<UndoResult> {
-  const { top } = turn;
-  const skips: UndoSkip[] = [...turn.refused];
-  const paths = turn.files.map((file) => file.path);
-  const present = new Set<string>();
-  for (const path of paths) {
-    if (await exists(join(top, path))) present.add(path);
-  }
-  // The work tree as it is now, for the files in question: a file changed since is not ours to put back.
-  const now = await withIndex(async (index) => {
-    const env = { GIT_INDEX_FILE: index };
-    await git(exec, top, ["read-tree", turn.before], env);
-    // `git add` refuses a path that is nowhere: neither in the tree nor in the work tree.
-    const known = turn.files.filter((file) => file.before !== null || present.has(file.path));
-    if (known.length > 0) {
-      await git(exec, top, ["add", "-A", "--", ...known.map((file) => file.path)], env);
-    }
-    return (await git(exec, top, ["write-tree"], env)).trim();
-  });
-  const current = await entries(exec, top, now, paths);
-  const back: string[] = [];
-  const gone: string[] = [];
-  for (const file of turn.files) {
-    const here = current.get(file.path) ?? null;
-    if (await isLink(join(top, file.path))) skips.push("link");
-    else if (here !== file.end && here !== file.before) skips.push("changed");
-    else if (here === file.before) skips.push("same");
-    else if (file.before === null) gone.push(file.path);
-    else back.push(file.path);
-  }
-  let restored = 0;
-  for (const path of gone) {
-    try {
-      await unlink(join(top, path));
-      restored += 1;
-    } catch {
-      skips.push("write");
-    }
-  }
-  if (back.length > 0) {
-    await withIndex(async (index) => {
-      const env = { GIT_INDEX_FILE: index };
-      await git(exec, top, ["read-tree", turn.before], env);
-      for (const path of back) {
-        try {
-          await git(exec, top, ["checkout-index", "-f", "--", path], env);
-          restored += 1;
-        } catch {
-          skips.push("write");
-        }
-      }
-    });
-  }
-  const counts = new Map<UndoSkip, number>();
-  for (const reason of skips) counts.set(reason, (counts.get(reason) ?? 0) + 1);
-  return { restored, skipped: [...counts].map(([reason, count]) => ({ reason, count })) };
-}
-
-/** The files a turn's edit and write calls named, once each, in the order they were first named. */
-export function editedFiles(
-  items: readonly { type: string; status?: unknown; detail?: unknown }[],
-): string[] {
-  const files = new Set<string>();
-  for (const item of items) {
-    if (item.type !== "tool_call" || item.status === "failed" || item.status === "canceled") {
-      continue;
-    }
-    const { detail } = item;
-    if (typeof detail !== "object" || detail === null) continue;
-    const kind: unknown = Reflect.get(detail, "type");
-    const path: unknown = Reflect.get(detail, "filePath");
-    if ((kind === "edit" || kind === "write") && typeof path === "string" && path !== "") {
-      files.add(path);
-    }
-  }
-  return [...files];
+/** Whether git records the executable bit in this repository. */
+async function keepsModes(exec: Exec, top: string): Promise<boolean> {
+  return git(exec, top, ["config", "--type=bool", "core.fileMode"])
+    .then((out) => out.trim() !== "false")
+    .catch(() => true);
 }
 
 /**
- * Undo for the last turn of each agent, from git: a snapshot of the work tree when the turn
- * starts, another when it ends, and the files the turn's edit and write calls named. Only those
- * files are put back, so what another agent or the owner changed elsewhere stays. Whatever goes
- * wrong, the turn has no undo; nothing here fails or waits a turn.
+ * A path's entry in the work tree now, as the snapshots write one (`<mode> <blob>`, hashed by git
+ * with its filters, `*` for the mode where git keeps none); null where there is no file, "other"
+ * where there is something that is not a plain file.
  */
-export function createUndo(ports: UndoPorts): Undo {
-  const slots = new Map<string, Slot>();
-  const { exec } = ports;
-  async function take(folder: string): Promise<Taken | null> {
-    try {
-      const top = await workTree(exec, folder);
-      return top === null ? null : { top, tree: await snapshot(exec, top) };
-    } catch (error) {
-      ports.log(`[office] undo snapshot failed: ${error instanceof Error ? error.message : error}`);
-      return null;
+async function entryNow(
+  exec: Exec,
+  top: string,
+  path: string,
+  modes: boolean,
+): Promise<string | null> {
+  let info: Awaited<ReturnType<typeof lstat>>;
+  try {
+    info = await lstat(join(top, path));
+  } catch {
+    return null;
+  }
+  if (!info.isFile()) return "other";
+  const blob = (await git(exec, top, ["hash-object", "--", path])).trim();
+  const mode = info.mode & 0o111 ? "100755" : "100644";
+  return `${modes ? mode : "*"} ${blob}`;
+}
+
+/** Every blob to write back must still be there, or nothing is touched: a missing one is a snapshot gone. */
+async function present(exec: Exec, top: string, entry: string): Promise<void> {
+  try {
+    await git(exec, top, ["cat-file", "-e", entry.split(" ")[1] ?? ""]);
+  } catch (error) {
+    if (killed(error)) throw error;
+    throw new Error(GONE, { cause: error });
+  }
+}
+
+/** Whether the work tree's entry is the tree's; with git not keeping modes, by content alone. */
+function same(now: string | null, entry: string | null): boolean {
+  if (now === "other") return false;
+  if (now === null || entry === null) return now === entry;
+  return now.startsWith("* ") ? now.slice(2) === entry.split(" ")[1] : now === entry;
+}
+
+/**
+ * What to do with one path, looked at right before the act: "act" when the file is what the turn
+ * left, else why it stays.
+ */
+async function verdict(
+  exec: Exec,
+  { top, before }: Snapshots,
+  change: Change,
+  modes: boolean,
+): Promise<UndoSkip | "act"> {
+  const why = await refusal(top, change);
+  if (why !== null) return why;
+  if (await ignores(exec, top, change.path)) return "ignored";
+  const here = await entryNow(exec, top, change.path, modes);
+  if (same(here, change.end)) return "act";
+  if (same(here, change.before)) return "same";
+  // A folder where the turn added a file, and the before tree has that folder: as before the turn.
+  if (
+    here === "other" &&
+    change.before === null &&
+    (await isTree(exec, top, `${before}:${change.path}`))
+  ) {
+    return "same";
+  }
+  return "changed";
+}
+
+async function isTree(exec: Exec, top: string, object: string): Promise<boolean> {
+  const kind = await git(exec, top, ["cat-file", "-t", object])
+    .then((out) => out.trim())
+    .catch(() => null);
+  return kind === "tree";
+}
+
+/**
+ * A folder the turn made where the before tree has a file: removed when it is empty now, whatever
+ * its birth time (the end tree shows the turn made it), so the file can come back in one undo.
+ * Never recursive: a folder holding anything is in the way, said as such. Null when there was no
+ * such folder, or it is gone now; a path refused or ignored is left for `verdict` to say.
+ */
+async function clearSwapped(
+  exec: Exec,
+  snapshots: Snapshots,
+  change: Change,
+  halt: () => UndoSkip | null,
+): Promise<UndoSkip | null> {
+  const { top, end } = snapshots;
+  if (change.end !== null || !modeOf(change.before)?.startsWith("100")) return null;
+  if ((await refusal(top, change)) !== null) return null;
+  const place = join(top, change.path);
+  try {
+    if (!(await lstat(place)).isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  if (!(await isTree(exec, top, `${end}:${change.path}`))) return null;
+  if (await ignores(exec, top, change.path)) return null;
+  const why = halt();
+  if (why !== null) return why;
+  try {
+    await rmdir(place);
+    return null;
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    return code === "ENOTEMPTY" || code === "EEXIST" ? "crowded" : "write";
+  }
+}
+
+/** Whether something the undo deleted was on this path's way: its folder, a file in it, or its case twin. */
+function inTheWay(path: string, deleted: readonly string[]): boolean {
+  const mine = path.toLowerCase();
+  return deleted.some((gone) => {
+    const theirs = gone.toLowerCase();
+    return theirs === mine || theirs.startsWith(`${mine}/`) || mine.startsWith(`${theirs}/`);
+  });
+}
+
+async function folderTimes(path: string): Promise<{ birth: number; change: number }> {
+  const { birthtimeMs, ctimeMs } = await stat(path);
+  return { birth: birthtimeMs, change: ctimeMs };
+}
+
+/**
+ * Puts a turn back over every path its diff lists, in two steps. First the files the turn added
+ * are deleted, with the folders it made that are left empty; then each file to write back is
+ * looked at afresh, so a folder the turn swapped for a file (or a file renamed by case alone) comes
+ * back once the turn's file is gone. Each path is looked at right before its act: a file that is
+ * not what the turn left is somebody's later work and is skipped. Writes go through a temporary
+ * index read from the before tree; it never runs checkout, reset, stash or clean, and the real
+ * index and HEAD are not touched. `stopped` is set when the undo did not finish and an undo again
+ * may do more: git failed or ran out of time, an agent began a turn, or a file to write back was
+ * left where the undo had just deleted something on its way.
+ */
+export async function undoCheckpoint(
+  exec: Exec,
+  snapshots: Snapshots,
+  options: UndoOptions = {},
+): Promise<UndoResult & { stopped: boolean }> {
+  const { top, before } = snapshots;
+  const halt = options.halt ?? (() => null);
+  const times = options.times ?? folderTimes;
+  const all = await changes(exec, snapshots);
+  for (const change of all) {
+    if (change.before !== null && modeOf(change.before)?.startsWith("100")) {
+      await present(exec, top, change.before);
     }
   }
+  const modes = await keepsModes(exec, top);
+  const first = await deleteAdded(
+    exec,
+    snapshots,
+    all.filter((one) => one.before === null),
+    { modes, halt, times },
+  );
+  const { skips, deleted } = first;
+  let { restored, stop } = first;
+  let again = false;
+  const back = all.filter((one) => one.before !== null);
+  let at = 0;
+  try {
+    if (back.length > 0 && stop === null) {
+      await withIndex(async (index) => {
+        const env = { GIT_INDEX_FILE: index };
+        // Read when the first file is due: a path git refuses is said under its own reason first.
+        let read = false;
+        for (; at < back.length; at += 1) {
+          const change = back[at] as Change;
+          const cleared = await clearSwapped(exec, snapshots, change, halt);
+          if (cleared === "began") {
+            stop = cleared;
+            return;
+          }
+          if (cleared !== null) {
+            skips.push(cleared);
+            continue;
+          }
+          const what = await verdict(exec, snapshots, change, modes);
+          if (what !== "act") {
+            // Left where the undo itself just removed something: an undo again may put it back.
+            const later = what !== "same" && inTheWay(change.path, deleted);
+            again ||= later;
+            skips.push(later ? "retry" : what);
+            continue;
+          }
+          stop = halt();
+          if (stop !== null) return;
+          if (!read) {
+            await git(exec, top, ["read-tree", before], env);
+            read = true;
+          }
+          try {
+            await git(exec, top, ["checkout-index", "-f", "--", change.path], env);
+            restored += 1;
+          } catch (error) {
+            if (killed(error)) throw error;
+            skips.push("write");
+          }
+        }
+      });
+    }
+  } catch {
+    stop = "stopped";
+  }
+  const left = stop;
+  if (left !== null) for (; at < back.length; at += 1) skips.push(left);
+  const counts = new Map<UndoSkip, number>();
+  for (const reason of skips) counts.set(reason, (counts.get(reason) ?? 0) + 1);
   return {
-    async begin(agentId, folder) {
-      slots.delete(agentId);
-      if (!ports.enabled()) return;
-      const slot: Slot = { taking: take(folder), turn: null };
-      slots.set(agentId, slot);
-      await slot.taking;
+    turnId: snapshots.turnId,
+    restored,
+    skipped: [...counts].map(([reason, count]) => ({ reason, count })),
+    stopped: stop !== null || again,
+  };
+}
+
+/**
+ * The undo's first step: each file the turn added that is still what the turn left is deleted,
+ * looked at right before, with the folders the turn made that are left empty.
+ */
+async function deleteAdded(
+  exec: Exec,
+  snapshots: Snapshots,
+  added: readonly Change[],
+  how: {
+    modes: boolean;
+    halt: () => UndoSkip | null;
+    times: (path: string) => Promise<{ birth: number; change: number }>;
+  },
+): Promise<{ restored: number; deleted: string[]; skips: UndoSkip[]; stop: UndoSkip | null }> {
+  const { top } = snapshots;
+  const skips: UndoSkip[] = [];
+  const deleted: string[] = [];
+  let stop: UndoSkip | null = null;
+  for (const change of added) {
+    if (stop !== null) {
+      skips.push(stop);
+      continue;
+    }
+    let what: UndoSkip | "act";
+    try {
+      what = await verdict(exec, snapshots, change, how.modes);
+    } catch {
+      stop = "stopped";
+      skips.push(stop);
+      continue;
+    }
+    if (what === "act") stop = how.halt();
+    if (what !== "act" || stop !== null) {
+      skips.push(stop ?? (what as UndoSkip));
+      continue;
+    }
+    try {
+      await unlink(join(top, change.path));
+    } catch {
+      skips.push("write");
+      continue;
+    }
+    deleted.push(change.path);
+    await prune(exec, snapshots, dirname(change.path), how.halt, how.times);
+  }
+  return { restored: deleted.length, deleted, skips, stop };
+}
+
+/**
+ * Removes the folders above a deleted file that are now empty and the turn made: not a folder in
+ * the before tree, and born after the turn began. A tree has no empty folder, so the birth time is
+ * what tells an empty folder of the owner's from the turn's; where the file system keeps none (no
+ * birth time, or one that reads as the change time) the folder stays.
+ */
+async function prune(
+  exec: Exec,
+  snapshots: Snapshots,
+  folder: string,
+  halt: () => UndoSkip | null,
+  times: (path: string) => Promise<{ birth: number; change: number }>,
+): Promise<void> {
+  const { top, before, beganAt } = snapshots;
+  if (beganAt === undefined) return;
+  for (let dir = folder; dir !== "." && dir !== "" && dir !== "/"; dir = dirname(dir)) {
+    if (await isTree(exec, top, `${before}:${dir}`)) return;
+    try {
+      const place = join(top, dir);
+      if ((await lstat(place)).isSymbolicLink()) return;
+      const { birth, change } = await times(place);
+      if (!(birth > 0) || birth === change || !(birth > beganAt) || halt() !== null) return;
+      // Refused when the folder holds anything: then it is not only the turn's.
+      await rmdir(place);
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Checkpoints for the last ten turns of each agent, from git: a snapshot of the work tree when a
+ * turn starts and another when it ends, kept when they differ. The list shows what each turn
+ * changed, shell commands too; undo puts back the newest, then the one before. Each agent's turns
+ * and undos wait for each other, and an undo stops when any agent in its work tree begins a turn.
+ * Whatever goes wrong in a snapshot, the turn is not kept; nothing here fails or waits a turn.
+ */
+export function createUndo(ports: UndoPorts): Undo {
+  const agents = new Map<string, Agent>();
+  const { exec } = ports;
+  function agentOf(agentId: string): Agent {
+    let agent = agents.get(agentId);
+    if (agent === undefined) {
+      agent = {
+        kept: [],
+        taken: null,
+        working: false,
+        folder: null,
+        place: null,
+        gap: false,
+        queue: Promise.resolve(),
+      };
+      agents.set(agentId, agent);
+    }
+    return agent;
+  }
+  /** Runs `work` after the agent's earlier git work, and before its later. */
+  function serial<T>(agent: Agent, work: () => Promise<T>): Promise<T> {
+    const next = agent.queue.then(work);
+    agent.queue = next.catch(() => undefined);
+    return next;
+  }
+  /** A turn not kept is a gap: the turns before it are no longer one step back each. */
+  function drop(agent: Agent): void {
+    if (agent.kept.length > 0) agent.gap = true;
+    agent.kept = [];
+  }
+  /** The work tree an agent's folder is in, as last read for that folder; undefined when not read yet. */
+  function knownTop(agent: Agent): string | null | undefined {
+    return agent.place !== null && agent.place.folder === agent.folder
+      ? agent.place.top
+      : undefined;
+  }
+  /** The other agents in a turn whose work tree is `top`, or may be (theirs not read yet). */
+  function othersIn(agent: Agent, top: string): boolean {
+    for (const other of agents.values()) {
+      if (other === agent || !other.working) continue;
+      const theirs = knownTop(other);
+      if (theirs === undefined || theirs === top) return true;
+    }
+    return false;
+  }
+  const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+  return {
+    begin(agentId, folder) {
+      const agent = agentOf(agentId);
+      agent.working = true;
+      agent.folder = folder;
+      const beganAt = Date.now();
+      return serial(agent, async () => {
+        agent.taken = null;
+        if (!ports.enabled()) {
+          drop(agent);
+          return;
+        }
+        // Unknown until read: a failure leaves it so, and the turn is a gap, not "no repository".
+        agent.place = null;
+        try {
+          const top = await workTree(exec, folder);
+          agent.place = { folder, top };
+          if (top !== null) agent.taken = { top, tree: await snapshot(exec, top), beganAt };
+        } catch (error) {
+          ports.log(`[office] undo snapshot failed: ${errorText(error)}`);
+        }
+        if (agent.taken === null) drop(agent);
+        else agent.gap = false;
+      });
     },
-    async end(agentId, folder, files) {
-      const slot = slots.get(agentId);
-      if (slot === undefined) return;
-      const taken = await slot.taking;
-      if (taken === null || slots.get(agentId) !== slot || files.length === 0) return;
-      try {
-        const turn = await readTurn(exec, taken, folder, files);
-        if (slots.get(agentId) === slot && turn.files.length > 0) slot.turn = turn;
-      } catch (error) {
-        ports.log(`[office] undo read failed: ${error instanceof Error ? error.message : error}`);
+    end(agentId, turnId) {
+      const agent = agents.get(agentId);
+      if (agent === undefined) return Promise.resolve();
+      agent.working = false;
+      const endedAt = new Date().toISOString();
+      return serial(agent, async () => {
+        const taken = agent.taken;
+        agent.taken = null;
+        if (taken === null) return;
+        if (!ports.enabled()) {
+          drop(agent);
+          return;
+        }
+        try {
+          // Once more before giving up: a lock or a slow moment at the turn's end passes.
+          const end = await snapshot(exec, taken.top).catch(() => snapshot(exec, taken.top));
+          if (end === taken.tree) return;
+          if (turnId === null) {
+            drop(agent);
+            return;
+          }
+          const snapshots = {
+            top: taken.top,
+            turnId,
+            before: taken.tree,
+            end,
+            beganAt: taken.beganAt,
+          };
+          const all = await changes(exec, snapshots);
+          if (all.length === 0) return;
+          const kept = { ...snapshots, endedAt, ...(await listed(exec, snapshots, all)) };
+          if (agents.get(agentId) !== agent) return;
+          agent.kept = [...agent.kept, kept].slice(-CHECKPOINTS_KEPT);
+        } catch (error) {
+          ports.log(`[office] undo read failed: ${errorText(error)}`);
+          drop(agent);
+        }
+      });
+    },
+    async status(agentId) {
+      const agent = agents.get(agentId);
+      const turns: Checkpoint[] = [];
+      for (const one of (agent?.kept ?? []).toReversed()) {
+        turns.push({
+          turnId: one.turnId,
+          endedAt: one.endedAt,
+          files: one.files,
+          more: one.more,
+          usable: await usable(exec, one),
+        });
       }
+      return { turns, gap: agent?.gap ? GAP : null };
     },
-    available(agentId) {
-      return slots.get(agentId)?.turn?.files.length ?? 0;
-    },
-    async undo(agentId) {
-      const turn = slots.get(agentId)?.turn;
-      if (turn === undefined || turn === null) return null;
-      slots.delete(agentId);
-      return restore(exec, turn);
+    async undo(agentId, turnId) {
+      const agent = agents.get(agentId);
+      if (agent === undefined) throw new Error(NOT_NEWEST);
+      if (agent.working) throw new Error(WORKING);
+      return serial(agent, async () => {
+        if (agent.working) throw new Error(WORKING);
+        const newest = agent.kept.at(-1);
+        if (newest === undefined || newest.turnId !== turnId) throw new Error(NOT_NEWEST);
+        // The tops not read yet are read now, so an agent at work elsewhere is no reason. One that
+        // cannot be read stays unknown, and counts as working in this tree.
+        for (const other of agents.values()) {
+          if (
+            other !== agent &&
+            other.working &&
+            other.folder !== null &&
+            knownTop(other) === undefined
+          ) {
+            const folder = other.folder;
+            const top = await workTree(exec, folder).catch(() => undefined);
+            if (top !== undefined) other.place = { folder, top };
+          }
+        }
+        if (othersIn(agent, newest.top)) throw new Error(OTHERS);
+        if (!(await usable(exec, newest))) throw new Error(GONE);
+        // Looked at before each act: a turn that begins meanwhile, here or in the same tree, stops it.
+        const halt = (): UndoSkip | null =>
+          agent.working || othersIn(agent, newest.top) ? "began" : null;
+        let result: Awaited<ReturnType<typeof undoCheckpoint>>;
+        try {
+          result = await undoCheckpoint(exec, newest, { halt });
+        } catch (error) {
+          if (errorText(error) === GONE) throw error;
+          ports.log(`[office] undo failed: ${errorText(error)}`);
+          throw new Error("git could not read this checkpoint, so nothing was put back", {
+            cause: error,
+          });
+        }
+        // Not finished, it stays: an undo again puts back the rest.
+        if (!result.stopped) agent.kept = agent.kept.filter((one) => one !== newest);
+        return { turnId: result.turnId, restored: result.restored, skipped: result.skipped };
+      });
     },
     forget(agentId) {
-      slots.delete(agentId);
+      agents.delete(agentId);
     },
   };
 }

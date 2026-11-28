@@ -29,15 +29,13 @@ const spent = (time: string, cost: string | undefined) => {
 };
 
 export const RULES: readonly Rule[] = [
+  [/^Put back (\d+) files?$/, (n) => `Đã khôi phục ${n} tệp`],
   [
-    /^Undo the last turn's edits to (\d+) files?\?$/,
-    (n) => `Hoàn tác các chỉnh sửa của lượt gần nhất trên ${n} tệp?`,
-  ],
-  [/^(\d+) files? restored, (\d+) skipped$/, (n, m) => `${n} tệp đã khôi phục, ${m} bỏ qua`],
-  [
-    /^(\d+) files? (changed after the turn|outside the repository|ignored by git|left alone, being a link|with nothing to put back|that could not be written)$/,
+    /^(\d+) (changed since the turn|already as before the turn|outside the repository|inside \.git|ignored by git|left alone as links|in a linked folder|left alone as submodules|could not be written|not reached: git stopped|not reached: an agent began working|not put back yet: undo again to finish|left: a folder with other files is in the way)$/,
     (n, why) => `${n} tệp ${translatePattern(why)}`,
   ],
+  [/^(\d+) more$/, (n) => `${n} nữa`],
+  [/^(\d\d:\d\d) · (\d+) files?$/, (time, n) => `${time} · ${n} tệp`],
   [/^(\d+) min ago$/, (n) => `${n} phút trước`],
   [/^(\d+) h ago$/, (n) => `${n} giờ trước`],
   [/^(\d+) min$/, (n) => `${n} phút`],

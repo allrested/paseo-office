@@ -805,16 +805,33 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Undo last turn": "Urungkan giliran terakhir",
   Undo: "Urungkan",
   "Undoing...": "Mengurungkan...",
-  "Off by default. On, the office saves the state of the files of a repository when the turn of an agent starts, as objects in that repository (its index, branches and stash are not touched), so a session can undo the files that turn edited or wrote. A change a shell command made is not undone, and the last turn is the only one kept, until the host restarts.":
-    "Bawaannya mati. Jika nyala, kantor menyimpan keadaan berkas repositori saat giliran agen dimulai, sebagai objek di repositori itu (indeks, cabang, dan stash-nya tidak disentuh), sehingga sesi bisa mengurungkan berkas yang disunting atau ditulis giliran itu. Perubahan dari perintah shell tidak diurungkan, dan hanya giliran terakhir yang disimpan, sampai host dimulai ulang.",
-  "Changes a shell command made are not undone, and a file changed since the turn is left as it is.":
-    "Perubahan dari perintah shell tidak diurungkan, dan berkas yang diubah setelah giliran itu dibiarkan apa adanya.",
-  "changed after the turn": "diubah setelah giliran",
+  "Off by default. On, the office saves the state of the files of a repository when the turn of an agent starts and when it ends, as objects in that repository (its index, branches and stash are not touched), so a session shows what each of its last ten turns changed, shell commands included, and can undo them one turn at a time. They are kept until the host restarts.":
+    "Bawaannya mati. Jika nyala, kantor menyimpan keadaan berkas repositori saat giliran agen dimulai dan selesai, sebagai objek di repositori itu (indeks, cabang, dan stash-nya tidak disentuh), sehingga sesi menampilkan apa yang diubah tiap giliran dari sepuluh giliran terakhirnya, termasuk oleh perintah shell, dan bisa mengurungkannya satu giliran demi satu giliran. Semuanya disimpan sampai host dimulai ulang.",
+  "What this turn changed": "Yang diubah giliran ini",
+  "This checkpoint's snapshot is gone": "Snapshot checkpoint ini sudah hilang",
+  "Undo this turn": "Urungkan giliran ini",
+  "Earlier turns": "Giliran sebelumnya",
+  "Put back everything that changed in this folder during the turn? Files changed since are left alone.":
+    "Kembalikan semua yang berubah di folder ini selama giliran itu? Berkas yang diubah setelahnya dibiarkan.",
+  "The last turn could not be snapshotted, so the checkpoints before it were dropped.":
+    "Giliran terakhir tidak bisa di-snapshot, jadi checkpoint sebelumnya dibuang.",
+  "not reached: an agent began working": "tidak tersentuh: ada agen yang mulai bekerja",
+  "not put back yet: undo again to finish": "belum dikembalikan: urungkan lagi untuk menyelesaikan",
+  "left: a folder with other files is in the way":
+    "dibiarkan: ada folder berisi berkas lain yang menghalangi",
+  binary: "biner",
+  added: "ditambahkan",
+  deleted: "dihapus",
+  "changed since the turn": "diubah sejak giliran itu",
+  "already as before the turn": "sudah seperti sebelum giliran",
+  "inside .git": "di dalam .git",
+  "left alone as links": "dibiarkan karena berupa tautan",
+  "in a linked folder": "di folder tautan",
+  "left alone as submodules": "dibiarkan karena berupa submodul",
+  "could not be written": "tidak bisa ditulis",
+  "not reached: git stopped": "tidak tersentuh: git berhenti",
   "outside the repository": "di luar repositori",
   "ignored by git": "diabaikan git",
-  "left alone, being a link": "dibiarkan karena berupa tautan",
-  "with nothing to put back": "tanpa yang perlu dikembalikan",
-  "that could not be written": "yang tidak bisa ditulis",
   "Starting by itself": "Memulai sendiri",
   "waiting, agents are not picking up work (Agent tools or Wake agents is off)":
     "menunggu, agen tidak mengambil pekerjaan (Alat agen atau Bangunkan agen mati)",

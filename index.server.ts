@@ -96,9 +96,8 @@ import {
   type Notice,
 } from "./shared/notify.js";
 import type { NotifyLevel } from "./shared/settings.js";
-import { turnItems } from "./server/live-ports.js";
 import { readForgotten, type Checkout } from "./server/forgotten-work.js";
-import { createUndo, editedFiles } from "./server/undo-turn.js";
+import { createUndo } from "./server/undo-turn.js";
 import { VAULT_TAIL_LIMIT, createVault, type Vault } from "./server/vault.js";
 import { TIMELINE_KEEP_MS, createTimelineLog, type TimelineLog } from "./server/timeline.js";
 import {
@@ -1242,10 +1241,13 @@ export function createOfficePlugin(
   server.handle(undoRpc, (input, context) =>
     guarded("undo", async () => {
       holder.remember(context.paseo);
-      const none = { files: 0, restored: 0, skipped: [] };
-      if (input.op === "status") return { ...none, files: undo.available(input.agentId) };
-      const result = await undo.undo(input.agentId);
-      return result === null ? none : { files: 0, ...result };
+      const result = input.op === "undo" ? await undo.undo(input.agentId, input.turnId) : null;
+      return {
+        ...(await undo.status(input.agentId)),
+        turnId: result?.turnId ?? null,
+        restored: result?.restored ?? 0,
+        skipped: result?.skipped ?? [],
+      };
     }),
   );
   server.handle(tenureRpc, async (input, context) => {
@@ -1297,12 +1299,10 @@ export function createOfficePlugin(
     }),
     server.addHook("agent.turn.after", async ({ agent, outcome, turnId }, context) => {
       // Not waited for: a second snapshot takes as long as the first, and nothing here needs it.
-      if (undoOn && turnId !== null) {
-        void (async () => {
-          const files = editedFiles(await turnItems(context.paseo, agent.id, turnId));
-          await undo.end(agent.id, agent.cwd, files);
-        })().catch((error: unknown) => log(`[office] undo read failed: ${errorMessage(error)}`));
-      }
+      // Called whatever the setting, so the agent's undo is no longer held as "working".
+      undo
+        .end(agent.id, turnId)
+        .catch((error: unknown) => log(`[office] undo read failed: ${errorMessage(error)}`));
       try {
         holder.remember(context.paseo);
         office.noteAgent(agent);

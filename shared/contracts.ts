@@ -1228,18 +1228,61 @@ export const homeDepartureRpc = defineRpc({
   input: z.object({ agentId: z.string().min(1), idleSince: z.string().min(1) }),
   output: z.object({ archived: z.boolean() }),
 });
-/** Why an undo leaves a file as it is. */
-export const UNDO_SKIPS = ["changed", "outside", "ignored", "link", "same", "write"] as const;
-export type UndoSkip = (typeof UNDO_SKIPS)[number];
 /**
- * The last turn's undo of a session: `status` says how many files an undo would put back (0 for
- * none), `undo` puts them back and says what it did.
+ * Why an undo leaves a file as it is: changed since the turn, already as before it, out of the
+ * work tree, in `.git`, ignored by git, a link, under a linked folder, a submodule, a write that
+ * failed, not reached because git stopped part-way or an agent began a turn, or left for an undo
+ * again because the undo had just removed something on its way, or a folder with other files
+ * standing where a file is to come back.
+ */
+export const UNDO_SKIPS = [
+  "changed",
+  "same",
+  "outside",
+  "git",
+  "ignored",
+  "link",
+  "linkedFolder",
+  "submodule",
+  "write",
+  "stopped",
+  "began",
+  "retry",
+  "crowded",
+] as const;
+export type UndoSkip = (typeof UNDO_SKIPS)[number];
+/** What a turn did to one file, by git's diff of its two snapshots; a binary file has no counts. */
+export const CheckpointFileSchema = z.object({
+  path: z.string(),
+  kind: z.enum(["added", "modified", "deleted"]),
+  added: z.number().int().nonnegative().nullable(),
+  removed: z.number().int().nonnegative().nullable(),
+});
+export type CheckpointFile = z.infer<typeof CheckpointFileSchema>;
+/** A kept turn: the files it changed (200 at most, `more` the rest), and whether git still has its snapshots. */
+export const CheckpointSchema = z.object({
+  turnId: z.string(),
+  endedAt: z.string(),
+  files: z.array(CheckpointFileSchema),
+  more: z.number().int().nonnegative(),
+  usable: z.boolean(),
+});
+export type Checkpoint = z.infer<typeof CheckpointSchema>;
+/**
+ * A session's checkpoints: `status` answers the turns kept, newest first, and why the list was
+ * emptied when a turn could not be snapshotted; `undo` puts back the turn the owner was shown
+ * (refused when it is no longer the newest), says what it did and answers the turns left.
  */
 export const undoRpc = defineRpc({
   name: "office.undo",
-  input: z.object({ agentId: z.string().min(1), op: z.enum(["status", "undo"]) }),
+  input: z.discriminatedUnion("op", [
+    z.object({ agentId: z.string().min(1), op: z.literal("status") }),
+    z.object({ agentId: z.string().min(1), op: z.literal("undo"), turnId: z.string().min(1) }),
+  ]),
   output: z.object({
-    files: z.number().int().nonnegative(),
+    turns: z.array(CheckpointSchema),
+    gap: z.string().nullable(),
+    turnId: z.string().nullable(),
     restored: z.number().int().nonnegative(),
     skipped: z.array(z.object({ reason: z.enum(UNDO_SKIPS), count: z.number().int().positive() })),
   }),

@@ -28,15 +28,13 @@ const spent = (time: string, cost: string | undefined) => {
 };
 
 export const RULES: readonly Rule[] = [
+  [/^Put back (\d+) files?$/, (n) => `คืนค่า ${n} ไฟล์`],
   [
-    /^Undo the last turn's edits to (\d+) files?\?$/,
-    (n) => `เลิกทำการแก้ไขของรอบล่าสุดใน ${n} ไฟล์หรือไม่?`,
-  ],
-  [/^(\d+) files? restored, (\d+) skipped$/, (n, m) => `คืนค่า ${n} ไฟล์ ข้าม ${m} ไฟล์`],
-  [
-    /^(\d+) files? (changed after the turn|outside the repository|ignored by git|left alone, being a link|with nothing to put back|that could not be written)$/,
+    /^(\d+) (changed since the turn|already as before the turn|outside the repository|inside \.git|ignored by git|left alone as links|in a linked folder|left alone as submodules|could not be written|not reached: git stopped|not reached: an agent began working|not put back yet: undo again to finish|left: a folder with other files is in the way)$/,
     (n, why) => `${n} ไฟล์${translatePattern(why)}`,
   ],
+  [/^(\d+) more$/, (n) => `อีก ${n}`],
+  [/^(\d\d:\d\d) · (\d+) files?$/, (time, n) => `${time} · ${n} ไฟล์`],
   [/^(\d+) min ago$/, (n) => `${n} นาทีที่แล้ว`],
   [/^(\d+) h ago$/, (n) => `${n} ชั่วโมงที่แล้ว`],
   [/^(\d+) min$/, (n) => `${n} นาที`],
