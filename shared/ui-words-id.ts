@@ -249,6 +249,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Streamer mode": "Mode streamer",
   "Take office photo": "Ambil foto kantor",
   "Taking photo…": "Mengambil foto…",
+  Tasks: "Tugas",
   "Teach a skill": "Ajarkan skill",
   "Team chat": "Obrolan tim",
   Teams: "Tim",
@@ -302,6 +303,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Agent color": "Warna agen",
   "Agent tasks": "Tugas agen",
   Agents: "Agen",
+  Answer: "Jawab",
   "Answer in the session": "Jawab di sesi",
   Auto: "Otomatis",
   "Auto picks for this device and steps down when frames come late. Low draws no shadows, at 30 frames a second.":

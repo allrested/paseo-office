@@ -164,7 +164,7 @@ export type PostKind = z.output<typeof PostKindSchema>;
 export const TaskStateSchema = z.enum(["open", "claimed", "done"]);
 export type TaskState = z.output<typeof TaskStateSchema>;
 
-export const UpdateActionSchema = z.enum(["claim", "done", "reopen"]);
+export const UpdateActionSchema = z.enum(["claim", "done", "reopen", "block"]);
 export type UpdateAction = z.output<typeof UpdateActionSchema>;
 
 export const PostSchema = z.object({
@@ -192,6 +192,8 @@ export const PostSchema = z.object({
   link: z.string().optional(),
   /** A done task's result: what the one who finished it reported. */
   result: z.string().optional(),
+  /** A claimed task's block: what its holder needs before it can go on. */
+  blocked: z.string().optional(),
   /** On a note: the task it answers; the note goes when the task does. */
   replyTo: z.string().optional(),
   createdAt: z.string(),

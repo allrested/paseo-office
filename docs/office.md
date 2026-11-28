@@ -238,9 +238,10 @@ The open sessions are kept on the device (`sessions` in the `office-column` sett
 [Desktop Office controls](workspace-controls.webp) · [Phone Office controls](workspace-controls-mobile.webp)
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
-  something to say: Incidents, Settings (while a schedule cannot follow the settings), Host,
-  Janitor, Stand-up, Reviews, QA and Library. The tab's count is the agents waiting and the cards
-  in a warning or danger colour; a card that only informs is not counted.
+  something to say: Incidents, Tasks (while a task waits on an answer), Settings (while a schedule
+  cannot follow the settings), Host, Janitor, Stand-up, Reviews, QA and Library. The tab's count
+  is the agents waiting and the cards in a warning or danger colour; a card that only informs is
+  not counted.
 
 In the full screen layout, Attention and Activity are icons in the header, beside the session
 details icon, and the column's own row keeps Sessions, Chat and the open sessions. An icon opens
@@ -516,10 +517,11 @@ pauses both automatic pickup and named wakes. Automatic pickup also requires **A
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
 
 The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
-(claimed), **Done** and **Notes**. To do and In progress are always there; Done and Notes show only
-when they hold something. Each heading says how many the column holds, as in "To do · 3". A task
-is a card with the list's checkbox and delete button, and a note keeps its Delete button. A card
-changes column through those buttons; nothing is dragged. **Clear finished** is in Done's heading.
+(claimed), **Needs you** (claimed and blocked), **Done** and **Notes**. To do and In progress are
+always there; Needs you, Done and Notes show only when they hold something. Each heading says how
+many the column holds, as in "To do · 3". A task is a card with the list's checkbox and delete
+button, and a note keeps its Delete button. A card changes column through those buttons; nothing
+is dragged. **Clear finished** is in Done's heading.
 When the board is 720 px wide or more, the columns sit side by side, 280 px each, and scroll
 sideways when they do not fit; in fullscreen a kanban's board opens in the wide dialog to make
 room for them. Narrower, as on a phone, they are stacked sections: a press on a heading folds or
@@ -547,6 +549,18 @@ card's count. A reply always sits on the task's board, under the lobby task when
 its result and its replies, in the lobby's list and in a room's Done section or column, and a task
 takes its replies with it when it is deleted, cleared or dropped.
 
+An agent that needs something from you before it can go on blocks its task: `office_update` with
+`block` and what it needs in `note`. Only the agent holding the task can block it. The task stays
+claimed and moves to the kanban's **Needs you** column, and a card and a list row show "Needs you:"
+and the reason above the task's thread. A linked lobby task and its copy carry the same block. A
+reply from anyone but the holder is the answer: it clears the block and wakes the holder with the
+reply. The block also goes when the holder finishes the task, claims it again or reopens it, and
+when you reopen it. The **Tasks** entry is in the Attention tab while a task is blocked, as in
+"2 need you", and counts in the tab's count. Its card lists the blocked tasks of every board,
+oldest first, a lobby task and its copy once: each task's text, "<agent> needs: <reason>", its
+board, an **Answer** field and **Open board**. Enter or **Send** posts the answer as a reply under
+the task; the row goes once the board has it.
+
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
 steps of its checklist. What an agent is at is said in the 3D whiteboard's words: its "doing now"
@@ -566,8 +580,9 @@ left from a workspace archived otherwise stays until its posts are deleted.
 
 Interactive agent sessions get three tools, `office_read`, `office_post` and `office_update`,
 unless the "Agent tools" setting is off when the session opens. `office_update` with `done` takes
-`note`, the task's result, and `office_post` takes `replyTo`, a task's id, to post a note under that
-task; `office_read` lists a result under its task and a reply as `p14 note re p12`. A provider
+`note`, the task's result, `office_update` with `block` takes `note`, what the agent needs, and
+`office_post` takes `replyTo`, a task's id, to post a note under that task; `office_read` lists a
+result under its task, what a blocked task needs, and a reply as `p14 note re p12`. A provider
 with Paseo's agent tools off gets none of them, and a provider that lists `send_agent_prompt` in
 `paseoTools.disabledTools` must list `office_post` too to keep its agents from waking others.
 

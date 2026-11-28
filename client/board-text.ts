@@ -78,17 +78,20 @@ export interface ResultPreview {
   cut: boolean;
 }
 
+/** The start of a text: its first `lines` lines and `chars` characters, and "…" when cut. */
+export function textPreview(text: string, lines: number, chars: number): ResultPreview {
+  const all = text.split("\n");
+  const head = all.slice(0, lines).join("\n");
+  if (all.length <= lines && head.length <= chars) return { shown: text, cut: false };
+  return { shown: `${head.slice(0, chars).trimEnd()}…`, cut: true };
+}
+
 /**
  * The start of a result, cut by its text rather than clamped by the layout: what is left out is
  * always behind More, and More shows only when something is.
  */
 export function resultPreview(result: string): ResultPreview {
-  const lines = result.split("\n");
-  const head = lines.slice(0, RESULT_LINES).join("\n");
-  if (lines.length <= RESULT_LINES && head.length <= RESULT_CHARS) {
-    return { shown: result, cut: false };
-  }
-  return { shown: `${head.slice(0, RESULT_CHARS).trimEnd()}…`, cut: true };
+  return textPreview(result, RESULT_LINES, RESULT_CHARS);
 }
 
 /** What "Clear finished" asks before it deletes the done to-dos. */

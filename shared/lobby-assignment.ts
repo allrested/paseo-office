@@ -17,13 +17,17 @@ function footerOf(claim: Claim, work: string): string {
 export function assignmentFooter(claim: Claim): string {
   return footerOf(
     claim,
-    `Work on this task. When it is complete, use office_update with id "${claim.id}", action "done" and a short result in note. If you need input, leave it claimed and explain what you need.`,
+    `Work on this task. When it is complete, use office_update with id "${claim.id}", action "done" and a short result in note. If you need input, use office_update with action "block" and say what you need in note; the answer comes back as a prompt.`,
   );
 }
 
 /** Footers an earlier plugin version sent: a session that opened before an upgrade still holds one. */
 export function legacyFooters(claim: Claim): string[] {
   return [
+    footerOf(
+      claim,
+      `Work on this task. When it is complete, use office_update with id "${claim.id}", action "done" and a short result in note. If you need input, leave it claimed and explain what you need.`,
+    ),
     footerOf(
       claim,
       `Work on this task. When it is complete, use office_update with id "${claim.id}" and action "done". If you need input, leave it claimed and explain what you need.`,

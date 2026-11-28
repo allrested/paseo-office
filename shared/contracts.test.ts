@@ -20,6 +20,7 @@ import {
   postRpc,
   setWakesPausedRpc,
   updateRpc,
+  UpdateActionSchema,
   type OfficeSnapshot,
 } from "./contracts.js";
 
@@ -247,4 +248,25 @@ test("weather snapshots validate scene readings and accept an older server", () 
   for (const scene of [{ kind: "season" }, { kind: "none" }]) expect(parse(scene)).toBe(true);
   for (const bad of [{ code: 100 }, { code: 1.5 }, { cloud: 1.1 }, { kind: "storm" }])
     expect(parse({ ...reading, ...bad })).toBe(false);
+});
+
+test("a post carries a block reason, and block is an update action for the tool and the rpc", () => {
+  const task = {
+    id: "p1",
+    seq: 2,
+    board: "w1",
+    kind: "task",
+    text: "Migrate",
+    author: "user",
+    state: "claimed",
+    claimedBy: "a",
+    blocked: "Which database?",
+    createdAt: "2026-11-11T00:00:00.000Z",
+    updatedAt: "2026-11-11T00:00:00.000Z",
+  };
+  expect(PostSchema.parse(task)).toEqual(task);
+  expect(UpdateActionSchema.parse("block")).toBe("block");
+  expect(updateRpc.input.safeParse({ id: "p1", action: "block", note: "Which?" }).success).toBe(
+    true,
+  );
 });

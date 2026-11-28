@@ -61,6 +61,7 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) failing$/, (n) => `${n} gagal`],
   [/^(\d+) claimed$/, (n) => `${n} diambil`],
   [/^(\d+) to review$/, (n) => `${n} untuk ditinjau`],
+  [/^(\d+) needs? you$/, (n) => `${n} butuh Anda`],
   [/^(\d+) tool steps$/, (n) => `${n} langkah alat`],
   [/^(\d+) cores?$/, (n) => `${n} inti`],
   [/^Task · claimed by (.+)$/, (name) => `Tugas · diambil oleh ${name}`],
@@ -162,6 +163,9 @@ export const RULES: readonly Rule[] = [
   ],
   [/^Log of (.+)$/, (name) => `Log ${name}`],
   [/^Needs you, (\d+)$/, (n) => `Butuh Anda, ${n}`],
+  [/^Needs you: ([\s\S]+)$/, (reason) => `Butuh Anda: ${reason}`],
+  // A blocked task on the Tasks card: its holder, then what it asked for.
+  [/^(.+?) needs: ([\s\S]+)$/, (name, reason) => `${name} butuh: ${reason}`],
   [
     /^No idle agent, so nobody can be asked, in (.+)\.$/,
     (teams) => `Tidak ada agen yang menganggur, jadi tidak ada yang bisa diminta, di ${teams}.`,

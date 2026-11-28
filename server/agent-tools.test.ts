@@ -7,6 +7,7 @@ import {
   runPost,
   runRead,
   runUpdate,
+  UpdateInputSchema,
   type OfficeToolPorts,
   type ToolAgent,
 } from "./agent-tools.js";
@@ -252,7 +253,7 @@ test("the tools take a reply and a result, and today's inputs still parse", asyn
     "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply.",
   );
   expect(update?.description).toBe(
-    "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note.",
+    "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note. Block it with note when you need input from the user.",
   );
 });
 
@@ -298,4 +299,24 @@ test("a post line gains re and result only when the post has them", () => {
   expect(postLine(post, (author) => author)).toBe(
     "p14 note re p12, from a: line one\n  line two\n  result: Fine.\n  Really.",
   );
+});
+
+test("a post line shows what a blocked task needs, one entry", () => {
+  const post: Post = {
+    id: "p12",
+    seq: 14,
+    board: "w1",
+    kind: "task",
+    state: "claimed",
+    claimedBy: "a",
+    text: "Migrate",
+    author: "user",
+    blocked: "Which database?\nPostgres or MySQL?",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  expect(postLine(post, (author) => author)).toBe(
+    "p12 task claimed by a, from user: Migrate\n  needs: Which database?\n  Postgres or MySQL?",
+  );
+  expect(UpdateInputSchema.safeParse({ id: "p12", action: "block", note: "x" }).success).toBe(true);
 });

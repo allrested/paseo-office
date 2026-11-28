@@ -245,6 +245,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Streamer mode": "โหมดสตรีมเมอร์",
   "Take office photo": "ถ่ายรูปออฟฟิศ",
   "Taking photo…": "กำลังถ่ายรูป…",
+  Tasks: "งาน",
   "Teach a skill": "สอน skill",
   "Team chat": "แชตทีม",
   Teams: "ทีม",
@@ -298,6 +299,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Agent color": "สี agent",
   "Agent tasks": "งานของ agent",
   Agents: "Agent",
+  Answer: "ตอบ",
   "Answer in the session": "ตอบใน session",
   Auto: "อัตโนมัติ",
   "Auto picks for this device and steps down when frames come late. Low draws no shadows, at 30 frames a second.":
