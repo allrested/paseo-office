@@ -11,6 +11,16 @@ import {
   stickyNotesOf,
 } from "./settings.js";
 
+const TELEGRAM_DEFAULTS = {
+  telegramChat: "",
+  telegramUsers: [],
+  telegramNeeds: true,
+  telegramStalled: false,
+  telegramDone: true,
+  telegramIncidents: true,
+  telegramPlan: true,
+  telegramLands: "backlog",
+};
 const WEATHER_DEFAULTS = { weatherMode: "off", weatherManual: "season", weatherUrl: "" };
 const INCIDENT_DEFAULTS = {
   jiraProjects: "",
@@ -71,6 +81,7 @@ const COMPANY = {
   intakeAutoStart: false,
   githubIntakeRepos: [],
   githubIntakeSearch: "label:agent is:open",
+  ...TELEGRAM_DEFAULTS,
   ...WEATHER_DEFAULTS,
 };
 
@@ -110,7 +121,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(16);
+  expect(officeHostSettings.version).toBe(17);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -131,7 +142,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(16);
+  expect(officeHostSettings.version).toBe(17);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -396,7 +407,7 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(16);
+  expect(officeHostSettings.version).toBe(17);
 });
 
 test("starting by itself is off, with its three numbers, and a number out of range is refused", async () => {
@@ -458,7 +469,7 @@ test("the Jira intake is off with no JQL, lands in the backlog, writes nothing b
   ).toBe(true);
   expect(schema.safeParse({ jiraIntakeJql: "j".repeat(1_001) }).success).toBe(false);
   expect(schema.safeParse({ intakeLands: "done" }).success).toBe(false);
-  expect(officeHostSettings.version).toBe(16);
+  expect(officeHostSettings.version).toBe(17);
 });
 
 test("the GitHub intake has no repository, searches label:agent is:open, and a version 15 document starts so", async () => {
@@ -523,4 +534,38 @@ test("a GitHub search that names a repository, organisation or user is refused",
   ]) {
     expect(hostIssues({ githubIntakeSearch: search }), search).toEqual([]);
   }
+});
+
+test("Telegram has no chat and no user, tells what needs you, is done, incidents and plans, and a version 16 document starts so", async () => {
+  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.schema.parse({})).toMatchObject(TELEGRAM_DEFAULTS);
+  expect(await upgraded({ agentTools: true, githubIntakeRepos: ["acme/web"] }, 16)).toMatchObject({
+    githubIntakeRepos: ["acme/web"],
+    ...TELEGRAM_DEFAULTS,
+  });
+  expect(hostIssues({ telegramLands: "todo" })).toEqual([]);
+  expect(officeHostSettings.schema.safeParse({ telegramLands: "done" }).success).toBe(false);
+});
+
+test("the Telegram chat is digits with an optional leading minus, and each user id is digits, at most 20", () => {
+  for (const chat of ["", "123456789", "-1001234567890"]) {
+    expect(hostIssues({ telegramChat: chat }), chat).toEqual([]);
+  }
+  for (const chat of ["@office", "12 34", "--1", "1-2", "-", "x".repeat(10)]) {
+    expect(hostIssues({ telegramChat: chat }), chat).toEqual([
+      `telegramChat: "${chat}" is not a Telegram chat id`,
+    ]);
+  }
+  expect(hostIssues({ telegramChat: "1".repeat(33) })).toEqual([
+    `telegramChat: "${"1".repeat(33)}" is not a Telegram chat id`,
+  ]);
+  expect(hostIssues({ telegramUsers: ["123", "4567890123"] })).toEqual([]);
+  for (const user of ["-123", "@me", "", "12a", "1".repeat(33)]) {
+    expect(hostIssues({ telegramUsers: [user] }), user).toEqual([
+      `telegramUsers: "${user}" is not a Telegram user id`,
+    ]);
+  }
+  const ids = Array.from({ length: 21 }, (_, index) => String(1000 + index));
+  expect(hostIssues({ telegramUsers: ids })).toEqual(["telegramUsers: at most 20 user ids"]);
+  expect(hostIssues({ telegramUsers: ids.slice(0, 20) })).toEqual([]);
 });

@@ -102,6 +102,11 @@ export const GITHUB_REPOS_MAX = 10;
 export const GITHUB_SEARCH_MAX = 200;
 /** Where a ticket the intake posts lands: held in the backlog, or To do at once. */
 export const INTAKE_LANDS = ["backlog", "todo"] as const;
+/** A Telegram chat id: digits, with a minus for a group. A user id is digits alone. */
+export const TELEGRAM_CHAT = /^-?\d{1,32}$/;
+export const TELEGRAM_USER = /^\d{1,32}$/;
+/** The most Telegram users the bridge hears: each can make an agent act. */
+export const TELEGRAM_USERS_MAX = 20;
 
 const HostValuesSchema = z.object({
   ...brandFields,
@@ -154,6 +159,14 @@ const HostValuesSchema = z.object({
   intakeAutoStart: z.boolean().default(false),
   githubIntakeRepos: z.array(z.string()).default([]),
   githubIntakeSearch: z.string().max(GITHUB_SEARCH_MAX).default("label:agent is:open"),
+  telegramChat: z.string().default(""),
+  telegramUsers: z.array(z.string()).default([]),
+  telegramNeeds: z.boolean().default(true),
+  telegramStalled: z.boolean().default(false),
+  telegramDone: z.boolean().default(true),
+  telegramIncidents: z.boolean().default(true),
+  telegramPlan: z.boolean().default(true),
+  telegramLands: z.enum(INTAKE_LANDS).default("backlog"),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
@@ -248,6 +261,24 @@ function refuseBadGithubValues(values: HostValues, context: z.RefinementCtx): vo
   }
 }
 
+function refuseBadTelegramValues(values: HostValues, context: z.RefinementCtx): void {
+  const chat = values.telegramChat;
+  if (chat !== "" && !TELEGRAM_CHAT.test(chat)) {
+    context.addIssue({
+      code: "custom",
+      path: ["telegramChat"],
+      message: `telegramChat: "${chat}" is not a Telegram chat id`,
+    });
+  }
+  const issue = (message: string) =>
+    context.addIssue({ code: "custom", path: ["telegramUsers"], message });
+  const bad = values.telegramUsers.find((user) => !TELEGRAM_USER.test(user));
+  if (bad !== undefined) issue(`telegramUsers: "${bad}" is not a Telegram user id`);
+  if (values.telegramUsers.length > TELEGRAM_USERS_MAX) {
+    issue(`telegramUsers: at most ${TELEGRAM_USERS_MAX} user ids`);
+  }
+}
+
 function refuseBadDays(values: HostValues, context: z.RefinementCtx): void {
   const days = values.notesDays;
   const bad = days.find((day) => !Number.isInteger(day) || day < 0 || day > 6);
@@ -300,14 +331,20 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * `githubIntakeSearch` matches, read the same way with the host's `gh` CLI; none is no GitHub
  * intake. `intakeAutoStart` on lets
  * the auto-start gate start held imported tasks too; off, the owner starts each one.
+ * `telegramChat` is the Telegram chat the office's bot writes to, empty for none, and
+ * `telegramUsers` the Telegram user ids it hears, in that chat or in a private chat with each;
+ * the bot's token is no setting. `telegramNeeds`, `telegramStalled`, `telegramDone`,
+ * `telegramIncidents` and `telegramPlan` each send one kind of message there; a task posted with
+ * `/task` lands where `telegramLands` says.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 16,
+  version: 17,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadGithubValues)
+    .superRefine(refuseBadTelegramValues)
     .superRefine(refuseBadDays)
     .superRefine(({ teams }, context) => refuseBadTeams(teams, context))
     .superRefine(({ notifyUrl }, ctx) => {
@@ -336,6 +373,8 @@ export const officeHostSettings = defineSettings({
   // Version 14 adds `autoStart`, off, with `autoStartUnderPct` 70, `autoStartAtOnce` 3 and `autoStartPerDay` 10.
   // Version 15 adds `jiraIntakeJql`, empty, `intakeLands`, backlog, `intakeWriteBack`, off, and `intakeAutoStart`, off.
   // Version 16 adds `githubIntakeRepos`, none, and `githubIntakeSearch`, "label:agent is:open".
+  // Version 17 adds `telegramChat`, empty, `telegramUsers`, none, `telegramNeeds`, `telegramDone`,
+  // `telegramIncidents` and `telegramPlan`, on, `telegramStalled`, off, and `telegramLands`, backlog.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

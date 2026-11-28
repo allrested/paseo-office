@@ -163,6 +163,14 @@ test("the intake's state replaces the one before", () => {
   });
 });
 
+test("the Telegram bridge's state replaces the one before", () => {
+  const telegram = { on: false, source: null, problem: "Telegram refused the token", dropped: 2 };
+  expect(applyOfficeEvent(EMPTY_OFFICE, { type: "telegram", telegram })).toEqual({
+    ...EMPTY_OFFICE,
+    telegram,
+  });
+});
+
 test("the gate's state replaces the one before", () => {
   const autoStart = { on: true, reason: "per-day" as const, startedToday: 10, perDay: 10 };
   expect(applyOfficeEvent(EMPTY_OFFICE, { type: "auto-start", autoStart })).toEqual({

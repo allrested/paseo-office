@@ -1,6 +1,10 @@
+import { stallCause as sharedStallCause, type StallCause } from "../shared/board-rules.js";
 import type { Post } from "../shared/contracts.js";
 import type { OfficeModel } from "../shared/model.js";
 import { authorName, textPreview } from "./board-text.js";
+
+// The stall rule is shared with the server's Telegram bridge; the card's users import it from here.
+export { STALL_MS, type StallCause } from "../shared/board-rules.js";
 
 /** Why a task is on the Tasks card. Each kind has its own words and its own way on. */
 export type TaskAttentionKind = "blocked" | "stalled" | "merged";
@@ -20,8 +24,6 @@ export interface TaskAttentionRow {
   pullRequest?: string;
 }
 
-export type StallCause = "error" | "idle" | "home";
-
 /**
  * What the rows are worked out from: the rooms' boards and the duty board, and who holds what, in
  * the office or at home.
@@ -37,9 +39,6 @@ export const DUTY_BOARD_NAME = "Duty board";
 /** The order of the kinds on the card. */
 const KIND_ORDER: readonly TaskAttentionKind[] = ["blocked", "stalled", "merged"];
 
-/** How long an idle holder may sit on a claim before the card lists it. */
-export const STALL_MS = 120_000;
-
 /** What Nudge says: a reply from the user, which wakes an idle holder. */
 export const NUDGE_TEXT =
   "Status check: finish with office_update done and a short result, or block with what you need.";
@@ -52,21 +51,13 @@ function isBlocked(post: Post): boolean {
   return post.kind === "task" && post.state === "claimed" && post.blocked !== undefined;
 }
 
-/**
- * Why a claim nobody works on is stalled, or null while its holder is at it or is not an agent
- * here. A holder at home keeps its claim and does nothing until it is woken, so it is listed at once.
- */
+/** Why a claim is stalled, as the shared rule says: its holder at home, then its status. */
 function stallCause(
   post: Post,
   now: number,
   { agents, home }: Pick<TaskAttentionModel, "agents" | "home">,
 ): StallCause | null {
-  if (post.kind !== "task" || post.state !== "claimed" || post.blocked !== undefined) return null;
-  if (post.claimedBy === undefined) return null;
-  if (home.has(post.claimedBy)) return "home";
-  const status = agents.get(post.claimedBy)?.status;
-  if (status === "error") return "error";
-  return status === "idle" && now - Date.parse(post.updatedAt) >= STALL_MS ? "idle" : null;
+  return sharedStallCause(post, now, (id) => (home.has(id) ? "home" : agents.get(id)?.status));
 }
 
 /**

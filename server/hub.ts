@@ -4,6 +4,7 @@ import type {
   ChatSnapshot,
   IncidentsState,
   IntakeState,
+  TelegramState,
   WeatherState,
   Checklists,
   ChecklistCounts,
@@ -92,6 +93,8 @@ export interface Hub {
   setAutoStart(autoStart: AutoStartState): void;
   /** The intake's state; the same state again sends nothing. */
   setIntake(intake: IntakeState): void;
+  /** The Telegram bridge's state; the same state again sends nothing. */
+  setTelegram(telegram: TelegramState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
@@ -174,6 +177,8 @@ export function createHub(ports: HubPorts): Hub {
   let sentAutoStart = "";
   let intake: IntakeState | null = null;
   let sentIntake = "";
+  let telegram: TelegramState | null = null;
+  let sentTelegram = "";
   let incidents: IncidentsState | null = null;
   let brand: OfficeSnapshot["brand"];
   let weather: WeatherState | null = null;
@@ -213,6 +218,7 @@ export function createHub(ports: HubPorts): Hub {
       ...(duties === null ? {} : { duties: { ...duties, duties: [...duties.duties] } }),
       ...(autoStart === null ? {} : { autoStart: { ...autoStart } }),
       ...(intake === null ? {} : { intake: structuredClone(intake) }),
+      ...(telegram === null ? {} : { telegram: { ...telegram } }),
     };
   }
 
@@ -644,6 +650,13 @@ export function createHub(ports: HubPorts): Hub {
       sentIntake = text;
       intake = structuredClone(next);
       broadcast({ type: "intake", intake: structuredClone(next) });
+    },
+    setTelegram(next) {
+      const text = JSON.stringify(next);
+      if (text === sentTelegram) return;
+      sentTelegram = text;
+      telegram = { ...next };
+      broadcast({ type: "telegram", telegram: { ...next } });
     },
     setBrand(next) {
       if (JSON.stringify(brand) === JSON.stringify(next)) return;

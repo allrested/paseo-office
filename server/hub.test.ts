@@ -1666,6 +1666,37 @@ test("the gate's state reaches subscribers in the snapshot and as an event, and 
   await subscriber.done;
 });
 
+const TELEGRAM = { on: true, source: "saved" as const, problem: null, dropped: 0 };
+
+test("the Telegram bridge's state reaches subscribers in the snapshot and as an event, and the same again sends nothing", async () => {
+  const harness = startHarness({ agents: [], workspaces: [] });
+  harness.hub.setTelegram(TELEGRAM);
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  expect(subscriber.events).toEqual([
+    {
+      type: "snapshot",
+      state: {
+        agents: [],
+        workspaces: [],
+        activity: {},
+        doing: {},
+        checklists: {},
+        boards: {},
+        wake: EMPTY_WAKE,
+        telegram: TELEGRAM,
+      },
+    },
+  ]);
+  harness.hub.setTelegram({ ...TELEGRAM });
+  expect(subscriber.events).toHaveLength(1);
+  const dropped = { ...TELEGRAM, dropped: 1 };
+  harness.hub.setTelegram(dropped);
+  expect(subscriber.events.at(-1)).toEqual({ type: "telegram", telegram: dropped });
+  subscriber.controller.abort();
+  await subscriber.done;
+});
+
 const INTAKE = {
   jira: { configured: true, problem: null, lastRun: "2026-11-11T09:00:00.000Z", imported: 2 },
   github: { configured: false, problem: null, lastRun: null, imported: 0 },

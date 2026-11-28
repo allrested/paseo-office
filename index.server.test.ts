@@ -31,6 +31,12 @@ import {
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
 import type { DutiesFile } from "./server/duty-service.js";
 import type { RunGh } from "./server/intake-github.js";
+import {
+  NO_SAVED_TOKEN,
+  type SavedToken,
+  type TelegramKept,
+  type TelegramStore,
+} from "./server/telegram-store.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -115,6 +121,14 @@ const ON: SettingsState = {
     intakeAutoStart: false,
     githubIntakeRepos: [],
     githubIntakeSearch: "label:agent is:open",
+    telegramChat: "",
+    telegramUsers: [],
+    telegramNeeds: true,
+    telegramStalled: false,
+    telegramDone: true,
+    telegramIncidents: true,
+    telegramPlan: true,
+    telegramLands: "backlog",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -152,6 +166,14 @@ const OFF: SettingsState = {
     intakeAutoStart: false,
     githubIntakeRepos: [],
     githubIntakeSearch: "label:agent is:open",
+    telegramChat: "",
+    telegramUsers: [],
+    telegramNeeds: true,
+    telegramStalled: false,
+    telegramDone: true,
+    telegramIncidents: true,
+    telegramPlan: true,
+    telegramLands: "backlog",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -412,6 +434,25 @@ function memoryTrackerStore(
   return store;
 }
 
+function memoryTelegramStore(
+  token: SavedToken = NO_SAVED_TOKEN,
+  state: TelegramKept | null = null,
+): TelegramStore & { token: SavedToken; state: TelegramKept | null } {
+  const store = {
+    token,
+    state,
+    loadToken: async () => store.token,
+    saveToken: async (next: string | null) => {
+      store.token = next === null ? NO_SAVED_TOKEN : { token: next, unreadable: false };
+    },
+    loadState: async () => structuredClone(store.state),
+    saveState: async (next: TelegramKept) => {
+      store.state = structuredClone(next);
+    },
+  };
+  return store;
+}
+
 function memoryChatStore(): ChatStore & { kept: ChatData } {
   // Copied on each load and save, as the file is.
   const store = {
@@ -486,6 +527,8 @@ function setup(
     start?: number;
     /** The host's `gh`, replaced. */
     runGh?: RunGh;
+    /** The Telegram bot's saved token and the bridge's state; none by default. */
+    telegramStore?: ReturnType<typeof memoryTelegramStore>;
   } = {},
 ) {
   const recorded: Recorded = {
@@ -506,6 +549,7 @@ function setup(
   const notesStore = memoryNotesStore();
   const incidentsStore = memoryIncidentsStore();
   const trackerStore = memoryTrackerStore(options.savedTrackers);
+  const telegramStore = options.telegramStore ?? memoryTelegramStore();
   const chatStore = options.chatStore ?? memoryChatStore();
   // The auto-start gate's day count, as auto-start.json keeps it.
   const autoStartKept: { value: unknown } = { value: null };
@@ -519,6 +563,7 @@ function setup(
     notesStore,
     incidentsStore,
     trackerStore,
+    telegramStore,
     chatStore,
     fetchFn: options.fetchFn ?? (() => Promise.reject(new Error("Unexpected weather request"))),
     tenureFile: { load: async () => null, save: async () => {} },
@@ -577,6 +622,7 @@ function setup(
     notesStore,
     incidentsStore,
     trackerStore,
+    telegramStore,
     autoStartKept,
     intakeKept,
     clock,
@@ -719,6 +765,14 @@ function notesSettings(
       intakeAutoStart: false,
       githubIntakeRepos: [],
       githubIntakeSearch: "label:agent is:open",
+      telegramChat: "",
+      telegramUsers: [],
+      telegramNeeds: true,
+      telegramStalled: false,
+      telegramDone: true,
+      telegramIncidents: true,
+      telegramPlan: true,
+      telegramLands: "backlog",
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1073,6 +1127,8 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.notes.modes.request",
     "office.trackers.save.request",
     "office.trackers.test.request",
+    "office.telegram.save.request",
+    "office.telegram.test.request",
     "office.chat.request",
     "office.life",
     "office.street.events",
@@ -1340,6 +1396,14 @@ const NOTES: SettingsState = {
     intakeAutoStart: false,
     githubIntakeRepos: [],
     githubIntakeSearch: "label:agent is:open",
+    telegramChat: "",
+    telegramUsers: [],
+    telegramNeeds: true,
+    telegramStalled: false,
+    telegramDone: true,
+    telegramIncidents: true,
+    telegramPlan: true,
+    telegramLands: "backlog",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -1475,6 +1539,14 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       intakeAutoStart: false,
       githubIntakeRepos: [],
       githubIntakeSearch: "label:agent is:open",
+      telegramChat: "",
+      telegramUsers: [],
+      telegramNeeds: true,
+      telegramStalled: false,
+      telegramDone: true,
+      telegramIncidents: true,
+      telegramPlan: true,
+      telegramLands: "backlog",
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1949,6 +2021,14 @@ const JIRA_ON: SettingsState = {
     intakeAutoStart: false,
     githubIntakeRepos: [],
     githubIntakeSearch: "label:agent is:open",
+    telegramChat: "",
+    telegramUsers: [],
+    telegramNeeds: true,
+    telegramStalled: false,
+    telegramDone: true,
+    telegramIncidents: true,
+    telegramPlan: true,
+    telegramLands: "backlog",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -2614,4 +2694,76 @@ test("with a repository the GitHub intake's timer is kept, and run now reads wit
     seen: { "github:acme/web#7": "2026-11-11T09:00:00.000Z" },
   });
   await stop();
+});
+
+const TELEGRAM_TOKEN = "123456789:AAH-secret_token_value_0123456789abcd";
+
+test("the Telegram token is saved through its call and never answered, and the office's state says where it comes from", async () => {
+  const { recorded, context, telegramStore, logs, stop } = setup(async () => ON);
+  await settle();
+  const save = recorded.handlers.get("office.telegram.save.request");
+  const state = await save?.({ token: ` ${TELEGRAM_TOKEN} ` }, context);
+  expect(state).toEqual({ on: false, source: "saved", problem: null, dropped: 0 });
+  expect(telegramStore.token).toEqual({ token: TELEGRAM_TOKEN, unreadable: false });
+  const office = openOffice(recorded, context);
+  await settle();
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { telegram?: unknown }
+    | undefined;
+  expect(snapshot?.telegram).toEqual(state);
+  // With no chat set, the test says so before it calls Telegram.
+  const probe = recorded.handlers.get("office.telegram.test.request");
+  expect(await probe?.({}, context)).toEqual({ ok: false, problem: "Set the chat id first" });
+  await expect(save?.({ token: "not a token" }, context)).rejects.toThrow(
+    "That is not a bot token",
+  );
+  expect(JSON.stringify({ logs, events: office.events })).not.toContain(TELEGRAM_TOKEN);
+  await office.leave();
+  await stop();
+});
+
+test("a /task from a listed user in the chat lands in the lobby's backlog, and stop ends the poll", async () => {
+  const sent: string[] = [];
+  let polls = 0;
+  const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const method = String(url).split("/").at(-1);
+    if (method === "sendMessage") {
+      sent.push(String((JSON.parse(String(init?.body)) as { text: string }).text));
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 70 } }));
+    }
+    if (method !== "getUpdates") throw new Error("Unexpected request");
+    polls += 1;
+    if (polls === 1) {
+      const message = {
+        message_id: 3,
+        from: { id: 501, is_bot: false },
+        chat: { id: -1001, type: "supergroup" },
+        text: "/task Fix the ledger",
+      };
+      return new Response(JSON.stringify({ ok: true, result: [{ update_id: 5, message }] }));
+    }
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("", "AbortError")));
+    });
+  });
+  const values = { ...ON.values, telegramChat: "-1001", telegramUsers: ["501"] };
+  const telegramStore = memoryTelegramStore(
+    { token: TELEGRAM_TOKEN, unreadable: false },
+    { version: 1, offset: 5, sent: [], taskTimes: [] },
+  );
+  const { recorded, context, stop } = setup(async () => ({ ...ON, values }), {
+    fetchFn,
+    telegramStore,
+  });
+  for (let round = 0; round < 20 && sent.length === 0; round += 1) await settle();
+  expect(sent).toEqual(["Posted p1 to the backlog."]);
+  expect(telegramStore.state?.offset).toBe(6);
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(boardShown(office.events, "lobby")).toEqual([
+    expect.objectContaining({ id: "p1", text: "Fix the ledger", author: "user", backlog: true }),
+  ]);
+  await office.leave();
+  await stop();
+  expect(polls).toBe(2);
 });
