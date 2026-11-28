@@ -3,6 +3,9 @@ import type { OfficeAgent, Post } from "../shared/contracts.js";
 import type { OfficeRoom } from "../shared/model.js";
 import {
   blockedLine,
+  NUDGE_TEXT,
+  STALL_MS,
+  stalledLine,
   taskAttentionNote,
   taskAttentionRows,
   taskPreview,
@@ -47,6 +50,13 @@ const agents = new Map<string, OfficeAgent>([
   ["a1", { id: "a1", title: "Builder" } as OfficeAgent],
   ["a2", { id: "a2", title: "Tester" } as OfficeAgent],
 ]);
+
+function withStatus(...statuses: [string, OfficeAgent["status"]][]): Map<string, OfficeAgent> {
+  const copy = new Map(agents);
+  for (const [id, status] of statuses) copy.set(id, { ...copy.get(id), status } as OfficeAgent);
+  return copy;
+}
+const stalledAt = (ago: number) => new Date(NOW - ago).toISOString();
 
 const ids = (rows: TaskAttentionRow[]) => rows.map((row) => row.post.id);
 
@@ -104,7 +114,111 @@ describe("task attention rows", () => {
   });
 });
 
+describe("stalled rows", () => {
+  it("lists a claim whose holder stopped on an error, however recent", () => {
+    const model = {
+      agents: withStatus(["a1", "error"]),
+      rooms: [room("lobby", "Lobby", [post(1, { updatedAt: stalledAt(1000) })])],
+    };
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "stalled", holder: "Builder", reason: null });
+  });
+
+  it("lists an idle holder's claim from two minutes on, not just before", () => {
+    const at = (ago: number) => ({
+      agents: withStatus(["a1", "idle"]),
+      rooms: [room("lobby", "Lobby", [post(1, { updatedAt: stalledAt(ago) })])],
+    });
+    expect(STALL_MS).toBe(120_000);
+    expect(taskAttentionRows(at(STALL_MS - 1), NOW)).toEqual([]);
+    expect(ids(taskAttentionRows(at(STALL_MS), NOW))).toEqual(["p1"]);
+  });
+
+  it("lists nothing for a running or initializing holder, the user or an unknown agent", () => {
+    const old = stalledAt(60 * 60_000);
+    const rooms = [
+      room("lobby", "Lobby", [
+        post(1, { updatedAt: old }),
+        post(2, { updatedAt: old, claimedBy: "a2" }),
+        post(3, { updatedAt: old, claimedBy: "user" }),
+        post(4, { updatedAt: old, claimedBy: "ghost" }),
+      ]),
+    ];
+    const model = { agents: withStatus(["a1", "running"], ["a2", "initializing"]), rooms };
+    expect(taskAttentionRows(model, NOW)).toEqual([]);
+  });
+
+  it("does not list a blocked task as stalled too", () => {
+    const model = {
+      agents: withStatus(["a1", "error"]),
+      rooms: [room("lobby", "Lobby", [post(1, { blocked: "Which region?" })])],
+    };
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows.map((row) => row.kind)).toEqual(["blocked"]);
+  });
+
+  it("lists a stalled lobby task once, not again as its copy", () => {
+    const old = stalledAt(5 * 60_000);
+    const model = {
+      agents: withStatus(["a1", "idle"]),
+      rooms: [
+        room("lobby", "Lobby", [post(3, { link: "p4", updatedAt: old })]),
+        room("w1", "Checkout", [post(4, { board: "w1", link: "p3", updatedAt: old })]),
+      ],
+    };
+    expect(ids(taskAttentionRows(model, NOW))).toEqual(["p3"]);
+  });
+
+  it("puts blocked rows first, then stalled ones, each oldest first", () => {
+    const old = stalledAt(5 * 60_000);
+    const model = {
+      agents: withStatus(["a1", "error"], ["a2", "idle"]),
+      rooms: [
+        room("lobby", "Lobby", [
+          post(9, { blocked: "Late?" }),
+          post(4, { claimedBy: "a2", updatedAt: old }),
+          post(2, { updatedAt: old }),
+          post(7, { blocked: "Early?" }),
+        ]),
+      ],
+    };
+    expect(ids(taskAttentionRows(model, NOW))).toEqual(["p7", "p9", "p2", "p4"]);
+  });
+});
+
 describe("task attention words", () => {
+  it("counts by kind: blocked, then stalled", () => {
+    const old = stalledAt(5 * 60_000);
+    const rows = taskAttentionRows(
+      {
+        agents: withStatus(["a1", "error"]),
+        rooms: [
+          room("lobby", "Lobby", [
+            post(1),
+            post(2, { claimedBy: "a1", blocked: "?" }),
+            post(3, { claimedBy: "a1", blocked: "?", updatedAt: old }),
+          ]),
+        ],
+      },
+      NOW,
+    );
+    expect(taskAttentionNote(rows)).toBe("2 need you · 1 stalled");
+    expect(taskAttentionNote(rows.filter((row) => row.kind === "stalled"))).toBe("1 stalled");
+    expect(taskAttentionNote(rows.slice(0, 1))).toBe("1 needs you");
+  });
+
+  it("says why a claim is listed", () => {
+    expect(stalledLine({ holder: "Builder", cause: "error" })).toBe("Builder stopped on an error");
+    expect(stalledLine({ holder: "Builder", cause: "idle" })).toBe("Builder is idle");
+  });
+
+  it("nudges with its fixed text", () => {
+    expect(NUDGE_TEXT).toBe(
+      "Status check: finish with office_update done and a short result, or block with what you need.",
+    );
+  });
+
   it("says how many need you, and nothing without rows", () => {
     const row = (seq: number) =>
       taskAttentionRows(

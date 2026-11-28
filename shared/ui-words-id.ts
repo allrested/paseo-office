@@ -592,6 +592,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Nothing said yet.": "Belum ada percakapan.",
   "Nothing yet since the office opened.": "Belum ada apa-apa sejak kantor dibuka.",
   "Number the tasks": "Nomori tugasnya",
+  Nudge: "Colek",
+  "Nudging...": "Mencolek...",
   "Office display name": "Nama tampilan kantor",
   "Office photo": "Foto kantor",
   "Office team": "Tim kantor",

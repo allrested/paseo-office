@@ -18,6 +18,8 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Needs you · 1", "Cần bạn · 1"],
     ["Waiting · 4", "Đang chờ · 4"],
     ["1 needs you", "1 cần bạn"],
+    ["2 need you · 1 stalled", "2 cần bạn · 1 bị kẹt"],
+    ["Builder is idle", "Builder đang rảnh"],
     ["3 need you", "3 cần bạn"],
     ["Needs you: Which region?", "Cần bạn: Which region?"],
     ["Builder needs: Which region?", "Builder cần: Which region?"],

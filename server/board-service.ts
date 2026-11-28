@@ -96,6 +96,11 @@ export interface BoardService {
   prune(): Promise<void>;
   /** Brings the duty board up to the list and the day, in one save. */
   syncDuties(plan: DutySync): Promise<void>;
+  /**
+   * Reopens every task `agentId` still holds, as the user would, in one save: the agent is closed or
+   * archived and will not finish them. Returns the ids left open (a pair's lobby task), in order.
+   */
+  releaseClaims(agentId: string): Promise<string[]>;
   /** A pretend duty the 3D office acted out: done by that agent. Once done, it stays as it is. */
   actDuty(id: string, agentId: string): Promise<PostResult>;
 }
@@ -538,6 +543,52 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return saved.ok ? { ok: true, post: reopened } : saved;
   }
 
+  /**
+   * A lobby task the agent holds reopens with its copy; a copy of a lobby task the agent does not
+   * hold is a leftover and only goes; any other held task reopens in place.
+   */
+  async function releaseHeld(agentId: string): Promise<string[]> {
+    const held = data.posts.filter(
+      (item) => item.kind === "task" && item.state === "claimed" && item.claimedBy === agentId,
+    );
+    const reopened = new Map<string, Post>();
+    const gone = new Set<string>();
+    const touched: string[] = [];
+    const ids: string[] = [];
+    let seq = data.nextSeq;
+    for (const task of held) {
+      const partner = partnerOf(task);
+      if (task.board !== LOBBY && partner?.board === LOBBY) {
+        // Its lobby task, if the agent holds it too, is handled in its own turn.
+        const pair = partner.state === "claimed" && partner.claimedBy === agentId;
+        if (!pair) {
+          gone.add(task.id);
+          touched.push(task.board);
+        }
+        continue;
+      }
+      if (partner !== undefined && task.board === LOBBY) {
+        gone.add(partner.id);
+        touched.push(partner.board);
+      }
+      reopened.set(task.id, {
+        ...withoutClaim(task),
+        state: "open",
+        seq: seq++,
+        updatedAt: now(),
+      });
+      touched.push(task.board);
+      ids.push(task.id);
+    }
+    if (touched.length === 0) return [];
+    const posts = data.posts
+      .filter((item) => !gone.has(item.id))
+      .map((item) => reopened.get(item.id) ?? item);
+    const saved = await commit({ ...data, nextSeq: seq, posts }, touched);
+    if (!saved.ok) throw new Error(saved.error);
+    return ids;
+  }
+
   /** Gives each lobby task claimed by an agent, without a copy, one on the agent's board. */
   async function copyClaims(): Promise<void> {
     let posts = data.posts;
@@ -792,6 +843,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       }),
     prune: () => exclusive(prunePosts),
     syncDuties: (plan) => exclusive(() => syncDutyBoard(plan)),
+    releaseClaims: (agentId) => exclusive(() => releaseHeld(agentId)),
     actDuty: (id, agentId) => exclusive(() => recordActed(id, agentId)),
   };
 }

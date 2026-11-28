@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Duty, Post } from "../shared/contracts.js";
 import { EMPTY_BOARDS, type BoardStore, type BoardsFile } from "./board-store.js";
 import {
@@ -1184,4 +1184,107 @@ test("a block, its claim and a reply's clearing reach the linked partner", async
   expect(find(service, "p1")).not.toHaveProperty("blocked");
   expect(find(service, "p3")).not.toHaveProperty("blocked");
   expect(find(service, "p3")?.state).toBe("done");
+});
+
+describe("releaseClaims", () => {
+  const claimed = (seq: number, fields: Partial<Post> = {}) =>
+    taskOn(seq, { state: "claimed", claimedBy: "a", result: "half", blocked: "Which?", ...fields });
+
+  test("a lobby task with its copy reopens, the copy goes, in one save", async () => {
+    const { service, store, events } = await claimedByA();
+    const saves = store.saved.length;
+    events.length = 0;
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(store.saved).toHaveLength(saves + 1);
+    expect(find(service, "p3")).toBeUndefined();
+    const task = find(service, "p1");
+    expect(task).toMatchObject({ state: "open", updatedAt: AT_T0 });
+    expect(task?.seq).toBeGreaterThan(3);
+    for (const key of ["claimedBy", "link", "result", "blocked"])
+      expect(task).not.toHaveProperty(key);
+    expect(events).toContain("board lobby p1");
+    expect(events).toContain("board w1 ");
+  });
+
+  test("a duty and a plain room task reopen in place, each with its own seq", async () => {
+    const duty = dutyPost(1, "cups", "2026-11-11", { state: "claimed", claimedBy: "a" });
+    const { service, store } = await harness(file([duty, claimed(2)]));
+    expect(await service.releaseClaims("a")).toEqual(["p1", "p2"]);
+    expect(store.saved).toHaveLength(1);
+    const [first, second] = [find(service, "p1"), find(service, "p2")];
+    expect(first).toMatchObject({ state: "open", duty: { id: "cups", day: "2026-11-11" } });
+    expect(second).toMatchObject({ state: "open" });
+    expect(first?.seq).not.toBe(second?.seq);
+    for (const item of [first, second]) {
+      for (const key of ["claimedBy", "result", "blocked"]) expect(item).not.toHaveProperty(key);
+    }
+  });
+
+  test("a copy whose lobby task is gone reopens as a plain room task", async () => {
+    const { service } = await harness(
+      file([claimed(1, { link: "p9" }), claimed(2, { link: "p3" }), lobbyTask(3, { link: "p5" })]),
+    );
+    expect(await service.releaseClaims("a")).toEqual(["p1", "p2"]);
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+    expect(find(service, "p1")).not.toHaveProperty("link");
+    expect(find(service, "p2")).toMatchObject({ state: "open" });
+    expect(find(service, "p3")).toBeDefined();
+  });
+
+  test("another agent's claims and the agent's done tasks are left alone", async () => {
+    const posts = [
+      claimed(1, { claimedBy: "b" }),
+      taskOn(2, { state: "done", claimedBy: "a" }),
+      taskOn(3),
+      claimed(4),
+    ];
+    const { service } = await harness(file(posts));
+    expect(await service.releaseClaims("a")).toEqual(["p4"]);
+    expect(find(service, "p1")).toEqual(posts[0]);
+    expect(find(service, "p2")).toEqual(posts[1]);
+    expect(find(service, "p3")).toEqual(posts[2]);
+  });
+
+  test("an agent holding nothing saves nothing and returns []", async () => {
+    const { service, store, events } = await harness(file([taskOn(1)]));
+    expect(await service.releaseClaims("a")).toEqual([]);
+    expect(store.saved).toHaveLength(0);
+    expect(events).toEqual([]);
+  });
+
+  test("a copy whose lobby task is done leaves the finished task alone and goes", async () => {
+    const lobby = lobbyTask(1, { state: "done", claimedBy: "a", result: "Merged", link: "p2" });
+    const copy = claimed(2, { link: "p1" });
+    const { service } = await harness(file([lobby, copy]));
+    expect(await service.releaseClaims("a")).toEqual([]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "done", claimedBy: "a", result: "Merged" });
+  });
+
+  test("a copy whose lobby task another agent holds leaves that claim alone", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "b", link: "p2" });
+    const { service } = await harness(file([lobby, claimed(2, { link: "p1" })]));
+    expect(await service.releaseClaims("a")).toEqual([]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "claimed", claimedBy: "b" });
+  });
+
+  test("a pair both held by the agent is released once", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a", link: "p2" });
+    const { service, store } = await harness(file([lobby, claimed(2, { link: "p1" })]));
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(store.saved).toHaveLength(1);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+    expect(find(service, "p1")).not.toHaveProperty("claimedBy");
+  });
+
+  test("a done copy of a lobby task the agent holds goes with the reopen", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a", link: "p2" });
+    const copy = taskOn(2, { state: "done", claimedBy: "a", link: "p1" });
+    const { service } = await harness(file([lobby, copy]));
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+  });
 });

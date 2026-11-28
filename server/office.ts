@@ -293,6 +293,17 @@ export function createOffice(deps: OfficeDeps): Office {
     },
     agentGone(agentId) {
       queue?.agentGone(agentId);
+      // A closed or archived agent never finishes what it held: the tasks go back to the pickup.
+      void ready
+        .then(() => service.releaseClaims(agentId))
+        .then((ids) => {
+          if (ids.length > 0) log(`[office] released ${ids.join(", ")} held by ${agentId}`);
+          // The promise lint rule wants every then() to return.
+          return ids;
+        })
+        .catch((error: unknown) =>
+          log(`[office] unable to release the claims of ${agentId}: ${errorMessage(error)}`),
+        );
     },
     async workspaceArchived(workspaceId) {
       await ready;
