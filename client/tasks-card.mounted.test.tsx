@@ -72,6 +72,24 @@ const ROWS: TaskAttentionRow[] = [
     reason: "Which region?",
   },
 ];
+const STALLED: TaskAttentionRow[] = [
+  {
+    kind: "stalled",
+    post: post(3, { board: "w1", text: "Write the docs" }),
+    board: "Checkout",
+    holder: "Tester",
+    reason: null,
+    cause: "idle",
+  },
+  {
+    kind: "stalled",
+    post: post(6, { text: "Run the audit" }),
+    board: "Lobby",
+    holder: "Builder",
+    reason: null,
+    cause: "error",
+  },
+];
 const NO_ROWS: TaskAttentionRow[] = [];
 
 let opened: string[];
@@ -216,4 +234,56 @@ test("its title, field and lines are in the interface's language", async () => {
   expect(allLabelled(UI_VI.Answer)).toHaveLength(2);
   expect(allLabelled("Answer")).toHaveLength(0);
   expect(lines()).not.toContain("Tester needs: Which key store?");
+});
+
+test("a stalled row says why, offers Nudge, Reopen and Open board, and has no Answer field", async () => {
+  await mount(<Harness rows={STALLED} />);
+  expect(lines()).toEqual([
+    "2 stalled",
+    "Write the docs",
+    "Tester is idle",
+    "Checkout",
+    "Nudge",
+    "Reopen",
+    "Open board",
+    "Run the audit",
+    "Builder stopped on an error",
+    "Lobby",
+    "Nudge",
+    "Reopen",
+    "Open board",
+  ]);
+  expect(allLabelled("Answer")).toHaveLength(0);
+});
+
+test("Nudge posts the fixed status check as a reply under the task", async () => {
+  await mount(<Harness rows={STALLED} />);
+  await press("Nudge", 1);
+  expect(sent.calls).toEqual([
+    {
+      board: "lobby",
+      kind: "note",
+      text: "Status check: finish with office_update done and a short result, or block with what you need.",
+      replyTo: "p6",
+    },
+  ]);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("Reopen reopens the task", async () => {
+  await mount(<Harness rows={STALLED} />);
+  await press("Reopen", 0);
+  expect(sent.calls).toEqual([{ id: "p3", action: "reopen" }]);
+});
+
+test("a stalled row's words are in the interface's language", async () => {
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={STALLED} />
+    </UiLanguage>,
+  );
+  expect(allLabelled("Nudge")).toHaveLength(0);
+  expect(lines()).not.toContain("Tester is idle");
+  expect(lines()).not.toContain("2 stalled");
 });

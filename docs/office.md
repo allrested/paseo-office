@@ -238,7 +238,7 @@ The open sessions are kept on the device (`sessions` in the `office-column` sett
 [Desktop Office controls](workspace-controls.webp) · [Phone Office controls](workspace-controls-mobile.webp)
 
 - **Attention** lists the agents that need you, then the office's cards, each only while it has
-  something to say: Incidents, Tasks (while a task waits on an answer), Settings (while a schedule
+  something to say: Incidents, Tasks (while a task waits on an answer or a claim has no one at it), Settings (while a schedule
   cannot follow the settings), Host, Janitor, Stand-up, Reviews, QA and Library. The tab's count
   is the agents waiting and the cards in a warning or danger colour; a card that only informs is
   not counted.
@@ -561,6 +561,17 @@ when you reopen it. The **Tasks** entry is in the Attention tab while a task is 
 oldest first, a lobby task and its copy once: each task's text, "<agent> needs: <reason>", its
 board, an **Answer** field and **Open board**. Enter or **Send** posts the answer as a reply under
 the task; the row goes once the board has it.
+
+The card also lists claims nobody works on, after the blocked ones, oldest first: a claimed task
+that is not blocked and whose holder, an agent of the office, stopped on an error ("<agent> stopped
+on an error") or has been idle for two minutes since the task last changed ("<agent> is idle"). A
+holder that is running or starting gives no row, nor does a task claimed by you; a closed holder
+needs none, since its claims are reopened. The entry counts both kinds: "2 need you · 1 stalled".
+A stalled row has **Nudge**, **Reopen** and **Open board**, and no Answer field. **Nudge** posts a
+reply under the task from you, "Status check: finish with office_update done and a short result,
+or block with what you need.", which wakes an idle holder (at most six an hour); **Reopen** frees
+the task for another agent. The clock is read again every 30 seconds while a task is claimed, so
+an idle claim turns up without another event.
 
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished

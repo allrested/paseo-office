@@ -19,6 +19,8 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Needs you · 1", "Butuh Anda · 1"],
     ["Waiting · 4", "Menunggu · 4"],
     ["1 needs you", "1 butuh Anda"],
+    ["2 need you · 1 stalled", "2 butuh Anda · 1 macet"],
+    ["Builder is idle", "Builder menganggur"],
     ["3 need you", "3 butuh Anda"],
     ["Needs you: Which region?", "Butuh Anda: Which region?"],
     ["Builder needs: Which region?", "Builder butuh: Which region?"],

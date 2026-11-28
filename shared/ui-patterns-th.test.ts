@@ -18,6 +18,8 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Needs you · 1", "ต้องการคุณ · 1"],
     ["Waiting · 4", "กำลังรอ · 4"],
     ["1 needs you", "ต้องการคุณ 1"],
+    ["1 needs you · 2 stalled", "ต้องการคุณ 1 · 2 ค้าง"],
+    ["Builder is idle", "Builder ว่างอยู่"],
     ["3 need you", "ต้องการคุณ 3"],
     ["Needs you: Which region?", "ต้องการคุณ: Which region?"],
     ["Builder needs: Which region?", "Builder ต้องการ: Which region?"],

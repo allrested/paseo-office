@@ -1,7 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StripCard } from "./attention-strip.js";
 import type { OfficeModel } from "../shared/model.js";
 import { taskAttentionNote, taskAttentionRows, type TaskAttentionRow } from "./task-attention.js";
+
+/** How often the clock is read again while a task is claimed, so an idle claim can stall. */
+export const TICK_MS = 30_000;
 
 export interface TaskAttention {
   rows: readonly TaskAttentionRow[];
@@ -24,12 +27,24 @@ export function useTaskAttention({ model, live, showBoard }: TaskAttentionInput)
   const [opened, setOpened] = useState(false);
   const onOpen = useCallback(() => setOpened(true), []);
   const close = useCallback(() => setOpened(false), []);
-  const rows = useMemo(() => taskAttentionRows(model, Date.now()), [model]);
-  // The last answer empties the card and closes it, so the next blocked task does not open it.
+  const [now, setNow] = useState(() => Date.now());
+  const claimed = useMemo(
+    () => model.rooms.some((room) => room.posts.some((post) => post.state === "claimed")),
+    [model],
+  );
+  // An idle claim turns stalled with time alone, so the clock is read again while any is held.
+  useEffect(() => {
+    if (!claimed) return undefined;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(timer);
+  }, [claimed]);
+  const rows = useMemo(() => taskAttentionRows(model, now), [model, now]);
+  // The last row going empties the card and closes it, so the next task does not open it.
   if (opened && rows.length === 0) setOpened(false);
   const entry = useMemo((): StripCard | null => {
     const note = taskAttentionNote(rows);
-    // A blocked task waits on the user, so the card asks for a look and counts in Attention.
+    // A blocked or stalled task waits on the user, so the card asks for a look and counts in Attention.
     return note === null ? null : { title: "Tasks", note: { text: note, tone: "warning" }, onOpen };
   }, [rows, onOpen]);
   const openBoard = useCallback(

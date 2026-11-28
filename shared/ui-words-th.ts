@@ -566,6 +566,8 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Nothing said yet.": "ยังไม่มีใครพูด",
   "Nothing yet since the office opened.": "ยังไม่มีอะไรตั้งแต่ออฟฟิศเปิด",
   "Number the tasks": "ใส่เลขกำกับงาน",
+  Nudge: "สะกิด",
+  "Nudging...": "กำลังสะกิด...",
   "Office display name": "ชื่อที่แสดงของออฟฟิศ",
   "Office photo": "รูปถ่ายออฟฟิศ",
   "Office team": "ทีมออฟฟิศ",

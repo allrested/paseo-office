@@ -587,6 +587,8 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Nothing said yet.": "Chưa có ai nói gì.",
   "Nothing yet since the office opened.": "Chưa có gì từ khi văn phòng mở.",
   "Number the tasks": "Đánh số các việc",
+  Nudge: "Nhắc",
+  "Nudging...": "Đang nhắc...",
   "Office display name": "Tên hiển thị của văn phòng",
   "Office photo": "Ảnh văn phòng",
   "Office team": "Nhóm văn phòng",
