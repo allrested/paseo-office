@@ -18,6 +18,8 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Notes · 2", "Catatan · 2"],
     ["Needs you · 1", "Butuh Anda · 1"],
     ["Waiting · 4", "Menunggu · 4"],
+    ["Backlog · 3", "Antrean · 3"],
+    ["Start task: Build the API", "Mulai tugas: Build the API"],
     ["1 needs you", "1 butuh Anda"],
     ["2 need you · 1 stalled", "2 butuh Anda · 1 macet"],
     ["Builder is idle", "Builder menganggur"],

@@ -17,6 +17,8 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Notes · 2", "Ghi chú · 2"],
     ["Needs you · 1", "Cần bạn · 1"],
     ["Waiting · 4", "Đang chờ · 4"],
+    ["Backlog · 3", "Tồn đọng · 3"],
+    ["Start task: Build the API", "Bắt đầu việc: Build the API"],
     ["Waiting on p12, p13", "Đang chờ p12, p13"],
     ["After p12, p13", "Sau p12, p13"],
     ["Follow-up: Build the API", "Theo tiếp: Build the API"],

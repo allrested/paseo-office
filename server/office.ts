@@ -75,7 +75,10 @@ export interface Office {
     replyTo?: string;
     team?: string;
     after?: string[];
+    backlog?: boolean;
   }): Promise<PostResult>;
+  /** Takes a held lobby task out of the backlog, so the pickup hands it out. */
+  start(id: string): Promise<PostResult>;
   update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
   remove(id: string): Promise<DeleteResult>;
   clearDone(board: string): Promise<DeleteResult>;
@@ -211,7 +214,8 @@ export function createOffice(deps: OfficeDeps): Office {
   }
 
   function mentioned(post: Post): void {
-    if (post.to === undefined || post.namedPickup || queue === null) return;
+    // A held task is told to nobody until it is started.
+    if (post.to === undefined || post.namedPickup || post.backlog || queue === null) return;
     // The agent cannot claim a task that still waits: it is told when nothing holds the task.
     if (waitsForRelease(post, allPosts())) {
       held.add(post.id);
@@ -231,7 +235,7 @@ export function createOffice(deps: OfficeDeps): Office {
       const post = posts.find((item) => item.id === id);
       if (post !== undefined && waitsForRelease(post, posts)) continue;
       held.delete(id);
-      const free = post?.state === "open" && post.claimedBy === undefined;
+      const free = post?.state === "open" && post.claimedBy === undefined && !post.backlog;
       if (post?.to !== undefined && free) wakeFor(post.to, post);
     }
   }
@@ -314,6 +318,14 @@ export function createOffice(deps: OfficeDeps): Office {
       }
       const result = await service.post({ ...input, author: USER_AUTHOR });
       if (result.ok) mentioned(result.post);
+      return result;
+    },
+    async start(id) {
+      await ready;
+      const wasHeld = service.postsOf("lobby").some((post) => post.id === id && post.backlog);
+      const result = await service.startTask(id);
+      // Started, it is told as a new post is.
+      if (result.ok && wasHeld) mentioned(result.post);
       return result;
     },
     async update(input) {

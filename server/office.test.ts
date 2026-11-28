@@ -1429,3 +1429,170 @@ test("an agent that stopped on an error settles with the figure of the view", as
   expect(store.current().posts[0]).toMatchObject({ spentUsd: 0.4 });
   await office.stop();
 });
+
+test("the pickup passes over a held lobby task until the owner starts it", async () => {
+  const { office, clock, prompts, store } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Hold it", backlog: true });
+  clock.advance(0);
+  await settle();
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(store.current().posts[0]).toMatchObject({ state: "open", backlog: true });
+  const started = await office.start("p1");
+  expect(started).toMatchObject({ ok: true, post: { id: "p1" } });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("Hold it");
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  expect(store.current().posts[0]).not.toHaveProperty("backlog");
+  await office.stop();
+});
+
+test("a held task for a named agent is neither woken nor handed out until it is started", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "For Bob", to: "b", backlog: true });
+  clock.advance(0);
+  await settle();
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p1");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("The office assigned you lobby task p1");
+  await office.stop();
+});
+
+test("a held task that also waits is handed out only once started and its tasks are done", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "Ship it",
+    after: ["p1"],
+    backlog: true,
+  });
+  await office.update({ id: "p1", action: "done" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p2");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("starting a task that waits keeps it waiting", async () => {
+  const { office, clock, prompts } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "Ship it",
+    after: ["p1"],
+    backlog: true,
+  });
+  await office.start("p2");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("a held task does not block the next task, and leaves the pickup with no work", async () => {
+  const { office, clock, prompts, store } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Hold it", backlog: true });
+  await office.post({ board: "lobby", kind: "task", text: "Do it" });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("Do it");
+  expect(store.current().posts.find((p) => p.id === "p1")).toMatchObject({ backlog: true });
+  // Nothing is left to hand out, so no retry is scheduled.
+  await office.update({ id: "p2", action: "done" });
+  clock.advance(0);
+  await settle();
+  const sent = prompts.length;
+  clock.advance(30_000);
+  await settle();
+  expect(prompts).toHaveLength(sent);
+  await office.stop();
+});
+
+test("an agent's held lobby task to itself is told to nobody, with or without after, and nothing is sent once started", async () => {
+  const { office, clock, prompts, hub } = start();
+  await office.ready;
+  const post = office.tools.find((tool) => tool.name === "office_post");
+  const context = toolContext({ id: "b", title: "Builder" });
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await post?.execute(
+    { kind: "task", text: "Mine", to: "b", board: "lobby", backlog: true },
+    context,
+  );
+  await post?.execute(
+    { kind: "task", text: "Mine later", to: "b", board: "lobby", backlog: true, after: ["p1"] },
+    context,
+  );
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(hub.events.findLast((event) => event.startsWith("wake"))).toBe("wake false {}");
+  await office.start("p2");
+  await office.start("p3");
+  clock.advance(0);
+  await settle();
+  // The queue drops a post to its own author, as it does for any self-addressed post.
+  expect(prompts).toEqual([]);
+  await office.stop();
+});
+
+test("a stored held lobby task for an agent is told as a new post once it is started, and only once", async () => {
+  const at = "2026-11-11T08:00:00.000Z";
+  const { office, prompts } = start({
+    ...EMPTY_BOARDS,
+    nextSeq: 3,
+    posts: [
+      {
+        id: "p2",
+        seq: 2,
+        board: "lobby",
+        kind: "task",
+        text: "Review it",
+        author: "user",
+        to: "b",
+        state: "open",
+        backlog: true,
+        createdAt: at,
+        updatedAt: at,
+      },
+    ],
+  });
+  await office.ready;
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p2");
+  await settle();
+  expect(prompts).toEqual([WAKE_FOR_REVIEW]);
+  await office.start("p2");
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});

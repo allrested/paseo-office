@@ -2024,3 +2024,127 @@ describe("a cost settled when the agent's turn has ended", () => {
     expect(find(sum.service, "p1")?.spentUsd).toBe(0.2);
   });
 });
+
+describe("the backlog", () => {
+  const held = (text: string, extra: Partial<Parameters<BoardService["post"]>[0]> = {}) => ({
+    board: "lobby",
+    kind: "task" as const,
+    text,
+    author: "user",
+    backlog: true,
+    ...extra,
+  });
+
+  test("a lobby task is held in the backlog, open, with to, team and after allowed", async () => {
+    const { service } = await harness(undefined, { teams: teamPorts(rosterTeams()) });
+    await service.post({ board: "w1", kind: "task", text: "Build", author: "user" });
+    const plain = await service.post(held("Hold it"));
+    expect(plain).toMatchObject({ ok: true, post: { state: "open", backlog: true } });
+    const named = await service.post(held("For Bob", { to: "b" }));
+    expect(named).toMatchObject({ ok: true, post: { backlog: true, to: "b", namedPickup: true } });
+    const team = await service.post(held("For QA", { team: "QA-PR" }));
+    expect(team).toMatchObject({ ok: true, post: { backlog: true, team: "t2" } });
+    const waits = await service.post(held("After", { after: ["p1"] }));
+    expect(waits).toMatchObject({ ok: true, post: { backlog: true, after: ["p1"] } });
+    const off = await service.post(held("Not held", { backlog: false }));
+    expect(off.ok && off.post).not.toHaveProperty("backlog");
+  });
+
+  test("only a lobby task goes to the backlog", async () => {
+    const { service, store } = await harness();
+    await service.post({ board: "lobby", kind: "task", text: "Root", author: "user" });
+    const saves = store.saved.length;
+    const refused = async (input: Parameters<BoardService["post"]>[0]) => {
+      const result = await service.post(input);
+      return result.ok ? "" : result.error;
+    };
+    const text = "Unable to post: only a lobby task goes to the backlog";
+    expect(await refused(held("x", { board: "w1" }))).toBe(text);
+    expect(await refused(held("x", { kind: "note" }))).toBe(text);
+    expect(await refused(held("x", { replyTo: "p1" }))).toBe(text);
+    expect(store.saved).toHaveLength(saves);
+  });
+
+  test("a held task is never claimed for the pickup", async () => {
+    const { service } = await harness();
+    await service.post(held("Hold it"));
+    expect(await service.claimLobbyTask("p1", "b", find(service, "p1")?.seq ?? 0)).toBeNull();
+    expect(find(service, "p1")).toMatchObject({ state: "open", backlog: true });
+  });
+
+  test("an agent neither claims nor finishes a held task, and it is held before it waits", async () => {
+    const { service } = await harness();
+    await service.post({ board: "w1", kind: "task", text: "Build", author: "user" });
+    await service.post(held("Hold it", { after: ["p1"] }));
+    expect(await service.update({ id: "p2", action: "claim", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to claim p2: it is in the backlog",
+    });
+    expect(await service.update({ id: "p2", action: "done", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to finish p2: it is in the backlog",
+    });
+  });
+
+  test("the user's claim or done clears the mark in the same update", async () => {
+    const { service } = await harness();
+    await service.post(held("One"));
+    await service.post(held("Two"));
+    const claimed = await service.update({ id: "p1", action: "claim", actor: "user" });
+    expect(claimed).toMatchObject({ ok: true, post: { state: "claimed", claimedBy: "user" } });
+    expect(find(service, "p1")).not.toHaveProperty("backlog");
+    const done = await service.update({ id: "p2", action: "done", actor: "user" });
+    expect(done).toMatchObject({ ok: true, post: { state: "done" } });
+    expect(find(service, "p2")).not.toHaveProperty("backlog");
+  });
+
+  test("a reopen of a held task changes nothing", async () => {
+    const { service, store } = await harness();
+    await service.post(held("Hold it"));
+    const saves = store.saved.length;
+    const before = find(service, "p1");
+    expect(await service.update({ id: "p1", action: "reopen", actor: "a" })).toEqual({
+      ok: true,
+      post: before,
+    });
+    expect(store.saved).toHaveLength(saves);
+    expect(find(service, "p1")).toMatchObject({ backlog: true });
+  });
+
+  test("starting clears the mark, raises seq and updatedAt, and announces the lobby", async () => {
+    const { service, clock, events } = await harness();
+    await service.post(held("For Bob", { to: "b" }));
+    clock.advance(1000);
+    events.length = 0;
+    const before = find(service, "p1");
+    const started = await service.startTask("p1");
+    expect(started.ok).toBe(true);
+    const after = started.ok ? started.post : undefined;
+    const { backlog: _held, ...rest } = before as Post;
+    expect(after).toEqual({
+      ...rest,
+      seq: (before?.seq ?? 0) + 1,
+      updatedAt: new Date(T0 + 1000).toISOString(),
+    });
+    expect(after).not.toHaveProperty("backlog");
+    expect(find(service, "p1")).toEqual(after);
+    expect(events).toEqual(["board lobby p1"]);
+  });
+
+  test("starting a task that is not held returns it unchanged; a note or unknown id is refused", async () => {
+    const { service, store } = await harness();
+    await service.post({ board: "lobby", kind: "task", text: "Plain", author: "user" });
+    await service.post({ board: "lobby", kind: "note", text: "Note", author: "user" });
+    const saves = store.saved.length;
+    expect(await service.startTask("p1")).toEqual({ ok: true, post: find(service, "p1") });
+    expect(await service.startTask("p2")).toEqual({
+      ok: false,
+      error: "Unable to start p2: it is a note",
+    });
+    expect(await service.startTask("p9")).toEqual({
+      ok: false,
+      error: "Unable to start p9: no such post",
+    });
+    expect(store.saved).toHaveLength(saves);
+  });
+});

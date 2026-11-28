@@ -17,6 +17,8 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Notes · 2", "บันทึก · 2"],
     ["Needs you · 1", "ต้องการคุณ · 1"],
     ["Waiting · 4", "กำลังรอ · 4"],
+    ["Backlog · 3", "งานค้าง · 3"],
+    ["Start task: Build the API", "เริ่มงาน: Build the API"],
     ["1 needs you", "ต้องการคุณ 1"],
     ["1 needs you · 2 stalled", "ต้องการคุณ 1 · 2 ค้าง"],
     ["Builder is idle", "Builder ว่างอยู่"],

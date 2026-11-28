@@ -19,6 +19,7 @@ import {
   incidentsDismissRpc,
   officeStateSubscription,
   postRpc,
+  startRpc,
   setWakesPausedRpc,
   updateRpc,
   UpdateActionSchema,
@@ -312,4 +313,13 @@ test("a task carries up to AFTER_MAX task ids it waits on, and the post rpc take
   const input = { board: "lobby", kind: "task", text: "x" };
   expect(postRpc.input.parse({ ...input, after: ["p1"] })).toEqual({ ...input, after: ["p1"] });
   expect(postRpc.input.safeParse({ ...input, after: [""] }).success).toBe(false);
+});
+
+test("the backlog: a post carries it as a boolean, and the start call takes an id", () => {
+  const input = { board: "lobby", kind: "task", text: "x" };
+  expect(postRpc.input.safeParse({ ...input, backlog: true }).success).toBe(true);
+  expect(postRpc.input.safeParse({ ...input, backlog: "yes" }).success).toBe(false);
+  expect(startRpc.name).toBe("office.task.start.request");
+  expect(startRpc.input.safeParse({ id: "p1" }).success).toBe(true);
+  expect(startRpc.input.safeParse({ id: "" }).success).toBe(false);
 });

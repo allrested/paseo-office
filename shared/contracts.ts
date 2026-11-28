@@ -207,6 +207,8 @@ export const PostSchema = z.object({
   team: z.string().optional(),
   /** On a task: the tasks, on any board, it waits on; it is not handed out while one is not done. */
   after: z.array(z.string()).max(AFTER_MAX).optional(),
+  /** On an open lobby task: held until the owner starts it; nothing is handed out or claimed by an agent. */
+  backlog: z.literal(true).optional(),
   /** On a claimed or done task: when its holder took it (ISO time); the claim's first, not a repeat's. */
   claimedAt: z.string().optional(),
   /** On a done task: when it was marked done (ISO time). */
@@ -763,7 +765,16 @@ export const postRpc = defineRpc({
     team: z.string().min(1).optional(),
     /** Task ids it waits on; the service checks them and their count. */
     after: z.array(z.string().min(1)).optional(),
+    /** Holds a lobby task in the backlog until the owner starts it. */
+    backlog: z.boolean().optional(),
   }),
+  output: PostResultSchema,
+});
+
+/** Takes a task out of the backlog, so the office hands it out. */
+export const startRpc = defineRpc({
+  name: "office.task.start.request",
+  input: z.object({ id: z.string().min(1) }),
   output: PostResultSchema,
 });
 

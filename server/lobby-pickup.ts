@@ -42,6 +42,8 @@ function awaitingPickup(task: Post, posts: readonly Post[]): boolean {
     task.state === "open" &&
     (!task.to || !!task.namedPickup) &&
     !task.claimedBy &&
+    // A task held in the backlog is not work until the owner starts it.
+    !task.backlog &&
     waitingOn(task, posts).length === 0
   );
 }

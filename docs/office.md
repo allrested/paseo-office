@@ -528,16 +528,16 @@ is handed out: a block, its answer and a reply change the task and leave the num
 still finishes it after them. A reopened task loses the number and gets a new one when it is
 handed out again.
 
-The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
-(claimed), **Needs you** (claimed and blocked), **Done** and **Notes**. To do and In progress are
-always there; Needs you, Done and Notes show only when they hold something. Each heading says how
+The lobby's board is a kanban: its to-dos and notes in columns, **Backlog** (held), **Waiting**,
+**To do** (open), **In progress** (claimed), **Needs you** (claimed and blocked), **Done** and
+**Notes**. To do and In progress are always there; the others show only when they hold something. Each heading says how
 many the column holds, as in "To do · 3". A task is a card with the list's checkbox and delete
 button, and a note keeps its Delete button. A card changes column through those buttons; nothing
 is dragged. **Clear finished** is in Done's heading.
 When the board is 720 px wide or more, the columns sit side by side, 280 px each, and scroll
 sideways when they do not fit; in fullscreen a kanban's board opens in the wide dialog to make
 room for them. Narrower, as on a phone, they are stacked sections: a press on a heading folds or
-unfolds its section, and Done starts folded. The form stays above the columns and **Agent tasks**
+unfolds its section, and Backlog and Done start folded. The form stays above the columns and **Agent tasks**
 under them.
 
 **Boards** in the settings chooses each board's layout on this device: **Lobby board** Kanban (the
@@ -547,6 +547,17 @@ the lobby's to-do list with its notes under it, and a room's posts in one list. 
 its finished tasks in a **Done** section at the bottom, shown once a task is done: its heading says
 how many, as in "Done · 2", starts folded and unfolds with a press, and has **Clear finished**
 beside it. A room's card still shows and counts only open and claimed tasks and notes.
+
+A lobby task can be held in the **Backlog**: it stays open but is not handed out, and no agent can
+claim it, until you press **Start** on its card or row, which takes it out (it then waits on
+what it is after, as any task does). The lobby's form has **Add to backlog** beside **Add**, both under the field: it
+posts exactly what Add would (the text, the agent or team chosen, the follow-up) and holds it, and
+is off under the same conditions as Add; Enter in the field still adds. A held task is in Backlog
+as a column, even when it also waits on others, and its card still says "Waiting on p12"; in the
+list it is in a **Backlog · 2** section above the to-dos, folded at first like a room's Done
+section and unfolded with a press, and is not also listed among the to-dos. A held task keeps its
+checkbox, **Delete**, **Follow-up** and **Reply**, and **Start** sits on the same line. Only the
+lobby has a backlog: a room's board and form are as they were.
 
 A lobby task can go to a team of the roster (see Team roster): it is handed out by the rules of
 Any idle agent, so it needs **Agent tools** and **Wake agents** as they do, but only to an idle
@@ -635,6 +646,20 @@ room's form both take it (in a room it sets the kind to Task, since a note canno
 task still takes the recipient or team the form has. This is how one team hands work to the next:
 post a task for one team, then a follow-up of it for another, which is handed out only once the
 first is done and carries the first one's result.
+
+A lobby task can be held in a backlog: `office_post` takes `backlog` (the office's own post takes it
+too), for a lobby task only ("only a lobby task goes to the backlog"), and it may carry `to`, `team`
+and `after`. A held task is open, but it is not work: the pickup passes over it, so an older held
+task never keeps a later one from an idle agent, and an agent can neither claim it nor mark it done
+("it is in the backlog"). One named for an agent stays held as well: it is not handed out and the
+agent is not woken until it is started, and it is then handed out as any named task is. One that
+also waits is shown and treated as held first; once started, the waiting rule applies as usual.
+Only you start it, by the office's start call (`office.task.start.request`, in the plugin's
+`startRpc`): the task keeps everything but the hold, gets a new sequence number and update time, and
+the pickup looks again. Starting a task that is not held changes nothing, and a note or an unknown
+id is refused. Your own claim or done on a held task starts it in the same update. Agents have no
+start: `office_update` has no such action, and a reopen of a held task changes nothing, since it is
+open and nobody holds it. `office_read` shows it as `p12 task open (backlog), from the user: ...`.
 
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays

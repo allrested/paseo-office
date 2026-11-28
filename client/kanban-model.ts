@@ -2,7 +2,14 @@ import { waitingOn } from "../shared/board-rules.js";
 import type { Post } from "../shared/contracts.js";
 
 /** The kanban columns, in the order they show left to right. */
-export type KanbanColumnId = "waiting" | "todo" | "progress" | "needs" | "done" | "notes";
+export type KanbanColumnId =
+  | "backlog"
+  | "waiting"
+  | "todo"
+  | "progress"
+  | "needs"
+  | "done"
+  | "notes";
 
 export interface KanbanColumn {
   id: KanbanColumnId;
@@ -12,6 +19,7 @@ export interface KanbanColumn {
 }
 
 const TITLES: Record<KanbanColumnId, string> = {
+  backlog: "Backlog",
   waiting: "Waiting",
   todo: "To do",
   progress: "In progress",
@@ -20,7 +28,15 @@ const TITLES: Record<KanbanColumnId, string> = {
   notes: "Notes",
 };
 
-const ORDER: readonly KanbanColumnId[] = ["waiting", "todo", "progress", "needs", "done", "notes"];
+const ORDER: readonly KanbanColumnId[] = [
+  "backlog",
+  "waiting",
+  "todo",
+  "progress",
+  "needs",
+  "done",
+  "notes",
+];
 
 /** To do and In progress stay on the board even when empty, so the lanes never vanish. */
 const ALWAYS_SHOWN: ReadonlySet<KanbanColumnId> = new Set(["todo", "progress"]);
@@ -41,6 +57,8 @@ export function columnOf(post: Post, all: readonly Post[]): KanbanColumnId {
   if (post.kind === "note") return "notes";
   if (post.state === "done") return "done";
   if (post.state === "claimed") return post.blocked === undefined ? "progress" : "needs";
+  // Held wins over waiting: the owner has to start it whatever it is after.
+  if (post.backlog === true) return "backlog";
   return isWaiting(post, all) ? "waiting" : "todo";
 }
 
