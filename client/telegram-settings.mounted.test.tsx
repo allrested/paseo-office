@@ -350,3 +350,30 @@ test("a refused user list keeps what was typed, a saved one lets go of it", asyn
   expect(saved).toEqual([{ telegramUsers: ["42", "99"] }]);
   expect(users()?.value).toBe("42");
 });
+
+test("a kept refusal goes with its draft when the stored list changes from outside", async () => {
+  await mount(READY, { ...VALUES, telegramUsers: ["42"] });
+  await typeAndLeave(users(), "42\n0123");
+  expect(alerts()).toHaveLength(1);
+  await mount(READY, { ...VALUES, telegramUsers: ["42", "7"] });
+  expect(users()?.value).toBe("42\n7");
+  expect(alerts()).toEqual([]);
+});
+
+test("editing the list back to the stored one and leaving the field clears its message", async () => {
+  await mount(READY, { ...VALUES, telegramUsers: ["42"] });
+  await typeAndLeave(users(), "42\n0123");
+  await typeAndLeave(users(), "42");
+  expect(users()?.value).toBe("42");
+  expect(alerts()).toEqual([]);
+  expect(saved).toEqual([]);
+});
+
+test("saving another field leaves a kept draft and its message alone", async () => {
+  await mount(READY, { ...VALUES, telegramUsers: ["42"] });
+  await typeAndLeave(users(), "42\n0123");
+  await typeAndLeave(chat(), "-100123");
+  expect(saved).toEqual([{ telegramChat: "-100123" }]);
+  expect(users()?.value).toBe("42\n0123");
+  expect(alerts()).toEqual(['Line 2: "0123" is not a Telegram user id']);
+});

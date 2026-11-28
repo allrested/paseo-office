@@ -228,17 +228,13 @@ interface Props {
  * told, and not sent.
  */
 export function TelegramSettings({ values, telegram, change, saveProblem, styles }: Props) {
-  // What the lines typed were refused for, until a save of them goes through.
-  const [chatRefused, setChatRefused] = useState<string | null>(null);
-  const [usersRefused, setUsersRefused] = useState<string | null>(null);
   const saveChat = useCallback(
     async (next: string) => {
       const refused =
         next !== "" && !TELEGRAM_CHAT.test(next)
           ? "A chat id is digits, with a minus first for a group"
           : null;
-      setChatRefused(refused);
-      if (refused !== null) return false;
+      if (refused !== null) return { refused };
       return change("Chat id", { telegramChat: next });
     },
     [change],
@@ -250,8 +246,7 @@ export function TelegramSettings({ values, telegram, change, saveProblem, styles
         .map((entry) => entry.trim())
         .filter((entry) => entry !== "");
       const problem = usersProblem(entries);
-      setUsersRefused(problem);
-      if (problem !== null) return false;
+      if (problem !== null) return { refused: problem };
       return change("User ids that are heard", { telegramUsers: entries });
     },
     [change],
@@ -269,7 +264,7 @@ export function TelegramSettings({ values, telegram, change, saveProblem, styles
         hint={CHAT_HINT}
         value={values?.telegramChat ?? null}
         onSave={saveChat}
-        problem={chatRefused ?? saveProblem("Chat id")}
+        problem={saveProblem("Chat id")}
         styles={styles}
       />
       <SettingField
@@ -277,7 +272,7 @@ export function TelegramSettings({ values, telegram, change, saveProblem, styles
         hint={USERS_HINT}
         value={values === null ? null : values.telegramUsers.join("\n")}
         onSave={saveUsers}
-        problem={usersRefused ?? saveProblem("User ids that are heard")}
+        problem={saveProblem("User ids that are heard")}
         lines={3}
         styles={styles}
       />

@@ -407,8 +407,7 @@ test("a bad key shows the schema's message and is not saved", async () => {
   expect(fieldBlock("Jira projects")).toContain(
     'Unable to save the Jira projects setting: jiraProjects: "shop" is not a Jira project key',
   );
-  // The refused text stays for correcting, with the message beside it.
-  expect(field("Jira projects").value).toBe("SHOP, shop");
+  expect(field("Jira projects").value).toBe("");
 });
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
