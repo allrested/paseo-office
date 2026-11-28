@@ -99,11 +99,14 @@ function availableForOfficeWork(agent: AgentSnapshotPayload, home = false): bool
 
 /**
  * Wake ports on the daemon's own API; the holder is set by every hook and handler. `roster` is the
- * roster as the settings now have it; an agent's teammate is the mark stored on it.
+ * roster as the settings now have it; an agent's teammate is the mark stored on it. `costOf` reads
+ * the cost the directory last had for an agent, `working` whether it is in a turn.
  */
 export function liveAgentPorts(
   holder: PaseoHolder,
   roster: () => Roster = () => NO_ROSTER,
+  costOf: (agentId: string) => number | undefined = () => undefined,
+  working: (agentId: string) => boolean = () => false,
 ): OfficeAgentPorts {
   // Resolves null for an agent the daemon does not know; rejects only for an empty id or a start
   // of an id that several agents share.
@@ -171,6 +174,8 @@ export function liveAgentPorts(
     },
     findTeam: async (nameOrId) => findRosterTeam(roster(), nameOrId)?.id ?? null,
     teamName: (teamId) => rosterTeamById(roster(), teamId)?.name ?? null,
+    costOf,
+    working,
   };
 }
 

@@ -89,3 +89,16 @@ test("the cards' longer lines are in Thai too, with their names and numbers kept
   ];
   for (const [english, thai] of lines) expect(translatePattern(english)).toBe(thai);
 });
+
+test("a done task's time and cost line takes the language, its dollar amount as it is", () => {
+  const lines: [string, string][] = [
+    ["took 23 min · $0.42", "ใช้เวลา 23 นาที · $0.42"],
+    ["took 1 h 5 min", "ใช้เวลา 1 ชม. 5 นาที"],
+    ["took 2 d", "ใช้เวลา 2 วัน"],
+    ["took 1 d 3 h · $12.50", "ใช้เวลา 1 วัน 3 ชม. · $12.50"],
+    ["took under a minute · under $0.01", "ใช้เวลา ไม่ถึงหนึ่งนาที · ต่ำกว่า $0.01"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+  // Only the exact line: a post that starts with the word is left alone.
+  expect(translatePattern("took the bus to work")).toBe("took the bus to work");
+});

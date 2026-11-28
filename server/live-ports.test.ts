@@ -552,3 +552,13 @@ test("an entry is in the notes when its header starts a line of its month's file
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("an agent's cost is read from what the directory last had", () => {
+  const costs = new Map([["a", 0.42]]);
+  const ports = liveAgentPorts(fakeHolder([]), undefined, (id) => costs.get(id));
+  expect(ports.costOf("a")).toBe(0.42);
+  expect(ports.costOf("b")).toBeUndefined();
+  costs.set("a", 1);
+  expect(ports.costOf("a")).toBe(1);
+  expect(liveAgentPorts(fakeHolder([])).costOf("a")).toBeUndefined();
+});

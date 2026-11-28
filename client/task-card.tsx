@@ -5,7 +5,14 @@ import { Icon } from "@getpaseo/plugin/client/ui";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
-import { afterLine, clearQuestion, resultPreview, todoMeta, type TeamNamer } from "./board-text.js";
+import {
+  afterLine,
+  clearQuestion,
+  resultPreview,
+  taskSpent,
+  todoMeta,
+  type TeamNamer,
+} from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -189,7 +196,7 @@ export interface TaskThreadProps {
 
 /**
  * Under a task, on its card and on a room's list row: what its holder needs while it is blocked,
- * what came of it, the replies, and Reply, which is how the need is answered. The thread stays
+ * what came of it and what it took, the replies, and Reply, which is how the need is answered. The thread stays
  * once the task is done. The field waits behind its button so a card stays short. Over it all is
  * the line of what the task is after, and beside Reply is Follow-up.
  */
@@ -206,6 +213,7 @@ export function TaskThread({
   const reply = useCallback(() => setReplying(true), []);
   const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
   const after = afterLine(task, all);
+  const spent = taskSpent(task);
   const t = useT();
   return (
     <>
@@ -214,6 +222,7 @@ export function TaskThread({
         <Text style={styles.standupBlocker}>{`Needs you: ${task.blocked}`}</Text>
       )}
       {task.result === undefined ? null : <TaskResult result={task.result} styles={styles} />}
+      {spent === null ? null : <Text style={styles.postMeta}>{spent}</Text>}
       {replies.map((note) => (
         <Text key={note.id} style={styles.postText}>
           {`${name(note.author)} · ${note.text}`}

@@ -115,6 +115,8 @@ function setup(initial?: BoardsFile) {
             : ([...teams].find(([, name]) => name.toLowerCase() === nameOrId.toLowerCase())?.[0] ??
               null),
         teamName: (id) => teams.get(id) ?? null,
+        costOf: () => undefined,
+        working: () => false,
         ...overrides,
       },
       log: (message) => logs.push(message),
@@ -1099,5 +1101,93 @@ test("a scan's own saves never start another scan", async () => {
   clock.advance(30_000);
   await settle();
   expect(scans).toBe(2);
+  await office.stop();
+});
+
+test("a cost the ports know reaches the board: an agent's claim keeps it, and its done is settled after the turn", async () => {
+  const { build, clock, store } = setup();
+  let cost = 2;
+  let working = true;
+  const office = build({
+    workspaceOf: async () => null,
+    costOf: (id) => (id === "b" ? cost : undefined),
+    working: () => working,
+  });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ claimedBy: "b", costAtClaim: 2 });
+  await office.update({ id: "p1", action: "done" });
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  expect(store.current().posts[0]).not.toHaveProperty("spentUsd");
+  // The directory still shows the agent at work: nothing is settled.
+  await office.settleSpentOf(new Map([["b", "running"]]));
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  // Not at work, with the cost of the turn: settled; another agent's state changes nothing.
+  working = false;
+  cost = 2.5;
+  await office.settleSpentOf(
+    new Map([
+      ["a", "idle"],
+      ["b", "running"],
+    ]),
+  );
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  await office.settleSpentOf(
+    new Map([
+      ["a", "running"],
+      ["b", "idle"],
+    ]),
+  );
+  expect(store.current().posts[0]).toMatchObject({ spentUsd: 0.5 });
+  expect(store.current().posts[0]).not.toHaveProperty("spentPending");
+  await office.stop();
+});
+
+test("an agent gone, absent from the view or closed there drops its pending cost, whatever cost is known", async () => {
+  for (const how of ["hook", "absent", "closed"]) {
+    const { build, clock, store } = setup();
+    let cost = 1;
+    const office = build({
+      workspaceOf: async (id) => (id === "b" ? "w2" : null),
+      costOf: () => cost,
+      working: () => true,
+    });
+    await office.ready;
+    office.setPickupEnabled(true);
+    await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+    clock.advance(0);
+    await settle();
+    await office.update({ id: "p1", action: "done" });
+    expect(store.current().posts.map((p) => p.spentPending)).toEqual([true, true]);
+    // The last view's figure is from before the finishing turn.
+    cost = 1.4;
+    if (how === "hook") office.agentGone("b");
+    else if (how === "absent") await office.settleSpentOf(new Map([["a", "running"]]));
+    else await office.settleSpentOf(new Map([["b", "closed"]]));
+    await settle();
+    for (const item of store.current().posts) {
+      expect(item).not.toHaveProperty("spentPending");
+      expect(item).not.toHaveProperty("spentUsd");
+    }
+    await office.stop();
+  }
+});
+
+test("an agent that stopped on an error settles with the figure of the view", async () => {
+  const { build, clock, store } = setup();
+  let cost = 1;
+  const office = build({ costOf: () => cost, working: () => true });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  await office.update({ id: "p1", action: "done" });
+  cost = 1.4;
+  await office.settleSpentOf(new Map([["b", "error"]]));
+  expect(store.current().posts[0]).toMatchObject({ spentUsd: 0.4 });
   await office.stop();
 });

@@ -107,3 +107,16 @@ test("the cards' longer lines are in Indonesian too, with their names and number
   ];
   for (const [english, indonesian] of lines) expect(translatePattern(english)).toBe(indonesian);
 });
+
+test("a done task's time and cost line takes the language, its dollar amount as it is", () => {
+  const lines: [string, string][] = [
+    ["took 23 min · $0.42", "memakan 23 mnt · $0.42"],
+    ["took 1 h 5 min", "memakan 1 jam 5 mnt"],
+    ["took 2 d", "memakan 2 hr"],
+    ["took 1 d 3 h · $12.50", "memakan 1 hr 3 jam · $12.50"],
+    ["took under a minute · under $0.01", "memakan kurang dari semenit · kurang dari $0.01"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+  // Only the exact line: a post that starts with the word is left alone.
+  expect(translatePattern("took the bus to work")).toBe("took the bus to work");
+});

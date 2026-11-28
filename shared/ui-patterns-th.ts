@@ -17,6 +17,16 @@ const label = (text: string) => {
   return /^[A-Za-z0-9]/.test(thai) ? ` ${thai}` : thai;
 };
 
+/** A done task's "took 23 min · $0.42": the time through the duration rules, the cost as it is. */
+const spent = (time: string, cost: string | undefined) => {
+  const days = /^(\d+) d$/.exec(time)?.[1];
+  let span = translatePattern(time);
+  if (time === "under a minute") span = "ไม่ถึงหนึ่งนาที";
+  if (days !== undefined) span = `${days} วัน`;
+  const price = cost === "under $0.01" ? "ต่ำกว่า $0.01" : cost;
+  return `ใช้เวลา ${span}${price === undefined ? "" : ` · ${price}`}`;
+};
+
 export const RULES: readonly Rule[] = [
   [
     /^Undo the last turn's edits to (\d+) files?\?$/,
@@ -33,6 +43,10 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) h$/, (n) => `${n} ชม.`],
   [/^(\d+) h (\d+) min$/, (h, m) => `${h} ชม. ${m} นาที`],
   [/^(\d+) d (\d+) h$/, (d, h) => `${d} วัน ${h} ชม.`],
+  [
+    /^took (under a minute|\d+ min|\d+ h(?: \d+ min)?|\d+ d(?: \d+ h)?)(?: · (\$\d+\.\d\d|under \$0\.01))?$/,
+    spent,
+  ],
   [/^Idle for (.+)$/, (time) => `ว่างมา ${translatePattern(time)}`],
   [/^Waiting (\d.*)$/, (time) => `รอ ${translatePattern(time)}`],
   [/^Waiting on (\d+) sub-agents?$/, (n) => `รอ subagent ${n} ตัว`],
