@@ -1483,7 +1483,7 @@ Incidents), the intake is off and has no timer.
   imported, the problem says "the first 100 matches are already imported: narrow the JQL", and
   nothing new arrives until the JQL leaves imported tickets out. So write a JQL that does: a label
   the team takes off (`labels = agent`), or a status the team moves tickets out of (`status = "To
-  Do"`). A run that comes due while one is still going is skipped. An answer over 5,000,000 bytes
+Do"`). A run that comes due while one is still going is skipped. An answer over 5,000,000 bytes
   is refused ("Jira answered with too much data").
   `office.intake.run.request` runs it at once and answers the state, so the settings can test a
   JQL without waiting. The JQL is never written to the plugin's log, and neither is the token.
@@ -1494,7 +1494,7 @@ Incidents), the intake is off and has no timer.
   that the owner reads a ticket before an agent does. The auto-start gate leaves held imported
   tasks alone unless `intakeAutoStart` is on: with it on, a ticket is started without the owner
   reading it, so leave it off unless only people you trust can write tickets. An agent handed it reads `The office
-  assigned you lobby task p12 from Jira PROJ-12.`, and `office_read` shows the task as
+assigned you lobby task p12 from Jira PROJ-12.`, and `office_read` shows the task as
   `p12 task open (backlog) [Jira PROJ-12], from the user: ...`. A reopen keeps the source.
 - **Once only.** A ticket is posted once. Before posting, the office looks for a post with the
   same source on any board, done or not, then in `<PASEO_HOME>/office/intake.json`, which keeps
@@ -1508,7 +1508,7 @@ Incidents), the intake is off and has no timer.
   more and the state says it is waiting. Finish or delete some and the next run goes on.
 - **Write back** (`intakeWriteBack`, off). When a task from a ticket becomes done with a result,
   the office comments on the ticket once: `Done in the office by <agent's title, or "the owner">:
-  <result>`, cut to 2,000 characters (`POST /rest/api/3/issue/<key>/comment`). The token must be
+<result>`, cut to 2,000 characters (`POST /rest/api/3/issue/<key>/comment`). The token must be
   allowed to comment; nothing else is written and no ticket is moved. A task done without a
   result, or while the switch is off, writes nothing. A failed comment is tried once more at the
   next run; after that its problem stays in the state and it is not tried again (after a daemon
