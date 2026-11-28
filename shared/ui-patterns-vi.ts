@@ -62,6 +62,7 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) failing$/, (n) => `${n} đang lỗi`],
   [/^(\d+) claimed$/, (n) => `${n} đã nhận`],
   [/^(\d+) to review$/, (n) => `${n} cần xem xét`],
+  [/^(\d+) needs? you$/, (n) => `${n} cần bạn`],
   [/^(\d+) tool steps$/, (n) => `${n} bước dùng công cụ`],
   [/^(\d+) cores?$/, (n) => `${n} nhân`],
   [/^Task · claimed by (.+)$/, (name) => `Việc · ${name} đã nhận`],
@@ -156,6 +157,9 @@ export const RULES: readonly Rule[] = [
   ],
   [/^Log of (.+)$/, (name) => `Log của ${name}`],
   [/^Needs you, (\d+)$/, (n) => `Cần bạn, ${n}`],
+  [/^Needs you: ([\s\S]+)$/, (reason) => `Cần bạn: ${reason}`],
+  // A blocked task on the Tasks card: its holder, then what it asked for.
+  [/^(.+?) needs: ([\s\S]+)$/, (name, reason) => `${name} cần: ${reason}`],
   [
     /^No idle agent, so nobody can be asked, in (.+)\.$/,
     (teams) => `Không có agent nào rảnh, nên chưa hỏi được ai, ở ${teams}.`,

@@ -61,6 +61,7 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) failing$/, (n) => `ล้มเหลว ${n}`],
   [/^(\d+) claimed$/, (n) => `รับแล้ว ${n}`],
   [/^(\d+) to review$/, (n) => `รอตรวจ ${n}`],
+  [/^(\d+) needs? you$/, (n) => `ต้องการคุณ ${n}`],
   [/^(\d+) tool steps$/, (n) => `${n} ขั้นตอนของเครื่องมือ`],
   [/^(\d+) cores?$/, (n) => `${n} คอร์`],
   [/^Task · claimed by (.+)$/, (name) => `งาน · ${name} รับแล้ว`],
@@ -148,6 +149,9 @@ export const RULES: readonly Rule[] = [
   [/^Last answer (.+): (.+)\.$/, (age, what) => `คำตอบล่าสุด ${translatePattern(age)}: ${what}`],
   [/^Log of (.+)$/, (name) => `Log ของ ${name}`],
   [/^Needs you, (\d+)$/, (n) => `ต้องการคุณ ${n}`],
+  [/^Needs you: ([\s\S]+)$/, (reason) => `ต้องการคุณ: ${reason}`],
+  // A blocked task on the Tasks card: its holder, then what it asked for.
+  [/^(.+?) needs: ([\s\S]+)$/, (name, reason) => `${name} ต้องการ: ${reason}`],
   [
     /^No idle agent, so nobody can be asked, in (.+)\.$/,
     (teams) => `ไม่มี agent ที่ว่าง จึงไม่มีใครให้ถามได้ ใน ${teams}`,

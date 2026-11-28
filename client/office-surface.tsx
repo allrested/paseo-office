@@ -113,6 +113,7 @@ import { leaveFullscreenAfter, lockEscape, pageUsesEscape, unlockEscape } from "
 import { todayZone } from "./notes-text.js";
 import { QaCard } from "./qa-card.js";
 import { ReviewCard } from "./review-card.js";
+import { TasksCard } from "./tasks-card.js";
 import { settingsEntry, settingsProblems } from "./settings-text.js";
 import { StandupCard } from "./standup-card.js";
 import { useIncidents } from "./use-incidents.js";
@@ -120,6 +121,7 @@ import { useJanitor } from "./use-janitor.js";
 import { useLibrary } from "./use-library.js";
 import { useQa } from "./use-qa.js";
 import { useReviews } from "./use-reviews.js";
+import { useTaskAttention } from "./use-task-attention.js";
 import { useScriptLog } from "./use-script-log.js";
 import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
@@ -2073,6 +2075,7 @@ export function OfficeSurface(
     showBoard: board.open,
   });
   const library = useLibrary({ model, post: boardActions.post, live, showBoard: board.open });
+  const tasks = useTaskAttention({ model, live, showBoard: board.open });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sceneProblem, setSceneProblem] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
@@ -2166,9 +2169,10 @@ export function OfficeSurface(
     () => weatherEntry(office.state.weather, settings.show),
     [office.state.weather, settings.show],
   );
-  // The strip's cards, each only while it has something to say. An incident comes first. The
-  // office's own cards with nothing to report (the janitor, the stand-up, QA, the library) are
-  // icons in the toolbar of a docked office, so the strip there holds only what needs a look.
+  // The strip's cards, each only while it has something to say. An incident comes first, then the
+  // tasks that wait on an answer. The office's own cards with nothing to report (the janitor, the
+  // stand-up, QA, the library) are icons in the toolbar of a docked office, so the strip there
+  // holds only what needs a look.
   const shortcuts = useMemo(
     () =>
       shortcutsOf([
@@ -2183,12 +2187,20 @@ export function OfficeSurface(
   const cards = useMemo(
     () =>
       stripCards(
-        [incidentsStripEntry, ...alerts.cards, settingsStripEntry, weatherStripEntry, hostEntry],
+        [
+          incidentsStripEntry,
+          tasks.entry,
+          ...alerts.cards,
+          settingsStripEntry,
+          weatherStripEntry,
+          hostEntry,
+        ],
         shortcuts,
         panels.docked,
       ),
     [
       incidentsStripEntry,
+      tasks.entry,
       alerts.cards,
       settingsStripEntry,
       weatherStripEntry,
@@ -2478,6 +2490,14 @@ export function OfficeSurface(
         onOpenBoard={reviews.openBoard}
         styles={styles}
         onClose={reviews.close}
+      />
+      <TasksCard
+        rows={tasks.rows}
+        open={tasks.open}
+        actions={boardActions}
+        onOpenBoard={tasks.openBoard}
+        styles={styles}
+        onClose={tasks.close}
       />
       <QaCard
         teams={qa.teams}

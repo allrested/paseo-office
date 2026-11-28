@@ -28,7 +28,7 @@ const ALWAYS_SHOWN: ReadonlySet<KanbanColumnId> = new Set(["todo", "progress"]);
 export function columnOf(post: Post, _posts: readonly Post[]): KanbanColumnId {
   if (post.kind === "note") return "notes";
   if (post.state === "done") return "done";
-  if (post.state === "claimed") return "progress";
+  if (post.state === "claimed") return post.blocked === undefined ? "progress" : "needs";
   return "todo";
 }
 

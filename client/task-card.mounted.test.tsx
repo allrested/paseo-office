@@ -279,3 +279,42 @@ test("a note's row has no thread and no Reply", async () => {
   expect(has("Reply")).toBe(false);
   expect(lines()).not.toContain("Result");
 });
+
+const BLOCKED = post(5, {
+  text: "Rotate keys",
+  state: "claimed",
+  claimedBy: "a1",
+  blocked: "Which key store?",
+});
+
+test("a blocked task's card says what it needs above its thread, answered by Reply", async () => {
+  await mount(<Card task={BLOCKED} replies={NO_REPLIES} />);
+  expect(lines()).toEqual([
+    "Rotate keys",
+    "claimed by Agent a1",
+    "Needs you: Which key store?",
+    "Reply",
+  ]);
+  await press("Reply");
+  await type("Write a reply", "The vault");
+  await press("Send");
+  expect(replied).toEqual(["p5: The vault"]);
+});
+
+test("a blocked task's list row says what it needs above its thread", async () => {
+  await mount(<Row item={BLOCKED} replies={NO_REPLIES} />);
+  const shown = lines();
+  expect(shown.slice(shown.indexOf("Needs you: Which key store?"))).toEqual([
+    "Needs you: Which key store?",
+    "Reply",
+    "Mark done",
+    "Delete",
+  ]);
+});
+
+const CLAIMED = post(5, { text: "Rotate keys", state: "claimed", claimedBy: "a1" });
+
+test("a task that is not blocked has no Needs you line", async () => {
+  await mount(<Card task={CLAIMED} replies={NO_REPLIES} />);
+  expect(lines().some((line) => line.startsWith("Needs you"))).toBe(false);
+});

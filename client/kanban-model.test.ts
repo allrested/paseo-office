@@ -28,6 +28,24 @@ describe("kanban columns", () => {
     ];
     expect(posts.map((p) => columnOf(p, posts))).toEqual(["todo", "progress", "done", "notes"]);
   });
+  it("puts a claimed task with a block in Needs you, between In progress and Done", () => {
+    const posts = [
+      post("p1", { state: "claimed", claimedBy: "a1" }),
+      post("p2", { state: "claimed", claimedBy: "a1", blocked: "Which region?" }),
+      post("p3", { state: "done" }),
+    ];
+    expect(posts.map((p) => columnOf(p, posts))).toEqual(["progress", "needs", "done"]);
+    expect(layout(kanbanColumns(posts))).toEqual([
+      ["todo", []],
+      ["progress", ["p1"]],
+      ["needs", ["p2"]],
+      ["done", ["p3"]],
+    ]);
+    expect(kanbanColumns([post("p1", { state: "claimed" })]).map((c) => c.id)).toEqual([
+      "todo",
+      "progress",
+    ]);
+  });
   it("keeps To do and In progress when empty and drops other empty columns", () => {
     expect(kanbanColumns([]).map((c) => c.id)).toEqual(["todo", "progress"]);
     expect(kanbanColumns([post("p3", { state: "done" })]).map((c) => c.id)).toEqual([

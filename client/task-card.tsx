@@ -99,10 +99,20 @@ interface ReplyFieldProps {
   task: Post;
   actions: BoardActions;
   styles: OfficeStyles;
+  /** The field's name and placeholder: "Write a reply" under a task, "Answer" on the Tasks card. */
+  label?: string;
+  /** Under a task the field opens on Reply and takes the focus; on a list of them it waits. */
+  autoFocus?: boolean;
 }
 
 /** One line and Send. Enter sends as well, so the field keeps its own pending state and failure. */
-function ReplyField({ task, actions, styles }: ReplyFieldProps) {
+export function ReplyField({
+  task,
+  actions,
+  styles,
+  label = "Write a reply",
+  autoFocus = true,
+}: ReplyFieldProps) {
   const [text, setText] = useState("");
   const mounted = useMounted();
   const [sending, setSending] = useState(false);
@@ -131,7 +141,7 @@ function ReplyField({ task, actions, styles }: ReplyFieldProps) {
       <View style={styles.taskReplyRow}>
         <View style={styles.rowBody}>
           <TextInput
-            accessibilityLabel="Write a reply"
+            accessibilityLabel={label}
             value={text}
             onChangeText={setText}
             onSubmitEditing={send}
@@ -139,8 +149,8 @@ function ReplyField({ task, actions, styles }: ReplyFieldProps) {
             // blurOnSubmit; native reads submitBehavior.
             submitBehavior="submit"
             blurOnSubmit={false}
-            autoFocus
-            placeholder="Write a reply"
+            autoFocus={autoFocus}
+            placeholder={label}
             placeholderTextColor={styles.placeholderColor}
             maxLength={POST_TEXT_MAX}
             style={styles.fieldInput}
@@ -174,14 +184,18 @@ export interface TaskThreadProps {
 }
 
 /**
- * Under a task, on its card and on a room's list row: what came of it, the replies, and Reply.
- * The thread stays once the task is done. The field waits behind its button so a card stays short.
+ * Under a task, on its card and on a room's list row: what its holder needs while it is blocked,
+ * what came of it, the replies, and Reply, which is how the need is answered. The thread stays
+ * once the task is done. The field waits behind its button so a card stays short.
  */
 export function TaskThread({ task, replies, name, actions, styles }: TaskThreadProps) {
   const [replying, setReplying] = useState(false);
   const reply = useCallback(() => setReplying(true), []);
   return (
     <>
+      {task.blocked === undefined ? null : (
+        <Text style={styles.standupBlocker}>{`Needs you: ${task.blocked}`}</Text>
+      )}
       {task.result === undefined ? null : <TaskResult result={task.result} styles={styles} />}
       {replies.map((note) => (
         <Text key={note.id} style={styles.postText}>

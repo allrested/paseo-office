@@ -249,6 +249,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Streamer mode": "Chế độ quay màn hình",
   "Take office photo": "Chụp ảnh văn phòng",
   "Taking photo…": "Đang chụp ảnh…",
+  Tasks: "Công việc",
   "Teach a skill": "Dạy một skill",
   "Team chat": "Chat nhóm",
   Teams: "Nhóm",
@@ -302,6 +303,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Agent color": "Màu agent",
   "Agent tasks": "Việc của agent",
   Agents: "Agent",
+  Answer: "Trả lời",
   "Answer in the session": "Trả lời trong phiên",
   Auto: "Tự động",
   "Auto picks for this device and steps down when frames come late. Low draws no shadows, at 30 frames a second.":
