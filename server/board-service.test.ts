@@ -1880,6 +1880,24 @@ describe("a cost settled when the agent's turn has ended", () => {
     }
   });
 
+  test("dropping a gone agent's wait removes the marker with no spentUsd, whatever cost is known, on both posts", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p1", "done");
+    costs.set("a", 1.4);
+    await service.settleSpent("a", false);
+    for (const id of ["p1", "p3"]) {
+      expect(find(service, id)).toMatchObject({ doneAt: AT_T0, costAtClaim: 1 });
+      expect(find(service, id)).not.toHaveProperty("spentPending");
+      expect(find(service, id)).not.toHaveProperty("spentUsd");
+    }
+    expect(service.spentPendingAgents()).toEqual([]);
+  });
+
   test("a reopen drops the marker", async () => {
     costs.clear();
     busy.clear();

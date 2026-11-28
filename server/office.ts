@@ -4,6 +4,7 @@ import {
   LOBBY,
   POST_TEXT_MAX,
   USER_AUTHOR,
+  type AgentStatus,
   type DeleteResult,
   type Duty,
   type Post,
@@ -89,10 +90,11 @@ export interface Office {
   checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
   agentGone(agentId: string): void;
   /**
-   * The directory's view: whether each agent is in a turn. An agent holding done tasks whose cost
-   * waits for its turn to end, and no longer in one (or gone from the view), has them settled.
+   * The directory's view: each agent's status. An agent holding done tasks whose cost waits for
+   * its turn to end, and no longer in one, has them settled with the view's figure; one gone from
+   * the view or closed there has the wait dropped with no figure.
    */
-  settleSpentOf(working: ReadonlyMap<string, boolean>): Promise<void>;
+  settleSpentOf(statuses: ReadonlyMap<string, AgentStatus>): Promise<void>;
   workspaceArchived(workspaceId: string): Promise<void>;
   stop(): Promise<void>;
 }
@@ -317,12 +319,13 @@ export function createOffice(deps: OfficeDeps): Office {
       const result = (text ?? "").trimEnd().split("\n").slice(0, -1).join("\n").trim();
       await service.finishLobbyClaim(claim, result.slice(0, POST_TEXT_MAX) || undefined);
     },
-    async settleSpentOf(working) {
+    async settleSpentOf(statuses) {
       await ready;
       for (const agentId of service.spentPendingAgents()) {
-        if (working.get(agentId) === true) continue;
+        const status = statuses.get(agentId);
+        if (status === "running" || status === "initializing") continue;
         try {
-          await service.settleSpent(agentId);
+          await service.settleSpent(agentId, status !== undefined && status !== "closed");
         } catch (error) {
           log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`);
         }
@@ -331,7 +334,7 @@ export function createOffice(deps: OfficeDeps): Office {
     agentGone(agentId) {
       queue?.agentGone(agentId);
       void ready
-        .then(() => service.settleSpent(agentId))
+        .then(() => service.settleSpent(agentId, false))
         .catch((error: unknown) =>
           log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`),
         );

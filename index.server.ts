@@ -406,7 +406,9 @@ export function createOfficePlugin(
           [agent.id, agent.status === "running" || agent.status === "initializing"] as const,
       ),
     );
-    void office.settleSpentOf(agentsWorking);
+    void office.settleSpentOf(
+      new Map(view.agents.map((agent) => [agent.id, agent.status] as const)),
+    );
   });
 
   const samples: HostSample[] = [];

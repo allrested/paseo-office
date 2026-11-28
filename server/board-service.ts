@@ -121,9 +121,10 @@ export interface BoardService {
   actDuty(id: string, agentId: string): Promise<PostResult>;
   /**
    * Works out `spentUsd` of every done task of `agentId` that waited for its turn to end, from the
-   * cost now known, and drops the wait. One save; none when nothing waits.
+   * cost now known, and drops the wait. One save; none when nothing waits. With `figure` false
+   * (the agent is gone, so what is known is from before its last turn) the wait is dropped alone.
    */
-  settleSpent(agentId: string): Promise<void>;
+  settleSpent(agentId: string, figure?: boolean): Promise<void>;
   /** The agents that hold a done task whose cost still waits for their turn to end. */
   spentPendingAgents(): string[];
 }
@@ -866,7 +867,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return saved.ok ? { ok: true, post: acted } : saved;
   }
 
-  async function settlePending(agentId: string): Promise<void> {
+  async function settlePending(agentId: string, figure: boolean): Promise<void> {
     const waiting = data.posts.filter(
       (item) => item.spentPending && item.state === "done" && item.claimedBy === agentId,
     );
@@ -876,7 +877,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     for (const item of waiting) {
       const next: Post = { ...item, seq: seq++, updatedAt: now() };
       delete next.spentPending;
-      const spent = spentSince(item);
+      const spent = figure ? spentSince(item) : undefined;
       if (spent !== undefined) next.spentUsd = spent;
       settled.set(item.id, next);
     }
@@ -1037,7 +1038,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     syncDuties: (plan) => exclusive(() => syncDutyBoard(plan)),
     releaseClaims: (agentId) => exclusive(() => releaseHeld(agentId)),
     actDuty: (id, agentId) => exclusive(() => recordActed(id, agentId)),
-    settleSpent: (agentId) => exclusive(() => settlePending(agentId)),
+    settleSpent: (agentId, figure = true) => exclusive(() => settlePending(agentId, figure)),
     spentPendingAgents: () => [...pendingAgents],
   };
 }
