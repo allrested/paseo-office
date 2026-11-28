@@ -687,7 +687,8 @@ among the agent's newest timeline items. The steps stay after the agent stops an
 archived or closed. The server keeps them in memory, and only while an office surface is open:
 after the last one closes or the daemon restarts, an agent's steps are back when it next updates
 its checklist. A board is removed when its workspace is archived while the daemon runs; a board
-left from a workspace archived otherwise stays until its posts are deleted.
+left from a workspace archived otherwise stays until its posts are deleted. A task that waited on
+one of the removed board's tasks is released then, as it is when a task is deleted.
 
 Interactive agent sessions get three tools, `office_read`, `office_post` and `office_update`,
 unless the "Agent tools" setting is off when the session opens. `office_update` with `done` takes

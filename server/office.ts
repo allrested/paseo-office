@@ -165,7 +165,9 @@ export function createOffice(deps: OfficeDeps): Office {
     },
     onBoardRemoved: (board) => {
       hub.removeBoard(board);
-      // The board's tasks are gone, and a task that is gone holds no other.
+      // The board's tasks are gone, and a task that is gone holds no other: what waited on one is
+      // handed out, or its agent told, with no other board changed.
+      pickup?.refresh();
       wakeReleased();
     },
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),

@@ -1249,6 +1249,27 @@ test("a task still waiting when the office starts wakes its agent at its release
   await office.stop();
 });
 
+test("a lobby task that waits on a task of an archived workspace is handed out when the board goes", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w9", kind: "task", text: "Build it" });
+  await office.post({ board: "lobby", kind: "task", text: "Review it", after: ["p1"] });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  // The workspace is archived: its board and the task on it are gone, with no other board changed.
+  await office.workspaceArchived("w9");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p2", state: "claimed", claimedBy: "b" }),
+  ]);
+  expect(prompts).toEqual([expect.stringContaining("  Review it\nWork on this task.")]);
+  await office.stop();
+});
+
 test("the user's post takes after as the tool's does", async () => {
   const { office } = start();
   await office.ready;
