@@ -52,6 +52,7 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Put back 1 file", "คืนค่า 1 ไฟล์"],
     ["3 changed since the turn", "3 ไฟล์ถูกแก้ไขหลังรอบนั้น"],
     ["1 ignored by git", "1 ไฟล์ที่ git ละเว้น"],
+    ["1 left: a folder with other files is in the way", "1 ไฟล์ที่ค้างไว้: มีโฟลเดอร์ที่มีไฟล์อื่นขวางอยู่"],
     ["8 more", "อีก 8"],
     ["13:40 · 5 files", "13:40 · 5 ไฟล์"],
     ["Last read 12:40: 3 imported", "อ่านล่าสุด 12:40: นำเข้า 3"],

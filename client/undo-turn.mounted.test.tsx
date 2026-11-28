@@ -236,6 +236,7 @@ test("an undo that stopped says why, and the turn can be undone again", async ()
           skipped: [
             { reason: "began", count: 2 },
             { reason: "retry", count: 1 },
+            { reason: "crowded", count: 1 },
           ],
         },
   );
@@ -244,6 +245,7 @@ test("an undo that stopped says why, and the turn can be undone again", async ()
   await press("Undo");
   expect(container.textContent).toContain("2 not reached: an agent began working");
   expect(container.textContent).toContain("1 not put back yet: undo again to finish");
+  expect(container.textContent).toContain("1 left: a folder with other files is in the way");
   expect(button("Undo this turn")).not.toBeNull();
 });
 

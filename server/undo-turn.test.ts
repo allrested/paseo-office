@@ -552,29 +552,20 @@ test("a file the turn renamed by case alone comes back, whatever the file system
   if (!folded) expect(await missing("A.TXT")).toBe(true);
 });
 
-test("a write-back left because of what is in the way of a removed file keeps the checkpoint", async () => {
+test("a folder the turn made where a file was, holding other files now, is said to be in the way", async () => {
   await turn("t1", async () => {
     await rm(join(repo, "gone.txt"));
     await write("gone.txt/x", "X\n");
   });
-  // The owner's new file in the turn's folder: the folder cannot go, so the file cannot come back yet.
+  // The owner's new file in the turn's folder: the folder cannot go, so the file cannot come back.
   await write("gone.txt/mine", "mine\n");
   expect(await undo.undo("a1", "t1")).toEqual({
     turnId: "t1",
     restored: 1,
-    skipped: [{ reason: "retry", count: 1 }],
+    skipped: [{ reason: "crowded", count: 1 }],
   });
   expect(await read("gone.txt/mine")).toBe("mine\n");
-  expect((await kept()).map((one) => one.turnId)).toEqual(["t1"]);
-  // Again, nothing the undo does is in the way: what is left is the owner's, and the turn goes.
-  expect(await undo.undo("a1", "t1")).toEqual({
-    turnId: "t1",
-    restored: 0,
-    skipped: [
-      { reason: "same", count: 1 },
-      { reason: "changed", count: 1 },
-    ],
-  });
+  // An undo again could do no more: the reason is final, and the turn goes.
   expect(await kept()).toEqual([]);
 });
 
@@ -715,4 +706,127 @@ test("a folder whose birth time is unknown, or not after the turn began, stays",
   expect(result.restored).toBe(2);
   expect((await stat(join(repo, "one"))).isDirectory()).toBe(true);
   expect((await stat(join(repo, "two"))).isDirectory()).toBe(true);
+});
+
+// The second review: each fails on the first fix round.
+
+/** An exec whose `rev-parse --show-toplevel` in `folder` fails with `failure`; git as it is otherwise. */
+function blind(folder: string, failure: () => Error): Exec {
+  return async (command, args, options) => {
+    if (args.includes("--show-toplevel") && options.cwd === folder) throw failure();
+    return exec(command, args, options);
+  };
+}
+
+for (const [name, failure] of [
+  ["a timeout", () => Object.assign(new Error("timed out"), { killed: true, signal: "SIGTERM" })],
+  ["any other error", () => Object.assign(new Error("spawn EAGAIN"), { code: "EAGAIN" })],
+] as const) {
+  test(`an agent whose work tree cannot be read (${name}) counts as working beside you`, async () => {
+    const sub = join(repo, "sub");
+    await mkdir(sub);
+    undo = createUndo({
+      exec: blind(sub, failure),
+      enabled: () => true,
+      log: (line) => logged.push(line),
+    });
+    await turn("t1", () => write("m.txt", "M1\n"));
+    await undo.begin("b", sub);
+    await expect(undo.undo("a1", "t1")).rejects.toThrow(
+      "another agent is working in this folder: undo when it has stopped",
+    );
+    expect(await read("m.txt")).toBe("M1\n");
+  });
+}
+
+test("an agent git says is in no repository is elsewhere, and the undo goes ahead", async () => {
+  const notRepo = Object.assign(new Error("Command failed"), {
+    code: 128,
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\n",
+  });
+  const sub = join(repo, "sub");
+  await mkdir(sub);
+  undo = createUndo({
+    exec: blind(sub, () => notRepo),
+    enabled: () => true,
+    log: (line) => logged.push(line),
+  });
+  await turn("t1", () => write("m.txt", "M1\n"));
+  await undo.begin("b", sub);
+  expect((await undo.undo("a1", "t1")).restored).toBe(1);
+  expect(await missing("m.txt")).toBe(true);
+});
+
+test("a file the turn swapped for a folder comes back in one undo without birth times", async () => {
+  await turn("t1", async () => {
+    await rm(join(repo, "gone.txt"));
+    await write("gone.txt/x", "X\n");
+  });
+  const [only] = await kept();
+  expect(only).toBeDefined();
+  const before = (await git("rev-parse", "HEAD^{tree}")).trim();
+  const noBirth = async () => ({ birth: 5_000, change: 5_000 });
+  const result = await undoCheckpoint(
+    exec,
+    { top: repo, turnId: "t1", before, end: await treeNow(), beganAt: 1_000 },
+    { times: noBirth },
+  );
+  expect(result).toEqual({ turnId: "t1", restored: 2, skipped: [], stopped: false });
+  expect(await read("gone.txt")).toBe("G0\n");
+});
+
+test("an end snapshot that fails once is tried again, and the turn is kept", async () => {
+  let failures = 0;
+  const flaky: Exec = async (command, args, options) => {
+    if (failures > 0 && args[0] === "write-tree") {
+      failures -= 1;
+      throw new Error("index.lock exists");
+    }
+    return exec(command, args, options);
+  };
+  undo = createUndo({ exec: flaky, enabled: () => true, log: (line) => logged.push(line) });
+  await turn("t1", () => write("a.txt", "A1\n"));
+  await undo.begin("a1", repo);
+  await write("a.txt", "A2\n");
+  failures = 1;
+  await undo.end("a1", "t2");
+  expect(await undo.status("a1")).toMatchObject({ gap: null });
+  expect((await kept()).map((one) => one.turnId)).toEqual(["t2", "t1"]);
+  await undo.begin("a1", repo);
+  await write("a.txt", "A3\n");
+  failures = 2;
+  await undo.end("a1", "t3");
+  expect(await undo.status("a1")).toEqual({
+    turns: [],
+    gap: "the last turn could not be snapshotted: earlier checkpoints were dropped",
+  });
+});
+
+test("a write-back left where the undo just deleted its parent keeps the checkpoint for an undo again", async () => {
+  await write("d/b", "DB\n");
+  await git("add", "-A");
+  await git("commit", "-q", "-m", "d");
+  // Untracked, so that ignoring it after the turn takes it out of the undo's hands.
+  await write("d/a", "DA\n");
+  await turn("t1", async () => {
+    await rm(join(repo, "d"), { recursive: true });
+    await write("d", "a file now\n");
+  });
+  await write(".git/info/exclude", "d/a\n");
+  expect(await undo.undo("a1", "t1")).toEqual({
+    turnId: "t1",
+    restored: 2,
+    skipped: [{ reason: "retry", count: 1 }],
+  });
+  expect(await read("d/b")).toBe("DB\n");
+  expect((await kept()).map((one) => one.turnId)).toEqual(["t1"]);
+  expect(await undo.undo("a1", "t1")).toEqual({
+    turnId: "t1",
+    restored: 0,
+    skipped: [
+      { reason: "same", count: 2 },
+      { reason: "ignored", count: 1 },
+    ],
+  });
+  expect(await kept()).toEqual([]);
 });

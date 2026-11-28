@@ -1183,8 +1183,8 @@ Claude Code's, so it works for every provider and writes nothing into the host's
   including what you or another agent changed in that time, not only what this agent did. A turn
   that changed nothing is not kept. Each agent keeps the ten newest; the eleventh drops the oldest.
   Each git call has a limit of 15 seconds and the hooks do not hold the turn.
-- A turn the office could not snapshot (the setting off, a git error or a timeout) drops the
-  agent's checkpoints, since the turns before it would no longer be one step back each. The panel
+- A turn the office could not snapshot (the setting off, a git error or a timeout; a failed snapshot
+  at the turn's end is tried once more first) drops the agent's checkpoints, since the turns before it would no longer be one step back each. The panel
   then says "The last turn could not be snapshotted, so the checkpoints before it were dropped."
   until the next turn is snapshotted.
 - The checkpoints are only in the daemon's memory: a restart forgets them. The trees have no ref,
@@ -1210,7 +1210,9 @@ and, for the files it left, each reason with its count. It undoes the turn the p
 that is no longer the newest (another undo got there first), it is refused with "that turn is no
 longer the newest: look again" and the panel reads the list again. It is refused while the agent is
 at work, and while another agent whose folder is in the same work tree is in a turn ("another agent
-is working in this folder: undo when it has stopped").
+is working in this folder: undo when it has stopped"). An agent in a turn whose folder git cannot
+read (a timeout, any failure other than git saying it is in no repository) counts as being in the
+same work tree.
 
 It goes over every path the turn's diff lists, in two steps. First the files the turn added; then
 the files it changed or deleted, looked at afresh once the first step is done, so a folder the turn
@@ -1223,7 +1225,9 @@ tree does not have):
   left empty (a folder not in the before tree whose birth time is known and after the turn began;
   where the file system keeps no birth time, or one that reads as its change time, the folder
   stays); a file the turn changed or deleted is written back from the before tree, with its
-  executable bit;
+  executable bit. Where the turn made a folder at the place of a file, that folder is removed
+  first when it is empty, whatever its birth time; one holding other files is left, counted "left:
+  a folder with other files is in the way";
 - different: it is somebody's later work, and is left, counted "changed since the turn"; one
   already as it was before the turn is counted as that.
 

@@ -30,7 +30,7 @@ const spent = (time: string, cost: string | undefined) => {
 export const RULES: readonly Rule[] = [
   [/^Put back (\d+) files?$/, (n) => `คืนค่า ${n} ไฟล์`],
   [
-    /^(\d+) (changed since the turn|already as before the turn|outside the repository|inside \.git|ignored by git|left alone as links|in a linked folder|left alone as submodules|could not be written|not reached: git stopped|not reached: an agent began working|not put back yet: undo again to finish)$/,
+    /^(\d+) (changed since the turn|already as before the turn|outside the repository|inside \.git|ignored by git|left alone as links|in a linked folder|left alone as submodules|could not be written|not reached: git stopped|not reached: an agent began working|not put back yet: undo again to finish|left: a folder with other files is in the way)$/,
     (n, why) => `${n} ไฟล์${translatePattern(why)}`,
   ],
   [/^(\d+) more$/, (n) => `อีก ${n}`],

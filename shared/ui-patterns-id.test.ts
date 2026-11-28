@@ -63,6 +63,10 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Put back 1 file", "1 berkas dikembalikan"],
     ["3 changed since the turn", "3 berkas diubah sejak giliran itu"],
     ["1 ignored by git", "1 berkas diabaikan git"],
+    [
+      "1 left: a folder with other files is in the way",
+      "1 berkas dibiarkan: ada folder berisi berkas lain yang menghalangi",
+    ],
     ["8 more", "8 lagi"],
     ["13:40 · 5 files", "13:40 · 5 berkas"],
     ["Last read 12:40: 3 imported", "Terakhir dibaca 12:40: 3 diimpor"],

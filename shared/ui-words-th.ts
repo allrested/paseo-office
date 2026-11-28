@@ -785,6 +785,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
     "snapshot รอบล่าสุดไม่ได้ จึงทิ้ง checkpoint ก่อนหน้านั้นไปแล้ว",
   "not reached: an agent began working": "ที่ไปไม่ถึง: มี agent เริ่มทำงาน",
   "not put back yet: undo again to finish": "ที่ยังไม่ได้คืนค่า: เลิกทำอีกครั้งให้เสร็จ",
+  "left: a folder with other files is in the way": "ที่ค้างไว้: มีโฟลเดอร์ที่มีไฟล์อื่นขวางอยู่",
   binary: "ไบนารี",
   added: "เพิ่มใหม่",
   deleted: "ลบแล้ว",

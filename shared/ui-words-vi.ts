@@ -809,6 +809,8 @@ export const UI_VI: Readonly<Record<string, string>> = {
     "Không thể chụp lượt gần nhất, nên các checkpoint trước đó đã bị bỏ.",
   "not reached: an agent began working": "chưa tới: một agent đã bắt đầu làm việc",
   "not put back yet: undo again to finish": "chưa khôi phục: hoàn tác lần nữa để xong",
+  "left: a folder with other files is in the way":
+    "bị bỏ lại: một thư mục chứa tệp khác đang chắn đường",
   binary: "nhị phân",
   added: "đã thêm",
   deleted: "đã xóa",

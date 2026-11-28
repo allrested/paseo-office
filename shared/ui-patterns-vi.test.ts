@@ -61,6 +61,10 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Put back 1 file", "Đã khôi phục 1 tệp"],
     ["3 changed since the turn", "3 tệp đã thay đổi sau lượt đó"],
     ["1 ignored by git", "1 tệp bị git bỏ qua"],
+    [
+      "1 left: a folder with other files is in the way",
+      "1 tệp bị bỏ lại: một thư mục chứa tệp khác đang chắn đường",
+    ],
     ["8 more", "8 nữa"],
     ["13:40 · 5 files", "13:40 · 5 tệp"],
     ["Last read 12:40: 3 imported", "Đọc lần cuối 12:40: đã nhập 3"],

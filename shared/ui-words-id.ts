@@ -817,6 +817,8 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Giliran terakhir tidak bisa di-snapshot, jadi checkpoint sebelumnya dibuang.",
   "not reached: an agent began working": "tidak tersentuh: ada agen yang mulai bekerja",
   "not put back yet: undo again to finish": "belum dikembalikan: urungkan lagi untuk menyelesaikan",
+  "left: a folder with other files is in the way":
+    "dibiarkan: ada folder berisi berkas lain yang menghalangi",
   binary: "biner",
   added: "ditambahkan",
   deleted: "dihapus",

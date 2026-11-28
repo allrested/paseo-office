@@ -25,6 +25,7 @@ const SKIPPED: Readonly<Record<UndoSkip, string>> = {
   stopped: "not reached: git stopped",
   began: "not reached: an agent began working",
   retry: "not put back yet: undo again to finish",
+  crowded: "left: a folder with other files is in the way",
 };
 
 /** The files of a turn shown before "N more". */

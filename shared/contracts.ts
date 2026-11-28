@@ -1232,7 +1232,8 @@ export const homeDepartureRpc = defineRpc({
  * Why an undo leaves a file as it is: changed since the turn, already as before it, out of the
  * work tree, in `.git`, ignored by git, a link, under a linked folder, a submodule, a write that
  * failed, not reached because git stopped part-way or an agent began a turn, or left for an undo
- * again because the undo had just removed something on its way.
+ * again because the undo had just removed something on its way, or a folder with other files
+ * standing where a file is to come back.
  */
 export const UNDO_SKIPS = [
   "changed",
@@ -1247,6 +1248,7 @@ export const UNDO_SKIPS = [
   "stopped",
   "began",
   "retry",
+  "crowded",
 ] as const;
 export type UndoSkip = (typeof UNDO_SKIPS)[number];
 /** What a turn did to one file, by git's diff of its two snapshots; a binary file has no counts. */
