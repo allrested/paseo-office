@@ -81,6 +81,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Dismiss tip": "ปิดเคล็ดลับ",
   "Dismissing...": "กำลังละเว้น...",
   "Dismissing…": "กำลังละเว้น…",
+  Done: "เสร็จแล้ว",
   "Display name. Leave blank to use the host default.": "ชื่อที่แสดง เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นของ host",
   "Duty board": "บอร์ดเวร",
   Edits: "การแก้ไข",
@@ -384,6 +385,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "The session receives your message and replies here.": "session จะได้รับข้อความของคุณและตอบกลับที่นี่",
   "This browser couldn’t display the workspace.": "เบราว์เซอร์นี้แสดงพื้นที่ทำงานไม่ได้",
   "This host reports no plan limits.": "host นี้ไม่รายงานลิมิตของแพลน",
+  "To do": "สิ่งที่ต้องทำ",
   "To switch accounts, use the account-switcher plugin. The office reads the limits and handles no sign-in.":
     "หากต้องการสลับบัญชี ให้ใช้ปลั๊กอิน account-switcher ออฟฟิศอ่านเฉพาะลิมิตและไม่จัดการการลงชื่อเข้าใช้",
   "To-do": "งานที่ต้องทำ",
@@ -491,6 +493,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Host details": "รายละเอียด host",
   "Host details could not be read. Try refreshing.": "อ่านรายละเอียด hostไม่ได้ ลองรีเฟรช",
   "Host resources": "ทรัพยากรของ host",
+  "In progress": "กำลังทำ",
   "In the teams' workspaces": "ในพื้นที่ทำงานของทีม",
   "In this mode the writer runs any tool or command without asking.":
     "ในโหมดนี้ ผู้เขียนจะรันเครื่องมือหรือคำสั่งใดก็ได้โดยไม่ถาม",
@@ -679,6 +682,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Using a skill": "กำลังใช้ skill",
   "Using a tool": "กำลังใช้เครื่องมือ",
   "Waited for you": "รอคุณ",
+  Waiting: "กำลังรอ",
   "Waiting for a review": "รอการตรวจสอบ",
   "Waiting for the first answer.": "รอคำตอบแรก",
   "Waiting for your answer": "รอคำตอบจากคุณ",

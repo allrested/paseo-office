@@ -43,6 +43,11 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) contexts nearly full$/, (n) => `context ใกล้เต็ม ${n} รายการ`],
   [/^Memory (\d+)%$/, (n) => `หน่วยความจำ ${n}%`],
   [/^All sessions · (\d+)$/, (n) => `session ทั้งหมด · ${n}`],
+  // A kanban column's heading: its title, then how many it holds.
+  [
+    /^(To do|In progress|Needs you|Waiting|Done|Notes) · (\d+)$/,
+    (title, n) => `${translatePattern(title)} · ${n}`,
+  ],
   [/^(\d+)\/(\d+) tasks$/, (done, all) => `${done}/${all} งาน`],
   [/^(\d+) open$/, (n) => `เปิดอยู่ ${n}`],
   [/^(\d+) open · a check failed$/, (n) => `เปิดอยู่ ${n} · การตรวจสอบล้มเหลว 1 รายการ`],

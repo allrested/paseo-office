@@ -17,13 +17,16 @@ import {
   recipientLabels,
 } from "./agent-picker-text.js";
 import { BoardAgents } from "./board-agents.js";
+import { KanbanBoard } from "./board-kanban.js";
 import { orderBoardPosts, roomAgents } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
+import type { BoardLayout } from "../shared/settings.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
+import { useBoardLayouts } from "./use-board-layouts.js";
 
 interface ChipProps {
   label: string;
@@ -249,6 +252,8 @@ export interface SheetBodyProps {
   onPicking(picking: boolean): void;
   /** An agent of the board was chosen: it opens as it does from its desk. */
   onSelectAgent(agentId: string): void;
+  /** The board's posts as columns or as one list: the device's choice for this kind of board. */
+  layout: BoardLayout;
   styles: OfficeStyles;
 }
 
@@ -262,6 +267,7 @@ function SheetBody({
   picking,
   onPicking,
   onSelectAgent,
+  layout,
   styles,
 }: SheetBodyProps) {
   const [kind, setKind] = useState<PostKind>("task");
@@ -356,22 +362,26 @@ function SheetBody({
           </>
         )}
       </View>
-      <View style={styles.boardPosts}>
-        {posts.length === 0 ? (
-          <Text style={styles.muted}>No posts</Text>
-        ) : (
-          <Text style={styles.sheetLabel}>Posts</Text>
-        )}
-        {posts.map((post) => (
-          <PostWithActions
-            key={post.id}
-            post={post}
-            name={name}
-            actions={actions}
-            styles={styles}
-          />
-        ))}
-      </View>
+      {layout === "kanban" ? (
+        <KanbanBoard posts={room.posts} name={name} actions={actions} styles={styles} />
+      ) : (
+        <View style={styles.boardPosts}>
+          {posts.length === 0 ? (
+            <Text style={styles.muted}>No posts</Text>
+          ) : (
+            <Text style={styles.sheetLabel}>Posts</Text>
+          )}
+          {posts.map((post) => (
+            <PostWithActions
+              key={post.id}
+              post={post}
+              name={name}
+              actions={actions}
+              styles={styles}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -403,8 +413,9 @@ export interface BoardSheetProps {
 
 /**
  * Post a task or note, optionally waking an agent; mark a task done or delete a post. Under the
- * form are the room's agents with what each is at. The lobby's board is a to-do list instead, with
- * the agents at work in every room under it.
+ * form are the room's agents with what each is at. The lobby's board is its to-dos instead, with
+ * the agents at work in every room under them. Each board is a kanban or a list as the device's
+ * Boards setting says: the lobby's a kanban and a room's a list unless it says otherwise.
  */
 export function BoardSheet({
   room,
@@ -421,6 +432,7 @@ export function BoardSheet({
   onClose,
 }: BoardSheetProps) {
   const [picking, setPicking] = useState(false);
+  const layouts = useBoardLayouts();
   // Another room's sheet, and a sheet opened again, start on the form.
   const roomId = room?.id ?? null;
   useEffect(() => {
@@ -463,6 +475,7 @@ export function BoardSheet({
             onPicking={setPicking}
             onSelectAgent={onSelectAgent}
             onOpenBoard={onOpenBoard}
+            layout={layouts.lobby}
             styles={styles}
           />
         ) : null}
@@ -492,6 +505,7 @@ export function BoardSheet({
             picking={picking}
             onPicking={setPicking}
             onSelectAgent={onSelectAgent}
+            layout={layouts.rooms}
             styles={styles}
           />
         ) : null}

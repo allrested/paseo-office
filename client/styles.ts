@@ -316,6 +316,20 @@ export interface OfficeStyles {
   lobbyDelete: ViewStyle;
   lobbyDeleteText: TextStyle;
   lobbyConfirm: ViewStyle;
+  /** A board as a kanban: its columns, stacked when narrow. */
+  kanban: ViewStyle;
+  /** Wide, the columns side by side in a scroller; it reaches out by a focus ring, as chips do. */
+  kanbanScroll: ViewStyle;
+  kanbanColumns: ViewStyle;
+  /** One column, a fixed width so the columns line up whatever their cards say. */
+  kanbanColumn: ViewStyle;
+  /** A column's heading and, on Done's, "Clear finished"; its question wraps under it. */
+  kanbanHeading: ViewStyle;
+  /** Narrow, a column's heading is the button that folds it: a touch target tall. */
+  kanbanFold: ViewStyle;
+  kanbanCards: ViewStyle;
+  /** A note in a column: a card as a task's is. */
+  kanbanNote: ViewStyle;
   post: ViewStyle;
   postMeta: TextStyle;
   postText: TextStyle;
@@ -438,6 +452,8 @@ const COLUMN = 720;
 const SCENE_MIN_HEIGHT = 160;
 /** Room around a focusable row inside a scroller, which would cut its focus ring off. */
 const FOCUS_RING = 4;
+/** Every kanban column's width, so a card's words wrap at the same place in each. */
+const KANBAN_COLUMN = 280;
 /** How wide the fade over the strip's right edge is on a phone. */
 const STRIP_FADE = 24;
 const DOT = 8;
@@ -1350,6 +1366,39 @@ export function useOfficeStyles(
       },
       lobbyDeleteText: { ...small, fontWeight: "500", color: colors.foregroundMuted },
       lobbyConfirm: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: 10, gap: 8 },
+      kanban: { gap: 16 },
+      kanbanScroll: { marginHorizontal: -FOCUS_RING },
+      kanbanColumns: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: FOCUS_RING,
+      },
+      kanbanColumn: { width: KANBAN_COLUMN, gap: 6 },
+      kanbanHeading: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+        minHeight: controlHeight,
+      },
+      kanbanFold: {
+        flexDirection: "row",
+        alignItems: "center",
+        flexGrow: 1,
+        gap: 6,
+        minHeight: TOUCH_CONTROL,
+        borderRadius: 6,
+      },
+      kanbanCards: { gap: 6 },
+      kanbanNote: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface1,
+        padding: 12,
+      },
       post: { gap: 4, paddingVertical: 4 },
       postMeta: { ...small, color: colors.foregroundMuted },
       postText: { ...base, color: colors.foreground },
