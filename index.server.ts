@@ -12,6 +12,7 @@ import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
 import {
   autoStartFile,
+  intakeFile,
   liftFile,
   tenureFile,
   timelineFile,
@@ -64,6 +65,14 @@ import {
   type AutoStart,
   type AutoStartCountFile,
 } from "./server/auto-start.js";
+import {
+  createIntake,
+  INTAKE_SCHEDULE,
+  intakeFileStore,
+  type Intake,
+  type IntakeSeenFile,
+} from "./server/intake-service.js";
+import { createJiraSource } from "./server/intake-jira.js";
 import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
@@ -159,6 +168,7 @@ import {
   dutiesSaveRpc,
   dutyActedRpc,
   incidentsDismissRpc,
+  intakeRunRpc,
   notifyTestRpc,
   notesModesRpc,
   planUsageRpc,
@@ -217,6 +227,8 @@ export interface OfficePluginDeps {
   dutiesFile: LifeFile<DutiesFile>;
   /** How many backlog tasks the office started by itself today. */
   autoStartFile: AutoStartCountFile;
+  /** The tickets the intake posted. */
+  intakeFile: IntakeSeenFile;
   /** The daemon's environment: a tracker with no saved connection takes its token from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -393,6 +405,8 @@ export function createOfficePlugin(
   let roster: Roster = NO_ROSTER;
   // Made once the office is: the office tells it of each board change and turn end.
   let autoStart: AutoStart | null = null;
+  // Made once the office is: a board change can be a task from a ticket now done.
+  let intake: Intake | null = null;
   const office = createOffice({
     store: deps.store,
     clock: deps.clock,
@@ -404,7 +418,10 @@ export function createOfficePlugin(
       (agentId) => agentsWorking.get(agentId) === true,
     ),
     log,
-    onChange: () => autoStart?.boardChanged(),
+    onChange: () => {
+      autoStart?.boardChanged();
+      intake?.boardChanged();
+    },
   });
   const stopCosts = hub.watch((view) => {
     // No directory, no figures: the last ones would go stale while the pickup hands out work. A
@@ -567,6 +584,29 @@ export function createOfficePlugin(
     (error: unknown) => log(`[office] tracker connections failed to load: ${errorMessage(error)}`),
   );
   const credentials = () => trackerCredentials(savedTrackers, deps.env);
+  // The owner's JQL, as the settings last had it; empty while they cannot be read. Never logged.
+  let intakeJql = "";
+  // Every 10 minutes while a source is set up: each new ticket becomes a lobby task.
+  intake = createIntake({
+    sources: [
+      createJiraSource({
+        env: () => credentials().jira,
+        jql: () => intakeJql,
+        ...(deps.fetchFn === undefined ? {} : { fetchFn: deps.fetchFn }),
+      }),
+    ],
+    board: {
+      allPosts: () => office.allPosts(),
+      post: (input) => office.post(input),
+      markWroteBack: (id) => office.markWroteBack(id),
+      label: (author) => office.label(author),
+    },
+    file: deps.intakeFile,
+    schedules: deps.schedules,
+    now: () => deps.clock.now(),
+    changed: (state) => hub.setIntake(state),
+    log,
+  });
   function pushIncidents(): void {
     if (checked === null) return;
     const { jira, sentry } = credentials();
@@ -713,6 +753,8 @@ export function createOfficePlugin(
     followWatching();
     office.setPickupEnabled(false);
     autoStart?.settingsChanged(null);
+    intakeJql = "";
+    void intake?.settingsChanged(null);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
     notesSchedule.fail(message);
@@ -756,6 +798,12 @@ export function createOfficePlugin(
       zone: knownZone(notesTimeZone(state.values, deps.hostTimeZone), deps.hostTimeZone),
     });
     weather.settingsChanged(state.values);
+    intakeJql = state.values.jiraIntakeJql;
+    await trackersLoaded;
+    await intake?.settingsChanged({
+      lands: state.values.intakeLands,
+      writeBack: state.values.intakeWriteBack,
+    });
     const notesSaved = await notesSchedule.sync(state.values);
     // The schedule was just set: at the daemon's start, or by a changed zone, folder or days. A
     // run that came due earlier today is made up.
@@ -948,6 +996,8 @@ export function createOfficePlugin(
     if ("problem" in changed) return { ok: false, problem: changed.problem };
     await deps.trackerStore.save(changed.saved);
     savedTrackers = changed.saved;
+    // A sign-in saved or cleared sets the intake up, or stops it.
+    await intake?.sync();
     // The check's schedule follows the new connection; the settings may be unreadable.
     await readHostSettings().then(followTrackers, pushIncidents);
     return { ok: true };
@@ -1127,6 +1177,14 @@ export function createOfficePlugin(
     await paseoForRun(INCIDENTS_SCHEDULE);
     await incidents.check();
   });
+  // A run needs no Paseo API: it posts as the user, and the pickup hands the task out later.
+  const stopIntakeRuns = deps.schedules.handle(INTAKE_SCHEDULE, async () => {
+    await intake?.run();
+  });
+  server.handle(intakeRunRpc, async () => {
+    if (intake === null) throw new Error("The intake did not start");
+    return intake.run();
+  });
 
   const removeHooks = [
     server.addHook("agent.open.before", async ({ request }, context) => {
@@ -1275,6 +1333,8 @@ export function createOfficePlugin(
     stopNotesRuns();
     stopDutyRuns();
     stopIncidentsRuns();
+    stopIntakeRuns();
+    intake?.stop();
     deps.schedules.stop();
     for (const remove of removeHooks) remove();
     stopStreet();
@@ -1336,6 +1396,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     autoStartFile: autoStartFileStore(autoStartFile(process.env, homedir())),
+    intakeFile: intakeFileStore(intakeFile(process.env, homedir())),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),

@@ -65,6 +65,9 @@ const COMPANY = {
   autoStartUnderPct: 70,
   autoStartAtOnce: 3,
   autoStartPerDay: 10,
+  jiraIntakeJql: "",
+  intakeLands: "backlog",
+  intakeWriteBack: false,
   ...WEATHER_DEFAULTS,
 };
 
@@ -104,7 +107,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(14);
+  expect(officeHostSettings.version).toBe(15);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -125,7 +128,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(14);
+  expect(officeHostSettings.version).toBe(15);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -390,7 +393,7 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(14);
+  expect(officeHostSettings.version).toBe(15);
 });
 
 test("starting by itself is off, with its three numbers, and a number out of range is refused", async () => {
@@ -425,4 +428,31 @@ test("starting by itself is off, with its three numbers, and a number out of ran
   ]) {
     expect(schema.safeParse(bad).success).toBe(false);
   }
+});
+
+test("the Jira intake is off with no JQL, lands in the backlog, writes nothing back, and a JQL over 1,000 characters is refused", async () => {
+  const defaults = officeHostSettings.schema.parse({});
+  expect(defaults).toMatchObject({
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
+  });
+  // A version 14 document starts with it off.
+  expect(await upgraded({ agentTools: true, autoStart: true }, 14)).toMatchObject({
+    autoStart: true,
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
+  });
+  const schema = officeHostSettings.schema;
+  expect(
+    schema.safeParse({
+      jiraIntakeJql: "j".repeat(1_000),
+      intakeLands: "todo",
+      intakeWriteBack: true,
+    }).success,
+  ).toBe(true);
+  expect(schema.safeParse({ jiraIntakeJql: "j".repeat(1_001) }).success).toBe(false);
+  expect(schema.safeParse({ intakeLands: "done" }).success).toBe(false);
+  expect(officeHostSettings.version).toBe(15);
 });

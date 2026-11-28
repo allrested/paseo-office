@@ -94,3 +94,25 @@ test("a prompt sent with the v2 footer still reads as an assignment", () => {
   const text = `The office assigned you lobby task p7 from the user.\n  Tidy the docs\n${v2}`;
   expect(readLobbyAssignment(text)).toEqual({ id: "p7", body: "Tidy the docs", kind: "lobby" });
 });
+
+test("a task from a ticket names its source in the heading, and reads as a lobby assignment", () => {
+  for (const heading of [
+    "The office assigned you lobby task p7 from Jira PROJ-12.",
+    "The office assigned you lobby task p7 from GitHub owner/repo#12.",
+    "The office assigned you lobby task p7 from the user.",
+    "The office assigned you lobby task p7 from agent Rani (a1).",
+  ]) {
+    expect(readLobbyAssignment(`${heading}\n  Fix it\n${footer}`)).toEqual({
+      id: "p7",
+      body: "Fix it",
+      kind: "lobby",
+    });
+  }
+  for (const heading of [
+    "The office assigned you lobby task p7 from Jira proj-12.",
+    "The office assigned you lobby task p7 from Jira PROJ-12 and more.",
+    "The office assigned you lobby task p7 from Linear PROJ-12.",
+  ]) {
+    expect(readLobbyAssignment(`${heading}\n  Fix it\n${footer}`)).toBeNull();
+  }
+});

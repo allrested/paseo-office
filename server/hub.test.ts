@@ -1665,3 +1665,37 @@ test("the gate's state reaches subscribers in the snapshot and as an event, and 
   subscriber.controller.abort();
   await subscriber.done;
 });
+
+const INTAKE = {
+  jira: { configured: true, problem: null, lastRun: "2026-11-11T09:00:00.000Z", imported: 2 },
+  waiting: false,
+};
+
+test("the intake's state reaches subscribers in the snapshot and as an event, and the same again sends nothing", async () => {
+  const harness = startHarness({ agents: [], workspaces: [] });
+  harness.hub.setIntake(INTAKE);
+  const subscriber = subscribe(harness.hub);
+  await settle();
+  expect(subscriber.events).toEqual([
+    {
+      type: "snapshot",
+      state: {
+        agents: [],
+        workspaces: [],
+        activity: {},
+        doing: {},
+        checklists: {},
+        boards: {},
+        wake: EMPTY_WAKE,
+        intake: INTAKE,
+      },
+    },
+  ]);
+  harness.hub.setIntake(structuredClone(INTAKE));
+  expect(subscriber.events).toHaveLength(1);
+  const waiting = { ...INTAKE, waiting: true };
+  harness.hub.setIntake(waiting);
+  expect(subscriber.events.at(-1)).toEqual({ type: "intake", intake: waiting });
+  subscriber.controller.abort();
+  await subscriber.done;
+});

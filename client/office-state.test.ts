@@ -151,6 +151,17 @@ test("the chat's changes", () => {
   expect(long?.messages[299].id).toBe("m300");
 });
 
+test("the intake's state replaces the one before", () => {
+  const intake = {
+    jira: { configured: true, problem: null, lastRun: "2026-11-11T09:00:00.000Z", imported: 1 },
+    waiting: false,
+  };
+  expect(applyOfficeEvent(EMPTY_OFFICE, { type: "intake", intake })).toEqual({
+    ...EMPTY_OFFICE,
+    intake,
+  });
+});
+
 test("the gate's state replaces the one before", () => {
   const autoStart = { on: true, reason: "per-day" as const, startedToday: 10, perDay: 10 };
   expect(applyOfficeEvent(EMPTY_OFFICE, { type: "auto-start", autoStart })).toEqual({

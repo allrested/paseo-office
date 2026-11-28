@@ -108,6 +108,9 @@ const ON: SettingsState = {
     autoStartUnderPct: 70,
     autoStartAtOnce: 3,
     autoStartPerDay: 10,
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -139,6 +142,9 @@ const OFF: SettingsState = {
     autoStartUnderPct: 70,
     autoStartAtOnce: 3,
     autoStartPerDay: 10,
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -494,6 +500,8 @@ function setup(
   const chatStore = options.chatStore ?? memoryChatStore();
   // The auto-start gate's day count, as auto-start.json keeps it.
   const autoStartKept: { value: unknown } = { value: null };
+  // The intake's seen tickets, as intake.json keeps them.
+  const intakeKept: { value: unknown } = { value: null };
   const clock = createFakeClock(options.start ?? Date.parse("2026-11-11T09:00:00.000Z"));
   const context = fakeContext(statuses, sent, writers, directory);
   const baseServer = fakeServer(recorded, read);
@@ -515,6 +523,12 @@ function setup(
       load: async () => structuredClone(autoStartKept.value) as never,
       save: async (count) => {
         autoStartKept.value = structuredClone(count);
+      },
+    },
+    intakeFile: {
+      load: async () => structuredClone(intakeKept.value) as never,
+      save: async (seen) => {
+        intakeKept.value = structuredClone(seen);
       },
     },
     env: options.env ?? {},
@@ -554,6 +568,7 @@ function setup(
     incidentsStore,
     trackerStore,
     autoStartKept,
+    intakeKept,
     clock,
     context,
     stop,
@@ -688,6 +703,9 @@ function notesSettings(
       autoStartUnderPct: 70,
       autoStartAtOnce: 3,
       autoStartPerDay: 10,
+      jiraIntakeJql: "",
+      intakeLands: "backlog",
+      intakeWriteBack: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1048,8 +1066,14 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.home.departure",
     "office.undo",
     "office.tenure.request",
+    "office.intake.run.request",
   ]);
-  expect([...recorded.scheduleRuns.keys()]).toEqual(["standup-notes", "duty-board", "incidents"]);
+  expect([...recorded.scheduleRuns.keys()]).toEqual([
+    "standup-notes",
+    "duty-board",
+    "incidents",
+    "intake",
+  ]);
   expect([...recorded.hooks.keys()]).toEqual([
     "agent.open.before",
     "agent.turn.before",
@@ -1297,6 +1321,9 @@ const NOTES: SettingsState = {
     autoStartUnderPct: 70,
     autoStartAtOnce: 3,
     autoStartPerDay: 10,
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -1426,6 +1453,9 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       autoStartUnderPct: 70,
       autoStartAtOnce: 3,
       autoStartPerDay: 10,
+      jiraIntakeJql: "",
+      intakeLands: "backlog",
+      intakeWriteBack: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1894,6 +1924,9 @@ const JIRA_ON: SettingsState = {
     autoStartUnderPct: 70,
     autoStartAtOnce: 3,
     autoStartPerDay: 10,
+    jiraIntakeJql: "",
+    intakeLands: "backlog",
+    intakeWriteBack: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -2434,5 +2467,76 @@ test("with Agent tools off nobody could take the work, and the gate says so", as
     perDay: 10,
   });
   await office.leave();
+  await stop();
+});
+
+test("with a JQL and a Jira sign-in the intake's timer is kept, and run now posts the ticket as a held lobby task", async () => {
+  const fetchFn = vi.fn(async (url: string | URL | Request) => {
+    const asked = new URL(String(url));
+    if (asked.pathname !== "/rest/api/3/search/jql") throw new Error("Unexpected request");
+    return new Response(
+      JSON.stringify({
+        issues: [{ key: "OPS-7", fields: { summary: "Checkout fails", description: "It fails." } }],
+      }),
+      { status: 200 },
+    );
+  });
+  const values = { ...ON.values, agentTools: false, jiraIntakeJql: "project = OPS" };
+  const { recorded, context, intakeKept, logs, stop } = setup(async () => ({ ...ON, values }), {
+    env: jiraVariables("https://acme.atlassian.example"),
+    fetchFn,
+  });
+  await settle();
+  expect(recorded.schedules).toContain("upsert intake every 600000");
+  const run = recorded.handlers.get("office.intake.run.request");
+  const state = await run?.({}, context);
+  expect(state).toEqual({
+    jira: {
+      configured: true,
+      problem: null,
+      lastRun: "2026-11-11T09:00:00.000Z",
+      imported: 1,
+    },
+    waiting: false,
+  });
+  expect(new URL(String(fetchFn.mock.calls[0]?.[0])).searchParams.get("jql")).toBe("project = OPS");
+  expect(intakeKept.value).toEqual({
+    version: 1,
+    seen: { "jira:OPS-7": "2026-11-11T09:00:00.000Z" },
+  });
+  const office = openOffice(recorded, context);
+  await settle();
+  expect(boardShown(office.events, "lobby")).toEqual([
+    expect.objectContaining({
+      text: "OPS-7 Checkout fails\nhttps://acme.atlassian.example/browse/OPS-7\n\nIt fails.",
+      backlog: true,
+      source: { kind: "jira", key: "OPS-7", url: "https://acme.atlassian.example/browse/OPS-7" },
+    }),
+  ]);
+  const snapshot = office.events.findLast((event) => event.type === "snapshot")?.state as
+    | { intake?: unknown }
+    | undefined;
+  expect(snapshot?.intake).toEqual(state);
+  // The scheduled run is the same run.
+  await recorded.scheduleRuns.get("intake")?.(Date.now());
+  expect(fetchFn).toHaveBeenCalledTimes(2);
+  expect(logs.join("\n")).not.toContain("project = OPS");
+  expect(logs.join("\n")).not.toContain("placeholder-jira-token");
+  await office.leave();
+  await stop();
+});
+
+test("with no JQL the intake has no timer and reads nothing", async () => {
+  const fetchFn = vi.fn(async () => new Response("{}"));
+  const { recorded, context, stop } = setup(async () => ON, {
+    env: jiraVariables("https://acme.atlassian.example"),
+    fetchFn,
+  });
+  await settle();
+  expect(recorded.schedules).toContain("remove intake");
+  expect(recorded.schedules).not.toContain("upsert intake every 600000");
+  const state = await recorded.handlers.get("office.intake.run.request")?.({}, context);
+  expect(state).toMatchObject({ jira: { configured: false, imported: 0 } });
+  expect(fetchFn).not.toHaveBeenCalled();
   await stop();
 });

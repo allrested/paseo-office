@@ -11,6 +11,7 @@ import {
   LOBBY,
   POST_TEXT_MAX,
   PostKindSchema,
+  SOURCE_NAMES,
   UpdateActionSchema,
   type Post,
 } from "../shared/contracts.js";
@@ -93,9 +94,12 @@ export function postLine(
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
   const re = post.replyTo ? ` re ${post.replyTo}` : "";
+  const source = post.source
+    ? ` [${SOURCE_NAMES[post.source.kind]} ${oneLine(post.source.key)}]`
+    : "";
   const needs = post.blocked ? `\n  needs: ${indented(post.blocked)}` : "";
   const result = post.result ? `\n  result: ${indented(post.result)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${team}${after}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
+  return `${post.id} ${post.kind}${state}${claim}${team}${after}${link}${re}${source}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
 }
 
 export function readText(

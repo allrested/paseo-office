@@ -169,6 +169,29 @@ export type TaskState = z.output<typeof TaskStateSchema>;
 export const UpdateActionSchema = z.enum(["claim", "done", "reopen", "block"]);
 export type UpdateAction = z.output<typeof UpdateActionSchema>;
 
+/** Where an imported task came from: a Jira ticket, or (Change 4) a GitHub issue. */
+export const POST_SOURCE_KINDS = ["jira", "github"] as const;
+export type PostSourceKind = (typeof POST_SOURCE_KINDS)[number];
+
+/** How a heading and a board read name a source's kind. */
+export const SOURCE_NAMES: Record<PostSourceKind, string> = { jira: "Jira", github: "GitHub" };
+
+/**
+ * The shape of each kind's key. A key reaches an assignment's heading and a link, so one of
+ * another shape is never taken from a tracker.
+ */
+export const SOURCE_KEYS: Record<PostSourceKind, RegExp> = {
+  jira: /^[A-Z][A-Z0-9_]*-\d+$/,
+  github: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#\d+$/,
+};
+
+export const PostSourceSchema = z.object({
+  kind: z.enum(POST_SOURCE_KINDS),
+  key: z.string(),
+  url: z.string(),
+});
+export type PostSource = z.output<typeof PostSourceSchema>;
+
 export const PostSchema = z.object({
   /** `p` and the post's seq at creation. */
   id: z.string(),
@@ -209,6 +232,10 @@ export const PostSchema = z.object({
   after: z.array(z.string()).max(AFTER_MAX).optional(),
   /** On an open lobby task: held until the owner starts it; nothing is handed out or claimed by an agent. */
   backlog: z.literal(true).optional(),
+  /** On a lobby task the intake posted: the ticket it came from. A reopen keeps it. */
+  source: PostSourceSchema.optional(),
+  /** On a done task from a ticket: its result was commented on the ticket. A reopen drops it. */
+  wroteBack: z.literal(true).optional(),
   /** On a claimed or done task: when its holder took it (ISO time); the claim's first, not a repeat's. */
   claimedAt: z.string().optional(),
   /** On a done task: when it was marked done (ISO time). */
@@ -568,6 +595,24 @@ export const AutoStartStateSchema = z.object({
 });
 export type AutoStartState = z.output<typeof AutoStartStateSchema>;
 
+/** One source of the intake: set up, why its last run failed, when it ran, what that run posted. */
+export const IntakeSourceStateSchema = z.object({
+  configured: z.boolean(),
+  problem: z.string().nullable(),
+  /** ISO time of its last run; null before one. */
+  lastRun: z.string().nullable(),
+  /** The tasks its last run posted. */
+  imported: z.number().int().nonnegative(),
+});
+
+/** The intake: each source's state, and whether it waits for imported tasks to be done. */
+export const IntakeStateSchema = z.object({
+  jira: IntakeSourceStateSchema,
+  /** The last run stopped at the open imported tasks' limit. */
+  waiting: z.boolean(),
+});
+export type IntakeState = z.output<typeof IntakeStateSchema>;
+
 export const OfficeSnapshotSchema = z.object({
   brand: BrandingSchema.optional(),
   agents: z.array(OfficeAgentSchema),
@@ -594,6 +639,8 @@ export const OfficeSnapshotSchema = z.object({
   duties: DutyBoardSchema.optional(),
   /** The auto-start gate; absent until the office's server has looked once. */
   autoStart: AutoStartStateSchema.optional(),
+  /** The intake; absent until the office's server has read the settings. */
+  intake: IntakeStateSchema.optional(),
 });
 export type OfficeSnapshot = z.output<typeof OfficeSnapshotSchema>;
 
@@ -613,6 +660,7 @@ export const OfficeEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("board-removed"), board: z.string() }),
   z.object({ type: z.literal("wake"), wake: WakeStateSchema }),
   z.object({ type: z.literal("auto-start"), autoStart: AutoStartStateSchema }),
+  z.object({ type: z.literal("intake"), intake: IntakeStateSchema }),
   z.object({ type: z.literal("chat"), change: ChatChangeSchema }),
 ]);
 export type OfficeEvent = z.output<typeof OfficeEventSchema>;
@@ -1055,6 +1103,13 @@ export const notifyTestRpc = defineRpc({
     z.object({ ok: z.literal(true) }),
     z.object({ ok: z.literal(false), problem: z.string() }),
   ]),
+});
+
+/** Runs the intake now, as its timer would, and answers its state: the settings' test of a JQL. */
+export const intakeRunRpc = defineRpc({
+  name: "office.intake.run.request",
+  input: z.object({}),
+  output: IntakeStateSchema,
 });
 
 /** Closes the named open incidents, or all of them when none are named. Their keys stay seen. */

@@ -76,7 +76,8 @@ function jqlTime(since: number, timeZone: string): string {
   return `${day} ${parts.get("hour")}:${parts.get("minute")}`;
 }
 
-function jiraTracker(env: JiraEnv, fetchFn: typeof fetch): Tracker {
+/** Jira's sign-in for `getJson` and `postJson`. */
+export function jiraTracker(env: JiraEnv, fetchFn: typeof fetch): Tracker {
   const basic = Buffer.from(`${env.email}:${env.token}`).toString("base64");
   return {
     name: "Jira",

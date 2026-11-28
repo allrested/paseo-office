@@ -87,17 +87,24 @@ function refusal(name: string, status: number, body: unknown): TrackerProblem {
   return new TrackerProblem(`${name} answered HTTP ${status}: ${words}`);
 }
 
-/** One GET to a tracker, read through `schema`. Rejects with a `TrackerProblem`. */
-export async function getJson<Schema extends z.ZodType>(
-  input: GetJsonInput<Schema>,
-): Promise<z.output<Schema>> {
-  const { tracker, url, schema } = input;
+/**
+ * One request to a tracker; resolves its parsed body once it answered 2xx. Rejects with a
+ * `TrackerProblem`.
+ */
+interface SendInit {
+  method?: "POST";
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+async function send(tracker: Tracker, url: string, init: SendInit): Promise<unknown> {
   const { name } = tracker;
   let response: Response;
   let text: string;
   try {
     response = await tracker.fetchFn(url, {
-      headers: { ...tracker.headers, Accept: "application/json" },
+      ...init,
+      headers: { ...tracker.headers, Accept: "application/json", ...init.headers },
       // A redirect would carry the token to wherever it points.
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -115,9 +122,30 @@ export async function getJson<Schema extends z.ZodType>(
   }
   const body = parseBody(text);
   if (!response.ok) throw refusal(name, status, body);
+  return body;
+}
+
+/** One GET to a tracker, read through `schema`. Rejects with a `TrackerProblem`. */
+export async function getJson<Schema extends z.ZodType>(
+  input: GetJsonInput<Schema>,
+): Promise<z.output<Schema>> {
+  const { tracker, url, schema } = input;
+  const body = await send(tracker, url, {});
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new TrackerProblem(`${name} answered in a shape the office does not read`);
+    throw new TrackerProblem(`${tracker.name} answered in a shape the office does not read`);
   }
   return parsed.data;
+}
+
+/**
+ * One POST of `body` as JSON to a tracker, with the GET's safety: its answer is not read. Rejects
+ * with a `TrackerProblem`.
+ */
+export async function postJson(input: { tracker: Tracker; url: string; body: unknown }) {
+  await send(input.tracker, input.url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input.body),
+  });
 }
