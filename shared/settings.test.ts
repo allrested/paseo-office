@@ -83,6 +83,7 @@ const COMPANY = {
   githubIntakeSearch: "label:agent is:open",
   ...TELEGRAM_DEFAULTS,
   ...WEATHER_DEFAULTS,
+  handOverWhenOut: false,
 };
 
 test("version 1 settings keep their Agent tools choice and have no notes folder", async () => {
@@ -121,7 +122,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.version).toBe(18);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -142,7 +143,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.version).toBe(18);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -407,7 +408,7 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.version).toBe(18);
 });
 
 test("starting by itself is off, with its three numbers, and a number out of range is refused", async () => {
@@ -469,7 +470,7 @@ test("the Jira intake is off with no JQL, lands in the backlog, writes nothing b
   ).toBe(true);
   expect(schema.safeParse({ jiraIntakeJql: "j".repeat(1_001) }).success).toBe(false);
   expect(schema.safeParse({ intakeLands: "done" }).success).toBe(false);
-  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.version).toBe(18);
 });
 
 test("the GitHub intake has no repository, searches label:agent is:open, and a version 15 document starts so", async () => {
@@ -537,7 +538,7 @@ test("a GitHub search that names a repository, organisation or user is refused",
 });
 
 test("Telegram has no chat and no user, tells what needs you, is done, incidents and plans, and a version 16 document starts so", async () => {
-  expect(officeHostSettings.version).toBe(17);
+  expect(officeHostSettings.version).toBe(18);
   expect(officeHostSettings.schema.parse({})).toMatchObject(TELEGRAM_DEFAULTS);
   expect(await upgraded({ agentTools: true, githubIntakeRepos: ["acme/web"] }, 16)).toMatchObject({
     githubIntakeRepos: ["acme/web"],
@@ -568,4 +569,15 @@ test("the Telegram chat is digits with an optional leading minus, and each user 
   const ids = Array.from({ length: 21 }, (_, index) => String(1000 + index));
   expect(hostIssues({ telegramUsers: ids })).toEqual(["telegramUsers: at most 20 user ids"]);
   expect(hostIssues({ telegramUsers: ids.slice(0, 20) })).toEqual([]);
+});
+
+test("handing over when a plan runs out is off, and a version 17 document starts so", async () => {
+  expect(officeHostSettings.version).toBe(18);
+  expect(officeHostSettings.schema.parse({}).handOverWhenOut).toBe(false);
+  expect(await upgraded({ agentTools: true, telegramChat: "123" }, 17)).toMatchObject({
+    telegramChat: "123",
+    handOverWhenOut: false,
+  });
+  expect(officeHostSettings.schema.safeParse({ handOverWhenOut: true }).success).toBe(true);
+  expect(officeHostSettings.schema.safeParse({ handOverWhenOut: "yes" }).success).toBe(false);
 });

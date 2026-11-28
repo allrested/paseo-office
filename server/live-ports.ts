@@ -77,6 +77,12 @@ export function liveHubPorts(
   };
 }
 
+/**
+ * How far back a hand-over looks for the holder's last answer: whole turns, so a turn the plan
+ * ran out in, with no answer of its own, still leaves the one before it.
+ */
+const LAST_ANSWER_TAIL_LIMIT = 50;
+
 /** A finished-turn notification is normal for an available agent. Other attention needs the user. */
 function availableForOfficeWork(agent: AgentSnapshotPayload, home = false): boolean {
   const attention = agent.requiresAttention || agent.attentionReason;
@@ -176,6 +182,31 @@ export function liveAgentPorts(
     teamName: (teamId) => rosterTeamById(roster(), teamId)?.name ?? null,
     costOf,
     working,
+    async providerOf(agentId) {
+      const result = await refresh(agentId);
+      return result?.agent.provider || null;
+    },
+    async lastAnswerOf(agentId, since) {
+      const page = await holder
+        .require()
+        .agents.ref(agentId)
+        .timeline.refetch({ direction: "tail", limit: LAST_ANSWER_TAIL_LIMIT, wholeTurns: true });
+      if (page.error) throw new Error(page.error);
+      // An entry with no time cannot be placed after the claim. A turn counts by when it ended.
+      const timed = page.entries.flatMap((entry) => {
+        const at = Date.parse(entry.timestamp ?? "");
+        return Number.isNaN(at) ? [] : [{ entry, at }];
+      });
+      const ended = new Map<string, number>();
+      for (const { entry, at } of timed) {
+        const turn = entry.turnId ?? `@${at}`;
+        ended.set(turn, Math.max(ended.get(turn) ?? at, at));
+      }
+      const recent = timed.filter(
+        ({ entry, at }) => (ended.get(entry.turnId ?? `@${at}`) ?? at) >= since,
+      );
+      return lastAssistantText(recent.map(({ entry }) => entry.item));
+    },
   };
 }
 

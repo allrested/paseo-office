@@ -91,6 +91,7 @@ export function postLine(
   const team = post.team ? ` for team ${oneLine(teamLabel(post.team))}` : "";
   const waiting = waitingOn(post, posts).length > 0 ? " (waiting)" : "";
   const after = post.after?.length ? ` after ${post.after.join(", ")}${waiting}` : "";
+  const notFor = post.notProvider ? ` not for ${oneLine(post.notProvider)}` : "";
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
   const re = post.replyTo ? ` re ${post.replyTo}` : "";
@@ -99,7 +100,7 @@ export function postLine(
     : "";
   const needs = post.blocked ? `\n  needs: ${indented(post.blocked)}` : "";
   const result = post.result ? `\n  result: ${indented(post.result)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${team}${after}${link}${re}${source}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
+  return `${post.id} ${post.kind}${state}${claim}${team}${after}${notFor}${link}${re}${source}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
 }
 
 export function readText(

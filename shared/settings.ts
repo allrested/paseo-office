@@ -170,6 +170,7 @@ const HostValuesSchema = z.object({
   telegramIncidents: z.boolean().default(true),
   telegramPlan: z.boolean().default(true),
   telegramLands: z.enum(INTAKE_LANDS).default("backlog"),
+  handOverWhenOut: z.boolean().default(false),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
@@ -338,12 +339,14 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * `telegramUsers` the Telegram user ids it hears, in that chat or in a private chat with each;
  * the bot's token is no setting. `telegramNeeds`, `telegramStalled`, `telegramDone`,
  * `telegramIncidents` and `telegramPlan` each send one kind of message there; a task posted with
- * `/task` lands where `telegramLands` says.
+ * `/task` lands where `telegramLands` says. `handOverWhenOut` on has the office hand over the
+ * lobby tasks held by a provider's agents not in a turn when its closest limit reads Out, to an
+ * agent of another provider; it needs `keepWatching`, which reads the limits.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 17,
+  version: 18,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadGithubValues)
@@ -378,6 +381,7 @@ export const officeHostSettings = defineSettings({
   // Version 16 adds `githubIntakeRepos`, none, and `githubIntakeSearch`, "label:agent is:open".
   // Version 17 adds `telegramChat`, empty, `telegramUsers`, none, `telegramNeeds`, `telegramDone`,
   // `telegramIncidents` and `telegramPlan`, on, `telegramStalled`, off, and `telegramLands`, backlog.
+  // Version 18 adds `handOverWhenOut`, off.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

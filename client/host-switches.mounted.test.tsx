@@ -180,6 +180,7 @@ beforeEach(() => {
     telegramIncidents: true,
     telegramPlan: true,
     telegramLands: "backlog",
+    handOverWhenOut: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -271,6 +272,7 @@ test("the notes folder saves once it loses focus, trimmed, and keeps the other s
         telegramIncidents: true,
         telegramPlan: true,
         telegramLands: "backlog",
+        handOverWhenOut: false,
         notifyUrl: "",
         notifyLevel: "danger",
         teams: [],
@@ -361,6 +363,7 @@ test("the switch keeps the notes settings when it saves", async () => {
       telegramIncidents: true,
       telegramPlan: true,
       telegramLands: "backlog",
+      handOverWhenOut: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -839,6 +842,19 @@ test("Start backlog tasks is off at first and saves autoStart, with the hint abo
   );
   await act(async () => control.click());
   expect(saved.map((save) => save.values.autoStart)).toEqual([true]);
+});
+
+test("Hand over when a plan runs out is off at first and saves handOverWhenOut, with its hint", async () => {
+  await mount();
+  const control = container.querySelector<HTMLElement>(
+    '[aria-label="Hand over when a plan runs out"]',
+  )!;
+  expect(control.getAttribute("aria-checked")).toBe("false");
+  expect(container.textContent).toContain(
+    "When a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider. Needs Keep watching.",
+  );
+  await act(async () => control.click());
+  expect(saved.map((save) => save.values.handOverWhenOut)).toEqual([true]);
 });
 
 test("the gate's numbers show the stored ones, and a number saves once it loses focus", async () => {

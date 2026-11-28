@@ -7,6 +7,7 @@ import { boardPreview, postMeta, todoPreview, type TeamNamer } from "./board-tex
 import type { OfficeRoom } from "../shared/model.js";
 import { SourceChip } from "./source-chip.js";
 import type { OfficeStyles } from "./styles.js";
+import { useProviderName } from "./use-plan-usage.js";
 
 export interface PostRowProps {
   post: Post;
@@ -18,11 +19,12 @@ export interface PostRowProps {
 }
 
 export function PostRow({ post, name, teamName, styles, brief = false }: PostRowProps) {
+  const providerName = useProviderName();
   return (
     <View style={styles.post}>
       <View style={styles.standupMeta}>
         <Text style={styles.postMeta} numberOfLines={brief ? 1 : undefined}>
-          {postMeta(post, name, teamName)}
+          {postMeta(post, name, teamName, providerName)}
         </Text>
         {post.source === undefined ? null : <SourceChip source={post.source} styles={styles} />}
       </View>

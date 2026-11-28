@@ -53,6 +53,11 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Task · claimed by Builder", "Việc · Builder đã nhận"],
     ["Team QA-PR", "Nhóm QA-PR"],
     ["for team QA-PR", "cho nhóm QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "Giao p12 cho agent của nhà cung cấp khác? Builder sẽ mất việc này, và một ghi chú nói rõ đã dừng ở đâu.",
+    ],
+    ["not for Codex", "không dành cho Codex"],
     ["1 teammate", "1 thành viên"],
     ["2 teammates", "2 thành viên"],
     ["Replay · 14:05 · 60×", "Xem lại · 14:05 · 60×"],
@@ -177,4 +182,33 @@ test("a done task's time and cost line takes the language, its dollar amount as 
   for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
   // Only the exact line: a post that starts with the word is left alone.
   expect(translatePattern("took the bus to work")).toBe("took the bus to work");
+});
+
+test("a meta line joined with · is translated part by part, whatever follows the claim", () => {
+  const lines: [string, string][] = [
+    [
+      "claimed by Planner · for team QA-PR · not for Codex · on Planner's board",
+      "Planner đã nhận · cho nhóm QA-PR · không dành cho Codex · trên bảng của Planner",
+    ],
+    [
+      "claimed by Planner · for Planner · for team QA-PR · not for Codex",
+      "Planner đã nhận · cho Planner · cho nhóm QA-PR · không dành cho Codex",
+    ],
+    [
+      "Task · claimed by Planner · You → Planner · for team QA-PR · not for Codex · from lobby task p12",
+      "Việc · Planner đã nhận · You → Planner · cho nhóm QA-PR · không dành cho Codex · từ việc ở sảnh p12",
+    ],
+    ["claimed by Planner · not for Codex", "Planner đã nhận · không dành cho Codex"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+});
+
+test("a line with · that is not a meta line is left to the other rules", () => {
+  for (const said of [
+    "Fix the build · for the demo",
+    "for me · not now",
+    "Task · fix the build · now",
+  ]) {
+    expect(translatePattern(said)).toBe(said);
+  }
 });

@@ -20,6 +20,7 @@ import {
 import { dutyPostText } from "../shared/duties.js";
 import type { BoardStore, BoardsFile } from "./board-store.js";
 import { errorMessage } from "./errors.js";
+import { cleanLines } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 
 export interface NewPost {
@@ -79,6 +80,39 @@ export interface BoardServicePorts {
   costOf?(agentId: string): number | undefined;
   /** Whether an agent is in a turn now (running or initializing); false when unknown. */
   working?(agentId: string): boolean;
+  /** The provider an agent runs on; null when unknown, and then no hand-over keeps it off a task. */
+  providerOf?(agentId: string): Promise<string | null>;
+}
+
+/** A hand-over note's answer: the holder's last words, never a whole transcript. */
+export const HAND_OVER_ANSWER_MAX = 1_200;
+/** A hand-over note's block reason, which comes first, so the So far block's cut keeps it. */
+export const HAND_OVER_REASON_MAX = 300;
+
+/** Who holds a task that can be handed over, and what says whether its answer is the task's. */
+export type HandOverHolder =
+  | {
+      ok: true;
+      holder: string;
+      /** When the holder took it; an answer from before then is not about the task. */
+      claimedAt?: string;
+      /** False while its assignment waits for delivery: the holder has not seen it. */
+      delivered: boolean;
+    }
+  | { ok: false; error: string };
+
+/** What a hand-over saves, read before it: reading the holder's answer never holds the queue. */
+export interface HandOver {
+  /** The task, or a room's copy of a lobby task. */
+  id: string;
+  /** The holder the answer was read from: if the task changed hands since, it is refused. */
+  holder: string;
+  /** The holder's last answer; null when none could be read. */
+  answer: string | null;
+  /** The holder's provider, kept as the task's `notProvider`; null when unknown. */
+  provider: string | null;
+  /** The provider's name when the office hands it over by itself because its plan ran out. */
+  outOf?: string;
 }
 
 /** What the duty board is brought up to: the list, the board's day, and the duties due now. */
@@ -102,6 +136,13 @@ export interface BoardService {
   wakesPaused(): boolean;
   post(input: NewPost): Promise<PostResult>;
   update(input: PostUpdate): Promise<PostResult>;
+  /** The agent holding a task that can be handed over, or why it cannot be. */
+  handOverHolder(id: string): HandOverHolder;
+  /**
+   * In one save: the holder's note under the task, the task reopened marked with its provider, and
+   * its copy deleted. The result is the reopened task (the lobby task when called on its copy).
+   */
+  handOver(input: HandOver): Promise<PostResult>;
   /** Takes a held task out of the backlog; one not held is returned as it is. */
   startTask(id: string): Promise<PostResult>;
   /**
@@ -189,6 +230,7 @@ function withoutClaim(post: Post): Post {
   if (post.team !== undefined) next.team = post.team;
   if (post.after !== undefined) next.after = post.after;
   if (post.source !== undefined) next.source = post.source;
+  if (post.notProvider !== undefined) next.notProvider = post.notProvider;
   // A reopened task has no result, and nothing written back: the next finish brings its own.
   return next;
 }
@@ -524,6 +566,41 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     };
   }
 
+  /** The provider an agent runs on; a failed lookup is logged and counts as unknown. */
+  async function providerOf(agentId: string): Promise<string | null> {
+    try {
+      return (await ports.providerOf?.(agentId)) ?? null;
+    } catch (error) {
+      ports.log(`[office] no provider for ${agentId}: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  /** Whether an agent may take a task: it was not handed over from the agent's provider. */
+  async function providerFits(task: Post, agentId: string): Promise<boolean> {
+    if (task.notProvider === undefined) return true;
+    return (await providerOf(agentId)) !== task.notProvider;
+  }
+
+  /**
+   * An agent's claim, finish or block of a task handed over from its own provider: the former
+   * holder coming back must not close what another agent now holds. The holder is never refused,
+   * and the user takes any.
+   */
+  async function providerRefusal(input: PostUpdate): Promise<PostResult | null> {
+    if (input.action === "reopen" || input.actor === USER_AUTHOR) return null;
+    const post = data.posts.find((item) => item.id === input.id);
+    if (post?.kind !== "task" || post.claimedBy === input.actor) return null;
+    // A copy stands for its lobby task, which carries the mark.
+    const partner = partnerOf(post);
+    const task = partner?.board === LOBBY ? partner : post;
+    if (task.notProvider === undefined || (await providerFits(task, input.actor))) return null;
+    return {
+      ok: false,
+      error: `Unable to ${VERBS[input.action]} ${post.id}: it was handed over from ${task.notProvider}`,
+    };
+  }
+
   /** The name of the team a task is for, while the roster still has it; else the task is anyone's. */
   function liveTeam(task: Post): string | null {
     return task.team === undefined ? null : (ports.teamName?.(task.team) ?? null);
@@ -671,6 +748,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (input.action === "done") {
       const done = { ...post, state: "done" as const, doneAt: now() };
       delete done.backlog;
+      delete done.notProvider;
       delete done.pickupMessageId;
       delete done.blocked;
       // A turn's cost is reported when the turn ends: done in the middle of one, it is settled then.
@@ -770,6 +848,88 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     }
     const saved = await commit({ ...data, nextSeq: seq, posts }, touched);
     return saved.ok ? { ok: true, post: changed } : saved;
+  }
+
+  /** The task a hand-over of `id` acts on: a copy stands for its lobby task. */
+  function handOverTask(id: string): Outcome<Post & { claimedBy: string }> {
+    const refuse = (reason: string): Outcome<Post & { claimedBy: string }> => ({
+      ok: false,
+      error: `Unable to hand over ${id}: ${reason}`,
+    });
+    const post = data.posts.find((item) => item.id === id);
+    if (post === undefined) return refuse("no such post");
+    if (post.kind !== "task") return refuse("it is a note");
+    const partner = PICKUP_BOARDS.has(post.board) ? undefined : partnerOf(post);
+    const task = partner?.board === LOBBY ? partner : post;
+    if (!PICKUP_BOARDS.has(task.board)) return refuse("only a lobby task or a duty is handed on");
+    if (task.state === "done") return refuse("it is done");
+    const holder = task.claimedBy;
+    if (task.state !== "claimed" || holder === undefined) return refuse("nobody holds it");
+    if (holder === USER_AUTHOR) return refuse("you hold it: reopen it instead");
+    return { ok: true, value: { ...task, claimedBy: holder } };
+  }
+
+  /** Where the holder left the task, as its note says: its answer, cleaned and cut, and its block. */
+  function handOverText(task: Post, input: HandOver): string {
+    // Control characters could move a terminal's cursor or forge a line; a newline and a tab stay.
+    const cut = (text: string, max: number) =>
+      text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    const answer = cut(cleanLines(input.answer ?? "").trim(), HAND_OVER_ANSWER_MAX);
+    const how = input.outOf === undefined ? "" : ` (handed over when ${input.outOf} ran out)`;
+    const words = answer === "" ? "no answer to read." : answer;
+    const head = `Where ${ports.label(input.holder)} left it${how}`;
+    // The reason first: the next agent's prompt cuts each note, and the answer can be long.
+    const reason = cleanLines(task.blocked ?? "").trim();
+    const text =
+      reason === ""
+        ? `${head}: ${words}`
+        : `${head}. It needed: ${cut(reason, HAND_OVER_REASON_MAX)}\n${words}`;
+    return text.length > POST_TEXT_MAX ? `${text.slice(0, POST_TEXT_MAX - 1)}…` : text;
+  }
+
+  async function handOverPost(input: HandOver): Promise<PostResult> {
+    const found = handOverTask(input.id);
+    if (!found.ok) return found;
+    const task = found.value;
+    if (task.claimedBy !== input.holder)
+      return { ok: false, error: `Unable to hand over ${input.id}: it changed hands, try again` };
+    const stamp = now();
+    let seq = data.nextSeq;
+    // The holder's own note: it wakes nobody, and the former holder is not told.
+    const note: Post = {
+      id: `p${seq}`,
+      seq,
+      board: task.board,
+      kind: "note",
+      text: handOverText(task, input),
+      author: input.holder,
+      replyTo: task.id,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    seq += 1;
+    const reopened: Post = { ...withoutClaim(task), state: "open", seq: seq++, updatedAt: stamp };
+    if (input.provider === null) delete reopened.notProvider;
+    else reopened.notProvider = input.provider;
+    // Named for the holder it would wait for that holder: it is free for anyone of another provider.
+    delete reopened.to;
+    delete reopened.namedPickup;
+    const partner = partnerOf(task);
+    // Make room as a reply does: the task and its replies stay.
+    const held = postsOf(task.board).filter(
+      (item) => item.id === task.id || item.replyTo === task.id,
+    );
+    const heldIds = new Set(held.map((item) => item.id));
+    const rest = postsOf(task.board).filter((item) => !heldIds.has(item.id));
+    const kept = [...trimBoard(rest, BOARD_POST_MAX - 1 - held.length), ...held];
+    if (kept.length >= BOARD_POST_MAX)
+      return { ok: false, error: "Unable to post: the board holds 200 open or claimed tasks" };
+    const posts = [...data.posts.filter((item) => item.board !== task.board), ...kept, note]
+      .filter((item) => item.id !== partner?.id)
+      .map((item) => (item.id === task.id ? reopened : item));
+    const touched = [task.board, ...(partner === undefined ? [] : [partner.board])];
+    const saved = await commit({ ...data, nextSeq: seq, posts }, touched);
+    return saved.ok ? { ok: true, post: reopened } : saved;
   }
 
   /** Reopening a copy reopens its lobby task and deletes the copy; the result is the lobby task. */
@@ -1017,8 +1177,21 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           backlogRefusal(input) ??
           waitingRefusal(input) ??
           (await teamRefusal(input)) ??
+          (await providerRefusal(input)) ??
           updatePost(input),
       ),
+    handOverHolder(id) {
+      const found = handOverTask(id);
+      if (!found.ok) return found;
+      const { claimedBy, claimedAt, pickupMessageId } = found.value;
+      return {
+        ok: true,
+        holder: claimedBy,
+        ...(claimedAt === undefined ? {} : { claimedAt }),
+        delivered: !pickupMessageId,
+      };
+    },
+    handOver: (input) => exclusive(() => handOverPost(input)),
     startTask: (id) =>
       exclusive(async (): Promise<PostResult> => {
         const result = await unhold(id, null);
@@ -1046,6 +1219,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           return null;
         if (ports.refuse?.(task, { id, actor: agentId, action: "claim" })) return null;
         if (!(await teamFits(task, agentId))) return null;
+        if (!(await providerFits(task, agentId))) return null;
         return updateForPickup({ id, actor: agentId, action: "claim" }, randomUUID());
       }),
     finishLobbyClaim: (claim, result) =>

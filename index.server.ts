@@ -58,7 +58,7 @@ import {
 import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
-import { createPlanWatch } from "./server/plan-watch.js";
+import { createPlanWatch, handOverWhenOut } from "./server/plan-watch.js";
 import {
   autoStartFileStore,
   createAutoStart,
@@ -151,7 +151,7 @@ import {
   dutiesFileStore,
   type DutiesFile,
 } from "./server/duty-service.js";
-import { createOffice } from "./server/office.js";
+import { createOffice, type HandOverAgent } from "./server/office.js";
 import { createPaseoHolder } from "./server/paseo-holder.js";
 import {
   boardsFile,
@@ -205,6 +205,7 @@ import {
   setWakesPausedRpc,
   skillsRpc,
   startRpc,
+  handOverRpc,
   updateRpc,
   sentImageRpc,
   worldLogoRpc,
@@ -424,7 +425,10 @@ export function createOfficePlugin(
   let autoStart: AutoStart | null = null;
   // Made once the office is: a board change can be a task from a ticket now done.
   let intake: Intake | null = null;
+  // The plan watch's providers at Out now; set once it is made, and none before.
+  let outProviders: () => ReadonlySet<string> = () => new Set();
   const office = createOffice({
+    outProviders: () => outProviders(),
     store: deps.store,
     clock: deps.clock,
     hub,
@@ -441,6 +445,21 @@ export function createOfficePlugin(
       telegram?.boardChanged();
     },
   });
+  // Each agent's provider and status as the directory last reported; null while there is none,
+  // and then no plan running out hands a task over.
+  let handOverAgents: HandOverAgent[] | null = null;
+  const stopHandOverAgents = hub.watch((view) => {
+    handOverAgents =
+      view === null
+        ? null
+        : view.agents.map((agent) => ({
+            id: agent.id,
+            provider: agent.provider,
+            status: agent.status,
+          }));
+  });
+  // Off until the settings are read: nothing is handed over before the owner has said it may be.
+  let handOverOn = false;
   // Each agent's status and name as the directory last reported; null while there is none, and
   // then no claim is told as stalled.
   let directoryAgents: ReadonlyMap<string, DirectoryAgent> | null = null;
@@ -516,6 +535,13 @@ export function createOfficePlugin(
     timers: deps.clock,
     log,
   });
+  // At Out, with the owner's switch on, the provider's idle holders' lobby tasks go to another's.
+  const handOverOut = handOverWhenOut({
+    on: () => handOverOn,
+    agents: () => handOverAgents,
+    handOver: (provider, agents) => office.handOverOut(provider, agents),
+    log,
+  });
   // The providers whose plan the owner left out; empty until the settings are read.
   let planHidden: ReadonlySet<string> = new Set();
   const planWatch = createPlanWatch({
@@ -523,13 +549,17 @@ export function createOfficePlugin(
       return projectPlanUsage((await holder.require().providers.listUsage()).providers);
     },
     counted: (provider) => !planHidden.has(provider),
-    raised: ({ provider, window }) =>
-      tell(planNotice(provider.name, window.label, window.usedPct, deps.clock.now(), officeName)),
+    raised: (crossing) => {
+      const { provider, window } = crossing;
+      tell(planNotice(provider.name, window.label, window.usedPct, deps.clock.now(), officeName));
+      handOverOut(crossing);
+    },
     // The gate's only reading: with Keep watching off there is none, and nothing starts by itself.
     observed: (reading) => autoStart?.planRead(reading),
     timers: deps.clock,
     log,
   });
+  outProviders = () => planWatch.outNow();
   // Starts the lobby's oldest backlog task while the plan, the claims and the day's count allow.
   autoStart = createAutoStart({
     board: office,
@@ -799,6 +829,7 @@ export function createOfficePlugin(
     pinnedNotes = "";
     notifyUrl = "";
     keepWatching = false;
+    handOverOn = false;
     loopGuard = false;
     undoOn = false;
     followWatching();
@@ -838,6 +869,7 @@ export function createOfficePlugin(
     pinnedNotes = state.values.pinnedNotes;
     keepWatching = state.values.keepWatching;
     planHidden = new Set(state.values.planHidden);
+    handOverOn = state.values.handOverWhenOut;
     loopGuard = state.values.loopGuard;
     undoOn = state.values.undoTurn;
     followWatching();
@@ -991,6 +1023,10 @@ export function createOfficePlugin(
   server.handle(startRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("start", () => office.start(input.id));
+  });
+  server.handle(handOverRpc, (input, context) => {
+    holder.remember(context.paseo);
+    return guarded("hand over", () => office.handOver(input.id));
   });
   server.handle(deleteRpc, (input, context) => {
     holder.remember(context.paseo);
@@ -1427,6 +1463,7 @@ export function createOfficePlugin(
     stopCheckouts();
     stopCosts();
     stopTelegramAgents();
+    stopHandOverAgents();
     stopVault?.();
     await deps.vaultStore?.flush();
     await deps.timelineStore?.flush();

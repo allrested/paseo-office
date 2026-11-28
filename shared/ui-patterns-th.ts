@@ -1,3 +1,4 @@
+import { translateMetaLine } from "./ui-meta-line.js";
 import { UI_TH } from "./ui-words-th.js";
 
 /**
@@ -235,6 +236,12 @@ export const RULES: readonly Rule[] = [
   [/^on (.+)'s board$/, (name) => `บนบอร์ดของ ${name}`],
   [/^Team (.+)$/, (name) => `ทีม ${name}`],
   [/^for team (.+)$/, (name) => `สำหรับทีม ${name}`],
+  [
+    /^Hand (p\d+) over to an agent of another provider\? (.+) loses it, and a note says where it was left\.$/,
+    (id, name) =>
+      `ส่งต่อ ${id} ให้เอเจนต์ของผู้ให้บริการรายอื่น? ${name} จะเสียงานนี้ไป และโน้ตจะบอกว่าทิ้งไว้ตรงไหน`,
+  ],
+  [/^not for (.+)$/, (name) => `ไม่ใช่สำหรับ ${name}`],
   [/^(\d+) teammates?$/, (n) => `${n} เพื่อนร่วมทีม`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,
@@ -307,6 +314,14 @@ export const RULES: readonly Rule[] = [
 
 /** The line in Thai when a rule fits it, else the line as it is. */
 export function translatePattern(text: string): string {
+  const known = UI_TH[text];
+  if (known !== undefined) return known;
+  const meta = translateMetaLine(text, translateWhole, (name) => `สำหรับ ${name}`);
+  return meta ?? translateWhole(text);
+}
+
+/** A line as one piece: its words, else the first rule that fits it. */
+function translateWhole(text: string): string {
   const known = UI_TH[text];
   if (known !== undefined) return known;
   for (const [shape, write] of RULES) {

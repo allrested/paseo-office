@@ -6,7 +6,7 @@ import type {
   WakeState,
 } from "../shared/contracts.js";
 import type { DutyRow } from "../shared/duties.js";
-import { LOBBY, USER_AUTHOR } from "../shared/names.js";
+import { DUTY, LOBBY, USER_AUTHOR } from "../shared/names.js";
 import {
   agentTitle,
   attentionReason,
@@ -47,17 +47,36 @@ export function linkLabel(post: Post, name: (author: string) => string): string 
 /** A roster team's name by its id; the id itself once the team is gone. */
 export type TeamNamer = (teamId: string) => string;
 
+/** A provider's display name by its id; the id itself where the client does not know it. */
+export type ProviderNamer = (providerId: string) => string;
+
+const providerId: ProviderNamer = (id) => id;
+
+/**
+ * Whether Hand over is offered: the server takes a claimed task of the lobby or the duty board, and
+ * a room's copy of a lobby task (it has a `link`), held by an agent. A room's own task, a task
+ * nobody holds, the owner's claim, a done task and a note are not.
+ */
+export function canHandOver(post: Post): boolean {
+  if (post.kind !== "task" || post.state !== "claimed") return false;
+  if (post.claimedBy === undefined || post.claimedBy === USER_AUTHOR) return false;
+  return post.board === LOBBY || post.board === DUTY || post.link !== undefined;
+}
+
 /** Spec: a post that names an agent shows "from → to"; a lobby task for a team says which. */
 export function postMeta(
   post: Post,
   name: (author: string) => string,
   teamName: TeamNamer,
+  providerName: ProviderNamer = providerId,
 ): string {
   const people =
     post.to === undefined ? name(post.author) : `${name(post.author)} → ${name(post.to)}`;
   const forTeam = post.team === undefined ? "" : ` · for team ${teamName(post.team)}`;
+  const notFor =
+    post.notProvider === undefined ? "" : ` · not for ${providerName(post.notProvider)}`;
   const link = linkLabel(post, name);
-  return `${postStateLabel(post, name)} · ${people}${forTeam}${link === null ? "" : ` · ${link}`}`;
+  return `${postStateLabel(post, name)} · ${people}${forTeam}${notFor}${link === null ? "" : ` · ${link}`}`;
 }
 
 /** Who claimed a to-do and whom or which team it names; null when none. A done to-do is no longer claimed. */
@@ -65,6 +84,7 @@ export function todoMeta(
   post: Post,
   name: (author: string) => string,
   teamName: TeamNamer,
+  providerName: ProviderNamer = providerId,
 ): string | null {
   const parts: string[] = [];
   if (post.state === "claimed" && post.claimedBy !== undefined) {
@@ -72,6 +92,7 @@ export function todoMeta(
   }
   if (post.to !== undefined) parts.push(`for ${name(post.to)}`);
   if (post.team !== undefined) parts.push(`for team ${teamName(post.team)}`);
+  if (post.notProvider !== undefined) parts.push(`not for ${providerName(post.notProvider)}`);
   const link = linkLabel(post, name);
   if (link !== null) parts.push(link);
   return parts.length > 0 ? parts.join(" · ") : null;

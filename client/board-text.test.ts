@@ -3,6 +3,7 @@ import type { AutoStartState, OfficeAgent, OfficeSnapshot, Post } from "../share
 import { buildOfficeModel, type OfficeModel, type OfficeRow } from "../shared/model.js";
 import {
   afterLine,
+  canHandOver,
   allPosts,
   authorName,
   autoStartLine,
@@ -73,6 +74,28 @@ test("a post's meta line gives its state, the claimer, and from → to", () => {
   expect(postMeta(post(2, { kind: "note", state: undefined, author: "a1" }), name, teamLabel)).toBe(
     "Note · Planner",
   );
+});
+
+test("a task handed over says which provider it is not for, by the name the client knows", () => {
+  const handed = post(1, { board: "lobby", notProvider: "codex" });
+  expect(todoMeta(handed, name, teamLabel)).toBe("not for codex");
+  expect(todoMeta(handed, name, teamLabel, () => "Codex")).toBe("not for Codex");
+  expect(postMeta(handed, name, teamLabel, () => "Codex")).toBe(
+    "Task · open · You · not for Codex",
+  );
+  expect(todoMeta(post(2, {}), name, teamLabel, () => "Codex")).toBeNull();
+});
+
+test("a task can be handed over when an agent holds it on the lobby, the duty board or as a room's copy", () => {
+  const held = { state: "claimed", claimedBy: "a1" } as const;
+  expect(canHandOver(post(1, { ...held, board: "lobby" }))).toBe(true);
+  expect(canHandOver(post(1, { ...held, board: "duty" }))).toBe(true);
+  expect(canHandOver(post(1, { ...held, link: "p9" }))).toBe(true);
+  expect(canHandOver(post(1, { ...held }))).toBe(false);
+  expect(canHandOver(post(1, { ...held, board: "lobby", claimedBy: "user" }))).toBe(false);
+  expect(canHandOver(post(1, { board: "lobby", state: "open" }))).toBe(false);
+  expect(canHandOver(post(1, { ...held, board: "lobby", state: "done" }))).toBe(false);
+  expect(canHandOver(post(1, { ...held, board: "lobby", kind: "note" }))).toBe(false);
 });
 
 test("a board lists open tasks, then claimed tasks, then notes, each oldest first", () => {

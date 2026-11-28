@@ -12,7 +12,9 @@ import {
   taskPreview,
   type TaskAttentionRow,
 } from "./task-attention.js";
-import { ReplyField } from "./task-card.js";
+import { canHandOver } from "./board-text.js";
+import { HandOverQuestion, ReplyField, ThreadButton, useHandOverAsk } from "./task-card.js";
+import { useProviderName } from "./use-plan-usage.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
@@ -30,8 +32,8 @@ const LINES = { blocked: blockedLine, stalled: stalledLine, merged: mergedLine }
  * A task on the card: its text, why it is here, its board, and a way on. A blocked task takes an
  * answer, a reply under the task that clears the block and wakes the holder. A stalled one takes
  * Nudge, a fixed reply that wakes an idle holder, or Reopen, which frees it for another. A task
- * whose holder's pull request is merged takes Mark done, which only the user presses. The row goes
- * when the board says so.
+ * whose holder's pull request is merged takes Mark done, which only the user presses. A stalled
+ * claim an agent holds also takes Hand over, after a question. The row goes when the board says so.
  */
 function Row({ row, actions, onOpenBoard, styles }: RowProps) {
   const roomId = row.post.board;
@@ -42,6 +44,10 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
   const markDone = useCallback(() => actions.markDone(post.id), [actions, post.id]);
   const { kind } = row;
   const stalled = kind === "stalled";
+  const providerName = useProviderName();
+  const handOver = useHandOverAsk(post);
+  // Named as the row names the holder; with none there is nobody to take it from.
+  const handable = stalled && canHandOver(post) && row.holder !== null;
   return (
     <View style={styles.reviewRow}>
       <Text accessibilityRole="header" style={styles.sheetText}>
@@ -49,6 +55,9 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
       </Text>
       <Text style={styles.standupBlocker}>{LINES[kind](row)}</Text>
       <Text style={styles.rowMeta}>{row.board}</Text>
+      {post.notProvider === undefined ? null : (
+        <Text style={styles.rowMeta}>{`not for ${providerName(post.notProvider)}`}</Text>
+      )}
       {kind === "blocked" ? (
         <ReplyField
           task={row.post}
@@ -68,6 +77,14 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
               onPress={reopen}
               styles={styles}
             />
+            {handable && !handOver.asking ? (
+              <ThreadButton
+                label="Hand over"
+                expanded={false}
+                onPress={handOver.ask}
+                styles={styles}
+              />
+            ) : null}
           </>
         ) : null}
         {kind === "merged" ? (
@@ -85,6 +102,15 @@ function Row({ row, actions, onOpenBoard, styles }: RowProps) {
           styles={styles}
         />
       </View>
+      {handable && handOver.asking && row.holder !== null ? (
+        <HandOverQuestion
+          task={post}
+          holder={row.holder}
+          actions={actions}
+          onKeep={handOver.close}
+          styles={styles}
+        />
+      ) : null}
     </View>
   );
 }

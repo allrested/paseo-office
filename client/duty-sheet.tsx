@@ -18,7 +18,14 @@ import { DAY_NAMES } from "./notes-days.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { SegmentPill } from "./segment-pill.js";
 import type { OfficeStyles } from "./styles.js";
-import { ReplyField, TaskFacts, ThreadButton } from "./task-card.js";
+import { canHandOver } from "./board-text.js";
+import {
+  HandOverQuestion,
+  ReplyField,
+  TaskFacts,
+  ThreadButton,
+  useHandOverAsk,
+} from "./task-card.js";
 import type { BoardActions } from "./use-board-actions.js";
 import type { DutyActions } from "./use-duty-actions.js";
 
@@ -57,8 +64,11 @@ function sent({ id, name, instructions, days, time }: Draft): DutyDraft {
   return kept === "" ? duty : { ...duty, time: kept };
 }
 
-/** How a reply is posted under a duty: the boards' own reply, a note that wakes the duty's holder. */
-type DutyBoardActions = Pick<BoardActions, "reply">;
+/**
+ * How a reply is posted under a duty: the boards' own reply, a note that wakes the duty's holder;
+ * and Hand over, which takes a duty from the agent that holds it.
+ */
+type DutyBoardActions = Pick<BoardActions, "reply" | "handOver">;
 
 interface DutyReplyProps {
   task: Post;
@@ -100,6 +110,8 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
   const { id } = row.post;
   const reopen = useCallback(() => actions.reopen(id), [actions, id]);
   const markDone = useCallback(() => actions.markDone(id), [actions, id]);
+  const handOver = useHandOverAsk(row.post);
+  const handable = canHandOver(row.post);
   return (
     <View style={styles.dutyCard}>
       <View style={styles.post}>
@@ -120,6 +132,9 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
             styles={styles}
           />
         ) : null}
+        {handable && !handOver.asking ? (
+          <ThreadButton label="Hand over" expanded={false} onPress={handOver.ask} styles={styles} />
+        ) : null}
         {done ? null : (
           <ActionButton
             label="Mark done"
@@ -130,6 +145,15 @@ function TodayRow({ row, name, actions, board, styles }: TodayRowProps) {
           />
         )}
       </View>
+      {handable && handOver.asking ? (
+        <HandOverQuestion
+          task={row.post}
+          holder={name(row.post.claimedBy ?? "")}
+          actions={board}
+          onKeep={handOver.close}
+          styles={styles}
+        />
+      ) : null}
     </View>
   );
 }

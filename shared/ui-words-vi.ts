@@ -835,6 +835,11 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "stopped, today's count cannot be read (see the office's log)":
     "đã dừng, không đọc được số việc hôm nay (xem log của văn phòng)",
   "Start backlog tasks": "Bắt đầu việc tồn đọng",
+  "Hand over": "Giao lại",
+  "Handing over...": "Đang giao lại...",
+  "Hand over when a plan runs out": "Giao lại khi gói hết hạn mức",
+  "When a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider. Needs Keep watching.":
+    "Khi một nhà cung cấp dùng hết hạn mức, các việc ở sảnh mà agent của họ đang giữ sẽ chuyển cho agent của nhà cung cấp khác. Cần Tiếp tục theo dõi.",
   "Start under (%)": "Bắt đầu khi dưới (%)",
   "At once": "Cùng lúc",
   "Per day": "Mỗi ngày",

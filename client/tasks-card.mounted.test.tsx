@@ -304,6 +304,7 @@ test("a stalled row says why, offers Nudge, Reopen and Open board, and has no An
     "Lobby",
     "Nudge",
     "Reopen",
+    "Hand over",
     "Open board",
   ]);
   expect(allLabelled("Answer")).toHaveLength(0);
@@ -318,6 +319,7 @@ test("a claim whose holder is at home says so, with Nudge and Reopen, in the int
     "Lobby",
     "Nudge",
     "Reopen",
+    "Hand over",
     "Open board",
   ]);
   act(() => root.unmount());
@@ -419,6 +421,7 @@ test("a duty's row names the duty board, and its Answer and Nudge post replies u
     "Duty board",
     "Nudge",
     "Reopen",
+    "Hand over",
     "Open board",
   ]);
   await type("Answer", "main");
@@ -446,4 +449,71 @@ test("a duty's row names the duty board in the interface's language", async () =
   );
   expect(lines()).not.toContain("Duty board");
   expect(lines().filter((line) => line === UI_VI["Duty board"])).toHaveLength(2);
+});
+
+test("a stalled row offers Hand over where the server would take it, not on a room's own task", async () => {
+  await mount(<Harness rows={STALLED} />);
+  // The room's own task (p3) has none; the lobby task (p6) has.
+  expect(allLabelled("Hand over")).toHaveLength(1);
+});
+
+test("Hand over asks first, then hands the task over by its id and shows nothing more", async () => {
+  await mount(<Harness rows={STALLED} />);
+  await press("Hand over");
+  expect(sent.calls).toEqual([]);
+  expect(lines()).toContain(
+    "Hand p6 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+  );
+  await press("Hand over");
+  expect(sent.calls).toEqual([{ id: "p6" }]);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("Keep it closes the question and hands nothing over", async () => {
+  await mount(<Harness rows={STALLED} />);
+  await press("Hand over");
+  await press("Keep it");
+  expect(sent.calls).toEqual([]);
+  expect(allLabelled("Keep it")).toHaveLength(0);
+});
+
+const BLOCKED_AND_MERGED = [...ROWS, ...MERGED];
+
+test("a blocked or merged row has no Hand over", async () => {
+  await mount(<Harness rows={BLOCKED_AND_MERGED} />);
+  expect(allLabelled("Hand over")).toHaveLength(0);
+});
+
+const NOT_FOR_ROWS: TaskAttentionRow[] = [
+  {
+    kind: "stalled",
+    post: post(11, { text: "Run the audit", notProvider: "codex" }),
+    board: "Lobby",
+    holder: "Builder",
+    reason: null,
+    cause: "idle",
+  },
+];
+
+test("a row of a task handed over says not for the provider, by id here", async () => {
+  await mount(<Harness rows={NOT_FOR_ROWS} />);
+  expect(lines()).toContain("not for codex");
+});
+
+test("the question is for one holder: a new holder closes it, and no holder means no button", async () => {
+  const stalled = (fields: Partial<TaskAttentionRow>): TaskAttentionRow[] => [
+    { ...(STALLED[1] as TaskAttentionRow), ...fields },
+  ];
+  await mount(<Harness rows={stalled({})} />);
+  await press("Hand over");
+  expect(allLabelled("Keep it")).toHaveLength(1);
+
+  await mount(<Harness rows={stalled({ holder: "Tester", post: post(6, { claimedBy: "a2" }) })} />);
+  expect(allLabelled("Keep it")).toHaveLength(0);
+  await press("Hand over");
+  expect(lines().some((line) => line.includes("Tester loses it"))).toBe(true);
+  expect(sent.calls).toEqual([]);
+
+  await mount(<Harness rows={stalled({ holder: null })} />);
+  expect(allLabelled("Hand over")).toHaveLength(0);
 });

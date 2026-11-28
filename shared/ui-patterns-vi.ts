@@ -1,3 +1,4 @@
+import { translateMetaLine } from "./ui-meta-line.js";
 import { UI_VI } from "./ui-words-vi.js";
 
 /**
@@ -249,6 +250,12 @@ export const RULES: readonly Rule[] = [
   [/^on (.+)'s board$/, (name) => `trên bảng của ${name}`],
   [/^Team (.+)$/, (name) => `Nhóm ${name}`],
   [/^for team (.+)$/, (name) => `cho nhóm ${name}`],
+  [
+    /^Hand (p\d+) over to an agent of another provider\? (.+) loses it, and a note says where it was left\.$/,
+    (id, name) =>
+      `Giao ${id} cho agent của nhà cung cấp khác? ${name} sẽ mất việc này, và một ghi chú nói rõ đã dừng ở đâu.`,
+  ],
+  [/^not for (.+)$/, (name) => `không dành cho ${name}`],
   [/^(\d+) teammates?$/, (n) => `${n} thành viên`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,
@@ -324,6 +331,14 @@ export const RULES: readonly Rule[] = [
 
 /** The line in Vietnamese when a rule fits it, else the line as it is. */
 export function translatePattern(text: string): string {
+  const known = UI_VI[text];
+  if (known !== undefined) return known;
+  const meta = translateMetaLine(text, translateWhole, (name) => `cho ${name}`);
+  return meta ?? translateWhole(text);
+}
+
+/** A line as one piece: its words, else the first rule that fits it. */
+function translateWhole(text: string): string {
   const known = UI_VI[text];
   if (known !== undefined) return known;
   for (const [shape, write] of RULES) {

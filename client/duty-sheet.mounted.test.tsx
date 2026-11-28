@@ -34,8 +34,11 @@ let asked: string[];
 let refusal: Error | null;
 /** The replies posted under a duty, as "<duty's post> <text>". */
 let replied: string[];
+/** The duties handed over, by their post's id. */
+let handedOver: string[];
 const BOARD = {
   reply: async (task: Post, text: string) => void replied.push(`${task.id} ${text}`),
+  handOver: async (id: string) => void handedOver.push(id),
 };
 
 const ACTIONS: DutyActions = {
@@ -96,6 +99,7 @@ beforeEach(() => {
   saved = [];
   asked = [];
   replied = [];
+  handedOver = [];
   refusal = null;
   container = document.createElement("div");
   document.body.append(container);
@@ -197,6 +201,7 @@ test("a blocked duty says what its holder needs, and Reply under it posts the an
     "Builder · It is not main",
     "Reply",
     "Reopen",
+    "Hand over",
     "Mark done",
   ]);
   await press("Reply");
@@ -341,4 +346,39 @@ test("the time field's words are in the interface's language", () => {
     expect(translate(language, "Duty 2 time"), language).toContain("2");
     expect(translate(language, "Duty 2 time"), language).not.toBe("Duty 2 time");
   }
+});
+
+test("a duty an agent holds can be handed over: it asks first, then hands the post over", async () => {
+  await mount(LIST, [post(1, "cups"), post(2, "build", { state: "claimed", claimedBy: "a2" })]);
+  await press("Hand over");
+  expect(text()).toContain(
+    "Hand p2 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+  );
+  expect(handedOver).toEqual([]);
+  await press("Keep it");
+  expect(handedOver).toEqual([]);
+  await press("Hand over");
+  await press("Hand over");
+  expect(handedOver).toEqual(["p2"]);
+});
+
+test("Hand over is not on an open duty, a done one or one the owner holds", async () => {
+  await mount(LIST, [
+    post(1, "cups", { state: "done", claimedBy: "a1" }),
+    post(2, "build", { state: "claimed", claimedBy: "user" }),
+  ]);
+  expect(container.querySelector('[aria-label="Hand over"]')).toBeNull();
+  await mount(LIST, [post(1, "cups"), post(2, "build")]);
+  expect(container.querySelector('[aria-label="Hand over"]')).toBeNull();
+});
+
+test("a duty's question is for one holder: when another agent has it, it closes and asks by name", async () => {
+  await mount(LIST, [post(1, "cups"), post(2, "build", { state: "claimed", claimedBy: "a2" })]);
+  await press("Hand over");
+  expect(text()).toContain("Builder loses it");
+  await mount(LIST, [post(1, "cups"), post(2, "build", { state: "claimed", claimedBy: "a1" })]);
+  expect(text()).not.toContain("loses it");
+  await press("Hand over");
+  expect(text()).toContain("Planner loses it");
+  expect(handedOver).toEqual([]);
 });

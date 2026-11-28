@@ -527,3 +527,29 @@ test("a post line names a task's ticket before whose it is", () => {
   };
   expect(postLine(github, label, (id) => id, [])).toContain(" [GitHub o/r#3], from the user");
 });
+
+test("a post line says which provider a handed-over task is not for, after its team and its after", () => {
+  const post: Post = {
+    id: "p14",
+    seq: 14,
+    board: "lobby",
+    kind: "task",
+    text: "Review",
+    author: "user",
+    state: "open",
+    team: "t2",
+    after: ["p12"],
+    notProvider: "claude",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  const label = (author: string) => (author === "user" ? "the user" : author);
+  expect(postLine(post, label, () => "QA-PR", [])).toBe(
+    "p14 task open for team QA-PR after p12 not for claude, from the user: Review",
+  );
+  const plain = { ...post };
+  delete plain.notProvider;
+  delete plain.team;
+  delete plain.after;
+  expect(postLine(plain, label, () => "QA-PR", [])).toBe("p14 task open, from the user: Review");
+});

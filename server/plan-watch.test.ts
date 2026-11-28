@@ -1,7 +1,13 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { PlanUsage } from "../shared/plan-usage.js";
 import { createFakeClock, settle } from "./fake-clock.js";
-import { PLAN_WATCH_MS, createPlanWatch, type PlanCrossing } from "./plan-watch.js";
+import {
+  PLAN_WATCH_MS,
+  createPlanWatch,
+  handOverWhenOut,
+  type PlanCrossing,
+} from "./plan-watch.js";
+import type { HandOverAgent } from "./office.js";
 
 function usage(provider: string, ...pcts: number[]): PlanUsage {
   return {
@@ -175,4 +181,112 @@ test("each reading is told with its instant, a failed one is not, and stopping f
   });
   watch.keep(false);
   expect(readings.at(-1)).toBeNull();
+});
+
+describe("handing over when a plan runs out", () => {
+  const AGENTS: HandOverAgent[] = [
+    { id: "a", provider: "claude", status: "idle" },
+    { id: "c", provider: "codex", status: "idle" },
+  ];
+
+  function wired(options: { on?: boolean; agents?: HandOverAgent[] | null } = {}) {
+    const clock = createFakeClock();
+    const calls: { provider: string; name: string; agents: readonly HandOverAgent[] }[] = [];
+    let on = options.on ?? true;
+    let reading: PlanUsage[] = [];
+    const out = handOverWhenOut({
+      on: () => on,
+      agents: () => (options.agents === undefined ? AGENTS : options.agents),
+      handOver: async (provider, agents) => {
+        calls.push({ provider: provider.id, name: provider.name, agents });
+        return [];
+      },
+      log: () => undefined,
+    });
+    const watch = createPlanWatch({
+      read: async () => reading,
+      counted: () => true,
+      raised: out,
+      timers: clock,
+      log: () => undefined,
+    });
+    watch.keep(true);
+    return {
+      calls,
+      turn: (next: boolean) => void (on = next),
+      async next(to: PlanUsage[]) {
+        reading = to;
+        clock.advance(PLAN_WATCH_MS);
+        await settle();
+      },
+    };
+  }
+
+  test("at Out with the switch on, once per raise; it arms again after the limit falls", async () => {
+    const { calls, next } = wired();
+    await next([usage("claude", 96)]);
+    expect(calls).toEqual([]);
+    await next([usage("claude", 100)]);
+    await next([usage("claude", 100)]);
+    expect(calls).toEqual([{ provider: "claude", name: "claude", agents: AGENTS }]);
+    await next([usage("claude", 10)]);
+    await next([usage("claude", 100)]);
+    expect(calls).toHaveLength(2);
+  });
+
+  test("nothing with the switch off, or with no directory open", async () => {
+    const off = wired({ on: false });
+    await off.next([usage("claude", 100)]);
+    expect(off.calls).toEqual([]);
+    const closed = wired({ agents: null });
+    await closed.next([usage("claude", 100)]);
+    expect(closed.calls).toEqual([]);
+  });
+});
+
+test("the providers out now are those counted at 100 in the last reading, while it is no older than 15 minutes", async () => {
+  const clock = createFakeClock();
+  let reading: PlanUsage[] | Error = [usage("claude", 100), usage("codex", 100), usage("pi", 50)];
+  let hidden = new Set<string>();
+  const seen: string[][] = [];
+  const holder: { watch: ReturnType<typeof createPlanWatch> | null } = { watch: null };
+  const outNow = () => [...(holder.watch?.outNow() ?? [])].sort();
+  const watch = createPlanWatch({
+    async read() {
+      if (reading instanceof Error) throw reading;
+      return reading;
+    },
+    counted: (provider) => !hidden.has(provider),
+    // Both reach Out in one reading: at the first raise the second is out too.
+    raised: () => seen.push(outNow()),
+    timers: clock,
+    log: () => undefined,
+  });
+  holder.watch = watch;
+  expect(outNow()).toEqual([]);
+  watch.keep(true);
+  await settle();
+  expect(seen[0]).toEqual(["claude", "codex"]);
+  hidden = new Set(["codex"]);
+  expect(outNow()).toEqual(["claude"]);
+  watch.keep(false);
+  expect(outNow()).toEqual([]);
+  reading = [usage("claude", 100)];
+  watch.keep(true);
+  await settle();
+  expect(outNow()).toEqual(["claude"]);
+  // A reading that no longer says so: Claude is not known to be out.
+  reading = [usage("claude", 20)];
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(outNow()).toEqual([]);
+  reading = [usage("claude", 100)];
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(outNow()).toEqual(["claude"]);
+  // The reads fail from now on: the last reading grows old.
+  reading = new Error("down");
+  clock.advance(PLAN_WATCH_MS * 4);
+  await settle();
+  expect(outNow()).toEqual([]);
 });

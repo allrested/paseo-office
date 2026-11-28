@@ -55,6 +55,11 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Task · claimed by Builder", "Tugas · diambil oleh Builder"],
     ["Team QA-PR", "Tim QA-PR"],
     ["for team QA-PR", "untuk tim QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "Serahkan p12 ke agen dari penyedia lain? Builder kehilangannya, dan sebuah catatan menyebutkan di mana tugas ditinggalkan.",
+    ],
+    ["not for Codex", "bukan untuk Codex"],
     ["1 teammate", "1 anggota tim"],
     ["2 teammates", "2 anggota tim"],
     ["Replay · 14:05 · 60×", "Putar ulang · 14:05 · 60×"],
@@ -179,4 +184,33 @@ test("a done task's time and cost line takes the language, its dollar amount as 
   for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
   // Only the exact line: a post that starts with the word is left alone.
   expect(translatePattern("took the bus to work")).toBe("took the bus to work");
+});
+
+test("a meta line joined with · is translated part by part, whatever follows the claim", () => {
+  const lines: [string, string][] = [
+    [
+      "claimed by Planner · for team QA-PR · not for Codex · on Planner's board",
+      "diambil oleh Planner · untuk tim QA-PR · bukan untuk Codex · di papan Planner",
+    ],
+    [
+      "claimed by Planner · for Planner · for team QA-PR · not for Codex",
+      "diambil oleh Planner · untuk Planner · untuk tim QA-PR · bukan untuk Codex",
+    ],
+    [
+      "Task · claimed by Planner · You → Planner · for team QA-PR · not for Codex · from lobby task p12",
+      "Tugas · diambil oleh Planner · You → Planner · untuk tim QA-PR · bukan untuk Codex · dari tugas lobi p12",
+    ],
+    ["claimed by Planner · not for Codex", "diambil oleh Planner · bukan untuk Codex"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+});
+
+test("a line with · that is not a meta line is left to the other rules", () => {
+  for (const said of [
+    "Fix the build · for the demo",
+    "for me · not now",
+    "Task · fix the build · now",
+  ]) {
+    expect(translatePattern(said)).toBe(said);
+  }
 });

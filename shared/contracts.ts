@@ -236,6 +236,11 @@ export const PostSchema = z.object({
   source: PostSourceSchema.optional(),
   /** On a done task from a ticket: its result was commented on the ticket. A reopen drops it. */
   wroteBack: z.literal(true).optional(),
+  /**
+   * On a task handed over: the provider whose agent held it, whose agents are not handed it again.
+   * A reopen and a claim keep it; done drops it.
+   */
+  notProvider: z.string().optional(),
   /** On a claimed or done task: when its holder took it (ISO time); the claim's first, not a repeat's. */
   claimedAt: z.string().optional(),
   /** On a done task: when it was marked done (ISO time). */
@@ -881,6 +886,13 @@ export const postRpc = defineRpc({
 /** Takes a task out of the backlog, so the office hands it out. */
 export const startRpc = defineRpc({
   name: "office.task.start.request",
+  input: z.object({ id: z.string().min(1) }),
+  output: PostResultSchema,
+});
+
+/** Takes a claimed lobby task or duty from its agent, for an agent of another provider. */
+export const handOverRpc = defineRpc({
+  name: "office.task.hand_over.request",
   input: z.object({ id: z.string().min(1) }),
   output: PostResultSchema,
 });

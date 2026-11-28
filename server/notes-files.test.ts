@@ -77,6 +77,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       telegramIncidents: true,
       telegramPlan: true,
       telegramLands: "backlog",
+      handOverWhenOut: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],

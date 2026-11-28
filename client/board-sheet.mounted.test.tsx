@@ -148,6 +148,7 @@ const ACTIONS: BoardActions = {
   remove: (id) => change(`remove ${id}`),
   clearDone: (board) => change(`clearDone ${board}`),
   start: (id) => change(`start ${id}`),
+  handOver: (id) => change(`handOver ${id}`),
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => author;
@@ -689,6 +690,7 @@ test("notes show under the list only when there are notes", async () => {
     "claimed by a1 · for a1",
     "Reply",
     "Follow-up",
+    "Hand over",
     "Notes",
     "Note · user",
     "The demo is on Thursday",
@@ -773,6 +775,7 @@ test("a room's list draws a copy's replies, which the host keeps under its lobby
     "user · Use the vault",
     "Reply",
     "Follow-up",
+    "Hand over",
     "Mark done",
     "Delete",
   ]);
@@ -799,6 +802,7 @@ test("a room's kanban draws a copy's replies on its card", async () => {
     "user · Use the vault",
     "Reply",
     "Follow-up",
+    "Hand over",
   ]);
 });
 
@@ -1074,6 +1078,7 @@ test("the lobby as a kanban keeps the form above its columns and Agent tasks und
     "claimed by a1",
     "Reply",
     "Follow-up",
+    "Hand over",
     "Done · 1",
     "Clear finished",
     "Notes · 1",

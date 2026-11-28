@@ -45,6 +45,11 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Task · claimed by Builder", "งาน · Builder รับแล้ว"],
     ["Team QA-PR", "ทีม QA-PR"],
     ["for team QA-PR", "สำหรับทีม QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "ส่งต่อ p12 ให้เอเจนต์ของผู้ให้บริการรายอื่น? Builder จะเสียงานนี้ไป และโน้ตจะบอกว่าทิ้งไว้ตรงไหน",
+    ],
+    ["not for Codex", "ไม่ใช่สำหรับ Codex"],
     ["1 teammate", "1 เพื่อนร่วมทีม"],
     ["2 teammates", "2 เพื่อนร่วมทีม"],
     ["3 h 20 min at work", "ทำงานมา 3 ชม. 20 นาที"],
@@ -151,4 +156,33 @@ test("a done task's time and cost line takes the language, its dollar amount as 
   for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
   // Only the exact line: a post that starts with the word is left alone.
   expect(translatePattern("took the bus to work")).toBe("took the bus to work");
+});
+
+test("a meta line joined with · is translated part by part, whatever follows the claim", () => {
+  const lines: [string, string][] = [
+    [
+      "claimed by Planner · for team QA-PR · not for Codex · on Planner's board",
+      "Planner รับแล้ว · สำหรับทีม QA-PR · ไม่ใช่สำหรับ Codex · บนบอร์ดของ Planner",
+    ],
+    [
+      "claimed by Planner · for Planner · for team QA-PR · not for Codex",
+      "Planner รับแล้ว · สำหรับ Planner · สำหรับทีม QA-PR · ไม่ใช่สำหรับ Codex",
+    ],
+    [
+      "Task · claimed by Planner · You → Planner · for team QA-PR · not for Codex · from lobby task p12",
+      "งาน · Planner รับแล้ว · You → Planner · สำหรับทีม QA-PR · ไม่ใช่สำหรับ Codex · จากงานของล็อบบี้ p12",
+    ],
+    ["claimed by Planner · not for Codex", "Planner รับแล้ว · ไม่ใช่สำหรับ Codex"],
+  ];
+  for (const [english, there] of lines) expect(translatePattern(english)).toBe(there);
+});
+
+test("a line with · that is not a meta line is left to the other rules", () => {
+  for (const said of [
+    "Fix the build · for the demo",
+    "for me · not now",
+    "Task · fix the build · now",
+  ]) {
+    expect(translatePattern(said)).toBe(said);
+  }
 });
