@@ -1240,7 +1240,10 @@ office sets them from its settings each time it starts and at each save, and sto
 - The duty board's run needs no Paseo API: it posts at once, and only handing a duty to an idle
   agent waits for the API. When the office starts, today's duties not yet posted whose time has
   passed are posted; an earlier day's are not. A run at a later time posts the duties whose time it
-  is; the duties of earlier days leave at the 08:00 run.
+  is; the duties of earlier days leave at the 08:00 run. A run that fires late but before the next
+  08:00 (a 23:59 run at 00:01, or after the host slept) still posts its duties on their day; one
+  that fires after the next 08:00 is not made up. Nor is a late-time run that came due while the
+  daemon was down once midnight has passed: before 08:00 the start posts nothing.
 
 ## Incidents
 

@@ -204,20 +204,28 @@ export function createDutyService(ports: DutyServicePorts): DutyService {
 
   /**
    * `dueAt`: a timer can fire a little before its time, which is then the board's instant. A duty
-   * is due on the board's day from its time; the day begins at 08:00, the earliest time.
+   * is due on the board's day from its time; the day begins at 08:00, the earliest time. A timer's
+   * run that fires late but on its board's day (a 23:59 run at 00:01, or after a sleep) still posts
+   * that day's duties; one that fires on a later board's day brings the board up as a start does.
+   * The catch-up (no `dueAt`) posts nothing before 08:00, so a late duty missed while the daemon
+   * was down is not made up after midnight.
    */
   async function bringUp(dueAt?: number): Promise<void> {
     try {
       const zone = await ports.zone();
       const instant = Math.max(ports.now(), dueAt ?? 0);
       const clock = dutyClock(instant, zone);
+      const onItsDay = dueAt !== undefined && dutyClock(dueAt, zone).day === clock.day;
       const read = zoneReader(instant, zone);
-      const minute = read("hour") * 60 + read("minute");
-      const due = clock.open
-        ? duties.filter(
-            (duty) => duty.days.includes(clock.weekday) && minute >= dutyDueMinute(duty),
-          )
-        : [];
+      const wall = read("hour") * 60 + read("minute");
+      // Past midnight the board's day runs on until 08:00: its minutes count on from 24:00.
+      const minute = clock.open ? wall : wall + 24 * 60;
+      const due =
+        clock.open || onItsDay
+          ? duties.filter(
+              (duty) => duty.days.includes(clock.weekday) && minute >= dutyDueMinute(duty),
+            )
+          : [];
       const dayOf = (at: number) => dutyClock(at, zone).day;
       await ports.board.syncDuties({ duties, day: clock.day, due, dayOf });
       day = clock.day;

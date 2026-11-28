@@ -61,17 +61,23 @@ function setup(
     zone?: string;
     /** The schedule engine's timers fire a millisecond before their time, as a real one can. */
     early?: boolean;
+    /** The schedule engine's timers fire this long after their time: a host asleep, or lagging. */
+    lateBy?: number;
     /** The kept file's load rejects with this. */
     unreadable?: string;
   } = {},
 ) {
   const clock = createFakeClock(options.start ?? WED_7AM);
-  const timers = options.early
-    ? {
-        now: () => clock.now(),
-        setTimeout: (run: () => void, ms: number) => clock.setTimeout(run, Math.max(0, ms - 1)),
-      }
-    : clock;
+  // How far off their time the engine's timers fire: a millisecond early, or late by `lateBy`.
+  const shift = options.early ? -1 : (options.lateBy ?? 0);
+  const timers =
+    shift === 0
+      ? clock
+      : {
+          now: () => clock.now(),
+          setTimeout: (run: () => void, ms: number) =>
+            clock.setTimeout(run, Math.max(0, ms + shift)),
+        };
   let boards: BoardsFile = EMPTY_BOARDS;
   const board = createBoardService({
     store: {
@@ -606,4 +612,76 @@ test("a kept time written by hand that is not HH:MM from 08:00 reads as 08:00; t
   expect(kept?.duties[1]).toEqual({ ...bin, time: "14:30" });
   expect(dutyDueMinute({ time: "07:00" })).toBe(8 * 60);
   expect(dutyDueMinute({ time: "nonsense" })).toBe(8 * 60);
+});
+
+/** Wednesday 18 November 2026, 09:00 in Riyadh, and the duties of a late evening. */
+const WED_9AM = WED_7AM + 2 * HOUR;
+const LATE = { id: "late", name: "Lock up", instructions: "", days: [3], time: "23:59" };
+const THURSDAY = { id: "cups", name: "Cups", instructions: "", days: [4] };
+const posted = (board: { postsOf(board: string): { duty?: { id: string; day: string } }[] }) =>
+  board.postsOf("duty").map((post) => post.duty);
+
+test.each([
+  ["at 00:01", 2 * MINUTE],
+  ["at 03:00 after a sleep", 3 * HOUR + MINUTE],
+])(
+  "a 23:59 run that fires after midnight, %s, still posts its duty on its day",
+  async (_, lateBy) => {
+    const { begin, board, clock } = setup({
+      start: WED_9AM,
+      lateBy,
+      file: { version: 1, duties: [LATE, THURSDAY] },
+    });
+    await begin();
+    expect(posted(board)).toEqual([]);
+    // To the instant the run fires: Wednesday 23:59 in Riyadh is 20:59 UTC.
+    clock.advance(Date.parse("2026-11-18T20:59:00.000Z") + lateBy - clock.now());
+    await settle();
+    expect(posted(board)).toEqual([{ id: "late", day: "2026-11-18" }]);
+  },
+);
+
+test("a 23:59 run that fires after the next 08:00 is not made up: the board is brought up as of then", async () => {
+  // It fires at 08:30 on Thursday; the 08:00 run, as late, has not fired yet.
+  const lateBy = 8 * HOUR + 31 * MINUTE;
+  const { begin, board, clock, told } = setup({
+    start: WED_9AM,
+    lateBy,
+    file: { version: 1, duties: [LATE, THURSDAY] },
+  });
+  await begin();
+  clock.advance(Date.parse("2026-11-18T20:59:00.000Z") + lateBy - 1 - clock.now());
+  await settle();
+  expect(posted(board)).toEqual([]);
+  clock.advance(1);
+  await settle();
+  expect(posted(board)).toEqual([{ id: "cups", day: "2026-11-19" }]);
+  expect(told.at(-1)?.day).toBe("2026-11-19");
+});
+
+test("the 08:00 run that fires at 08:05 posts the morning's duties and not a later one's", async () => {
+  const cups = { id: "cups", name: "Cups", instructions: "", days: [3] };
+  const { begin, board, clock } = setup({
+    lateBy: 5 * MINUTE,
+    file: { version: 1, duties: [cups, LATE] },
+  });
+  await begin();
+  clock.advance(HOUR + 5 * MINUTE - 1);
+  await settle();
+  expect(posted(board)).toEqual([]);
+  clock.advance(1);
+  await settle();
+  expect(posted(board)).toEqual([{ id: "cups", day: "2026-11-18" }]);
+});
+
+test("a start after midnight does not make up a late duty whose time passed while it was down", async () => {
+  const late = { ...LATE, time: "23:30" };
+  // Thursday 00:30 in Riyadh: the board's day is still Wednesday's.
+  const { begin, board, told } = setup({
+    start: Date.parse("2026-11-18T21:30:00.000Z"),
+    file: { version: 1, duties: [late] },
+  });
+  await begin();
+  expect(posted(board)).toEqual([]);
+  expect(told.at(-1)?.day).toBe("2026-11-18");
 });

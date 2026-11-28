@@ -503,7 +503,8 @@ export function createOfficePlugin(
     log,
   });
   // The duty list, posted on the duty board at each duty's time (08:00 unless set) in the notes'
-  // zone, and caught up at the start and at each save. A zone that cannot be read, or that Intl does not know, is the host's.
+  // zone, and caught up at the start and at each save. A zone that cannot be read, or that Intl
+  // does not know, is the host's.
   const duties = createDutyService({
     file: deps.dutiesFile,
     board: office,
