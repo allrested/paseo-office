@@ -11,7 +11,7 @@ import {
   postStateLabel,
   queuedWakes,
   repliesOf,
-  resultIsLong,
+  resultPreview,
   roomAgents,
   stepMark,
   todoMeta,
@@ -135,12 +135,18 @@ test("replies show under their task, so the top level and a card's count leave t
   expect(boardPreview(posts, 1)).toEqual({ shown: [posts[0]], more: 1 });
 });
 
-test("a result is long past three lines or what three lines hold", () => {
-  expect(resultIsLong("Shipped in 1.4.2")).toBe(false);
-  expect(resultIsLong("one\ntwo\nthree")).toBe(false);
-  expect(resultIsLong("one\ntwo\nthree\nfour")).toBe(true);
-  expect(resultIsLong("x".repeat(100))).toBe(false);
-  expect(resultIsLong("x".repeat(101))).toBe(true);
+test("a result shows its first three lines and 160 characters, and says when it left some out", () => {
+  expect(resultPreview("Shipped in 1.4.2")).toEqual({ shown: "Shipped in 1.4.2", cut: false });
+  expect(resultPreview("one\ntwo\nthree")).toEqual({ shown: "one\ntwo\nthree", cut: false });
+  const full = "x".repeat(160);
+  expect(resultPreview(full)).toEqual({ shown: full, cut: false });
+  expect(resultPreview(`${full}y`)).toEqual({ shown: `${full}…`, cut: true });
+  expect(resultPreview("one\ntwo\nthree\nfour")).toEqual({ shown: "one\ntwo\nthree…", cut: true });
+  const words = "The build passed on every target. ".repeat(10);
+  const long = resultPreview(words);
+  expect(long.cut).toBe(true);
+  expect(long.shown).toBe(`${words.slice(0, 160).trimEnd()}…`);
+  expect(long.shown.length).toBeLessThanOrEqual(161);
 });
 
 test("the wake count says how many posts wait, and nothing when none do", () => {

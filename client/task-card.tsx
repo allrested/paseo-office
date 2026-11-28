@@ -5,8 +5,9 @@ import { Icon } from "@getpaseo/plugin/client/ui";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
-import { RESULT_LINES, clearQuestion, resultIsLong, todoMeta } from "./board-text.js";
+import { clearQuestion, resultPreview, todoMeta } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 import type { BoardActions } from "./use-board-actions.js";
 import { listenForSpace } from "./web-env.web.js";
 
@@ -59,10 +60,11 @@ interface ThreadButtonProps {
 
 /** "Reply", "More", "Less": small words that open something under them. */
 function ThreadButton({ label, expanded, onPress, styles }: ThreadButtonProps) {
+  const t = useT();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={t(label)}
       aria-expanded={expanded}
       onPress={onPress}
       style={styles.taskThreadButton}
@@ -72,18 +74,16 @@ function ThreadButton({ label, expanded, onPress, styles }: ThreadButtonProps) {
   );
 }
 
-/** A task's result: three lines, and the rest behind "More" when there is more. */
+/** A task's result: its start (`resultPreview`), and the whole of it behind "More" when it is cut. */
 function TaskResult({ result, styles }: { result: string; styles: OfficeStyles }) {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((current) => !current), []);
-  const long = resultIsLong(result);
+  const preview = resultPreview(result);
   return (
     <View>
       <Text style={styles.postMeta}>Result</Text>
-      <Text style={styles.postText} numberOfLines={long && !open ? RESULT_LINES : undefined}>
-        {result}
-      </Text>
-      {long ? (
+      <Text style={styles.postText}>{open ? result : preview.shown}</Text>
+      {preview.cut ? (
         <ThreadButton
           label={open ? "Less" : "More"}
           expanded={open}

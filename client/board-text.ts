@@ -67,14 +67,28 @@ export function repliesOf(task: Post, posts: readonly Post[]): Post[] {
     .sort((left, right) => left.seq - right.seq);
 }
 
-/** A result shows three lines; past them, or past what three lines of a card hold, "More" shows. */
+/** A result's start, as a card shows it until More: the first three lines and 160 characters. */
 export const RESULT_LINES = 3;
-// A kanban card's three lines hold about this much. A wider row may show "More" with nothing
-// hidden, which costs a press; a narrower guess would hide words with no way to reach them.
-const RESULT_CHARS = 100;
+export const RESULT_CHARS = 160;
 
-export function resultIsLong(result: string): boolean {
-  return result.split("\n").length > RESULT_LINES || result.length > RESULT_CHARS;
+export interface ResultPreview {
+  /** What the card shows; ends with "…" when some of the result is left out. */
+  shown: string;
+  /** Some was left out, so the card offers More. */
+  cut: boolean;
+}
+
+/**
+ * The start of a result, cut by its text rather than clamped by the layout: what is left out is
+ * always behind More, and More shows only when something is.
+ */
+export function resultPreview(result: string): ResultPreview {
+  const lines = result.split("\n");
+  const head = lines.slice(0, RESULT_LINES).join("\n");
+  if (lines.length <= RESULT_LINES && head.length <= RESULT_CHARS) {
+    return { shown: result, cut: false };
+  }
+  return { shown: `${head.slice(0, RESULT_CHARS).trimEnd()}…`, cut: true };
 }
 
 /** What "Clear finished" asks before it deletes the done to-dos. */

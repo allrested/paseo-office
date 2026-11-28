@@ -11,12 +11,17 @@ import type { Post } from "../shared/contracts.js";
 import { PostWithActions } from "./board-sheet.js";
 import { useOfficeStyles } from "./styles.js";
 import { TaskCard } from "./task-card.js";
+import { UiLanguage } from "./ui-language.js";
+import { UI_VI } from "../shared/ui-words-vi.js";
 import type { BoardActions } from "./use-board-actions.js";
 
+/** The device's choice of language for the interface; "auto" follows the app's, English here. */
+const language = vi.hoisted(() => ({ choice: "auto" }));
 vi.mock("@getpaseo/plugin/client", () => ({
   useRpc: () => async () => ({ ok: true }),
-  useSettings: () => ({ status: "loading" }),
+  useSettings: () => ({ status: "ready", values: { choice: language.choice } }),
 }));
+vi.mock("./app-locale.js", () => ({ useAppLocale: () => "en" }));
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { ScrollView, TextInput } = await import("react-native");
   const Icon = () => null;
@@ -96,6 +101,7 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  language.choice = "auto";
   replied = [];
   refusal = null;
   answer = null;
@@ -150,17 +156,6 @@ function lines(): string[] {
     .map((element) => element.textContent ?? "");
 }
 
-/** The element whose own text is this. */
-function textElement(text: string): HTMLElement {
-  const found = [...container.querySelectorAll<HTMLElement>("*")].find(
-    (element) => element.childElementCount === 0 && element.textContent === text,
-  );
-  if (!found) throw new Error(`No text "${text}"`);
-  return found;
-}
-// react-native-web clamps with -webkit-box classes and the line count as a style.
-const clamped = (text: string) => /WebkitBoxOrient/.test(textElement(text).className);
-
 test("a done task's card shows its result, then its replies oldest first, then Reply", async () => {
   await mount(<Card />);
 
@@ -173,7 +168,6 @@ test("a done task's card shows its result, then its replies oldest first, then R
     "Reply",
   ]);
   expect(has("More")).toBe(false);
-  expect(clamped("Shipped 1.4.2")).toBe(false);
   expect(has("Write a reply")).toBe(false);
 });
 
@@ -182,17 +176,34 @@ test("a task with no result and no replies has only its Reply button under it", 
   expect(lines()).toEqual(["Rotate keys", "Reply"]);
 });
 
-test("a long result shows three lines, and More and Less show the rest and fold it again", async () => {
+test("a long result shows its start, and More and Less show the whole of it and fold it again", async () => {
   await mount(<Card task={post(1, { state: "done", result: LONG })} replies={NO_REPLIES} />);
-  expect(clamped(LONG)).toBe(true);
+  const start = `${LONG.slice(0, 160).trimEnd()}…`;
+  expect(lines()).toContain(start);
+  expect(lines()).not.toContain(LONG);
   expect(byLabel("More").getAttribute("aria-expanded")).toBe("false");
 
   await press("More");
-  expect(clamped(LONG)).toBe(false);
+  expect(lines()).toContain(LONG);
+  expect(lines()).not.toContain(start);
   expect(byLabel("Less").getAttribute("aria-expanded")).toBe("true");
 
   await press("Less");
-  expect(clamped(LONG)).toBe(true);
+  expect(lines()).toContain(start);
+});
+
+test("the thread's buttons are named in the interface's language", async () => {
+  language.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Card task={post(1, { state: "done", result: LONG })} />
+    </UiLanguage>,
+  );
+  expect(has(UI_VI.Reply)).toBe(true);
+  expect(has(UI_VI.More)).toBe(true);
+  await press(UI_VI.More);
+  expect(has(UI_VI.Less)).toBe(true);
+  expect(has("Reply")).toBe(false);
 });
 
 test("Reply opens the field; Send waits for words and sends the reply under the task", async () => {

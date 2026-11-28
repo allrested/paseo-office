@@ -537,7 +537,8 @@ New lobby to-dos addressed to a specific agent use the same tracked assignment a
 A task finished with a note keeps it as its result (up to 2,000 characters), and a linked lobby
 task and its copy carry the same result. A session that finishes its assignment by the completion
 line has the rest of that reply kept as the result. A card and a list row show the result under
-the task's text, three lines of it with **More** for the rest. A note can be a reply under a task:
+the task's text: its first three lines and 160 characters, and **More** for the rest when there is
+more. A note can be a reply under a task:
 the replies show under the task, oldest first, each as "author · text", and never as notes of their
 own, in the Notes column, the lobby's Notes or a room card's count. A reply always sits on the
 task's board, under the lobby task when it answers a copy. **Reply** under a task opens a one-line
