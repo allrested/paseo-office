@@ -630,6 +630,54 @@ test("a pickup by an agent with a workspace puts the task on its board, and its 
   await office.stop();
 });
 
+test("a closed agent's claim reopens and goes to the next idle agent, and says so", async () => {
+  const { build, clock, targets, store, prompts, logs } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
+  targets.delete("b");
+  targets.set("c", "wakeable");
+  office.agentGone("b");
+  await settle();
+  expect(logs).toContain("[office] released p1 held by b");
+  expect(store.current().posts).toHaveLength(1);
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "c" });
+  expect(prompts.at(-1)).toContain("c: The office assigned you lobby task");
+  await office.stop();
+});
+
+test("a failing release is logged, and an agent holding nothing logs nothing", async () => {
+  const held: Post = {
+    id: "p1",
+    seq: 1,
+    board: "w1",
+    kind: "task",
+    text: "Mine",
+    author: "user",
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+    state: "claimed",
+    claimedBy: "b",
+  };
+  const { office, store, logs } = start({ ...EMPTY_BOARDS, nextSeq: 2, posts: [held] });
+  await office.ready;
+  office.agentGone("a");
+  await settle();
+  expect(logs).toEqual([]);
+  store.failNext("disk full");
+  office.agentGone("b");
+  await settle();
+  expect(logs).toContain(
+    "[office] unable to release the claims of b: Unable to save the board: disk full",
+  );
+});
+
 test("the user's reopen of a lobby task deletes its copy", async () => {
   const { build, clock, store } = setup();
   const office = build({ workspaceOf: async () => "w2" });

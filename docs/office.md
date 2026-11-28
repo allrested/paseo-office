@@ -512,7 +512,8 @@ Each room has a board, and the lobby has one for the host: posts are tasks (open
 notes, kept in `<PASEO_HOME>/office/boards.json` (200 per board, done tasks dropped after 7 days).
 The lobby's to-do list defaults to **Any idle agent**. An available interactive session picks up
 each open task and appears on the board as its claimant. The claim stays until the task is marked
-done or reopened. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
+done or reopened, or until its agent is closed or archived, which reopens every task it still held
+(a lobby task with its copy included) for the next idle agent. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
 
@@ -631,7 +632,8 @@ report wins. With no 3D office open, or nobody idle, before its day ends, it sta
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
 It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
-Reopen (so a duty an agent that has gone still holds can be handed out again), and the list with
+Reopen (a duty is freed on its own when its agent is closed or archived, so Reopen is for one an
+agent still holds but is not working on), and the list with
 each duty's name, instructions and day buttons, saved whole. Unticking today's day on a duty takes
 its open post of today off the board when you save; a claimed one stays until it is done, as for a
 removed duty. The scene is told each duty's name, its chore, its holder's title cut to 24 characters
