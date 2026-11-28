@@ -1,9 +1,9 @@
 import type { OfficeAgent, Post, WorkspacePullRequest } from "../shared/contracts.js";
 import {
+  answerTo,
   askedOf as answerOf,
   idleAgents,
   isUserRequest,
-  latestRequest,
   type AskAgent,
   type Asked,
 } from "./ask-text.js";
@@ -34,6 +34,12 @@ const REVIEW_MAX = 600;
 /** How a request for a review starts on the board: the office finds its own requests by it. */
 export const REVIEW_MARK = "Review request: ";
 
+/** How a request for a tour of a pull request starts; a tour is not a review. */
+export const TOUR_MARK = "Tour request: ";
+
+/** What a tour shows before the rest is folded behind a toggle. */
+export const TOUR_LINES = 30;
+
 export type ReviewAgent = AskAgent;
 
 /** The newest request for a review of a pull request, and the note that answered it. */
@@ -53,12 +59,29 @@ export interface ReviewRow {
   status: string;
   /** Something stands between it and a merge that is not the review itself. */
   troubled: boolean;
+  /** The branch it goes into and the one it comes from; null when the forge did not say. */
+  base: string | null;
+  head: string | null;
+  /** Its place in a stack of pull requests; null outside one. */
+  stack: StackPlace | null;
   asked: ReviewAsked | null;
   /**
    * Who a request would go to now: the team's newest idle agent. Null when none is idle, and
    * while the agent already asked has not answered.
    */
   reviewer: ReviewAgent | null;
+  /** The newest request for a tour of the pull request, and the note that answered it. */
+  tour: ReviewAsked | null;
+  /** A tour was asked and its agent, still in the room, has not answered. */
+  tourPending: boolean;
+  /** Who Explain would go to: as `reviewer`, but kept apart from the review's own request. */
+  explainer: ReviewAgent | null;
+}
+
+/** A row's place in a stack: "2 of 3" is position 2, depth 3. */
+export interface StackPlace {
+  position: number;
+  depth: number;
 }
 
 function standOf(request: WorkspacePullRequest): ReviewStand {
@@ -85,19 +108,58 @@ export function reviewAsk(request: WorkspacePullRequest): string {
   ].join("\n");
 }
 
-function isRequestFor(post: Post, url: string): boolean {
-  if (!isUserRequest(post)) return false;
-  const [first, second] = post.text.split("\n");
-  return first !== undefined && first.startsWith(REVIEW_MARK) && second === url;
+/**
+ * What an agent is asked for a tour: the same shape as a review request with its own first line.
+ * It asks for a reading order and for no verdict; the office fetches no diff, the agent reads it.
+ */
+export function tourAsk(request: WorkspacePullRequest): string {
+  return [
+    `${TOUR_MARK}${reviewTitle(request)}`,
+    request.url,
+    "List the changed files in the order to read them, one line each with why it changed. Do not review the change.",
+  ].join("\n");
 }
 
+function isRequestFor(post: Post, url: string, mark: string): boolean {
+  if (!isUserRequest(post)) return false;
+  const [first, second] = post.text.split("\n");
+  return first !== undefined && first.startsWith(mark) && second === url;
+}
+
+/**
+ * The newest request that starts with `mark` for a pull request, and its answer. A review and a
+ * tour are separate requests answered by the same kind of note, so the requests of both kinds
+ * share the agent's notes: oldest request first, each takes the asked agent's first note not
+ * taken yet. With a review and a tour both asked of one agent, its first note answers the OLDER
+ * request and the next note the newer one. Replies under a task are no answer.
+ */
 function askedOf(
   room: OfficeRoom,
   url: string,
+  mark: string,
   agents: ReadonlyMap<string, OfficeAgent>,
+  max: number,
 ): ReviewAsked | null {
-  const found = latestRequest(room.posts, (post) => isRequestFor(post, url));
-  return found === null ? null : answerOf(found, agents, REVIEW_MAX);
+  const requests = room.posts
+    .filter((post) => [REVIEW_MARK, TOUR_MARK].some((kind) => isRequestFor(post, url, kind)))
+    .sort((a, b) => a.seq - b.seq);
+  const taken = new Set<string>();
+  let found: { agentId: string; answer: Post | null } | null = null;
+  for (const request of requests) {
+    const answer = answerTo(room.posts, request, taken);
+    if (answer !== null) taken.add(answer.id);
+    if (request.to !== undefined && isRequestFor(request, url, mark)) {
+      found = { agentId: request.to, answer };
+    }
+  }
+  return found === null ? null : answerOf(found, agents, max);
+}
+
+/** Whether an agent was asked and has not answered, and is still here to. */
+function isPending(room: OfficeRoom, asked: ReviewAsked | null): boolean {
+  return (
+    asked !== null && asked.text === null && room.rows.some((row) => row.agent.id === asked.agentId)
+  );
 }
 
 function reviewerOf(room: OfficeRoom, asked: ReviewAsked | null): ReviewAgent | null {
@@ -137,7 +199,8 @@ export function reviewRows(model: Pick<OfficeModel, "rooms" | "agents">): Review
     if (!request || (request.state !== "open" && request.state !== "draft")) continue;
     const stand = standOf(request);
     const checks = CHECK_WORDS[request.checks];
-    const asked = askedOf(room, request.url, model.agents);
+    const asked = askedOf(room, request.url, REVIEW_MARK, model.agents, REVIEW_MAX);
+    const tour = askedOf(room, request.url, TOUR_MARK, model.agents, Number.POSITIVE_INFINITY);
     rows.push({
       roomId: room.id,
       title: reviewTitle(request),
@@ -149,11 +212,86 @@ export function reviewRows(model: Pick<OfficeModel, "rooms" | "agents">): Review
         .filter((part) => part !== null)
         .join(", "),
       troubled: stand === "changes" || request.checks === "failure" || request.conflicts,
+      base: request.base,
+      head: request.head ?? null,
+      stack: null,
       asked,
       reviewer: reviewerOf(room, asked),
+      tour,
+      tourPending: isPending(room, tour),
+      explainer: reviewerOf(room, tour),
     });
   }
-  return rows.sort((a, b) => STAND_ORDER.indexOf(a.stand) - STAND_ORDER.indexOf(b.stand));
+  return reviewStacks(
+    rows.sort((a, b) => STAND_ORDER.indexOf(a.stand) - STAND_ORDER.indexOf(b.stand)),
+  );
+}
+
+/**
+ * Pull requests on each other, in merge order. A row whose base is another row's head (both
+ * known, compared exactly) stands on it; a stack runs from the row on a branch outside the set
+ * upward, and a row with two children makes two lines that share it, each continuing in the order
+ * the rows are listed. A row's depth is the longest line through it. A stack is kept together at
+ * the place of its bottom; a cycle is bad data, not a stack, and its rows stay where they are.
+ */
+export function reviewStacks<T extends Pick<ReviewRow, "base" | "head" | "stack">>(
+  rows: readonly T[],
+): T[] {
+  // A base that two heads match belongs to the first of them listed.
+  const parentOf = rows.map((row, index) =>
+    row.base === null ? -1 : rows.findIndex((other, at) => at !== index && other.head === row.base),
+  );
+  const children = rows.map((_, index) =>
+    parentOf.flatMap((parent, child) => (parent === index ? [child] : [])),
+  );
+  const places = new Map<number, StackPlace>();
+  const order = new Map<number, number[]>();
+  const height = (index: number): number => 1 + Math.max(0, ...(children[index] ?? []).map(height));
+  const walk = (index: number, position: number, line: number[]): void => {
+    line.push(index);
+    places.set(index, { position, depth: position - 1 + height(index) });
+    for (const child of children[index] ?? []) walk(child, position + 1, line);
+  };
+  rows.forEach((_, index) => {
+    if (parentOf[index] !== -1 || (children[index] ?? []).length === 0) return;
+    const line: number[] = [];
+    walk(index, 1, line);
+    order.set(index, line);
+  });
+  const out: T[] = [];
+  rows.forEach((row, index) => {
+    const line = order.get(index);
+    if (line === undefined) {
+      if (!places.has(index)) out.push(row);
+      return;
+    }
+    for (const member of line) {
+      const base = rows[member];
+      const stack = places.get(member);
+      if (base !== undefined && stack !== undefined) out.push({ ...base, stack });
+    }
+  });
+  return out;
+}
+
+/** A tour for the card: its first lines, the rest to fold away, and how many lines that is. */
+export function tourView(text: string): { shown: string; rest: string; more: number } {
+  const lines = text.split("\n");
+  return {
+    shown: lines.slice(0, TOUR_LINES).join("\n"),
+    rest: lines.slice(TOUR_LINES).join("\n"),
+    more: Math.max(0, lines.length - TOUR_LINES),
+  };
+}
+
+/** "Stack: 2 of 3": the row's place from the bottom and the stack's depth along its line. */
+export function stackLabel(stack: StackPlace): string {
+  return `Stack: ${stack.position} of ${stack.depth}`;
+}
+
+/** Explain's label: "Asked Builder" while the agent has not answered. */
+export function explainLabel(row: Pick<ReviewRow, "tour" | "tourPending">): string {
+  return row.tourPending && row.tour !== null ? `Asked ${row.tour.title}` : "Explain";
 }
 
 function count(n: number, one: string, many: string): string {

@@ -442,6 +442,21 @@ test("a pull request is merged, closed, a draft or open, whatever its forge call
   expect(state({ state: "opened", isDraft: true })?.state).toBe("draft");
 });
 
+test("a pull request carries the branch it comes from when the daemon says it", () => {
+  const head = (pullRequest: object) =>
+    projectWorkspace(
+      workspaceInput({
+        githubRuntime: {
+          pullRequest: { url: "u", title: "t", state: "OPEN", isMerged: false, ...pullRequest },
+        },
+      }),
+    )?.pullRequest;
+  expect(head({ headRefName: "feat/cart" })?.head).toBe("feat/cart");
+  expect(head({ headRefName: null })?.head).toBeNull();
+  expect(head({ headRefName: "" })?.head).toBeNull();
+  expect(head({})).not.toHaveProperty("head");
+});
+
 test("a workspace without a branch, a ticket or a pull request carries none", () => {
   const plain = { id: "w1", name: "main", projectName: "paseo" };
   expect(

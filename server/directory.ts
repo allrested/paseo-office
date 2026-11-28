@@ -108,6 +108,7 @@ export interface DirectoryPullRequestInput {
   title: string;
   state: string;
   baseRefName?: string | null;
+  headRefName?: string | null;
   isMerged: boolean;
   isDraft?: boolean;
   mergeable?: string;
@@ -200,6 +201,7 @@ function pullRequestOf(workspace: DirectoryWorkspaceInput): WorkspacePullRequest
     url: request.url,
     title: request.title,
     base: request.baseRefName || null,
+    ...(request.headRefName === undefined ? {} : { head: request.headRefName || null }),
     state: pullRequestState(request),
     checks: request.checksStatus ?? "none",
     runs: runsOf(request.checks ?? []),

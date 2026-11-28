@@ -13,8 +13,12 @@ import {
   reviewHint,
   reviewNote,
   reviewRows,
+  reviewStacks,
   reviewSummary,
   reviewTitle,
+  tourAsk,
+  tourView,
+  type ReviewRow,
 } from "./review-text.js";
 
 function agent(id: string, patch: Partial<OfficeAgent> = {}): OfficeAgent {
@@ -111,8 +115,14 @@ test("the queue has every open or draft pull request with what stands in its way
       stand: "review",
       status: "Waiting for a review, checks fail, has conflicts",
       troubled: true,
+      base: "main",
+      head: null,
+      stack: null,
       asked: null,
       reviewer: { agentId: "a", title: "a" },
+      tour: null,
+      tourPending: false,
+      explainer: { agentId: "a", title: "a" },
     },
   ]);
 });
@@ -314,4 +324,212 @@ test("the button asks again once a review came in, and the line under it says wh
   );
   // The line about the request itself says that it waits.
   expect(reviewHint({ asked: pending, reviewer: null }, false)).toBeNull();
+});
+
+test("a tour request names the pull request, its address and what to list", () => {
+  const lines = (patch: Partial<WorkspacePullRequest>) => tourAsk(request(patch)).split("\n");
+  expect(lines({})).toEqual([
+    "Tour request: #12 Fix checkout",
+    "https://forge.example/pull/12",
+    "List the changed files in the order to read them, one line each with why it changed. Do not review the change.",
+  ]);
+  expect(lines({ number: null })[0]).toBe("Tour request: Fix checkout");
+});
+
+const tourBoard = (posts: Post[], agents = [agent("a"), agent("b")]) =>
+  rowsOf(agents, [workspace("w1", { pullRequest: request() })], { w1: posts })[0];
+
+test("the tour is the asked agent's first note after the request, not a reply and not another's", () => {
+  const ask = tourAsk(request());
+  const answered = tourBoard([
+    post(1, { text: ask, to: "b" }),
+    post(2, { author: "a", text: "Not the one asked." }),
+    post(3, { author: "b", text: "Reply under a task.", replyTo: "t1" }),
+    post(4, { author: "b", text: "  cart.ts: the rounding  " }),
+    post(5, { author: "b", text: "Later." }),
+  ]);
+  expect(answered?.tour).toEqual({
+    agentId: "b",
+    title: "b",
+    text: "cart.ts: the rounding",
+    cut: false,
+  });
+  expect(answered?.tourPending).toBe(false);
+  expect(answered?.asked).toBeNull();
+  expect(answered?.explainer).not.toBeNull();
+});
+
+test("a reply under a task is not taken for the review either", () => {
+  const answered = tourBoard([
+    post(1, { text: reviewAsk(request()), to: "b" }),
+    post(2, { author: "b", text: "Reply under a task.", replyTo: "t1" }),
+  ]);
+  expect(answered?.asked?.text).toBeNull();
+});
+
+test("Explain is off while a tour is asked and its agent is in the room, and on when it left", () => {
+  const ask = tourAsk(request());
+  const asked = tourBoard([post(1, { text: ask, to: "b" })]);
+  expect(asked?.tour).toEqual({ agentId: "b", title: "b", text: null, cut: false });
+  expect(asked?.tourPending).toBe(true);
+  expect(asked?.explainer).toBeNull();
+  // (a review is a separate request: it is still open to be asked)
+  expect(asked?.reviewer).not.toBeNull();
+
+  const left = tourBoard([post(1, { text: ask, to: "gone" })]);
+  expect(left?.tourPending).toBe(false);
+  expect(left?.explainer).not.toBeNull();
+});
+
+test("a pending review does not block Explain, and the answer to one is not the other's", () => {
+  const review = tourBoard([post(1, { text: reviewAsk(request()), to: "b" })]);
+  expect(review?.reviewer).toBeNull();
+  expect(review?.explainer).not.toBeNull();
+  expect(review?.tour).toBeNull();
+  const tour = tourBoard([
+    post(1, { text: tourAsk(request()), to: "b" }),
+    post(2, { author: "b", text: "tour answer" }),
+  ]);
+  expect(tour?.asked).toBeNull();
+  expect(tour?.tour?.text).toBe("tour answer");
+});
+
+test("with a review and a tour both asked of one agent, the first note answers the older one", () => {
+  const both = (first: string, second: string) =>
+    tourBoard([
+      post(1, { text: first, to: "b" }),
+      post(2, { text: second, to: "b" }),
+      post(3, { author: "b", text: "first note" }),
+    ]);
+  const review = reviewAsk(request());
+  const tour = tourAsk(request());
+  // review asked first: it gets "first note", the tour is still waiting
+  const reviewFirst = both(review, tour);
+  expect(reviewFirst?.asked?.text).toBe("first note");
+  expect(reviewFirst?.tour?.text).toBeNull();
+  // tour asked first: the other way round
+  const tourFirst = both(tour, review);
+  expect(tourFirst?.tour?.text).toBe("first note");
+  expect(tourFirst?.asked?.text).toBeNull();
+  // the next note answers the newer one
+  const answered = tourBoard([
+    post(1, { text: review, to: "b" }),
+    post(2, { text: tour, to: "b" }),
+    post(3, { author: "b", text: "first note" }),
+    post(4, { author: "b", text: "second note" }),
+  ]);
+  expect(answered?.asked?.text).toBe("first note");
+  expect(answered?.tour?.text).toBe("second note");
+});
+
+test("a tour shows its first 30 lines and counts the rest", () => {
+  const long = Array.from({ length: 34 }, (_, index) => `file-${index + 1}.ts: why`).join("\n");
+  const view = tourView(long);
+  expect(view.shown.split("\n")).toHaveLength(30);
+  expect(view.shown.endsWith("file-30.ts: why")).toBe(true);
+  expect(view.rest).toBe("file-31.ts: why\nfile-32.ts: why\nfile-33.ts: why\nfile-34.ts: why");
+  expect(view.more).toBe(4);
+  expect(tourView("one\ntwo")).toEqual({ shown: "one\ntwo", rest: "", more: 0 });
+});
+
+test("a long tour is not cut at the review's length", () => {
+  const long = "x".repeat(2000);
+  const row = tourBoard([
+    post(1, { text: tourAsk(request()), to: "b" }),
+    post(2, { author: "b", text: long }),
+  ]);
+  expect(row?.tour?.text).toBe(long);
+});
+
+function stackRow(
+  id: string,
+  base: string | null,
+  head: string | null,
+): Pick<ReviewRow, "roomId" | "base" | "head" | "stack"> {
+  return { roomId: id, base, head, stack: null };
+}
+const stacked = (rows: ReturnType<typeof stackRow>[]) =>
+  reviewStacks(rows).map((row) =>
+    row.stack === null ? row.roomId : `${row.roomId} ${row.stack.position}/${row.stack.depth}`,
+  );
+
+test("pull requests that are not on each other make no stack", () => {
+  expect(stacked([stackRow("a", "main", "a"), stackRow("b", "main", "b")])).toEqual(["a", "b"]);
+  expect(stacked([])).toEqual([]);
+});
+
+test("a pull request based on another's branch stands above it, in a stack of two", () => {
+  // listed top first: the card puts the bottom first
+  expect(stacked([stackRow("top", "mid", "top"), stackRow("mid", "main", "mid")])).toEqual([
+    "mid 1/2",
+    "top 2/2",
+  ]);
+});
+
+test("a stack of three is kept together, bottom first, where its bottom stood in the queue", () => {
+  expect(
+    stacked([
+      stackRow("x", "main", "x"),
+      stackRow("c", "b", "c"),
+      stackRow("y", "main", "y"),
+      stackRow("a", "main", "a"),
+      stackRow("b", "a", "b"),
+    ]),
+  ).toEqual(["x", "y", "a 1/3", "b 2/3", "c 3/3"]);
+});
+
+test("a fork is a stack that shares its bottom: each row is labelled by its depth", () => {
+  expect(
+    stacked([
+      stackRow("root", "main", "root"),
+      stackRow("one", "root", "one"),
+      stackRow("two", "root", "two"),
+      stackRow("two-up", "two", "two-up"),
+    ]),
+  ).toEqual(["root 1/3", "one 2/2", "two 2/3", "two-up 3/3"]);
+});
+
+test("a cycle is not a stack: its rows stay where they are with no label", () => {
+  expect(
+    stacked([stackRow("a", "b", "a"), stackRow("b", "a", "b"), stackRow("c", "main", "c")]),
+  ).toEqual(["a", "b", "c"]);
+  expect(stacked([stackRow("self", "self", "self")])).toEqual(["self"]);
+});
+
+test("a null head or base joins no stack, even with another null", () => {
+  expect(stacked([stackRow("a", null, null), stackRow("b", null, null)])).toEqual(["a", "b"]);
+  expect(stacked([stackRow("a", "main", null), stackRow("b", "x", "b")])).toEqual(["a", "b"]);
+});
+
+test("a merged pull request in the middle breaks the stack: the card lists none of it", () => {
+  const rows = rowsOf(
+    [],
+    [
+      workspace("w1", { pullRequest: request({ url: "u1", base: "main", head: "a" }) }),
+      workspace("w2", {
+        pullRequest: request({ url: "u2", base: "a", head: "b", state: "merged" }),
+      }),
+      workspace("w3", { pullRequest: request({ url: "u3", base: "b", head: "c" }) }),
+    ],
+  );
+  expect(rows.map((row) => [row.roomId, row.stack])).toEqual([
+    ["w1", null],
+    ["w3", null],
+  ]);
+});
+
+test("the queue keeps a stack together and labels its rows", () => {
+  const rows = rowsOf(
+    [],
+    [
+      workspace("top", { pullRequest: request({ url: "u1", base: "mid", head: "top" }) }),
+      workspace("draft", { pullRequest: request({ url: "u2", state: "draft", head: "d" }) }),
+      workspace("mid", { pullRequest: request({ url: "u3", base: "main", head: "mid" }) }),
+    ],
+  );
+  expect(rows.map((row) => [row.roomId, row.stack])).toEqual([
+    ["mid", { position: 1, depth: 2 }],
+    ["top", { position: 2, depth: 2 }],
+    ["draft", null],
+  ]);
 });

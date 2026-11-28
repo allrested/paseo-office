@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { StripCard } from "./attention-strip.js";
 import type { OfficeModel } from "../shared/model.js";
-import { reviewAsk, reviewNote, reviewRows, type ReviewRow } from "./review-text.js";
+import { reviewAsk, reviewNote, reviewRows, tourAsk, type ReviewRow } from "./review-text.js";
 import type { BoardActions } from "./use-board-actions.js";
 
 export interface Reviews {
@@ -11,6 +11,8 @@ export interface Reviews {
   open: boolean;
   /** Posts the request for a review on the pull request's board, naming the row's reviewer. */
   ask(row: ReviewRow): Promise<void>;
+  /** Posts the request for a tour of the pull request, naming the row's explainer. */
+  explain(row: ReviewRow): Promise<void>;
   /** Leaves the card for the workspace, where the app has the diff; undefined where the host cannot. */
   openWorkspace: ((workspaceId: string) => void) | undefined;
   /** Leaves the card for the room's board, which has the review in full. */
@@ -50,6 +52,19 @@ export function useReviews({ model, post, live, showWorkspace, showBoard }: Revi
     },
     [model.rooms, post],
   );
+  const explain = useCallback(
+    async (row: ReviewRow) => {
+      const request = model.rooms.find((room) => room.id === row.roomId)?.workspace?.pullRequest;
+      if (!request || row.explainer === null) return;
+      await post({
+        board: row.roomId,
+        kind: "note",
+        text: tourAsk(request),
+        to: row.explainer.agentId,
+      });
+    },
+    [model.rooms, post],
+  );
   const openWorkspace = useMemo(() => {
     if (showWorkspace === undefined) return undefined;
     return (workspaceId: string) => {
@@ -64,5 +79,5 @@ export function useReviews({ model, post, live, showWorkspace, showBoard }: Revi
     },
     [showBoard],
   );
-  return { rows, entry, open: opened && live, ask, openWorkspace, openBoard, close };
+  return { rows, entry, open: opened && live, ask, explain, openWorkspace, openBoard, close };
 }

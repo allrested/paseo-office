@@ -174,6 +174,9 @@ export const RULES: readonly Rule[] = [
     (n) =>
       `${n} agen ditanya. Masing-masing menjawab di papan timnya, dan catatannya tampil di sini.`,
   ],
+  [/^Stack: (\d+) of (\d+)$/, (n, m) => `Tumpukan: ${n} dari ${m}`],
+  [/^(\d+) more lines?$/, (n) => `${n} baris lagi`],
+  [/^Asked (.+)$/, (x) => `${x} sudah ditanya`],
   [/^Changes requested on (.+)$/, (ref) => `Perubahan diminta pada ${ref}`],
   [/^Checks fail on (.+)$/, (ref) => `Pemeriksaan gagal pada ${ref}`],
   [/^Context (\d+)% full, (.+)$/, (n, rest) => `Konteks ${n}% penuh, ${translatePattern(rest)}`],

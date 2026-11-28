@@ -120,6 +120,8 @@ export const WorkspacePullRequestSchema = z.object({
   title: z.string(),
   /** The branch it would be merged into; null when the forge did not say. */
   base: z.string().nullable(),
+  /** The branch it comes from; absent when the daemon does not say, null when it says none. */
+  head: z.string().nullable().optional(),
   state: z.enum(["open", "draft", "merged", "closed"]),
   /** Its checks taken together. */
   checks: z.enum(["none", "pending", "success", "failure"]),
