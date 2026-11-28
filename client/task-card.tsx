@@ -13,6 +13,7 @@ import {
   todoMeta,
   type TeamNamer,
 } from "./board-text.js";
+import { SourceChip } from "./source-chip.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -361,6 +362,11 @@ export function TaskCard({
           <Icon name="Trash2" size={16} color={styles.iconColor} />
         </Pressable>
       </View>
+      {post.source === undefined ? null : (
+        <View style={styles.standupMeta}>
+          <SourceChip source={post.source} styles={styles} />
+        </View>
+      )}
       <View style={styles.taskCardThread}>
         <TaskThread
           task={post}

@@ -1453,8 +1453,28 @@ Sound is on, and only after a press in the scene.
 The office can post tickets from Jira as lobby tasks by itself. **Jira intake** in the host
 settings (`jiraIntakeJql`) takes a JQL of the owner's own, up to 1,000 characters; while it is
 empty, or Jira has no sign-in (the one under Services, or the daemon's environment, as for
-Incidents), the intake is off and has no timer. The settings' screen for it comes in a later
-change; the settings document holds it now.
+Incidents), the intake is off and has no timer.
+
+- **Where the settings are.** Settings, Services, **Intake**, after the connections. "Jira tickets
+  to bring in (JQL)" is a field of three lines, up to 1,000 characters, saved when it loses focus,
+  with the hint that the tickets it matches become lobby tasks, each once, and that imported
+  tickets should be left out of it. "Imported tasks go to" is Backlog or To do (`intakeLands`).
+  The switch "Let the gate start imported tasks" (`intakeAutoStart`) warns that a ticket's text
+  reaches an agent without you reading it; "Comment the result on the ticket"
+  (`intakeWriteBack`) warns that everyone who can read the ticket reads the comment. The intake
+  uses the Jira connection above it and takes no token of its own.
+- **The status line and Read now.** Under the fields: "Not set up: needs a JQL and the Jira
+  connection." while the source is not set up; otherwise the last run, as "Last read 12:40: 3
+  imported" or "Last read 12:40: nothing new" (the device's clock), or "Not read yet." before the
+  first, then the run's problem in the warning colour, and "Waiting: 50 imported tasks are open."
+  while the cap holds the intake back. **Read now** runs the intake at once
+  (`office.intake.run.request`), shows "Reading..." meanwhile and a failure like any other
+  button's, and is off while the source is not set up.
+- **The chip.** A task from a ticket shows the ticket's key ("PROJ-12") on its meta line, on the
+  kanban card, the list row and a room's copy alike. It is a link: it opens the ticket's address
+  as the Reviews card opens a pull request, and its name for a screen reader is "Open PROJ-12 in
+  Jira" (or "Open <key> on GitHub"). Only an http or https address is opened; any other is shown
+  as plain text. A press on it changes nothing on the task.
 
 - **What is read, and how often.** Every 10 minutes the office sends the JQL to Jira as written
   (`GET /rest/api/3/search/jql`, the office adds nothing to it) and reads the summary and the

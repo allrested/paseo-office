@@ -282,6 +282,11 @@ export const RULES: readonly Rule[] = [
     (example) =>
       `Địa chỉ trả lời theo định dạng open-meteo, ví dụ ${example}. https, hoặc http trên chính host. Host đọc mỗi 15 phút khi văn phòng đang mở.`,
   ],
+  // The intake's status line, and the chip that opens a task's ticket.
+  [/^Last read (\d{2}:\d{2}): (\d+) imported$/, (time, n) => `Đọc lần cuối ${time}: đã nhập ${n}`],
+  [/^Last read (\d{2}:\d{2}): nothing new$/, (time) => `Đọc lần cuối ${time}: không có gì mới`],
+  [/^Open (\S+) in Jira$/, (key) => `Mở ${key} trong Jira`],
+  [/^Open (\S+) on GitHub$/, (key) => `Mở ${key} trên GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,

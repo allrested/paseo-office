@@ -291,6 +291,17 @@ export const RULES: readonly Rule[] = [
     (example) =>
       `Alamat yang menjawab dalam format open-meteo, misalnya ${example}. https, atau http di host itu sendiri. Host membacanya tiap 15 menit selama kantor terbuka.`,
   ],
+  // The intake's status line, and the chip that opens a task's ticket.
+  [
+    /^Last read (\d{2}:\d{2}): (\d+) imported$/,
+    (time, n) => `Terakhir dibaca ${time}: ${n} diimpor`,
+  ],
+  [
+    /^Last read (\d{2}:\d{2}): nothing new$/,
+    (time) => `Terakhir dibaca ${time}: tidak ada yang baru`,
+  ],
+  [/^Open (\S+) in Jira$/, (key) => `Buka ${key} di Jira`],
+  [/^Open (\S+) on GitHub$/, (key) => `Buka ${key} di GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,

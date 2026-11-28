@@ -12,6 +12,7 @@ import { PostWithActions } from "./board-sheet.js";
 import { useOfficeStyles } from "./styles.js";
 import { AfterField, type FollowUp } from "./follow-up.js";
 import { TaskCard } from "./task-card.js";
+import { PostRow } from "./room-board.js";
 import { UiLanguage } from "./ui-language.js";
 import { UI_VI } from "../shared/ui-words-vi.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -26,7 +27,17 @@ vi.mock("./app-locale.js", () => ({ useAppLocale: () => "en" }));
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { ScrollView, TextInput } = await import("react-native");
   const Icon = () => null;
-  return { Icon, ScrollView, TextInput };
+  // The app opens the address; a link here is an anchor, so the address it would open is its href.
+  const ExternalLink = (props: {
+    href: string;
+    accessibilityLabel?: string;
+    children: ReactNode;
+  }) => (
+    <a href={props.href} aria-label={props.accessibilityLabel}>
+      {props.children}
+    </a>
+  );
+  return { Icon, ScrollView, TextInput, ExternalLink };
 });
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -156,6 +167,11 @@ function Row({
       styles={styles}
     />
   );
+}
+
+function StyledRow({ item }: { item: Post }) {
+  const styles = useOfficeStyles(THEME, false, false);
+  return <PostRow post={item} name={nameOf} teamName={teamIdOf} styles={styles} brief />;
 }
 
 let container: HTMLElement;
@@ -547,4 +563,71 @@ test("a held task that also waits still says what it waits on", async () => {
   await mount(<Card task={HELD_WAITING} replies={NO_REPLIES} others={BLOCKER} />);
   expect(lines()).toContain("Waiting on p2");
   expect(has("Start task: Rotate keys")).toBe(true);
+});
+
+const FROM_JIRA = post(7, {
+  text: "PROJ-12 Checkout fails",
+  source: { kind: "jira", key: "PROJ-12", url: "https://acme.atlassian.net/browse/PROJ-12" },
+});
+const FROM_GITHUB = post(8, {
+  text: "Fix the ledger",
+  source: {
+    kind: "github",
+    key: "acme/ledger#41",
+    url: "https://github.com/acme/ledger/issues/41",
+  },
+});
+
+/** The chip's link, by its label: its text and the address it opens. */
+function chip(label: string): { text: string | null; href: string | null } {
+  const link = byLabel(label);
+  return { text: link.textContent, href: link.getAttribute("href") };
+}
+
+test("a task from a ticket shows its key as a link on the card, the row and the room's copy", async () => {
+  const label = "Open PROJ-12 in Jira";
+  const want = { text: "PROJ-12", href: "https://acme.atlassian.net/browse/PROJ-12" };
+  await mount(<Card task={FROM_JIRA} replies={NO_REPLIES} />);
+  expect(chip(label)).toEqual(want);
+  await mount(<Row item={FROM_JIRA} replies={NO_REPLIES} />);
+  expect(chip(label)).toEqual(want);
+  await mount(<StyledRow item={FROM_JIRA} />);
+  expect(chip(label)).toEqual(want);
+});
+
+test("an issue's chip names GitHub and keeps the key as it is", async () => {
+  await mount(<Card task={FROM_GITHUB} replies={NO_REPLIES} />);
+  expect(chip("Open acme/ledger#41 on GitHub")).toEqual({
+    text: "acme/ledger#41",
+    href: "https://github.com/acme/ledger/issues/41",
+  });
+});
+
+test("a task without a source has no chip, and a press on the chip changes nothing", async () => {
+  await mount(<Card task={post(9, { text: "Plain" })} replies={NO_REPLIES} />);
+  expect(container.querySelector("a")).toBeNull();
+  await mount(<Card task={FROM_JIRA} replies={NO_REPLIES} />);
+  // jsdom does not navigate; the click is all that matters here.
+  byLabel("Open PROJ-12 in Jira").addEventListener("click", (event) => event.preventDefault());
+  await press("Open PROJ-12 in Jira");
+  expect(started).toEqual([]);
+});
+
+test("an address that is not http or https is not opened", async () => {
+  for (const url of ["javascript:alert(1)", "file:///etc/passwd", "//evil.test/x"]) {
+    const task = post(10, { text: "Odd", source: { kind: "jira", key: "PROJ-1", url } });
+    await mount(<Card task={task} replies={NO_REPLIES} />);
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.textContent).toContain("PROJ-1");
+  }
+});
+
+test("the chip's label is translated like the visible words", async () => {
+  language.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Card task={FROM_JIRA} replies={NO_REPLIES} />
+    </UiLanguage>,
+  );
+  expect(container.querySelector("a")?.getAttribute("aria-label")).toBe("Mở PROJ-12 trong Jira");
 });

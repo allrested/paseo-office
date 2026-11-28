@@ -5,6 +5,7 @@ import type { Post } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
 import { boardPreview, postMeta, todoPreview, type TeamNamer } from "./board-text.js";
 import type { OfficeRoom } from "../shared/model.js";
+import { SourceChip } from "./source-chip.js";
 import type { OfficeStyles } from "./styles.js";
 
 export interface PostRowProps {
@@ -19,9 +20,12 @@ export interface PostRowProps {
 export function PostRow({ post, name, teamName, styles, brief = false }: PostRowProps) {
   return (
     <View style={styles.post}>
-      <Text style={styles.postMeta} numberOfLines={brief ? 1 : undefined}>
-        {postMeta(post, name, teamName)}
-      </Text>
+      <View style={styles.standupMeta}>
+        <Text style={styles.postMeta} numberOfLines={brief ? 1 : undefined}>
+          {postMeta(post, name, teamName)}
+        </Text>
+        {post.source === undefined ? null : <SourceChip source={post.source} styles={styles} />}
+      </View>
       <Text style={styles.postText} numberOfLines={brief ? 2 : undefined}>
         {post.text}
       </Text>
