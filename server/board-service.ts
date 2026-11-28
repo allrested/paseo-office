@@ -34,7 +34,7 @@ export interface PostUpdate {
   id: string;
   action: UpdateAction;
   actor: string;
-  /** With `done`: what came of the task; kept as its result. */
+  /** With `done`: what came of the task, kept as its result. With `block`: what the holder needs. */
   note?: string;
 }
 
@@ -105,7 +105,12 @@ const PICKUP_BOARDS: ReadonlySet<string> = new Set([LOBBY, DUTY]);
 
 type Outcome<T> = { ok: true; value: T } | { ok: false; error: string };
 
-const VERBS: Record<UpdateAction, string> = { claim: "claim", done: "finish", reopen: "reopen" };
+const VERBS: Record<UpdateAction, string> = {
+  claim: "claim",
+  done: "finish",
+  reopen: "reopen",
+  block: "block",
+};
 
 function byAge(left: Post, right: Post): number {
   return left.createdAt.localeCompare(right.createdAt) || left.seq - right.seq;
@@ -264,6 +269,27 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return undefined;
   }
 
+  /** An answer from anyone but the holder unblocks the task, and its partner, in the reply's save. */
+  function unblocked(
+    root: Post | undefined,
+    author: string,
+    posts: Post[],
+    seq: number,
+    stamp: string,
+  ): { posts: Post[]; seq: number; boards: string[] } {
+    if (root?.blocked === undefined || author === root.claimedBy) return { posts, seq, boards: [] };
+    const partner = partnerOf(root);
+    const ids = new Set([root.id, ...(partner === undefined ? [] : [partner.id])]);
+    const boards = partner === undefined ? [] : [partner.board];
+    const cleared = posts.map((item) => {
+      if (!ids.has(item.id)) return item;
+      const resumed: Post = { ...item, seq: seq++, updatedAt: stamp };
+      delete resumed.blocked;
+      return resumed;
+    });
+    return { posts: cleared, seq, boards };
+  }
+
   async function createPost(input: NewPost): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
@@ -305,9 +331,10 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (kept.length >= BOARD_POST_MAX) {
       return { ok: false, error: "Unable to post: the board holds 200 open or claimed tasks" };
     }
-    const others = data.posts.filter((item) => item.board !== board);
-    const posts = [...others, ...kept, created];
-    const saved = await commit({ ...data, nextSeq: seq + 1, posts }, [board]);
+    const all = [...data.posts.filter((item) => item.board !== board), ...kept, created];
+    const answered = unblocked(root, input.author, all, seq + 1, stamp);
+    const touched = [board, ...answered.boards.filter((item) => item !== board)];
+    const saved = await commit({ ...data, nextSeq: answered.seq, posts: answered.posts }, touched);
     return saved.ok ? { ok: true, post: created } : saved;
   }
 
@@ -363,6 +390,40 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return { posts: [...posts.filter((item) => item.board !== room), ...kept, copy], copy };
   }
 
+  function blockState(post: Post, input: PostUpdate): Outcome<Post | null> {
+    const refuse = (reason: string): Outcome<Post | null> => ({
+      ok: false,
+      error: `Unable to block ${post.id}: ${reason}`,
+    });
+    const reason = input.note?.trim();
+    if (!reason) return refuse("say what you need in note");
+    if (post.state === "done") return refuse("it is done");
+    if (post.claimedBy === undefined) return refuse("claim it first");
+    if (post.claimedBy !== input.actor) return refuse(`claimed by ${ports.label(post.claimedBy)}`);
+    return post.blocked === reason
+      ? { ok: true, value: null }
+      : { ok: true, value: { ...post, blocked: reason } };
+  }
+
+  function claimState(post: Post, input: PostUpdate): Outcome<Post | null> {
+    const refuse = (reason: string): Outcome<Post | null> => ({
+      ok: false,
+      error: `Unable to claim ${post.id}: ${reason}`,
+    });
+    if (post.state === "done") return refuse("it is done");
+    if (post.state === "claimed" && post.claimedBy === input.actor) {
+      // The one repeated claim that changes the post: the holder is back at work.
+      if (post.blocked === undefined) return { ok: true, value: null };
+      const resumed = { ...post };
+      delete resumed.blocked;
+      return { ok: true, value: resumed };
+    }
+    if (post.state === "claimed" && post.claimedBy !== undefined) {
+      return refuse(`claimed by ${ports.label(post.claimedBy)}`);
+    }
+    return { ok: true, value: { ...post, state: "claimed", claimedBy: input.actor } };
+  }
+
   function nextState(post: Post, input: PostUpdate): Outcome<Post | null> {
     const refuse = (reason: string): Outcome<Post | null> => ({
       ok: false,
@@ -371,18 +432,12 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (post.kind !== "task") return refuse("it is a note");
     const refusal = ports.refuse?.(post, input) ?? null;
     if (refusal !== null) return refuse(refusal);
-    if (input.action === "claim") {
-      if (post.state === "done") return refuse("it is done");
-      if (post.state === "claimed" && post.claimedBy === input.actor)
-        return { ok: true, value: null };
-      if (post.state === "claimed" && post.claimedBy !== undefined) {
-        return refuse(`claimed by ${ports.label(post.claimedBy)}`);
-      }
-      return { ok: true, value: { ...post, state: "claimed", claimedBy: input.actor } };
-    }
+    if (input.action === "block") return blockState(post, input);
+    if (input.action === "claim") return claimState(post, input);
     if (input.action === "done") {
       const done = { ...post, state: "done" as const };
       delete done.pickupMessageId;
+      delete done.blocked;
       const result = input.note?.trim();
       if (result) done.result = result;
       return post.state === "done" ? { ok: true, value: null } : { ok: true, value: done };
@@ -396,8 +451,27 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
   function doneAs(partner: Post, post: Post, seq: number): Post {
     const done: Post = { ...partner, state: "done", seq, updatedAt: now() };
     delete done.pickupMessageId;
+    delete done.blocked;
     if (post.result !== undefined) done.result = post.result;
     return done;
+  }
+
+  /** `partner` with the same block mark as `post`: a linked pair always agrees. */
+  function markedAs(partner: Post, post: Post, seq: number): Post {
+    const marked: Post = { ...partner, seq, updatedAt: now() };
+    if (post.blocked === undefined) delete marked.blocked;
+    else marked.blocked = post.blocked;
+    return marked;
+  }
+
+  /** A lobby task newly claimed by an agent, with no copy yet, gets one on the agent's board. */
+  function needsCopy(post: Post, next: Post, partner: Post | undefined, actor: string): boolean {
+    return (
+      partner === undefined &&
+      post.board === LOBBY &&
+      next.state === "claimed" &&
+      actor !== USER_AUTHOR
+    );
   }
 
   async function updatePost(input: PostUpdate, pickupMessageId?: string): Promise<PostResult> {
@@ -409,13 +483,9 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const partner = partnerOf(post);
     if (partner?.board === LOBBY && next.value.state === "open")
       return reopenFromCopy(post, partner);
-    const room =
-      partner === undefined &&
-      post.board === LOBBY &&
-      next.value.state === "claimed" &&
-      input.actor !== USER_AUTHOR
-        ? await roomOf(input.actor)
-        : null;
+    const room = needsCopy(post, next.value, partner, input.actor)
+      ? await roomOf(input.actor)
+      : null;
     let seq = data.nextSeq;
     const changed: Post = { ...next.value, seq: seq++, updatedAt: now() };
     if (pickupMessageId) changed.pickupMessageId = pickupMessageId;
@@ -429,6 +499,13 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       const done = doneAs(partner, changed, seq++);
       posts = posts.map((item) => (item.id === partner.id ? done : item));
       touched.push(partner.board);
+    } else if (partner !== undefined) {
+      if (partner.blocked !== changed.blocked) {
+        posts = posts.map((item) =>
+          item.id === partner.id ? markedAs(partner, changed, seq++) : item,
+        );
+        touched.push(partner.board);
+      }
     } else if (room !== null) {
       const added = withCopy(posts, changed, input.actor, room, seq);
       if (added !== null) {

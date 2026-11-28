@@ -469,7 +469,7 @@ test("an instructed duty goes to an idle agent as a lobby task does; a pretend o
       "  Build",
       "  ",
       "  Run the build",
-      'Work on this task. When it is complete, use office_update with id "p2", action "done" and a short result in note. If you need input, leave it claimed and explain what you need.',
+      'Work on this task. When it is complete, use office_update with id "p2", action "done" and a short result in note. If you need input, use office_update with action "block" and say what you need in note; the answer comes back as a prompt.',
       "If the tool is unavailable and you have finished, put this exact line at the end of your reply: Completed office task p2 (assignment 3).",
     ].join("\n"),
   ]);
@@ -779,4 +779,21 @@ test("a completion line keeps the reply's text before it as the task's result", 
   expect(store.current().posts[1]).toMatchObject({ state: "done" });
   expect(store.current().posts[1]).not.toHaveProperty("result");
   await office.stop();
+});
+
+test("the user never blocks a task, whoever holds it", async () => {
+  const { office } = start();
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Review this" });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  await update?.execute({ id: "p1", action: "claim" }, toolContext({ id: "a", title: null }));
+  expect(await office.update({ id: "p1", action: "block", note: "I need it" })).toEqual({
+    ok: false,
+    error: "Unable to block p1: only the agent holding it blocks it",
+  });
+  const blocked = await update?.execute(
+    { id: "p1", action: "block", note: "Which one?" },
+    toolContext({ id: "a", title: null }),
+  );
+  expect(blocked?.isError).not.toBe(true);
 });

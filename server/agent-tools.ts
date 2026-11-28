@@ -75,8 +75,9 @@ export function postLine(post: Post, label: (author: string) => string): string 
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
   const re = post.replyTo ? ` re ${post.replyTo}` : "";
+  const needs = post.blocked ? `\n  needs: ${indented(post.blocked)}` : "";
   const result = post.result ? `\n  result: ${indented(post.result)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${result}`;
+  return `${post.id} ${post.kind}${state}${claim}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
 }
 
 export function readText(
@@ -168,7 +169,7 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_update",
       description:
-        "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note.",
+        "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note. Block it with note when you need input from the user.",
       input: UpdateInputSchema,
       execute: (input, { agent }) => runUpdate(ports, agent, input),
     }),

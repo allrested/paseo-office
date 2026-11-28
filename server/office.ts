@@ -112,6 +112,8 @@ export function createOffice(deps: OfficeDeps): Office {
    * it. An agent finishes or reopens only a duty it holds; the owner's hand marks any.
    */
   function refuse(post: Post, input: PostUpdate): string | null {
+    if (input.action === "block" && input.actor === USER_AUTHOR)
+      return "only the agent holding it blocks it";
     if (post.board !== DUTY) return null;
     const pretend = !instructed(post);
     if (input.action === "claim") return pretend ? PRETEND : null;

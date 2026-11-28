@@ -1076,3 +1076,112 @@ test("a reply is refused when only its task and replies could make room", async 
   });
   expect(store.saved).toEqual([]);
 });
+
+const block = (service: BoardService, id: string, actor: string, note?: string) =>
+  service.update({ id, action: "block", actor, ...(note === undefined ? {} : { note }) });
+
+test("the holder blocks its task with a trimmed reason; the post carries it", async () => {
+  const { service } = await harness(file([taskOn(1, { state: "claimed", claimedBy: "a" })]));
+  const result = await block(service, "p1", "a", "  Which database?  ");
+  expect(result).toMatchObject({
+    ok: true,
+    post: { state: "claimed", blocked: "Which database?" },
+  });
+  expect(result.ok && result.post.seq).toBeGreaterThan(1);
+});
+
+test("block is refused without a reason, an unheld task, someone else's or a done one", async () => {
+  const { service } = await harness(
+    file([
+      taskOn(1, { state: "claimed", claimedBy: "a" }),
+      taskOn(2),
+      taskOn(3, { state: "claimed", claimedBy: "b" }),
+      taskOn(4, { state: "done", claimedBy: "a" }),
+      post(5),
+    ]),
+  );
+  const error = (text: string) => ({ ok: false, error: `Unable to block ${text}` });
+  expect(await block(service, "p1", "a")).toEqual(error("p1: say what you need in note"));
+  expect(await block(service, "p1", "a", "   ")).toEqual(error("p1: say what you need in note"));
+  expect(await block(service, "p2", "a", "why")).toEqual(error("p2: claim it first"));
+  expect(await block(service, "p3", "a", "why")).toEqual(error("p3: claimed by Bob"));
+  expect(await block(service, "p4", "a", "why")).toEqual(error("p4: it is done"));
+  expect(await block(service, "p5", "a", "why")).toEqual(error("p5: it is a note"));
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+});
+
+test("blocking again replaces the reason", async () => {
+  const { service } = await harness(file([taskOn(1, { state: "claimed", claimedBy: "a" })]));
+  await block(service, "p1", "a", "First");
+  await block(service, "p1", "a", "Second");
+  expect(find(service, "p1")?.blocked).toBe("Second");
+});
+
+test("the holder's claim clears the mark; an unblocked repeated claim changes nothing", async () => {
+  const { service, store } = await harness(
+    file([taskOn(1, { state: "claimed", claimedBy: "a", blocked: "Need it" })]),
+  );
+  const claim = await service.update({ id: "p1", action: "claim", actor: "a" });
+  expect(claim).toMatchObject({ ok: true, post: { state: "claimed", claimedBy: "a" } });
+  expect(claim.ok && claim.post).not.toHaveProperty("blocked");
+  const saves = store.saved.length;
+  await service.update({ id: "p1", action: "claim", actor: "a" });
+  expect(store.saved).toHaveLength(saves);
+});
+
+test("done and any reopen clear the mark", async () => {
+  const held = (seq: number) =>
+    taskOn(seq, { state: "claimed", claimedBy: "a", blocked: "Need it" });
+  const { service } = await harness(file([held(1), held(2), held(3)]));
+  await service.update({ id: "p1", action: "done", actor: "a", note: "Went ahead" });
+  expect(find(service, "p1")).toMatchObject({ state: "done", result: "Went ahead" });
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+  await service.update({ id: "p2", action: "reopen", actor: "a" });
+  expect(find(service, "p2")).not.toHaveProperty("blocked");
+  await service.update({ id: "p3", action: "reopen", actor: "user" });
+  expect(find(service, "p3")).toMatchObject({ state: "open" });
+  expect(find(service, "p3")).not.toHaveProperty("blocked");
+});
+
+test("a reply from anyone but the holder clears the mark in the same save; the holder's does not", async () => {
+  const { service, store } = await harness(
+    file([taskOn(1, { state: "claimed", claimedBy: "a", blocked: "Need it" })]),
+  );
+  await service.post({ board: "w1", kind: "note", text: "mine", author: "a", replyTo: "p1" });
+  expect(find(service, "p1")?.blocked).toBe("Need it");
+  const saves = store.saved.length;
+  const reply = await service.post({
+    board: "w1",
+    kind: "note",
+    text: "Use postgres",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(store.saved).toHaveLength(saves + 1);
+  expect(find(service, "p1")).toMatchObject({ state: "claimed", claimedBy: "a" });
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+  expect(find(service, "p1")?.seq).toBeGreaterThan(1);
+  expect(reply.ok && reply.post.to).toBe("a");
+});
+
+test("a block, its claim and a reply's clearing reach the linked partner", async () => {
+  const { service, events } = await claimedByA();
+  await block(service, "p1", "a", "Which one?");
+  expect(find(service, "p1")?.blocked).toBe("Which one?");
+  expect(find(service, "p3")?.blocked).toBe("Which one?");
+  await block(service, "p3", "a", "Which?");
+  expect(find(service, "p1")?.blocked).toBe("Which?");
+  await service.update({ id: "p3", action: "claim", actor: "a" });
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+  expect(find(service, "p3")).not.toHaveProperty("blocked");
+  await block(service, "p1", "a", "Again");
+  expect(events.at(-1)).toBe("board w1 p3");
+  await service.post({ board: "lobby", kind: "note", text: "Go", author: "user", replyTo: "p1" });
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+  expect(find(service, "p3")).not.toHaveProperty("blocked");
+  await block(service, "p3", "a", "More");
+  await service.update({ id: "p1", action: "done", actor: "a" });
+  expect(find(service, "p1")).not.toHaveProperty("blocked");
+  expect(find(service, "p3")).not.toHaveProperty("blocked");
+  expect(find(service, "p3")?.state).toBe("done");
+});
