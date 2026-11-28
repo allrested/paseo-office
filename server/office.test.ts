@@ -115,6 +115,7 @@ function setup(initial?: BoardsFile) {
             : ([...teams].find(([, name]) => name.toLowerCase() === nameOrId.toLowerCase())?.[0] ??
               null),
         teamName: (id) => teams.get(id) ?? null,
+        costOf: () => undefined,
         ...overrides,
       },
       log: (message) => logs.push(message),

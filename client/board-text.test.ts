@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import { buildOfficeModel, type OfficeModel, type OfficeRow } from "../shared/model.js";
 import {
@@ -16,6 +16,7 @@ import {
   resultPreview,
   roomAgents,
   stepMark,
+  taskSpent,
   todoMeta,
   todoPreview,
   topLevel,
@@ -416,4 +417,61 @@ test("a task's after line says what it waits on, then where it came from", () =>
   const taken = task("p4", { after: ["p1"], state: "claimed" });
   expect(afterLine(taken, [task("p1"), taken])).toBe("After p1");
   expect(afterLine(task("p5"), [])).toBeNull();
+});
+
+describe("taskSpent", () => {
+  const MIN = 60 * 1000;
+  const HOUR = 60 * MIN;
+  const START = Date.parse("2026-11-17T09:00:00.000Z");
+  const spent = (ms: number, fields: Partial<Post> = {}) =>
+    taskSpent({
+      id: "p1",
+      seq: 1,
+      board: "w1",
+      kind: "task",
+      text: "t",
+      author: "user",
+      state: "done",
+      claimedAt: new Date(START).toISOString(),
+      doneAt: new Date(START + ms).toISOString(),
+      createdAt: "2026-11-17T08:00:00.000Z",
+      updatedAt: "2026-11-17T08:00:00.000Z",
+      ...fields,
+    });
+
+  test("the time from the claim to done, by its size", () => {
+    expect(spent(0)).toBe("took under a minute");
+    expect(spent(59_000)).toBe("took under a minute");
+    expect(spent(60_000)).toBe("took 1 min");
+    expect(spent(23 * MIN)).toBe("took 23 min");
+    expect(spent(59 * MIN)).toBe("took 59 min");
+    expect(spent(60 * MIN)).toBe("took 1 h");
+    expect(spent(65 * MIN)).toBe("took 1 h 5 min");
+    expect(spent(120 * MIN)).toBe("took 2 h");
+    expect(spent(23 * HOUR + 59 * MIN)).toBe("took 23 h 59 min");
+    expect(spent(24 * HOUR)).toBe("took 1 d");
+    expect(spent(27 * HOUR)).toBe("took 1 d 3 h");
+    expect(spent(48 * HOUR)).toBe("took 2 d");
+  });
+
+  test("the cost follows when it is above zero", () => {
+    expect(spent(23 * MIN, { spentUsd: 0 })).toBe("took 23 min");
+    expect(spent(23 * MIN, { spentUsd: 0.004 })).toBe("took 23 min · under $0.01");
+    expect(spent(23 * MIN, { spentUsd: 0.42 })).toBe("took 23 min · $0.42");
+    expect(spent(23 * MIN, { spentUsd: 12.5 })).toBe("took 23 min · $12.50");
+    expect(spent(30_000, { spentUsd: 0.42 })).toBe("took under a minute · $0.42");
+  });
+
+  test("nothing unless the task is done and both times are read", () => {
+    expect(spent(MIN, { state: "claimed" })).toBeNull();
+    expect(spent(MIN, { state: "open" })).toBeNull();
+    expect(spent(MIN, { claimedAt: undefined })).toBeNull();
+    expect(spent(MIN, { doneAt: undefined })).toBeNull();
+    expect(spent(MIN, { claimedAt: "soon" })).toBeNull();
+    expect(spent(MIN, { doneAt: "later" })).toBeNull();
+  });
+
+  test("a done time before the claim reads as no time at all", () => {
+    expect(spent(-5 * MIN)).toBe("took under a minute");
+  });
 });

@@ -43,6 +43,8 @@ export interface OfficeAgentPorts {
   findTeam(nameOrId: string): Promise<string | null>;
   /** A roster team's name by its id; null once it is gone or the roster is off. */
   teamName(teamId: string): string | null;
+  /** What the agent's turns have cost so far, as the directory last had it; undefined when unknown. */
+  costOf(agentId: string): number | undefined;
 }
 
 export type OfficeHub = Pick<Hub, "setBoards" | "setBoard" | "removeBoard" | "setWake">;
@@ -150,6 +152,7 @@ export function createOffice(deps: OfficeDeps): Office {
     teamOf: (agentId) => deps.agents.teamOf(agentId),
     findTeam: (nameOrId) => deps.agents.findTeam(nameOrId),
     teamName: (teamId) => deps.agents.teamName(teamId),
+    costOf: (agentId) => deps.agents.costOf(agentId),
   });
 
   function noteAgent(agent: ToolAgent): void {

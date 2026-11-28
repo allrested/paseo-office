@@ -91,6 +91,41 @@ export function afterLine(post: Post, all: readonly Post[]): string | null {
     : `After ${post.after.join(", ")}`;
 }
 
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/** A span as "under a minute", "23 min", "1 h 5 min" or "1 d 3 h"; the smaller unit left out at 0. */
+function spanText(ms: number): string {
+  if (ms < MINUTE_MS) return "under a minute";
+  if (ms < HOUR_MS) return `${Math.floor(ms / MINUTE_MS)} min`;
+  if (ms < DAY_MS) {
+    const hours = Math.floor(ms / HOUR_MS);
+    const minutes = Math.floor((ms % HOUR_MS) / MINUTE_MS);
+    return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
+  }
+  const days = Math.floor(ms / DAY_MS);
+  const hours = Math.floor((ms % DAY_MS) / HOUR_MS);
+  return hours === 0 ? `${days} d` : `${days} d ${hours} h`;
+}
+
+/**
+ * What a done task took: "took 23 min · $0.42", from its holder's claim to done, with what the
+ * holder spent when the provider reported a cost. Null unless the task is done and both times read.
+ */
+export function taskSpent(post: Post): string | null {
+  if (post.state !== "done" || post.claimedAt === undefined || post.doneAt === undefined) {
+    return null;
+  }
+  const from = Date.parse(post.claimedAt);
+  const to = Date.parse(post.doneAt);
+  if (Number.isNaN(from) || Number.isNaN(to)) return null;
+  const time = `took ${spanText(Math.max(0, to - from))}`;
+  const cost = post.spentUsd;
+  if (cost === undefined || cost <= 0) return time;
+  return `${time} · ${cost < 0.01 ? "under $0.01" : `$${cost.toFixed(2)}`}`;
+}
+
 /** A board's posts without the replies: a reply shows under its task, never on its own. */
 export function topLevel(posts: readonly Post[]): Post[] {
   return posts.filter((post) => post.replyTo === undefined);

@@ -202,6 +202,14 @@ export const PostSchema = z.object({
   team: z.string().optional(),
   /** On a task: the tasks, on any board, it waits on; it is not handed out while one is not done. */
   after: z.array(z.string()).max(AFTER_MAX).optional(),
+  /** On a claimed or done task: when its holder took it (ISO time); the claim's first, not a repeat's. */
+  claimedAt: z.string().optional(),
+  /** On a done task: when it was marked done (ISO time). */
+  doneAt: z.string().optional(),
+  /** What its agent holder's turns had cost when it took the task; absent when no cost was known. */
+  costAtClaim: z.number().nonnegative().optional(),
+  /** What the holder's turns cost from the claim to done; absent when either end had no cost. */
+  spentUsd: z.number().nonnegative().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

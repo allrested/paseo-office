@@ -573,6 +573,17 @@ card's count. A reply always sits on the task's board, under the lobby task when
 its result and its replies, in the lobby's list and in a room's Done section or column, and a task
 takes its replies with it when it is deleted, cleared or dropped.
 
+A done task says what it took, in one line under its result and above its replies, on a card and
+on a list row: "took 23 min · $0.42". The time runs from the claim to done ("took under a minute",
+"took 1 h 5 min", "took 1 d 3 h"). The cost is what the agent that held the task spent from its
+claim to done, read from the cost the agent's provider reports; chat with the agent in that time
+counts too, since it is the agent's turns that are measured, not only the task's. A provider that
+reports no cost, or whose counter went back down in between, shows the time alone, as does a task
+you claimed yourself, and a cost under one cent shows as "under $0.01". Whoever marks the task done,
+the line measures the agent that held it. A reopened task loses the line and starts afresh at its
+next claim; a task done with no claim, and a pretend duty acted out in the 3D office, show none.
+`office_read` does not carry the line.
+
 A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the
 user's post takes it too), for a task only, never a note or a reply, and each must name a task
 that exists. A copy's id is kept as its lobby task's, since the copy goes when that task is

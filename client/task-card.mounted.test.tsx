@@ -442,3 +442,53 @@ test("Follow-up and the lines are in Vietnamese when the interface is", async ()
   expect(has(UI_VI.Clear)).toBe(true);
   expect(has("Clear")).toBe(false);
 });
+
+const TOOK = {
+  claimedAt: "2026-11-17T09:00:00.000Z",
+  doneAt: "2026-11-17T09:23:00.000Z",
+  spentUsd: 0.42,
+};
+
+test("a done task's card says what it took, under the result and over the replies", async () => {
+  await mount(<Card task={post(1, { ...TASK, ...TOOK })} />);
+  expect(lines()).toEqual([
+    "Ship the release",
+    "Result",
+    "Shipped 1.4.2",
+    "took 23 min · $0.42",
+    "Agent a1 · Which tag?",
+    "You · v1.4.2",
+    "Reply",
+    "Follow-up",
+  ]);
+});
+
+test("a room's list row says it too, with the time alone when no cost is known", async () => {
+  await mount(
+    <Row item={post(1, { ...TASK, ...TOOK, spentUsd: undefined })} replies={NO_REPLIES} />,
+  );
+  const shown = lines();
+  expect(shown.slice(shown.indexOf("Ship the release")).slice(0, 4)).toEqual([
+    "Ship the release",
+    "Result",
+    "Shipped 1.4.2",
+    "took 23 min",
+  ]);
+});
+
+test("a task not done, or done with no claim time, says nothing of it", async () => {
+  await mount(<Card task={post(1, { ...TASK, ...TOOK, state: "claimed" })} replies={NO_REPLIES} />);
+  expect(lines().some((line) => line.startsWith("took"))).toBe(false);
+  await mount(<Card task={post(1, { ...TASK, doneAt: TOOK.doneAt })} replies={NO_REPLIES} />);
+  expect(lines().some((line) => line.startsWith("took"))).toBe(false);
+});
+
+test("the line takes the interface's language, its dollar amount as it is", async () => {
+  language.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Card task={post(1, { ...TASK, ...TOOK })} replies={NO_REPLIES} />
+    </UiLanguage>,
+  );
+  expect(lines()).toContain("mất 23 phút · $0.42");
+});

@@ -70,6 +70,8 @@ export interface BoardServicePorts {
   findTeam?(nameOrId: string): Promise<string | null>;
   /** A roster team's name by its id; null once it is gone, or with the roster off. */
   teamName?(teamId: string): string | null;
+  /** What an agent's turns have cost so far; undefined when its provider reports no cost. */
+  costOf?(agentId: string): number | undefined;
 }
 
 /** What the duty board is brought up to: the list, the board's day, and the duties due now. */
@@ -495,6 +497,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       createdAt: stamp,
       updatedAt: stamp,
     };
+    if (task.claimedAt !== undefined) copy.claimedAt = task.claimedAt;
+    if (task.costAtClaim !== undefined) copy.costAtClaim = task.costAtClaim;
     return { posts: [...posts.filter((item) => item.board !== room), ...kept, copy], copy };
   }
 
@@ -529,7 +533,24 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (post.state === "claimed" && post.claimedBy !== undefined) {
       return refuse(`claimed by ${ports.label(post.claimedBy)}`);
     }
-    return { ok: true, value: { ...post, state: "claimed", claimedBy: input.actor } };
+    const claimed: Post = {
+      ...post,
+      state: "claimed",
+      claimedBy: input.actor,
+      claimedAt: now(),
+    };
+    // The user's claim has no cost to measure; an agent's has, when its provider reports one.
+    const cost = input.actor === USER_AUTHOR ? undefined : ports.costOf?.(input.actor);
+    if (cost !== undefined) claimed.costAtClaim = cost;
+    return { ok: true, value: claimed };
+  }
+
+  /** What the holder's turns cost since the claim; undefined unless both ends are known and it grew. */
+  function spentSince(post: Post): number | undefined {
+    if (post.claimedBy === undefined || post.costAtClaim === undefined) return undefined;
+    const cost = ports.costOf?.(post.claimedBy);
+    if (cost === undefined || cost < post.costAtClaim) return undefined;
+    return Math.round((cost - post.costAtClaim) * 10000) / 10000;
   }
 
   function nextState(post: Post, input: PostUpdate): Outcome<Post | null> {
@@ -543,9 +564,11 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (input.action === "block") return blockState(post, input);
     if (input.action === "claim") return claimState(post, input);
     if (input.action === "done") {
-      const done = { ...post, state: "done" as const };
+      const done = { ...post, state: "done" as const, doneAt: now() };
       delete done.pickupMessageId;
       delete done.blocked;
+      const spent = spentSince(post);
+      if (spent !== undefined) done.spentUsd = spent;
       const result = input.note?.trim();
       if (result) done.result = result;
       return post.state === "done" ? { ok: true, value: null } : { ok: true, value: done };
@@ -561,6 +584,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     delete done.pickupMessageId;
     delete done.blocked;
     if (post.result !== undefined) done.result = post.result;
+    if (post.doneAt !== undefined) done.doneAt = post.doneAt;
+    if (post.spentUsd !== undefined) done.spentUsd = post.spentUsd;
     return done;
   }
 
@@ -802,6 +827,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       ...post,
       state: "done",
       claimedBy: agentId,
+      doneAt: now(),
       seq: data.nextSeq,
       updatedAt: now(),
     };

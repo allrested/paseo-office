@@ -17,6 +17,16 @@ const lower = (text: string) => {
   return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 };
 
+/** A done task's "took 23 min · $0.42": the time through the duration rules, the cost as it is. */
+const spent = (time: string, cost: string | undefined) => {
+  const days = /^(\d+) d$/.exec(time)?.[1];
+  let span = translatePattern(time);
+  if (time === "under a minute") span = "kurang dari semenit";
+  if (days !== undefined) span = `${days} hr`;
+  const price = cost === "under $0.01" ? "kurang dari $0.01" : cost;
+  return `memakan ${span}${price === undefined ? "" : ` · ${price}`}`;
+};
+
 export const RULES: readonly Rule[] = [
   [
     /^Undo the last turn's edits to (\d+) files?\?$/,
@@ -33,6 +43,10 @@ export const RULES: readonly Rule[] = [
   [/^(\d+) h$/, (n) => `${n} jam`],
   [/^(\d+) h (\d+) min$/, (h, m) => `${h} jam ${m} mnt`],
   [/^(\d+) d (\d+) h$/, (d, h) => `${d} hr ${h} jam`],
+  [
+    /^took (under a minute|\d+ min|\d+ h(?: \d+ min)?|\d+ d(?: \d+ h)?)(?: · (\$\d+\.\d\d|under \$0\.01))?$/,
+    spent,
+  ],
   [/^Idle for (.+)$/, (time) => `Menganggur selama ${translatePattern(time)}`],
   [/^Waiting (\d.*)$/, (time) => `Menunggu ${translatePattern(time)}`],
   [/^Waiting on (\d+) sub-agents?$/, (n) => `Menunggu ${n} sub-agen`],
