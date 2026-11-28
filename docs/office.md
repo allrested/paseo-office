@@ -718,6 +718,21 @@ watching); "Claude's 5 hours is at 82% (starts under 70%)"; "3 tasks are in prog
 most 3)"; done for today, "10 started (at most 10 a day)"; or stopped, today's count cannot be read
 (see the office's log). With the switch off there is no line.
 
+Under it is the switch **Hand over when a plan runs out** (`handOverWhenOut`), with the hint "When
+a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider.
+Needs Keep watching." (see Plan limits for what it does).
+
+On the board, **Hand over** is on a task an agent holds where the server would take it: a lobby
+task's card or row (kanban and list), a room's copy of a lobby task (a room post with a `link`), a
+duty on the duty board, and a stalled row of the Tasks card, after Nudge and Reopen. It is not on a
+room's own task, an open, held, waiting or done task, one you hold, or a note. It asks once, in
+place, as Delete does: "Hand p12 over to an agent of another provider? Builder loses it, and a
+note says where it was left.", with **Hand over** (pending "Handing over...") and **Keep it**. A
+refusal shows the server's sentence under the button and leaves the question open; on success
+nothing else is shown, since the board updates by itself. A task handed over says "not for
+Codex" on its meta line, in both layouts and on the Tasks card: the provider's display name when
+the plan readings carry it, else its id.
+
 A claimed lobby task or duty can be handed over, by the office's hand-over call
 (`office.task.hand_over.request`, in the plugin's `handOverRpc`, with the task's id; on a room's
 copy it acts on the lobby task). It is for a task stuck with an agent that cannot go on, as when

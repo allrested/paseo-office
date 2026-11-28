@@ -53,6 +53,11 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["Task · claimed by Builder", "Việc · Builder đã nhận"],
     ["Team QA-PR", "Nhóm QA-PR"],
     ["for team QA-PR", "cho nhóm QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "Giao p12 cho agent của nhà cung cấp khác? Builder sẽ mất việc này, và một ghi chú nói rõ đã dừng ở đâu.",
+    ],
+    ["not for Codex", "không dành cho Codex"],
     ["1 teammate", "1 thành viên"],
     ["2 teammates", "2 thành viên"],
     ["Replay · 14:05 · 60×", "Xem lại · 14:05 · 60×"],

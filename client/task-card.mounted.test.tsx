@@ -6,13 +6,14 @@
 import { act, useMemo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Post } from "../shared/contracts.js";
 import { PostWithActions } from "./board-sheet.js";
 import { useOfficeStyles } from "./styles.js";
 import { AfterField, type FollowUp } from "./follow-up.js";
 import { TaskCard } from "./task-card.js";
 import { PostRow } from "./room-board.js";
+import { PlanUsageContext } from "./use-plan-usage.js";
 import { UiLanguage } from "./ui-language.js";
 import { UI_VI } from "../shared/ui-words-vi.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -71,6 +72,8 @@ const REPLIES = [
 let replied: string[];
 /** The tasks started, by id. */
 let started: string[];
+/** The tasks handed over, by id. */
+let handedOver: string[];
 /** Set to make the host refuse the reply. */
 let refusal: Error | null;
 /** While set, a reply waits for it: the host has not answered yet. */
@@ -85,6 +88,11 @@ const ACTIONS: BoardActions = {
   },
   start: async (id) => {
     started.push(id);
+    await answer;
+    if (refusal) throw refusal;
+  },
+  handOver: async (id) => {
+    handedOver.push(id);
     await answer;
     if (refusal) throw refusal;
   },
@@ -182,6 +190,7 @@ beforeEach(() => {
   followed = [];
   replied = [];
   started = [];
+  handedOver = [];
   refusal = null;
   answer = null;
   container = document.createElement("div");
@@ -630,4 +639,130 @@ test("the chip's label is translated like the visible words", async () => {
     </UiLanguage>,
   );
   expect(container.querySelector("a")?.getAttribute("aria-label")).toBe("Mở PROJ-12 trong Jira");
+});
+
+const HANDABLE = { board: "lobby", state: "claimed", claimedBy: "a1", link: "p9" } as const;
+
+describe("Hand over", () => {
+  test("shows on a lobby task an agent holds, on the card and on the row", async () => {
+    await mount(<Card task={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    expect(has("Hand over")).toBe(true);
+    await mount(<Row item={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    expect(has("Hand over")).toBe(true);
+  });
+
+  test("shows on a room's copy of a lobby task, and on a lobby task without a copy yet", async () => {
+    await mount(
+      <Row
+        item={post(12, { state: "claimed", claimedBy: "a1", link: "p9" })}
+        replies={NO_REPLIES}
+      />,
+    );
+    expect(has("Hand over")).toBe(true);
+    await mount(
+      <Card
+        task={post(12, { board: "lobby", state: "claimed", claimedBy: "a1" })}
+        replies={NO_REPLIES}
+      />,
+    );
+    expect(has("Hand over")).toBe(true);
+  });
+
+  test("does not show on a room's own task, an open, held or done task, the owner's claim or a note", async () => {
+    const hidden: Partial<Post>[] = [
+      { state: "claimed", claimedBy: "a1" },
+      { board: "lobby", state: "open" },
+      { board: "lobby", state: "open", backlog: true },
+      { board: "lobby", state: "done", claimedBy: "a1" },
+      { board: "lobby", state: "claimed", claimedBy: "user" },
+      { board: "lobby", state: "claimed" },
+    ];
+    for (const fields of hidden) {
+      await mount(<Card task={post(12, fields)} replies={NO_REPLIES} />);
+      expect(has("Hand over")).toBe(false);
+      await mount(<Row item={post(12, fields)} replies={NO_REPLIES} />);
+      expect(has("Hand over")).toBe(false);
+    }
+    await mount(
+      <Row item={post(12, { kind: "note", state: undefined, link: "p9" })} replies={NO_REPLIES} />,
+    );
+    expect(has("Hand over")).toBe(false);
+  });
+
+  test("asks once, naming the task and its holder, and Keep it closes the question", async () => {
+    await mount(<Card task={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    await press("Hand over");
+    expect(lines()).toContain(
+      "Hand p12 over to an agent of another provider? Agent a1 loses it, and a note says where it was left.",
+    );
+    expect(handedOver).toEqual([]);
+    expect(has("Keep it")).toBe(true);
+    await press("Keep it");
+    expect(handedOver).toEqual([]);
+    expect(has("Keep it")).toBe(false);
+    expect(has("Hand over")).toBe(true);
+  });
+
+  test("Hand over calls handOver with the id once and shows Handing over... while it waits", async () => {
+    let release: () => void = () => undefined;
+    answer = new Promise((done) => {
+      release = done;
+    });
+    await mount(<Card task={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    await press("Hand over");
+    await press("Hand over");
+    expect(handedOver).toEqual(["p12"]);
+    expect(has("Handing over...")).toBe(true);
+    await press("Handing over...");
+    expect(handedOver).toEqual(["p12"]);
+    await act(async () => release());
+    await settle();
+    expect(handedOver).toEqual(["p12"]);
+  });
+
+  test("a refusal is shown with its sentence and the question stays", async () => {
+    refusal = new Error("Unable to hand over: the owner holds p12");
+    await mount(<Card task={post(12, HANDABLE)} replies={NO_REPLIES} />);
+    await press("Hand over");
+    await press("Hand over");
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      "Unable to hand over: the owner holds p12",
+    );
+    expect(has("Keep it")).toBe(true);
+  });
+
+  test("the question and its buttons are translated", async () => {
+    language.choice = "vi";
+    await mount(
+      <UiLanguage>
+        <Card task={post(12, HANDABLE)} replies={NO_REPLIES} />
+      </UiLanguage>,
+    );
+    await press(UI_VI["Hand over"]);
+    expect(has(UI_VI["Keep it"])).toBe(true);
+    expect(has("Keep it")).toBe(false);
+  });
+});
+
+const KNOWN = [{ provider: "codex", name: "Codex", plan: null, windows: [] }];
+
+describe("not for a provider", () => {
+  const NOT = { board: "lobby", notProvider: "codex" } as const;
+
+  test("the meta line says not for the provider's id when the client does not know it", async () => {
+    await mount(<Card task={post(12, NOT)} replies={NO_REPLIES} />);
+    expect(lines()).toContain("not for codex");
+    await mount(<StyledRow item={post(12, NOT)} />);
+    expect(lines().join(" ")).toContain("not for codex");
+  });
+
+  test("it says the provider's display name when the plan readings carry it", async () => {
+    await mount(
+      <PlanUsageContext.Provider value={KNOWN}>
+        <Card task={post(12, NOT)} replies={NO_REPLIES} />
+        <StyledRow item={post(13, NOT)} />
+      </PlanUsageContext.Provider>,
+    );
+    expect(lines().filter((line) => line.includes("not for Codex"))).toHaveLength(2);
+  });
 });

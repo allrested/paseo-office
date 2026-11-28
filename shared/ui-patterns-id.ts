@@ -258,6 +258,12 @@ export const RULES: readonly Rule[] = [
   [/^on (.+)'s board$/, (name) => `di papan ${name}`],
   [/^Team (.+)$/, (name) => `Tim ${name}`],
   [/^for team (.+)$/, (name) => `untuk tim ${name}`],
+  [
+    /^Hand (p\d+) over to an agent of another provider\? (.+) loses it, and a note says where it was left\.$/,
+    (id, name) =>
+      `Serahkan ${id} ke agen dari penyedia lain? ${name} kehilangannya, dan sebuah catatan menyebutkan di mana tugas ditinggalkan.`,
+  ],
+  [/^not for (.+)$/, (name) => `bukan untuk ${name}`],
   [/^(\d+) teammates?$/, (n) => `${n} anggota tim`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,

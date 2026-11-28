@@ -87,6 +87,7 @@ const ACTIONS: BoardActions = {
   reply: (task, text) => change(`reply ${task.id} ${text}`),
   clearDone: (board) => change(`clearDone ${board}`),
   start: (id) => change(`start ${id}`),
+  handOver: (id) => change(`handOver ${id}`),
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => author;
@@ -203,6 +204,7 @@ test("wide, the columns sit side by side, 280 px each, with their counts and the
     "claimed by a1",
     "Reply",
     "Follow-up",
+    "Hand over",
     "Done · 1",
     "Clear finished",
     "Update the README",
@@ -250,6 +252,7 @@ test("narrow, and before it is measured, the columns stack with Done folded; a p
     "claimed by a1",
     "Reply",
     "Follow-up",
+    "Hand over",
     "Done · 1",
     "Clear finished",
     "Notes · 1",

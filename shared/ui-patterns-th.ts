@@ -235,6 +235,12 @@ export const RULES: readonly Rule[] = [
   [/^on (.+)'s board$/, (name) => `บนบอร์ดของ ${name}`],
   [/^Team (.+)$/, (name) => `ทีม ${name}`],
   [/^for team (.+)$/, (name) => `สำหรับทีม ${name}`],
+  [
+    /^Hand (p\d+) over to an agent of another provider\? (.+) loses it, and a note says where it was left\.$/,
+    (id, name) =>
+      `ส่งต่อ ${id} ให้เอเจนต์ของผู้ให้บริการรายอื่น? ${name} จะเสียงานนี้ไป และโน้ตจะบอกว่าทิ้งไว้ตรงไหน`,
+  ],
+  [/^not for (.+)$/, (name) => `ไม่ใช่สำหรับ ${name}`],
   [/^(\d+) teammates?$/, (n) => `${n} เพื่อนร่วมทีม`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,

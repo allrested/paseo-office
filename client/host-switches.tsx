@@ -48,6 +48,7 @@ type HostSetting =
   | "History vault"
   | "Keep watching"
   | "Start backlog tasks"
+  | "Hand over when a plan runs out"
   | "Start under (%)"
   | "At once"
   | "Per day"
@@ -311,6 +312,7 @@ export function HostSwitches({
             </View>
           </View>
           <BacklogGate values={stored} change={change} saveProblem={saveProblem} styles={styles} />
+          <HandOverGate values={stored} change={change} saveProblem={saveProblem} styles={styles} />
           <ArchiveSetting
             values={stored}
             change={change}
@@ -676,6 +678,40 @@ function BacklogGate({
           styles={styles}
         />
       </View>
+    </View>
+  );
+}
+
+/** Whether the office hands a provider's lobby tasks to another provider once its limit is used up. */
+function HandOverGate({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const toggle = useCallback(
+    (next: boolean) => void change("Hand over when a plan runs out", { handOverWhenOut: next }),
+    [change],
+  );
+  const problem = saveProblem("Hand over when a plan runs out");
+  return (
+    <View style={settingsLayout.block}>
+      <LabeledSwitch
+        label="Hand over when a plan runs out"
+        value={stored?.handOverWhenOut ?? null}
+        onChange={toggle}
+        styles={styles}
+      />
+      <Text style={styles.fieldHint}>
+        {
+          "When a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider. Needs Keep watching."
+        }
+      </Text>
+      {problem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {problem}
+        </Text>
+      )}
     </View>
   );
 }

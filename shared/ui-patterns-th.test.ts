@@ -45,6 +45,11 @@ test("lines built from data keep their data and take Thai words", () => {
     ["Task · claimed by Builder", "งาน · Builder รับแล้ว"],
     ["Team QA-PR", "ทีม QA-PR"],
     ["for team QA-PR", "สำหรับทีม QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "ส่งต่อ p12 ให้เอเจนต์ของผู้ให้บริการรายอื่น? Builder จะเสียงานนี้ไป และโน้ตจะบอกว่าทิ้งไว้ตรงไหน",
+    ],
+    ["not for Codex", "ไม่ใช่สำหรับ Codex"],
     ["1 teammate", "1 เพื่อนร่วมทีม"],
     ["2 teammates", "2 เพื่อนร่วมทีม"],
     ["3 h 20 min at work", "ทำงานมา 3 ชม. 20 นาที"],

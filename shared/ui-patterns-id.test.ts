@@ -55,6 +55,11 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["Task · claimed by Builder", "Tugas · diambil oleh Builder"],
     ["Team QA-PR", "Tim QA-PR"],
     ["for team QA-PR", "untuk tim QA-PR"],
+    [
+      "Hand p12 over to an agent of another provider? Builder loses it, and a note says where it was left.",
+      "Serahkan p12 ke agen dari penyedia lain? Builder kehilangannya, dan sebuah catatan menyebutkan di mana tugas ditinggalkan.",
+    ],
+    ["not for Codex", "bukan untuk Codex"],
     ["1 teammate", "1 anggota tim"],
     ["2 teammates", "2 anggota tim"],
     ["Replay · 14:05 · 60×", "Putar ulang · 14:05 · 60×"],

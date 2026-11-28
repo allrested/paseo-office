@@ -16,6 +16,7 @@ import {
   type PaceTrack,
   type PlanUsage,
 } from "../shared/plan-usage.js";
+import type { ProviderNamer } from "./board-text.js";
 import { officeHostSettings } from "../shared/settings.js";
 
 const NO_USAGE: readonly PlanUsage[] = [];
@@ -114,4 +115,18 @@ export function usePlanUsage(live: boolean): PlanState {
       picker: { all: usage, hidden, setCounted: values === undefined ? null : setCounted },
     };
   }, [usage, track, hidden, setCounted, values]);
+}
+
+/**
+ * A provider's display name for the lines that say a task is not for it: the name the plan
+ * readings carry, hidden providers included, else the id. Without a reading the id stands.
+ */
+export function useProviderName(): ProviderNamer {
+  const picker = useContext(PlanPickerContext);
+  const usage = usePlanUsageValue();
+  const known = picker?.all ?? usage;
+  return useCallback(
+    (id) => known.find((provider) => provider.provider === id)?.name ?? id,
+    [known],
+  );
 }

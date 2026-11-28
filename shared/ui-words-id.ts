@@ -841,6 +841,11 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "stopped, today's count cannot be read (see the office's log)":
     "berhenti, hitungan hari ini tidak dapat dibaca (lihat log kantor)",
   "Start backlog tasks": "Mulai tugas antrean",
+  "Hand over": "Serahkan",
+  "Handing over...": "Menyerahkan...",
+  "Hand over when a plan runs out": "Serahkan saat paket habis",
+  "When a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider. Needs Keep watching.":
+    "Saat batas sebuah penyedia habis, tugas lobi yang dipegang agennya diserahkan ke agen dari penyedia lain. Perlu Tetap memantau.",
   "Start under (%)": "Mulai di bawah (%)",
   "At once": "Sekaligus",
   "Per day": "Per hari",

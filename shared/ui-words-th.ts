@@ -810,6 +810,11 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "stopped, today's count cannot be read (see the office's log)":
     "หยุดแล้ว อ่านจำนวนของวันนี้ไม่ได้ (ดู log ของออฟฟิศ)",
   "Start backlog tasks": "เริ่มงานค้าง",
+  "Hand over": "ส่งต่อ",
+  "Handing over...": "กำลังส่งต่อ...",
+  "Hand over when a plan runs out": "ส่งต่อเมื่อแพ็กเกจหมดโควตา",
+  "When a provider's limit is used up, the lobby tasks its agents hold go to an agent of another provider. Needs Keep watching.":
+    "เมื่อโควตาของผู้ให้บริการรายหนึ่งหมด งานในล็อบบี้ที่เอเจนต์ของรายนั้นถืออยู่จะถูกส่งให้เอเจนต์ของผู้ให้บริการรายอื่น ต้องเปิด เฝ้าดูต่อ",
   "Start under (%)": "เริ่มเมื่อต่ำกว่า (%)",
   "At once": "พร้อมกัน",
   "Per day": "ต่อวัน",

@@ -3,6 +3,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import {
   clearDoneRpc,
   deleteRpc,
+  handOverRpc,
   postRpc,
   setWakesPausedRpc,
   startRpc,
@@ -29,6 +30,8 @@ export interface BoardActions {
   reply(task: Post, text: string): Promise<void>;
   /** Takes a held task out of the backlog, so the office hands it out. */
   start(id: string): Promise<void>;
+  /** Takes a claimed lobby task or duty from its agent, for an agent of another provider. */
+  handOver(id: string): Promise<void>;
   markDone(id: string): Promise<void>;
   reopen(id: string): Promise<void>;
   remove(id: string): Promise<void>;
@@ -42,6 +45,7 @@ export function useBoardActions(): BoardActions {
   const post = useRpc(postRpc);
   const start = useRpc(startRpc);
   const update = useRpc(updateRpc);
+  const handOver = useRpc(handOverRpc);
   const remove = useRpc(deleteRpc);
   const clearDone = useRpc(clearDoneRpc);
   const pause = useRpc(setWakesPausedRpc);
@@ -57,6 +61,10 @@ export function useBoardActions(): BoardActions {
       },
       async start(id) {
         const result = await start({ id });
+        if (!result.ok) throw new Error(result.error);
+      },
+      async handOver(id) {
+        const result = await handOver({ id });
         if (!result.ok) throw new Error(result.error);
       },
       async markDone(id) {
@@ -79,6 +87,6 @@ export function useBoardActions(): BoardActions {
         await pause({ paused });
       },
     }),
-    [post, start, update, remove, clearDone, pause],
+    [post, start, update, handOver, remove, clearDone, pause],
   );
 }

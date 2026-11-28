@@ -7,6 +7,7 @@ import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
 import {
   afterLine,
+  canHandOver,
   clearQuestion,
   resultPreview,
   taskSpent,
@@ -16,6 +17,7 @@ import {
 import { SourceChip } from "./source-chip.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
+import { useProviderName } from "./use-plan-usage.js";
 import type { BoardActions } from "./use-board-actions.js";
 import { listenForSpace } from "./web-env.web.js";
 
@@ -54,6 +56,40 @@ export function DeleteQuestion({ question, onDelete, onKeep, styles }: DeleteQue
           styles={styles}
         />
         <ActionButton label="Keep" pendingLabel="Keeping..." onPress={onKeep} styles={styles} />
+      </View>
+    </>
+  );
+}
+
+interface HandOverQuestionProps {
+  task: Post;
+  /** Who holds the task now, by name. */
+  holder: string;
+  actions: Pick<BoardActions, "handOver">;
+  onKeep(): void;
+  styles: OfficeStyles;
+}
+
+/**
+ * Hand over takes the task from its holder, so it asks once, in the card, as Delete does. The
+ * question stays after a refusal, with the server's sentence under the button; once the task is
+ * handed over the board no longer offers it, and the question goes with it.
+ */
+export function HandOverQuestion({ task, holder, actions, onKeep, styles }: HandOverQuestionProps) {
+  const handOver = useCallback(() => actions.handOver(task.id), [actions, task.id]);
+  return (
+    <>
+      <Text style={styles.sheetText}>
+        {`Hand ${task.id} over to an agent of another provider? ${holder} loses it, and a note says where it was left.`}
+      </Text>
+      <View style={styles.actions}>
+        <ActionButton
+          label="Hand over"
+          pendingLabel="Handing over..."
+          onPress={handOver}
+          styles={styles}
+        />
+        <ActionButton label="Keep it" pendingLabel="Keeping..." onPress={onKeep} styles={styles} />
       </View>
     </>
   );
@@ -229,8 +265,8 @@ export interface TaskThreadProps {
  * Under a task, on its card and on a room's list row: what its holder needs while it is blocked,
  * what came of it and what it took, the replies, and Reply, which is how the need is answered. The thread stays
  * once the task is done. The field waits behind its button so a card stays short. Over it all is
- * the line of what the task is after, and beside Reply is Follow-up, and Start while it is held in
- * the backlog.
+ * the line of what the task is after, and beside Reply is Follow-up, Start while it is held in
+ * the backlog, and Hand over while an agent holds it where the server would take it.
  */
 export function TaskThread({
   task,
@@ -243,6 +279,9 @@ export function TaskThread({
 }: TaskThreadProps) {
   const [replying, setReplying] = useState(false);
   const reply = useCallback(() => setReplying(true), []);
+  const [handing, setHanding] = useState(false);
+  const askHandOver = useCallback(() => setHanding(true), []);
+  const keepIt = useCallback(() => setHanding(false), []);
   const followUp = useCallback(() => onFollowUp(task.id), [onFollowUp, task.id]);
   const start = useCallback(() => actions.start(task.id), [actions, task.id]);
   const after = afterLine(task, all);
@@ -273,7 +312,19 @@ export function TaskThread({
         >
           <Text style={styles.lobbyDeleteText}>Follow-up</Text>
         </Pressable>
+        {canHandOver(task) && !handing ? (
+          <ThreadButton label="Hand over" expanded={false} onPress={askHandOver} styles={styles} />
+        ) : null}
       </View>
+      {canHandOver(task) && handing ? (
+        <HandOverQuestion
+          task={task}
+          holder={name(task.claimedBy ?? "")}
+          actions={actions}
+          onKeep={keepIt}
+          styles={styles}
+        />
+      ) : null}
     </>
   );
 }
@@ -306,7 +357,8 @@ export function TaskCard({
   styles,
 }: TaskCardProps) {
   const done = post.state === "done";
-  const meta = todoMeta(post, name, teamName);
+  const providerName = useProviderName();
+  const meta = todoMeta(post, name, teamName, providerName);
   const mounted = useMounted();
   // The box shows the board's state: it changes when the board does, and is off until the answer.
   const [pending, setPending] = useState(false);
