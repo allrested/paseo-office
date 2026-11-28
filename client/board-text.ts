@@ -55,6 +55,28 @@ export function todoMeta(post: Post, name: (author: string) => string): string |
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+/** A board's posts without the replies: a reply shows under its task, never on its own. */
+export function topLevel(posts: readonly Post[]): Post[] {
+  return posts.filter((post) => post.replyTo === undefined);
+}
+
+/** The notes under a task, oldest first. */
+export function repliesOf(task: Post, posts: readonly Post[]): Post[] {
+  return posts
+    .filter((post) => post.kind === "note" && post.replyTo === task.id)
+    .sort((left, right) => left.seq - right.seq);
+}
+
+/** A result shows three lines; past them, or past what three lines of a card hold, "More" shows. */
+export const RESULT_LINES = 3;
+// A kanban card's three lines hold about this much. A wider row may show "More" with nothing
+// hidden, which costs a press; a narrower guess would hide words with no way to reach them.
+const RESULT_CHARS = 100;
+
+export function resultIsLong(result: string): boolean {
+  return result.split("\n").length > RESULT_LINES || result.length > RESULT_CHARS;
+}
+
 /** What "Clear finished" asks before it deletes the done to-dos. */
 export function clearQuestion(count: number): string {
   return count === 1 ? "Delete 1 finished to-do?" : `Delete ${count} finished to-dos?`;
@@ -81,10 +103,14 @@ export interface BoardPreview {
   more: number;
 }
 
-/** What a room card shows of its board: the first posts in board order, and how many are left. */
+/**
+ * What a room card shows of its board: the first posts in board order, and how many are left.
+ * Replies are counted with their task, so they are neither shown nor counted.
+ */
 export function boardPreview(posts: readonly Post[], max: number = CARD_POSTS): BoardPreview {
-  const shown = orderBoardPosts(posts).slice(0, max);
-  return { shown, more: posts.length - shown.length };
+  const top = topLevel(posts);
+  const shown = orderBoardPosts(top).slice(0, max);
+  return { shown, more: top.length - shown.length };
 }
 
 /** What the lobby's card shows of its to-dos: the first unfinished ones, and how many are left. */

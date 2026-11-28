@@ -3,6 +3,7 @@ import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import type { Post } from "../shared/contracts.js";
 import { PostWithActions } from "./board-sheet.js";
+import { repliesOf } from "./board-text.js";
 import { kanbanColumns, kanbanWide, type KanbanColumn } from "./kanban-model.js";
 import type { OfficeStyles } from "./styles.js";
 import { ClearFinished, TaskCard } from "./task-card.js";
@@ -19,6 +20,8 @@ export interface KanbanBoardProps {
 
 interface ColumnProps {
   column: KanbanColumn;
+  /** The whole board, replies included: a task's card shows the ones under it. */
+  board: readonly Post[];
   name(author: string): string;
   actions: BoardActions;
   styles: OfficeStyles;
@@ -30,7 +33,7 @@ function headingOf(column: KanbanColumn): string {
 }
 
 /** Done's "Clear finished". Done shows only while it holds a task, so there is one to clear. */
-function ColumnClear({ column, actions, styles }: Omit<ColumnProps, "name">) {
+function ColumnClear({ column, actions, styles }: Omit<ColumnProps, "name" | "board">) {
   const first = column.posts[0];
   if (column.id !== "done" || first === undefined) return null;
   return (
@@ -44,7 +47,7 @@ function ColumnClear({ column, actions, styles }: Omit<ColumnProps, "name">) {
 }
 
 /** A task is a card with its box; a note keeps the buttons it has on the list. */
-function ColumnCards({ column, name, actions, styles }: ColumnProps) {
+function ColumnCards({ column, board, name, actions, styles }: ColumnProps) {
   return (
     <View style={styles.kanbanCards}>
       {column.posts.map((post) =>
@@ -53,7 +56,14 @@ function ColumnCards({ column, name, actions, styles }: ColumnProps) {
             <PostWithActions post={post} name={name} actions={actions} styles={styles} />
           </View>
         ) : (
-          <TaskCard key={post.id} post={post} name={name} actions={actions} styles={styles} />
+          <TaskCard
+            key={post.id}
+            post={post}
+            replies={repliesOf(post, board)}
+            name={name}
+            actions={actions}
+            styles={styles}
+          />
         ),
       )}
     </View>
@@ -61,7 +71,7 @@ function ColumnCards({ column, name, actions, styles }: ColumnProps) {
 }
 
 /** Wide: a column of its own width beside the others. */
-function SideColumn({ column, name, actions, styles }: ColumnProps) {
+function SideColumn({ column, board, name, actions, styles }: ColumnProps) {
   return (
     <View style={styles.kanbanColumn}>
       <View style={styles.kanbanHeading}>
@@ -70,13 +80,13 @@ function SideColumn({ column, name, actions, styles }: ColumnProps) {
         </Text>
         <ColumnClear column={column} actions={actions} styles={styles} />
       </View>
-      <ColumnCards column={column} name={name} actions={actions} styles={styles} />
+      <ColumnCards column={column} board={board} name={name} actions={actions} styles={styles} />
     </View>
   );
 }
 
 /** Narrow: a section whose heading folds it. Done starts folded: what is finished waits below. */
-function StackedColumn({ column, name, actions, styles }: ColumnProps) {
+function StackedColumn({ column, board, name, actions, styles }: ColumnProps) {
   const [open, setOpen] = useState(column.id !== "done");
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
@@ -96,7 +106,9 @@ function StackedColumn({ column, name, actions, styles }: ColumnProps) {
         </Pressable>
         <ColumnClear column={column} actions={actions} styles={styles} />
       </View>
-      {open ? <ColumnCards column={column} name={name} actions={actions} styles={styles} /> : null}
+      {open ? (
+        <ColumnCards column={column} board={board} name={name} actions={actions} styles={styles} />
+      ) : null}
     </View>
   );
 }
@@ -127,6 +139,7 @@ export function KanbanBoard({ posts, name, actions, styles }: KanbanBoardProps) 
             <SideColumn
               key={column.id}
               column={column}
+              board={posts}
               name={name}
               actions={actions}
               styles={styles}
@@ -138,6 +151,7 @@ export function KanbanBoard({ posts, name, actions, styles }: KanbanBoardProps) 
           <StackedColumn
             key={column.id}
             column={column}
+            board={posts}
             name={name}
             actions={actions}
             styles={styles}

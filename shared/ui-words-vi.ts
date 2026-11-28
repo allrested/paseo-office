@@ -327,12 +327,14 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Green is at work, amber waiting for you, red stopped on an error, grey resting. A gap is a time the office was closed. The marks are tool calls.":
     "Xanh lá là đang làm, vàng là chờ bạn, đỏ là dừng vì lỗi, xám là đang nghỉ. Khoảng trống là lúc văn phòng đóng. Các dấu là lệnh gọi công cụ.",
   "Last 30 minutes": "30 phút qua",
+  Less: "Thu gọn",
   Live: "Trực tiếp",
   "Loading the 3D view...": "Đang tải giao diện 3D...",
   "Loading the duty list...": "Đang tải danh sách trực nhật...",
   "Local resource readings are unavailable on this host.":
     "Host này không có số liệu tài nguyên cục bộ.",
   Models: "Model",
+  More: "Xem thêm",
   "New messages": "Tin nhắn mới",
   "New poll": "Bình chọn mới",
   "No SSH hosts configured on this server.": "Máy chủ này chưa cấu hình host SSH nào.",
@@ -380,6 +382,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Reading the prompts...": "Đang đọc prompt...",
   "Reading the timeline...": "Đang đọc dòng thời gian...",
   Requests: "Yêu cầu",
+  Result: "Kết quả",
   Run: "Chạy",
   Scripts: "Script",
   "Send a prompt": "Gửi prompt",
@@ -405,6 +408,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "What it should teach": "Nội dung cần dạy",
   "Who writes it": "Ai viết",
   Workspace: "Không gian làm việc",
+  "Write a reply": "Viết trả lời",
   You: "Bạn",
   "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.":
     "Nhiệm vụ trực nhật không có hướng dẫn chỉ là giả lập: văn phòng 3D diễn lại và không agent nào được yêu cầu. Nhiệm vụ có hướng dẫn được giao cho một agent đang rảnh vào mỗi ngày của nó, từ 08:00 theo múi giờ của ghi chú.",

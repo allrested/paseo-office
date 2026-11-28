@@ -140,6 +140,7 @@ const ACTIONS: BoardActions = {
     if (refusal) throw refusal;
     posted.push(input);
   },
+  reply: (task, text) => change(`reply ${task.id} ${text}`),
   markDone: (id) => change(`markDone ${id}`),
   reopen: (id) => change(`reopen ${id}`),
   remove: (id) => change(`remove ${id}`),
@@ -663,10 +664,90 @@ test("notes show under the list only when there are notes", async () => {
     "Clear finished",
     "Rotate keys",
     "claimed by a1 · for a1",
+    "Reply",
     "Notes",
     "Note · user",
     "The demo is on Thursday",
     "Delete",
+    "Agent tasks",
+    "No agent tasks",
+  ]);
+});
+
+test("the lobby's list draws a reply under its to-do, never in Notes", async () => {
+  const todo = post(1, { text: "Rotate keys", state: "done", result: "Rotated" });
+  const reply = post(2, {
+    kind: "note",
+    state: undefined,
+    replyTo: "p1",
+    author: "a1",
+    text: "Thanks",
+  });
+  await mount({ rooms: lobbyRooms([todo, reply]), roomId: "lobby" });
+
+  expect(lines()).not.toContain("Notes");
+  expect(linesFrom("To-do")).toEqual([
+    "To-do",
+    "Clear finished",
+    "Rotate keys",
+    "Result",
+    "Rotated",
+    "a1 · Thanks",
+    "Reply",
+    "Agent tasks",
+    "No agent tasks",
+  ]);
+  await press("Reply");
+  await type("Write a reply", "Good");
+  await press("Send");
+  expect(asked).toEqual(["reply p1 Good"]);
+});
+
+test("a room's list draws a reply under its task and not as a post of its own", async () => {
+  const posts = [
+    post(1, { board: "w1", text: "Ship it" }),
+    post(2, { board: "w1", kind: "note", state: undefined, replyTo: "p1", text: "Which tag?" }),
+    post(3, { board: "w1", kind: "note", state: undefined, text: "Freeze on Friday" }),
+  ];
+  await mount({ rooms: officeRooms([], { w1: posts }) });
+
+  expect(linesFrom("Posts")).toEqual([
+    "Posts",
+    "Task · open · user",
+    "Ship it",
+    "user · Which tag?",
+    "Reply",
+    "Mark done",
+    "Delete",
+    "Note · user",
+    "Freeze on Friday",
+    "Delete",
+  ]);
+});
+
+test("a room's board of only a reply to a done task says it has no posts", async () => {
+  const posts = [
+    post(1, { board: "w1", state: "done" }),
+    post(2, { board: "w1", kind: "note", state: undefined, replyTo: "p1", text: "Thanks" }),
+  ];
+  await mount({ rooms: officeRooms([], { w1: posts }) });
+  expect(lines()).toContain("No posts");
+  expect(lines()).not.toContain("user · Thanks");
+});
+
+test("the lobby as a kanban draws a reply on its task's card, not in Notes", async () => {
+  layouts("kanban", "list");
+  const todo = post(1, { text: "Rotate keys" });
+  const reply = post(2, { kind: "note", state: undefined, replyTo: "p1", text: "Which ones?" });
+  await mount({ rooms: lobbyRooms([todo, reply]), roomId: "lobby" });
+
+  expect(lines()).not.toContain("Notes · 1");
+  expect(linesFrom("To do · 1")).toEqual([
+    "To do · 1",
+    "Rotate keys",
+    "user · Which ones?",
+    "Reply",
+    "In progress · 0",
     "Agent tasks",
     "No agent tasks",
   ]);
@@ -849,9 +930,11 @@ test("the lobby as a kanban keeps the form above its columns and Agent tasks und
   expect(linesFrom("To do · 1")).toEqual([
     "To do · 1",
     "Rotate keys",
+    "Reply",
     "In progress · 1",
     "Check the build",
     "claimed by a1",
+    "Reply",
     "Done · 1",
     "Clear finished",
     "Notes · 1",
@@ -879,6 +962,7 @@ test("a room's board as a kanban draws its columns under the form and the agents
     "No agents",
     "To do · 1",
     "Ship it",
+    "Reply",
     "In progress · 0",
     "Notes · 1",
     "Note · user",
@@ -899,6 +983,7 @@ test("until the device's setting is read the lobby is a kanban and a room's boar
     "Posts",
     "Task · open · user",
     "Ship it",
+    "Reply",
     "Mark done",
     "Delete",
   ]);

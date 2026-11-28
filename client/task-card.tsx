@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { Pressable, View } from "react-native";
-import { Text } from "./text.js";
+import { Text, TextInput } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import type { Post } from "../shared/contracts.js";
+import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
-import { clearQuestion, todoMeta } from "./board-text.js";
+import { textAfterSend } from "./agent-card.js";
+import { RESULT_LINES, clearQuestion, resultIsLong, todoMeta } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 import { listenForSpace } from "./web-env.web.js";
@@ -49,18 +50,167 @@ export function DeleteQuestion({ question, onDelete, onKeep, styles }: DeleteQue
   );
 }
 
-export interface TaskCardProps {
-  post: Post;
+interface ThreadButtonProps {
+  label: string;
+  expanded: boolean;
+  onPress(): void;
+  styles: OfficeStyles;
+}
+
+/** "Reply", "More", "Less": small words that open something under them. */
+function ThreadButton({ label, expanded, onPress, styles }: ThreadButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      aria-expanded={expanded}
+      onPress={onPress}
+      style={styles.taskThreadButton}
+    >
+      <Text style={styles.lobbyDeleteText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** A task's result: three lines, and the rest behind "More" when there is more. */
+function TaskResult({ result, styles }: { result: string; styles: OfficeStyles }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const long = resultIsLong(result);
+  return (
+    <View>
+      <Text style={styles.postMeta}>Result</Text>
+      <Text style={styles.postText} numberOfLines={long && !open ? RESULT_LINES : undefined}>
+        {result}
+      </Text>
+      {long ? (
+        <ThreadButton
+          label={open ? "Less" : "More"}
+          expanded={open}
+          onPress={toggle}
+          styles={styles}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+interface ReplyFieldProps {
+  task: Post;
+  actions: BoardActions;
+  styles: OfficeStyles;
+}
+
+/** One line and Send. Enter sends as well, so the field keeps its own pending state and failure. */
+function ReplyField({ task, actions, styles }: ReplyFieldProps) {
+  const [text, setText] = useState("");
+  const mounted = useMounted();
+  const [sending, setSending] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  // Set before the first await, so a second Enter before the re-render cannot send twice.
+  const inFlight = useRef(false);
+  const send = useCallback(async () => {
+    const sent = text.trim();
+    if (sent === "" || inFlight.current) return;
+    inFlight.current = true;
+    setSending(true);
+    setFailure(null);
+    try {
+      await actions.reply(task, sent);
+      // Cleared only if the field still holds what was sent, so later typing stays.
+      if (mounted.current) setText((current) => textAfterSend(current, sent));
+    } catch (caught) {
+      if (mounted.current) setFailure(failureText("Send", caught));
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setSending(false);
+    }
+  }, [actions, task, text, mounted]);
+  return (
+    <>
+      <View style={styles.taskReplyRow}>
+        <View style={styles.rowBody}>
+          <TextInput
+            accessibilityLabel="Write a reply"
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={send}
+            // Enter sends and the focus stays for the next reply. react-native-web reads only
+            // blurOnSubmit; native reads submitBehavior.
+            submitBehavior="submit"
+            blurOnSubmit={false}
+            autoFocus
+            placeholder="Write a reply"
+            placeholderTextColor={styles.placeholderColor}
+            maxLength={POST_TEXT_MAX}
+            style={styles.fieldInput}
+          />
+        </View>
+        <ActionButton
+          label="Send"
+          pendingLabel="Sending..."
+          onPress={send}
+          disabled={sending || text.trim().length === 0}
+          styles={styles}
+          primary
+        />
+      </View>
+      {failure === null ? null : (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {failure}
+        </Text>
+      )}
+    </>
+  );
+}
+
+export interface TaskThreadProps {
+  task: Post;
+  /** The notes under the task, oldest first (`repliesOf`). */
+  replies: readonly Post[];
   name(author: string): string;
   actions: BoardActions;
   styles: OfficeStyles;
 }
 
 /**
- * A to-do: its checkbox ticks or unticks it, and Delete asks first. The list draws it as a row,
- * the kanban as a card.
+ * Under a task, on its card and on a room's list row: what came of it, the replies, and Reply.
+ * The thread stays once the task is done. The field waits behind its button so a card stays short.
  */
-export function TaskCard({ post, name, actions, styles }: TaskCardProps) {
+export function TaskThread({ task, replies, name, actions, styles }: TaskThreadProps) {
+  const [replying, setReplying] = useState(false);
+  const reply = useCallback(() => setReplying(true), []);
+  return (
+    <>
+      {task.result === undefined ? null : <TaskResult result={task.result} styles={styles} />}
+      {replies.map((note) => (
+        <Text key={note.id} style={styles.postText}>
+          {`${name(note.author)} · ${note.text}`}
+        </Text>
+      ))}
+      {replying ? (
+        <ReplyField task={task} actions={actions} styles={styles} />
+      ) : (
+        <ThreadButton label="Reply" expanded={false} onPress={reply} styles={styles} />
+      )}
+    </>
+  );
+}
+
+export interface TaskCardProps {
+  post: Post;
+  /** The notes under it, oldest first (`repliesOf`). */
+  replies: readonly Post[];
+  name(author: string): string;
+  actions: BoardActions;
+  styles: OfficeStyles;
+}
+
+/**
+ * A to-do: its checkbox ticks or unticks it, and Delete asks first. Its result and replies are
+ * under it. The list draws it as a row, the kanban as a card.
+ */
+export function TaskCard({ post, replies, name, actions, styles }: TaskCardProps) {
   const done = post.state === "done";
   const meta = todoMeta(post, name);
   const mounted = useMounted();
@@ -117,6 +267,9 @@ export function TaskCard({ post, name, actions, styles }: TaskCardProps) {
         >
           <Icon name="Trash2" size={16} color={styles.iconColor} />
         </Pressable>
+      </View>
+      <View style={styles.taskCardThread}>
+        <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
       </View>
       {failure === null ? null : (
         <Text accessibilityRole="alert" style={styles.actionError}>

@@ -6,11 +6,20 @@ import {
   postRpc,
   setWakesPausedRpc,
   updateRpc,
+  type Post,
   type PostKind,
 } from "../shared/contracts.js";
 
 export interface BoardActions {
-  post(input: { board: string; kind: PostKind; text: string; to?: string }): Promise<void>;
+  post(input: {
+    board: string;
+    kind: PostKind;
+    text: string;
+    to?: string;
+    replyTo?: string;
+  }): Promise<void>;
+  /** A note under the task, on the task's board; the server wakes the task's holder. */
+  reply(task: Post, text: string): Promise<void>;
   markDone(id: string): Promise<void>;
   reopen(id: string): Promise<void>;
   remove(id: string): Promise<void>;
@@ -30,6 +39,10 @@ export function useBoardActions(): BoardActions {
     (): BoardActions => ({
       async post(input) {
         const result = await post(input);
+        if (!result.ok) throw new Error(result.error);
+      },
+      async reply(task, text) {
+        const result = await post({ board: task.board, kind: "note", text, replyTo: task.id });
         if (!result.ok) throw new Error(result.error);
       },
       async markDone(id) {

@@ -11,7 +11,7 @@ import { NOBODY } from "./agent-picker-text.js";
 import { BoardTeams } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
 import { PostWithActions, WakeField, useWakeChoice, type SheetBodyProps } from "./board-sheet.js";
-import { officeWork } from "./board-text.js";
+import { officeWork, repliesOf, topLevel } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { ClearFinished, TaskCard, useMounted } from "./task-card.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -38,7 +38,7 @@ function TodoHeading({ board, done, actions, styles }: TodoHeadingProps) {
 
 interface TodoListProps {
   room: OfficeRoom;
-  /** The lobby's notes, oldest first. */
+  /** The lobby's notes, oldest first, without the replies, which show under their to-dos. */
   notes: readonly Post[];
   name(author: string): string;
   actions: BoardActions;
@@ -54,7 +54,14 @@ function TodoList({ room, notes, name, actions, styles }: TodoListProps) {
         <TodoHeading board={room.id} done={done} actions={actions} styles={styles} />
         {room.todos.length === 0 ? <Text style={styles.muted}>No to-dos</Text> : null}
         {room.todos.map((post) => (
-          <TaskCard key={post.id} post={post} name={name} actions={actions} styles={styles} />
+          <TaskCard
+            key={post.id}
+            post={post}
+            replies={repliesOf(post, room.posts)}
+            name={name}
+            actions={actions}
+            styles={styles}
+          />
         ))}
       </View>
       {notes.length > 0 ? (
@@ -132,10 +139,13 @@ export function LobbyBody({
       if (mounted.current) setAdding(false);
     }
   }, [actions, room.id, text, to, reset, mounted]);
-  // The lobby's tasks are the to-dos; what is left of its posts are notes, oldest first.
-  const notes = useMemo(() => room.posts.filter((post) => post.kind === "note"), [room.posts]);
-  // The kanban takes both: the to-dos, done ones too, which the room's posts leave out.
-  const board = useMemo(() => [...room.todos, ...notes], [room.todos, notes]);
+  // The lobby's tasks are the to-dos; what is left of its posts are notes, oldest first, and the
+  // replies among them show under their to-dos.
+  const allNotes = useMemo(() => room.posts.filter((post) => post.kind === "note"), [room.posts]);
+  const notes = useMemo(() => topLevel(allNotes), [allNotes]);
+  // The kanban takes both: the to-dos, done ones too, which the room's posts leave out, and every
+  // note, replies too, for the cards to find theirs.
+  const board = useMemo(() => [...room.todos, ...allNotes], [room.todos, allNotes]);
   const teams = useMemo(() => officeWork(rooms, agentTasks), [rooms, agentTasks]);
   if (picking) {
     return (

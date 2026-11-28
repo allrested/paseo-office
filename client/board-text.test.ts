@@ -10,10 +10,13 @@ import {
   postMeta,
   postStateLabel,
   queuedWakes,
+  repliesOf,
+  resultIsLong,
   roomAgents,
   stepMark,
   todoMeta,
   todoPreview,
+  topLevel,
   wakeSummary,
   workText,
 } from "./board-text.js";
@@ -105,6 +108,39 @@ test("a room card shows the first three posts of its board and counts the rest",
     more: 0,
   });
   expect(boardPreview([])).toEqual({ shown: [], more: 0 });
+});
+
+test("a task's replies are the notes under it, oldest first; a task's result is no reply", () => {
+  const task = post(1, { result: "Shipped" });
+  const other = post(2, {});
+  const later = post(5, { kind: "note", state: undefined, replyTo: "p1", text: "Thanks" });
+  const first = post(3, { kind: "note", state: undefined, replyTo: "p1", text: "Which branch?" });
+  const elsewhere = post(4, { kind: "note", state: undefined, replyTo: "p2" });
+  const loose = post(6, { kind: "note", state: undefined });
+  const posts = [task, other, later, first, elsewhere, loose];
+  expect(repliesOf(task, posts).map((item) => item.id)).toEqual(["p3", "p5"]);
+  expect(repliesOf(other, posts).map((item) => item.id)).toEqual(["p4"]);
+  expect(repliesOf(loose, posts)).toEqual([]);
+});
+
+test("replies show under their task, so the top level and a card's count leave them out", () => {
+  const posts = [
+    post(1, {}),
+    post(2, { kind: "note", state: undefined, replyTo: "p1" }),
+    post(3, { kind: "note", state: undefined }),
+    post(4, { kind: "note", state: undefined, replyTo: "p1" }),
+  ];
+  expect(topLevel(posts).map((item) => item.id)).toEqual(["p1", "p3"]);
+  expect(boardPreview(posts)).toEqual({ shown: [posts[0], posts[2]], more: 0 });
+  expect(boardPreview(posts, 1)).toEqual({ shown: [posts[0]], more: 1 });
+});
+
+test("a result is long past three lines or what three lines hold", () => {
+  expect(resultIsLong("Shipped in 1.4.2")).toBe(false);
+  expect(resultIsLong("one\ntwo\nthree")).toBe(false);
+  expect(resultIsLong("one\ntwo\nthree\nfour")).toBe(true);
+  expect(resultIsLong("x".repeat(100))).toBe(false);
+  expect(resultIsLong("x".repeat(101))).toBe(true);
 });
 
 test("the wake count says how many posts wait, and nothing when none do", () => {

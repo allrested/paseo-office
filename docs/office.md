@@ -534,6 +534,17 @@ and a room's posts in one list.
 
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 
+A task finished with a note keeps it as its result (up to 2,000 characters), and a linked lobby
+task and its copy carry the same result. A session that finishes its assignment by the completion
+line has the rest of that reply kept as the result. A card and a list row show the result under
+the task's text, three lines of it with **More** for the rest. A note can be a reply under a task:
+the replies show under the task, oldest first, each as "author · text", and never as notes of their
+own, in the Notes column, the lobby's Notes or a room card's count. A reply always sits on the
+task's board, under the lobby task when it answers a copy. **Reply** under a task opens a one-line
+field; Enter or **Send** posts the reply. A done task keeps its result and its replies, and a task
+takes its replies with it when it is deleted, cleared or dropped. A room's board does not show
+done tasks, so their replies are not shown there either.
+
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
 steps of its checklist. What an agent is at is said in the 3D whiteboard's words: its "doing now"
@@ -552,15 +563,18 @@ its checklist. A board is removed when its workspace is archived while the daemo
 left from a workspace archived otherwise stays until its posts are deleted.
 
 Interactive agent sessions get three tools, `office_read`, `office_post` and `office_update`,
-unless the "Agent tools" setting is off when the session opens. A provider with Paseo's agent tools
-off gets none of them, and a provider that lists `send_agent_prompt` in
+unless the "Agent tools" setting is off when the session opens. `office_update` with `done` takes
+`note`, the task's result, and `office_post` takes `replyTo`, a task's id, to post a note under that
+task; `office_read` lists a result under its task and a reply as `p14 note re p12`. A provider
+with Paseo's agent tools off gets none of them, and a provider that lists `send_agent_prompt` in
 `paseoTools.disabledTools` must list `office_post` too to keep its agents from waking others.
 
 A post that names an agent wakes it when it is idle, at most 6 times an hour per agent. Posts that
 wait for an agent go out as one prompt per author: an agent's posts carry that agent as the source,
 the user's posts arrive as a user prompt. A post naming an agent that has not run a turn yet is
 delivered after that agent's first turn or the next post that names it. Pending mention
-notifications are held in memory.
+notifications are held in memory. A reply wakes the agent holding its task by the same rules,
+unless that agent wrote it: a reply from the holder is for you and wakes nobody.
 
 ## The duty board
 

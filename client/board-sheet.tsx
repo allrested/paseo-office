@@ -18,11 +18,12 @@ import {
 } from "./agent-picker-text.js";
 import { BoardAgents } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
-import { orderBoardPosts, roomAgents } from "./board-text.js";
+import { orderBoardPosts, repliesOf, roomAgents, topLevel } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import type { BoardLayout } from "../shared/settings.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
+import { TaskThread } from "./task-card.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -59,12 +60,22 @@ export function Chip({ label, value, selected, onSelect, styles }: ChipProps) {
 
 interface PostActionsProps {
   post: Post;
+  /** A task's notes under it, oldest first (`repliesOf`); a note has none. */
+  replies?: readonly Post[];
   name(author: string): string;
   actions: BoardActions;
   styles: OfficeStyles;
 }
 
-export function PostWithActions({ post, name, actions, styles }: PostActionsProps) {
+const NO_REPLIES: readonly Post[] = [];
+
+export function PostWithActions({
+  post,
+  replies = NO_REPLIES,
+  name,
+  actions,
+  styles,
+}: PostActionsProps) {
   const finished = post.state === "done";
   const toggleDone = useCallback(
     () => (finished ? actions.reopen(post.id) : actions.markDone(post.id)),
@@ -79,6 +90,11 @@ export function PostWithActions({ post, name, actions, styles }: PostActionsProp
   return (
     <View style={styles.boardPost}>
       <PostRow post={post} name={name} styles={styles} />
+      {post.kind === "task" ? (
+        <View style={styles.taskThread}>
+          <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
+        </View>
+      ) : null}
       {asking ? (
         <>
           <Text style={styles.sheetText}>Delete this post?</Text>
@@ -284,7 +300,8 @@ function SheetBody({
     (value: string) => setKind(value === "note" ? "note" : "task"),
     [],
   );
-  const posts = useMemo(() => orderBoardPosts(room.posts), [room.posts]);
+  // A reply shows under its task; one whose task is done goes unseen, as its task does here.
+  const posts = useMemo(() => orderBoardPosts(topLevel(room.posts)), [room.posts]);
   const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
   const submit = useCallback(async () => {
     const sent = text.trim();
@@ -375,6 +392,7 @@ function SheetBody({
             <PostWithActions
               key={post.id}
               post={post}
+              replies={repliesOf(post, room.posts)}
               name={name}
               actions={actions}
               styles={styles}
