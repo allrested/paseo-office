@@ -575,6 +575,8 @@ export interface BoardSheetProps {
   actions: BoardActions;
   /** "Wake agents" is off: a post that names an agent waits. */
   wakesPaused: boolean;
+  /** The line over the lobby's Backlog on whether the office starts tasks by itself; none while it does not. */
+  startLine?: string | null;
   /**
    * The host's sheet has already left when it reports a close (a phone's, swiped away, or a
    * tablet's, dismissed by Back), so a close from the page closes the sheet.
@@ -616,6 +618,7 @@ export function BoardSheet({
   teamName,
   actions,
   wakesPaused,
+  startLine = null,
   sheetLeavesFirst,
   styles,
   onSelectAgent,
@@ -671,6 +674,7 @@ export function BoardSheet({
             onPicking={setPicking}
             onSelectAgent={onSelectAgent}
             onOpenBoard={onOpenBoard}
+            startLine={startLine}
             layout={layouts.lobby}
             styles={styles}
           />

@@ -787,3 +787,67 @@ test("the webhook address is saved, and a test message is sent only once there i
   expect(alerts()).toEqual(["Unable to send a test: The webhook answered 403"]);
   expect(container.textContent).not.toContain("The webhook took the test message");
 });
+
+test("Start backlog tasks is off at first and saves autoStart, with the hint about Keep watching", async () => {
+  await mount();
+  const control = container.querySelector<HTMLElement>('[aria-label="Start backlog tasks"]')!;
+  expect(control.getAttribute("aria-checked")).toBe("false");
+  expect(container.textContent).toContain(
+    "Needs Keep watching: with no reading of the plan's limits nothing is started.",
+  );
+  await act(async () => control.click());
+  expect(saved.map((save) => save.values.autoStart)).toEqual([true]);
+});
+
+test("the gate's numbers show the stored ones, and a number saves once it loses focus", async () => {
+  await mount();
+  expect(field("Start under (%)").value).toBe("70");
+  expect(field("At once").value).toBe("3");
+  expect(field("Per day").value).toBe("10");
+
+  await type("At once", "5");
+  expect(saved).toEqual([]);
+  await leave("At once");
+  expect(saved.map((save) => save.values.autoStartAtOnce)).toEqual([5]);
+  expect(saved[0]?.values.autoStartPerDay).toBe(10);
+});
+
+test("a number out of range is clamped when the field is left, and the clamped one saved", async () => {
+  await mount();
+  await type("Per day", "250");
+  await leave("Per day");
+  await type("Start under (%)", "5");
+  await leave("Start under (%)");
+  await type("At once", "0");
+  await leave("At once");
+  expect(saved.map((save) => save.values.autoStartPerDay)).toEqual([200, 10, 10]);
+  expect(saved.map((save) => save.values.autoStartUnderPct)).toEqual([70, 10, 70]);
+  expect(saved.map((save) => save.values.autoStartAtOnce)).toEqual([3, 3, 1]);
+});
+
+test("a number field ignores what is not a digit, and a field left empty saves nothing", async () => {
+  await mount();
+  await type("Start under (%)", "7a0%");
+  expect(field("Start under (%)").value).toBe("70");
+  await leave("Start under (%)");
+  expect(saved).toEqual([]);
+
+  await type("Per day", "");
+  await leave("Per day");
+  expect(saved).toEqual([]);
+  expect(field("Per day").value).toBe("10");
+});
+
+test("a submitted number saves once, though the submit also takes the focus away", async () => {
+  let reply: (saved: boolean) => void = () => undefined;
+  answer = new Promise((resolve) => {
+    reply = resolve;
+  });
+  await mount();
+  await type("Per day", "12");
+  await submit("Per day");
+  await leave("Per day");
+  expect(saved.map((save) => save.values.autoStartPerDay)).toEqual([12]);
+  expect(field("Per day").value).toBe("12");
+  await act(async () => reply(true));
+});

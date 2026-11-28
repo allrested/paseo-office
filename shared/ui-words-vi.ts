@@ -809,4 +809,18 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "that could not be written": "không ghi được",
   "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
     "Host này không biết agent đã khởi chạy tiến trình nào, nên bộ nhớ không được hiển thị theo agent và không có tính năng dọn dẹp. Mục System liệt kê các tiến trình lớn nhất.",
+  "Starting by itself": "Tự động bắt đầu",
+  "waiting, agents are not picking up work (Agent tools or Wake agents is off)":
+    "đang chờ, các agent không nhận việc (Công cụ của agent hoặc Gọi agent dậy đang tắt)",
+  "nothing here is ready to start": "ở đây chưa có việc nào sẵn sàng bắt đầu",
+  "waiting for a reading of the plan's limits (needs Keep watching)":
+    "đang chờ số đọc giới hạn của gói (cần Tiếp tục theo dõi)",
+  "stopped, today's count cannot be read (see the office's log)":
+    "đã dừng, không đọc được số việc hôm nay (xem log của văn phòng)",
+  "Start backlog tasks": "Bắt đầu việc tồn đọng",
+  "Start under (%)": "Bắt đầu khi dưới (%)",
+  "At once": "Cùng lúc",
+  "Per day": "Mỗi ngày",
+  "Needs Keep watching: with no reading of the plan's limits nothing is started.":
+    "Cần Tiếp tục theo dõi: không có số đọc giới hạn của gói thì không bắt đầu việc nào.",
 };

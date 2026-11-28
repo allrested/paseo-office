@@ -36,15 +36,22 @@ task does not go back to the backlog.
 
 **Change.** Host settings under Automation, all off or empty at first:
 
-- **Start backlog tasks** (off). On, the office starts the oldest backlog task when all of these
-  hold, and says in the lobby which one stopped it when one does not:
+- **Start backlog tasks** (off). On, the office starts the oldest held task that is ready (one that
+  still waits on other tasks is passed over) when the pickup could hand it out (Agent tools on and
+  wakes not paused) and all of these hold; the lobby says which one stopped it when one does not:
   - every limit of every provider in use is under **Start under** (70%);
-  - fewer than **At once** (3) lobby tasks are claimed;
+  - fewer than **At once** (3) lobby tasks are in progress or to do (claimed, or open and not
+    held);
   - fewer than **Per day** (10) were started by the office today, in the notes' zone.
 - A limit that cannot be read counts as over: with Keep watching off, or before the first read,
-  nothing starts by itself. The setting says so beside its switch.
-- **Pace.** The plan pill adds "at this pace out by Thu 14:00" when the last two readings put a
-  limit over 100% before its reset. It is a line, not a rule of the gate.
+  nothing starts by itself. The setting says so beside its switch. If the day's count cannot be
+  read, nothing starts either.
+- **Why it waits.** The lobby shows a line over the Backlog while the switch is on: "Starting by
+  itself", or the reason in the order the gate looks: not picking up work (`no-pickup`), nothing
+  ready (`empty`), no reading (`no-reading`), a limit (`limit`), too many in progress or to do
+  (`at-once`), the day's count reached (`per-day`), the count unreadable (`no-count`).
+- **Pace.** The plan pill adds "at this pace out by Thu 14:00" when two readings at least 5 minutes
+  apart put a limit at 100% before its reset. It is a line, not a rule of the gate.
 
 The gate only ever starts backlog tasks. A task posted to To do is handed out as today.
 

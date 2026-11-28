@@ -815,4 +815,18 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "left alone, being a link": "dibiarkan karena berupa tautan",
   "with nothing to put back": "tanpa yang perlu dikembalikan",
   "that could not be written": "yang tidak bisa ditulis",
+  "Starting by itself": "Memulai sendiri",
+  "waiting, agents are not picking up work (Agent tools or Wake agents is off)":
+    "menunggu, agen tidak mengambil pekerjaan (Alat agen atau Bangunkan agen mati)",
+  "nothing here is ready to start": "belum ada yang siap dimulai di sini",
+  "waiting for a reading of the plan's limits (needs Keep watching)":
+    "menunggu pembacaan batas paket (perlu Tetap memantau)",
+  "stopped, today's count cannot be read (see the office's log)":
+    "berhenti, hitungan hari ini tidak dapat dibaca (lihat log kantor)",
+  "Start backlog tasks": "Mulai tugas antrean",
+  "Start under (%)": "Mulai di bawah (%)",
+  "At once": "Sekaligus",
+  "Per day": "Per hari",
+  "Needs Keep watching: with no reading of the plan's limits nothing is started.":
+    "Perlu Tetap memantau: tanpa pembacaan batas paket, tidak ada yang dimulai.",
 };

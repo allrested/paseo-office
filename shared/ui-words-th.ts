@@ -785,4 +785,18 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "that could not be written": "ที่เขียนไม่ได้",
   "This host cannot tell which process an agent started, so memory is not shown by agent and no clean-up is offered. The System section lists the largest processes.":
     "host นี้ระบุไม่ได้ว่า agent เริ่มโปรเซสใด จึงไม่แสดงหน่วยความจำแยกตาม agent และไม่มีตัวเลือกล้างข้อมูล ส่วน System แสดงโปรเซสที่ใหญ่ที่สุด",
+  "Starting by itself": "เริ่มงานเอง",
+  "waiting, agents are not picking up work (Agent tools or Wake agents is off)":
+    "รออยู่ agent ไม่รับงาน (เครื่องมือของ agent หรือ ปลุก agent ปิดอยู่)",
+  "nothing here is ready to start": "ที่นี่ยังไม่มีงานที่พร้อมเริ่ม",
+  "waiting for a reading of the plan's limits (needs Keep watching)":
+    "รอการอ่านขีดจำกัดของแพ็กเกจ (ต้องเปิด เฝ้าดูต่อ)",
+  "stopped, today's count cannot be read (see the office's log)":
+    "หยุดแล้ว อ่านจำนวนของวันนี้ไม่ได้ (ดู log ของออฟฟิศ)",
+  "Start backlog tasks": "เริ่มงานค้าง",
+  "Start under (%)": "เริ่มเมื่อต่ำกว่า (%)",
+  "At once": "พร้อมกัน",
+  "Per day": "ต่อวัน",
+  "Needs Keep watching: with no reading of the plan's limits nothing is started.":
+    "ต้องเปิด เฝ้าดูต่อ: ถ้าไม่มีการอ่านขีดจำกัดของแพ็กเกจ จะไม่เริ่มงานใดเลย",
 };

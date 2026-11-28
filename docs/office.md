@@ -691,6 +691,18 @@ event when it changes. The reasons, in the order they are checked: `off`, `no-pi
 held task ready), `no-reading`, `limit` (with the worst window), `at-once` (with the committed
 count), `per-day` and `no-count` (the count file cannot be read; the day's count then reads 0).
 
+The gate's settings are in Settings, Automation: the switch **Start backlog tasks**, and under it
+**Start under (%)** (10 to 100), **At once** (1 to 20) and **Per day** (1 to 200), with the hint
+"Needs Keep watching: with no reading of the plan's limits nothing is started." A number takes
+digits only; one out of range is held to the range when the field is left, and that is what is
+saved. While the switch is on, a line over the Backlog (the Backlog column's body under its heading
+on the kanban, the unfolded **Backlog** section on the list) says "Starting by itself" when the gate
+is open and otherwise why it waits: agents are not picking up work (Agent tools or Wake agents is
+off); nothing here is ready to start; waiting for a reading of the plan's limits (needs Keep
+watching); "Claude's 5 hours is at 82% (starts under 70%)"; "3 tasks are in progress or to do (at
+most 3)"; done for today, "10 started (at most 10 a day)"; or stopped, today's count cannot be read
+(see the office's log). With the switch off there is no line.
+
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays
 claimed and moves to the kanban's **Needs you** column, and a card and a list row show "Needs you:"
@@ -1228,7 +1240,12 @@ listed, and a host whose Paseo has no provider usage shows no limits at all.
 
 From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the
 warning colour; from 95% in the danger colour; at 100% it reads "Out of Claude" (or the provider's
-name). On the 3D floor a plan at 100% puts the countdown board on the wall, and the people on that
+name). When a limit's use rose between two readings at least 5 minutes apart, and at that rate it
+reaches 100% before its reset, the note adds "at this pace out by Thu 14:00" (the weekday and the
+24-hour time in the device's locale and zone) for the soonest such limit of the counted providers.
+The page keeps each limit's earlier reading for this and replaces it only by one at least 5 minutes
+later, so the pace shows after the second reading 5 minutes on and is worked out again every 5 to 7
+minutes. It is a line, not a rule of the gate, and a limit already out has none. On the 3D floor a plan at 100% puts the countdown board on the wall, and the people on that
 plan who are resting take a break in the pantry until it resets. Whoever is still working keeps
 working.
 

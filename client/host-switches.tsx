@@ -6,6 +6,7 @@ import { Text } from "./text.js";
 import { useSettings, type SettingsState } from "@getpaseo/plugin/client";
 import { SettingsSections, settingsLayout } from "./settings-sections.js";
 import { SettingField } from "./setting-field.js";
+import { NumberField } from "./number-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import { NotifyFields, type NotifySetting } from "./notify-settings.js";
 import type { IncidentsState, WakeState } from "../shared/contracts.js";
@@ -44,6 +45,10 @@ type HostSetting =
   | "Streamer mode"
   | "History vault"
   | "Keep watching"
+  | "Start backlog tasks"
+  | "Start under (%)"
+  | "At once"
+  | "Per day"
   | "Stop repeated failing calls"
   | "Undo last turn"
   | "Pinned notes"
@@ -295,6 +300,7 @@ export function HostSwitches({
               />
             </View>
           </View>
+          <BacklogGate values={stored} change={change} saveProblem={saveProblem} styles={styles} />
           <ArchiveSetting
             values={stored}
             change={change}
@@ -572,6 +578,79 @@ function TrackerFields({ values, incidents, change, saveProblem, styles }: Track
         </View>
       )}
     </>
+  );
+}
+
+/** Whether the office starts backlog tasks by itself, and the limits of the gate that lets it. */
+function BacklogGate({
+  values: stored,
+  change,
+  saveProblem,
+  styles,
+}: Omit<TrackerFieldsProps, "incidents">) {
+  const toggle = useCallback(
+    (next: boolean) => void change("Start backlog tasks", { autoStart: next }),
+    [change],
+  );
+  const saveUnder = useCallback(
+    (next: number) => change("Start under (%)", { autoStartUnderPct: next }),
+    [change],
+  );
+  const saveAtOnce = useCallback(
+    (next: number) => change("At once", { autoStartAtOnce: next }),
+    [change],
+  );
+  const savePerDay = useCallback(
+    (next: number) => change("Per day", { autoStartPerDay: next }),
+    [change],
+  );
+  const problem = saveProblem("Start backlog tasks");
+  return (
+    <View style={settingsLayout.block}>
+      <LabeledSwitch
+        label="Start backlog tasks"
+        value={stored?.autoStart ?? null}
+        onChange={toggle}
+        styles={styles}
+      />
+      <Text style={styles.fieldHint}>
+        {"Needs Keep watching: with no reading of the plan's limits nothing is started."}
+      </Text>
+      {problem && (
+        <Text accessibilityRole="alert" style={styles.actionError}>
+          {problem}
+        </Text>
+      )}
+      <View style={styles.headerFields}>
+        <NumberField
+          label="Start under (%)"
+          value={stored?.autoStartUnderPct ?? null}
+          min={10}
+          max={100}
+          onSave={saveUnder}
+          problem={saveProblem("Start under (%)")}
+          styles={styles}
+        />
+        <NumberField
+          label="At once"
+          value={stored?.autoStartAtOnce ?? null}
+          min={1}
+          max={20}
+          onSave={saveAtOnce}
+          problem={saveProblem("At once")}
+          styles={styles}
+        />
+        <NumberField
+          label="Per day"
+          value={stored?.autoStartPerDay ?? null}
+          min={1}
+          max={200}
+          onSave={savePerDay}
+          problem={saveProblem("Per day")}
+          styles={styles}
+        />
+      </View>
+    </View>
   );
 }
 

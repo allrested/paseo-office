@@ -9,10 +9,11 @@ import {
 } from "react";
 import { useRpc, useSettings } from "@getpaseo/plugin/client";
 import { planUsageRpc } from "../shared/contracts.js";
-import type { PlanUsage } from "../shared/plan-usage.js";
+import { nextPace, soonestPace, type PaceTrack, type PlanUsage } from "../shared/plan-usage.js";
 import { officeHostSettings } from "../shared/settings.js";
 
 const NO_USAGE: readonly PlanUsage[] = [];
+const NO_TRACK: PaceTrack = new Map();
 /** The providers refresh their own readings about this often; asking sooner reads the same. */
 const EVERY_MS = 120_000;
 
@@ -22,6 +23,9 @@ export const PlanUsageContext = createContext<readonly PlanUsage[]>(NO_USAGE);
 export function usePlanUsageValue(): readonly PlanUsage[] {
   return useContext(PlanUsageContext);
 }
+
+/** When the soonest counted limit runs out at its pace, for the toolbar's note; null when none does. */
+export const PlanPaceContext = createContext<number | null>(null);
 
 /** Which providers' plans count: every provider the host reports, and the switch for each. */
 export interface PlanPicker {
@@ -37,6 +41,8 @@ export const PlanPickerContext = createContext<PlanPicker | null>(null);
 export interface PlanState {
   /** The plans that count: the ones the owner has not left out. */
   counted: readonly PlanUsage[];
+  /** When the soonest of those limits reaches 100% at the pace of its last readings, if before its reset. */
+  outAt: number | null;
   picker: PlanPicker;
 }
 
@@ -51,13 +57,19 @@ export function usePlanUsage(live: boolean): PlanState {
   const asking = useRef(ask);
   asking.current = ask;
   const [usage, setUsage] = useState<readonly PlanUsage[]>(NO_USAGE);
+  // Each limit's earlier reading, to tell its pace from the next one.
+  const [track, setTrack] = useState<PaceTrack>(NO_TRACK);
   useEffect(() => {
     if (!live) return undefined;
     let ended = false;
     const read = async () => {
       try {
         const answer = await asking.current({});
-        if (!ended && answer.ok) setUsage(answer.providers);
+        if (!ended && answer.ok) {
+          const readAt = Date.now();
+          setUsage(answer.providers);
+          setTrack((before) => nextPace(before, answer.providers, readAt));
+        }
       } catch {
         // (the host went away: the next reading says)
       }
@@ -86,11 +98,12 @@ export function usePlanUsage(live: boolean): PlanState {
     },
     [save, values, revision],
   );
-  return useMemo(
-    () => ({
-      counted: usage.filter((provider) => !hidden.has(provider.provider)),
+  return useMemo(() => {
+    const counted = usage.filter((provider) => !hidden.has(provider.provider));
+    return {
+      counted,
+      outAt: soonestPace(track, counted),
       picker: { all: usage, hidden, setCounted: values === undefined ? null : setCounted },
-    }),
-    [usage, hidden, setCounted, values],
-  );
+    };
+  }, [usage, track, hidden, setCounted, values]);
 }

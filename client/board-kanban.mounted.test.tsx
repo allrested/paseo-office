@@ -98,7 +98,15 @@ const onFollowUp = (id: string) => {
   followed.push(id);
 };
 
-function Harness({ posts, all = posts }: { posts: Post[]; all?: Post[] }) {
+function Harness({
+  posts,
+  all = posts,
+  startLine,
+}: {
+  posts: Post[];
+  all?: Post[];
+  startLine?: string | null;
+}) {
   const styles = useOfficeStyles(THEME, false, false);
   return (
     <KanbanBoard
@@ -108,6 +116,7 @@ function Harness({ posts, all = posts }: { posts: Post[]; all?: Post[] }) {
       name={nameOf}
       teamName={teamIdOf}
       actions={ACTIONS}
+      startLine={startLine}
       styles={styles}
     />
   );
@@ -130,8 +139,8 @@ afterEach(() => {
   container.remove();
 });
 
-const mount = (posts: Post[], all?: Post[]) =>
-  act(async () => root.render(<Harness posts={posts} all={all} />));
+const mount = (posts: Post[], all?: Post[], startLine?: string | null) =>
+  act(async () => root.render(<Harness posts={posts} all={all} startLine={startLine} />));
 const settle = () => act(async () => void (await new Promise((done) => setTimeout(done, 0))));
 
 /** The board's view reports `width`, as a sheet of that width would. */
@@ -347,4 +356,28 @@ test("narrow, Backlog starts folded like Done, and a press unfolds it", async ()
   await press("Backlog · 1");
   expect(byLabel("Backlog · 1").getAttribute("aria-expanded")).toBe("true");
   expect(lines()).toContain("Plan the audit");
+});
+
+test("wide, the line sits under the Backlog heading, and only there", async () => {
+  await mount(HELD, undefined, "Starting by itself");
+  await sizeBoard(900);
+  expect(lines().slice(0, 3)).toEqual(["Backlog · 1", "Starting by itself", "Plan the audit"]);
+  expect(column("Backlog · 1").textContent).toContain("Starting by itself");
+  expect(column("To do · 2").textContent).not.toContain("Starting by itself");
+  expect(lines().filter((line) => line === "Starting by itself")).toHaveLength(1);
+});
+
+test("narrow, the line shows once Backlog is unfolded", async () => {
+  await mount(HELD, undefined, "Starting by itself");
+  expect(lines()).not.toContain("Starting by itself");
+  await press("Backlog · 1");
+  expect(lines().slice(0, 3)).toEqual(["Backlog · 1", "Starting by itself", "Plan the audit"]);
+});
+
+test("there is no line while the gate is off, or where there is no Backlog", async () => {
+  await mount(HELD, undefined, null);
+  await sizeBoard(900);
+  expect(lines().some((line) => line.startsWith("Starting by itself"))).toBe(false);
+  await mount(BOARD, undefined, "Starting by itself");
+  expect(lines().some((line) => line.startsWith("Starting by itself"))).toBe(false);
 });

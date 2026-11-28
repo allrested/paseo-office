@@ -185,6 +185,32 @@ export const RULES: readonly Rule[] = [
   ],
   [/^No output yet, read at (.+)$/, (time) => `ยังไม่มีเอาต์พุต อ่านเมื่อ ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `${name} หมดแล้ว`],
+  [
+    /^(.+) · at this pace out by (.+)$/,
+    (note, time) => `${translatePattern(note)} · ที่ความเร็วนี้จะหมดภายใน ${time}`,
+  ],
+  [/^Starting by itself: (.+)$/, (why) => `เริ่มงานเอง: ${translatePattern(why)}`],
+  [
+    /^waiting, (.+)'s (.+) is at (\d+)% \(starts under (\d+)%\)$/,
+    (provider, window, used, under) =>
+      `รออยู่ ${window} ของ ${provider} ใช้ไป ${used}% (เริ่มเมื่อต่ำกว่า ${under}%)`,
+  ],
+  [
+    /^waiting, a limit of the plan is too high \(starts under (\d+)%\)$/,
+    (under) => `รออยู่ ขีดจำกัดของแพ็กเกจสูงเกินไป (เริ่มเมื่อต่ำกว่า ${under}%)`,
+  ],
+  [
+    /^waiting, (\d+) tasks? (?:is|are) in progress or to do \(at most (\d+)\)$/,
+    (n, most) => `รออยู่ มี ${n} งานกำลังทำหรือรอทำ (สูงสุด ${most})`,
+  ],
+  [
+    /^waiting, enough tasks are in progress or to do \(at most (\d+)\)$/,
+    (most) => `รออยู่ มีงานกำลังทำหรือรอทำมากพอแล้ว (สูงสุด ${most})`,
+  ],
+  [
+    /^done for today, (\d+) started \(at most (\d+) a day\)$/,
+    (n, most) => `เสร็จสำหรับวันนี้ เริ่มไปแล้ว ${n} งาน (สูงสุด ${most} ต่อวัน)`,
+  ],
   [/^resets in (.+)$/, (time) => `รีเซ็ตใน ${translatePattern(time)}`],
   [/^Owed from (.+?)\. (.+)$/, (day, state) => `ค้างตั้งแต่ ${day} ${translatePattern(state)}`],
   [/^The conversation cannot be read: (.+)$/, (why) => `อ่านบทสนทนาไม่ได้: ${why}`],

@@ -193,6 +193,32 @@ export const RULES: readonly Rule[] = [
   ],
   [/^No output yet, read at (.+)$/, (time) => `Chưa có kết quả, đọc lúc ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `Hết ${name}`],
+  [
+    /^(.+) · at this pace out by (.+)$/,
+    (note, time) => `${translatePattern(note)} · theo tốc độ này sẽ hết lúc ${time}`,
+  ],
+  [/^Starting by itself: (.+)$/, (why) => `Tự động bắt đầu: ${translatePattern(why)}`],
+  [
+    /^waiting, (.+)'s (.+) is at (\d+)% \(starts under (\d+)%\)$/,
+    (provider, window, used, under) =>
+      `đang chờ, ${window} của ${provider} đã dùng ${used}% (bắt đầu khi dưới ${under}%)`,
+  ],
+  [
+    /^waiting, a limit of the plan is too high \(starts under (\d+)%\)$/,
+    (under) => `đang chờ, một giới hạn của gói quá cao (bắt đầu khi dưới ${under}%)`,
+  ],
+  [
+    /^waiting, (\d+) tasks? (?:is|are) in progress or to do \(at most (\d+)\)$/,
+    (n, most) => `đang chờ, ${n} việc đang làm hoặc cần làm (tối đa ${most})`,
+  ],
+  [
+    /^waiting, enough tasks are in progress or to do \(at most (\d+)\)$/,
+    (most) => `đang chờ, đã có đủ việc đang làm hoặc cần làm (tối đa ${most})`,
+  ],
+  [
+    /^done for today, (\d+) started \(at most (\d+) a day\)$/,
+    (n, most) => `xong cho hôm nay, đã bắt đầu ${n} việc (tối đa ${most} mỗi ngày)`,
+  ],
   [/^resets in (.+)$/, (time) => `đặt lại sau ${translatePattern(time)}`],
   [/^Owed from (.+?)\. (.+)$/, (day, state) => `Còn nợ từ ${day}. ${translatePattern(state)}`],
   [/^The conversation cannot be read: (.+)$/, (why) => `Không đọc được hội thoại: ${why}`],

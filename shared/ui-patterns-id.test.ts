@@ -97,6 +97,27 @@ test("the cards' longer lines are in Indonesian too, with their names and number
     ["Checks fail on #12", "Pemeriksaan gagal pada #12"],
     ["Context 91% full, 182k of 200k tokens", "Konteks 91% penuh, 182k dari 200k token"],
     ["Out of Claude", "Claude habis"],
+    [
+      "Claude 85% · at this pace out by Thu 14:00",
+      "Claude 85% · dengan laju ini habis pada Thu 14:00",
+    ],
+    ["Starting by itself", "Memulai sendiri"],
+    [
+      "Starting by itself: nothing here is ready to start",
+      "Memulai sendiri: belum ada yang siap dimulai di sini",
+    ],
+    [
+      "Starting by itself: waiting, Claude's 5 hours is at 82% (starts under 70%)",
+      "Memulai sendiri: menunggu, 5 hours milik Claude sudah 82% (mulai di bawah 70%)",
+    ],
+    [
+      "Starting by itself: waiting, 3 tasks are in progress or to do (at most 3)",
+      "Memulai sendiri: menunggu, 3 tugas sedang dikerjakan atau akan dikerjakan (paling banyak 3)",
+    ],
+    [
+      "Starting by itself: done for today, 10 started (at most 10 a day)",
+      "Memulai sendiri: selesai untuk hari ini, 10 dimulai (paling banyak 10 sehari)",
+    ],
     ["resets in 2 h 5 min", "direset dalam 2 jam 5 mnt"],
     ["120 times the clock", "120 kali kecepatan jam"],
     [
