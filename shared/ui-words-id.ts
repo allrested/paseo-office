@@ -447,6 +447,9 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Ask for a review": "Minta tinjauan",
   "Ask for an update": "Minta kabar",
   "Ask for another review": "Minta tinjauan lagi",
+  Explain: "Jelaskan",
+  Tour: "Urutan baca",
+  "Fewer lines": "Lebih sedikit baris",
   "At home · a task or a reply brings it back":
     "Di rumah · tugas atau balasan memanggilnya kembali",
   "Attach image": "Lampirkan gambar",

@@ -1865,6 +1865,28 @@ request again, and the asked agent's first note after it is shown as the review
 (`client/review-text.ts`). While a request has no answer and its agent is still in the room, nobody
 else is asked.
 
+**Explain** sits beside it and asks the same pick (the team's newest idle agent) for a tour of the
+pull request. The note has three lines: `Tour request: #<n> <title>` (without the number when there
+is none), the pull request's address, and the ask to list the changed files in the order to read
+them, one line each with why it changed, and not to review the change. The tour is the asked
+agent's first note after the request that is not a reply under a task; the card shows it under the
+row as "Tour", plain text, its first 30 lines with "N more lines" behind a toggle. While a tour
+request has no answer and its agent is still in the room, Explain is off for that pull request and
+reads "Asked <agent>". A tour and a review are found separately: a pending tour does not block
+"Ask for a review" and the reverse, and when both are pending for one agent its first note
+answers the older request and the next note the newer. The office still fetches no diff and calls
+no forge: the agent does the reading.
+
+**Stacks.** The descriptor's `headRefName` is carried as the pull request's `head` (absent when the
+daemon does not say). Among the open and draft pull requests the card lists, one whose base equals
+another's head (both known, compared exactly) stands on it. A stack runs from the pull request
+whose base is not another row's head upward, each row labelled "Stack: 2 of 3" (its place from the
+bottom and the depth along its own line), and the card keeps a stack's rows together, bottom
+first, where its bottom stood in the queue. A fork is drawn as two lines that share their bottom,
+each row labelled by its depth. A cycle is bad data, not a stack: its rows stay where they are
+with no label. Merged and closed pull requests are no part of a stack (`reviewStacks`,
+`client/review-text.ts`).
+
 ## QA
 
 The QA entry is in the Attention tab while a workspace has a pull request with checks, an agent at a

@@ -24,6 +24,24 @@ export function isUserRequest(post: Post): boolean {
   return post.kind === "note" && post.author === USER_AUTHOR && post.to !== undefined;
 }
 
+/** The asked agent's first note after `request`, not a reply under a task and not in `taken`. */
+export function answerTo(
+  posts: readonly Post[],
+  request: Post,
+  taken: ReadonlySet<string> = new Set(),
+): Post | null {
+  return posts
+    .filter(
+      (post) =>
+        post.kind === "note" &&
+        post.author === request.to &&
+        post.replyTo === undefined &&
+        post.seq > request.seq &&
+        !taken.has(post.id),
+    )
+    .reduce<Post | null>((first, post) => (first && first.seq < post.seq ? first : post), null);
+}
+
 /** The newest post `isRequest` takes, and the asked agent's first note after it. */
 export function latestRequest(
   posts: readonly Post[],
@@ -34,10 +52,7 @@ export function latestRequest(
     .reduce<Post | null>((latest, post) => (latest && latest.seq > post.seq ? latest : post), null);
   if (request === null || request.to === undefined) return null;
   const agentId = request.to;
-  const answer = posts
-    .filter((post) => post.kind === "note" && post.author === agentId && post.seq > request.seq)
-    .reduce<Post | null>((first, post) => (first && first.seq < post.seq ? first : post), null);
-  return { request, agentId, answer };
+  return { request, agentId, answer: answerTo(posts, request) };
 }
 
 /** Who was asked, by name, and its answer cut at `max`. */

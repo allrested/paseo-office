@@ -2507,6 +2507,7 @@ export function OfficeSurface(
         rows={reviews.rows}
         open={reviews.open}
         ask={reviews.ask}
+        explain={reviews.explain}
         wakesPaused={office.state.wake.paused}
         onOpenWorkspace={reviews.openWorkspace}
         onOpenBoard={reviews.openBoard}

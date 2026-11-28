@@ -6,9 +6,12 @@ import { OfficeModal as Modal } from "./office-modal.js";
 import { ActionButton, failureText } from "./action-button.js";
 import {
   REVIEW_HELP,
+  explainLabel,
   reviewAskLabel,
   reviewHint,
   reviewSummary,
+  stackLabel,
+  tourView,
   type ReviewAsked,
   type ReviewRow,
 } from "./review-text.js";
@@ -37,17 +40,43 @@ function Asked({ asked, styles }: AskedProps) {
   );
 }
 
+interface TourProps {
+  text: string;
+  styles: OfficeStyles;
+}
+
+/** The tour an agent wrote: its first lines, and the rest behind a toggle. */
+function Tour({ text, styles }: TourProps) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const { shown, rest, more } = tourView(text);
+  const label = open ? "Fewer lines" : `${more} more ${more === 1 ? "line" : "lines"}`;
+  return (
+    <View style={styles.reviewAnswer}>
+      <Text style={styles.rowMeta}>Tour</Text>
+      <Text style={styles.sheetText}>{shown}</Text>
+      {open && more > 0 ? <Text style={styles.sheetText}>{rest}</Text> : null}
+      {more > 0 ? (
+        <View style={styles.actions}>
+          <ActionButton label={label} pendingLabel={label} onPress={toggle} styles={styles} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 interface RowProps {
   row: ReviewRow;
   wakesPaused: boolean;
   ask(row: ReviewRow): Promise<void>;
+  explain(row: ReviewRow): Promise<void>;
   /** Undefined on a host that cannot open a workspace from here. */
   onOpenWorkspace: ((roomId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
   styles: OfficeStyles;
 }
 
-function Row({ row, wakesPaused, ask, onOpenWorkspace, onOpenBoard, styles }: RowProps) {
+function Row({ row, wakesPaused, ask, explain, onOpenWorkspace, onOpenBoard, styles }: RowProps) {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -66,6 +95,15 @@ function Row({ row, wakesPaused, ask, onOpenWorkspace, onOpenBoard, styles }: Ro
       if (mounted.current) setFailure(failureText(label, caught));
     }
   }, [ask, row, label]);
+  const explainLabelNow = explainLabel(row);
+  const tell = useCallback(async () => {
+    setFailure(null);
+    try {
+      await explain(row);
+    } catch (caught) {
+      if (mounted.current) setFailure(failureText("Explain", caught));
+    }
+  }, [explain, row]);
   const openWorkspace = useCallback(
     () => onOpenWorkspace?.(row.roomId),
     [onOpenWorkspace, row.roomId],
@@ -83,8 +121,10 @@ function Row({ row, wakesPaused, ask, onOpenWorkspace, onOpenBoard, styles }: Ro
           {row.linkText}
         </ExternalLink>
       </View>
+      {row.stack ? <Text style={styles.rowMeta}>{stackLabel(row.stack)}</Text> : null}
       <Text style={row.troubled ? styles.standupBlocker : styles.muted}>{row.status}</Text>
       {row.asked ? <Asked asked={row.asked} styles={styles} /> : null}
+      {row.tour?.text ? <Tour text={row.tour.text} styles={styles} /> : null}
       <View style={styles.actions}>
         {row.reviewer ? (
           <ActionButton
@@ -92,6 +132,15 @@ function Row({ row, wakesPaused, ask, onOpenWorkspace, onOpenBoard, styles }: Ro
             pendingLabel="Asking..."
             onPress={request}
             disabled={wakesPaused}
+            styles={styles}
+          />
+        ) : null}
+        {row.explainer || row.tourPending ? (
+          <ActionButton
+            label={explainLabelNow}
+            pendingLabel="Asking..."
+            onPress={tell}
+            disabled={wakesPaused || row.tourPending}
             styles={styles}
           />
         ) : null}
@@ -127,6 +176,8 @@ export interface ReviewCardProps {
   open: boolean;
   /** Posts the request for a review on the pull request's board, naming the row's reviewer. */
   ask(row: ReviewRow): Promise<void>;
+  /** Posts the request for a tour of the pull request, naming the row's explainer. */
+  explain(row: ReviewRow): Promise<void>;
   /** "Wake agents" is off: a request would wait, so nobody is asked. */
   wakesPaused: boolean;
   /** Shows the workspace, where the app has the diff; undefined where the host cannot. */
@@ -139,12 +190,14 @@ export interface ReviewCardProps {
 /**
  * The review queue: every open pull request of a workspace, what stands in its way, and the
  * ways on from here. The diff is in the workspace, the verdict is given on the forge, and an
- * agent of the team can be asked for a review, which comes back as a note.
+ * agent of the team can be asked for a review or for a tour of the changed files, which come
+ * back as notes. Pull requests stacked on each other stand together, bottom first.
  */
 export function ReviewCard({
   rows,
   open,
   ask,
+  explain,
   wakesPaused,
   onOpenWorkspace,
   onOpenBoard,
@@ -174,6 +227,7 @@ export function ReviewCard({
                     row={row}
                     wakesPaused={wakesPaused}
                     ask={ask}
+                    explain={explain}
                     onOpenWorkspace={onOpenWorkspace}
                     onOpenBoard={onOpenBoard}
                     styles={styles}
