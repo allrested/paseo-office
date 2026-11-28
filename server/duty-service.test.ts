@@ -12,6 +12,7 @@ import {
   dutiesFileStore,
   dutyCadence,
   dutyClock,
+  dutyDueMinute,
   type DutiesFile,
 } from "./duty-service.js";
 import { createFakeClock, settle } from "./fake-clock.js";
@@ -60,17 +61,23 @@ function setup(
     zone?: string;
     /** The schedule engine's timers fire a millisecond before their time, as a real one can. */
     early?: boolean;
+    /** The schedule engine's timers fire this long after their time: a host asleep, or lagging. */
+    lateBy?: number;
     /** The kept file's load rejects with this. */
     unreadable?: string;
   } = {},
 ) {
   const clock = createFakeClock(options.start ?? WED_7AM);
-  const timers = options.early
-    ? {
-        now: () => clock.now(),
-        setTimeout: (run: () => void, ms: number) => clock.setTimeout(run, Math.max(0, ms - 1)),
-      }
-    : clock;
+  // How far off their time the engine's timers fire: a millisecond early, or late by `lateBy`.
+  const shift = options.early ? -1 : (options.lateBy ?? 0);
+  const timers =
+    shift === 0
+      ? clock
+      : {
+          now: () => clock.now(),
+          setTimeout: (run: () => void, ms: number) =>
+            clock.setTimeout(run, Math.max(0, ms + shift)),
+        };
   let boards: BoardsFile = EMPTY_BOARDS;
   const board = createBoardService({
     store: {
@@ -411,4 +418,270 @@ test("one that cannot even be moved aside rejects, and the list is then never sa
       "Unable to save the duty list: the kept one could not be read, and a save would replace it (it could not be moved aside)",
   });
   expect(file.kept()).toBeNull();
+});
+
+const MINUTE = 60 * 1000;
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+const dutyIds = (board: { postsOf(board: string): { duty?: { id: string } }[] }) =>
+  board.postsOf("duty").map((post) => post.duty?.id);
+
+test.each([
+  // Wednesday 18 November 2026, 07:00 in Tokyo (UTC+9) and in New York (UTC-5).
+  ["Asia/Tokyo", Date.parse("2026-11-17T22:00:00.000Z")],
+  ["America/New_York", Date.parse("2026-11-18T12:00:00.000Z")],
+])(
+  "a duty with a time is due from that time in %s; one without, from 08:00",
+  async (zone, start) => {
+    const cups = { id: "cups", name: "Cups", instructions: "", days: EVERY_DAY };
+    const bin = { id: "bin", name: "Bin", instructions: "", days: EVERY_DAY, time: "14:30" };
+    const { begin, board, clock } = setup({
+      start,
+      zone,
+      file: { version: 1, duties: [cups, bin] },
+    });
+    await begin();
+    expect(dutyIds(board)).toEqual([]);
+    clock.advance(HOUR);
+    await settle();
+    expect(dutyIds(board)).toEqual(["cups"]);
+    // 14:29, then 14:30, in the zone.
+    clock.advance(6 * HOUR + 29 * MINUTE);
+    await settle();
+    expect(dutyIds(board)).toEqual(["cups"]);
+    clock.advance(MINUTE);
+    await settle();
+    expect(dutyIds(board)).toEqual(["cups", "bin"]);
+    expect(board.postsOf("duty").map((post) => post.duty?.day)).toEqual([
+      "2026-11-18",
+      "2026-11-18",
+    ]);
+  },
+);
+
+test("the timer runs at 08:00 and at each later time a duty has, once per time, and follows each save", async () => {
+  const duty = (id: string, time?: string) => ({
+    id,
+    name: id,
+    instructions: "",
+    days: [3],
+    ...(time === undefined ? {} : { time }),
+  });
+  expect(
+    dutyCadence(ZONE, [duty("a", "08:00"), duty("b", "13:30"), duty("c", "13:30"), duty("d")]),
+  ).toEqual({ type: "crons", expressions: ["0 8 * * *", "30 13 * * *"], timezone: ZONE });
+  expect(dutyCadence(ZONE, [duty("a", "08:00"), duty("d")])).toEqual(dutyCadence(ZONE));
+  expect(dutyDueMinute(duty("b", "13:30"))).toBe(13 * 60 + 30);
+  expect(dutyDueMinute(duty("d"))).toBe(8 * 60);
+
+  const { begin, schedules, service } = setup();
+  await begin();
+  const cadences = async () => (await schedules.list()).map((entry) => entry.cadence);
+  expect(await service.save([duty("b", "13:30"), duty("d")])).toEqual({ ok: true });
+  expect(await cadences()).toEqual([
+    { type: "crons", expressions: ["0 8 * * *", "30 13 * * *"], timezone: ZONE },
+  ]);
+  expect(service.list()[0]?.time).toBe("13:30");
+  expect(await service.save([duty("d")])).toEqual({ ok: true });
+  expect(await cadences()).toEqual([dutyCadence(ZONE)]);
+});
+
+test("a run at a later time posts only what came due: nothing else is posted again or cleared", async () => {
+  // Tuesday 17 November 2026, 07:00 in Riyadh.
+  const tuesday = WED_7AM - 24 * HOUR;
+  const cups = { id: "cups", name: "Cups", instructions: "", days: [2, 3] };
+  const tea = { id: "tea", name: "Tea", instructions: "", days: [2, 3] };
+  const bin = { id: "bin", name: "Bin", instructions: "", days: [3], time: "13:30" };
+  const { begin, board, clock } = setup({
+    start: tuesday,
+    file: { version: 1, duties: [cups, tea, bin] },
+  });
+  await begin();
+  clock.advance(HOUR);
+  await settle();
+  await board.update({ id: "p2", action: "done", actor: "user" });
+  // Wednesday 08:00: Tuesday's cups are owed, Tuesday's tea leaves and Wednesday's is posted.
+  clock.advance(24 * HOUR);
+  await settle();
+  expect(board.postsOf("duty").map((post) => [post.duty?.id, post.duty?.day])).toEqual([
+    ["cups", "2026-11-17"],
+    ["tea", "2026-11-18"],
+  ]);
+  // Both finished at 10:00: the owed cups count for Wednesday.
+  clock.advance(2 * HOUR);
+  const [owed, today] = board.postsOf("duty");
+  await board.update({ id: owed!.id, action: "done", actor: "user" });
+  await board.update({ id: today!.id, action: "done", actor: "user" });
+  const before = board.postsOf("duty");
+  clock.advance(3 * HOUR + 29 * MINUTE);
+  await settle();
+  expect(board.postsOf("duty")).toEqual(before);
+  clock.advance(MINUTE);
+  await settle();
+  const after = board.postsOf("duty");
+  expect(after.filter((post) => post.duty?.id !== "bin")).toEqual(before);
+  expect(after.filter((post) => post.duty?.id === "bin").map((post) => post.duty)).toEqual([
+    { id: "bin", day: "2026-11-18" },
+  ]);
+});
+
+test("a start past a duty's time posts it at once; one whose time is still ahead waits for it", async () => {
+  const bin = { id: "bin", name: "Bin", instructions: "", days: [3], time: "14:30" };
+  const tea = { id: "tea", name: "Tea", instructions: "", days: [3], time: "16:00" };
+  // Wednesday 15:00 in Riyadh.
+  const { begin, board, clock } = setup({
+    start: WED_7AM + 8 * HOUR,
+    file: { version: 1, duties: [bin, tea] },
+  });
+  await begin();
+  expect(dutyIds(board)).toEqual(["bin"]);
+  clock.advance(HOUR);
+  await settle();
+  expect(dutyIds(board)).toEqual(["bin", "tea"]);
+});
+
+test("a later time saved on a duty not yet posted delays it; an earlier one already past posts it at the save", async () => {
+  const bin = { id: "bin", name: "Bin", instructions: "", days: [3], time: "10:00" };
+  const tea = { id: "tea", name: "Tea", instructions: "", days: [3], time: "12:00" };
+  const { begin, board, clock, service } = setup({ file: { version: 1, duties: [bin, tea] } });
+  await begin();
+  // 09:00: neither is due yet.
+  clock.advance(2 * HOUR);
+  await settle();
+  expect(dutyIds(board)).toEqual([]);
+  expect(
+    await service.save([
+      { ...bin, time: "12:00" },
+      { ...tea, time: "08:30" },
+    ]),
+  ).toEqual({
+    ok: true,
+  });
+  expect(dutyIds(board)).toEqual(["tea"]);
+  // 10:00 passes without the bin; 12:00 posts it.
+  clock.advance(2 * HOUR);
+  await settle();
+  expect(dutyIds(board)).toEqual(["tea"]);
+  clock.advance(HOUR);
+  await settle();
+  expect(dutyIds(board)).toEqual(["tea", "bin"]);
+});
+
+test("a time saved on a duty posted today leaves today's post as it is", async () => {
+  const { begin, board, clock, service } = setup({ start: WED_7AM + 2 * HOUR });
+  await begin();
+  const before = board.postsOf("duty");
+  expect(before).toHaveLength(4);
+  const [cups, ...others] = STARTING_DUTIES;
+  expect(await service.save([{ ...cups!, time: "15:00" }, ...others])).toEqual({ ok: true });
+  expect(board.postsOf("duty")).toEqual(before);
+  // 15:00 comes and goes: the cups are not posted again.
+  clock.advance(7 * HOUR);
+  await settle();
+  expect(board.postsOf("duty")).toEqual(before);
+});
+
+test("a save with a time outside 08:00 to 23:59 is refused, naming the duty", async () => {
+  const { begin, service } = setup();
+  await begin();
+  expect(await service.save([{ name: "Bin", instructions: "", days: [3], time: "07:00" }])).toEqual(
+    { ok: false, error: 'Unable to save: Duty "Bin": the time must be between 08:00 and 23:59' },
+  );
+  expect(service.list()).toEqual(STARTING_DUTIES);
+});
+
+test("a kept time written by hand that is not HH:MM from 08:00 reads as 08:00; the file is kept", async () => {
+  const path = await tempPath();
+  const logs: string[] = [];
+  const store = dutiesFileStore(path, { now: () => 5000, log: (line) => logs.push(line) });
+  const [cups, bin] = STARTING_DUTIES;
+  await store.save({ version: 1, duties: [] });
+  await writeFile(
+    path,
+    JSON.stringify({
+      version: 1,
+      duties: [
+        { ...cups, time: "07:00" },
+        { ...bin, time: "14:30" },
+      ],
+    }),
+  );
+  const kept = await store.load();
+  expect(logs).toEqual([]);
+  expect(kept?.duties[0]).toEqual(cups);
+  expect(kept?.duties[0]?.time).toBeUndefined();
+  expect(kept?.duties[1]).toEqual({ ...bin, time: "14:30" });
+  expect(dutyDueMinute({ time: "07:00" })).toBe(8 * 60);
+  expect(dutyDueMinute({ time: "nonsense" })).toBe(8 * 60);
+});
+
+/** Wednesday 18 November 2026, 09:00 in Riyadh, and the duties of a late evening. */
+const WED_9AM = WED_7AM + 2 * HOUR;
+const LATE = { id: "late", name: "Lock up", instructions: "", days: [3], time: "23:59" };
+const THURSDAY = { id: "cups", name: "Cups", instructions: "", days: [4] };
+const posted = (board: { postsOf(board: string): { duty?: { id: string; day: string } }[] }) =>
+  board.postsOf("duty").map((post) => post.duty);
+
+test.each([
+  ["at 00:01", 2 * MINUTE],
+  ["at 03:00 after a sleep", 3 * HOUR + MINUTE],
+])(
+  "a 23:59 run that fires after midnight, %s, still posts its duty on its day",
+  async (_, lateBy) => {
+    const { begin, board, clock } = setup({
+      start: WED_9AM,
+      lateBy,
+      file: { version: 1, duties: [LATE, THURSDAY] },
+    });
+    await begin();
+    expect(posted(board)).toEqual([]);
+    // To the instant the run fires: Wednesday 23:59 in Riyadh is 20:59 UTC.
+    clock.advance(Date.parse("2026-11-18T20:59:00.000Z") + lateBy - clock.now());
+    await settle();
+    expect(posted(board)).toEqual([{ id: "late", day: "2026-11-18" }]);
+  },
+);
+
+test("a 23:59 run that fires after the next 08:00 is not made up: the board is brought up as of then", async () => {
+  // It fires at 08:30 on Thursday; the 08:00 run, as late, has not fired yet.
+  const lateBy = 8 * HOUR + 31 * MINUTE;
+  const { begin, board, clock, told } = setup({
+    start: WED_9AM,
+    lateBy,
+    file: { version: 1, duties: [LATE, THURSDAY] },
+  });
+  await begin();
+  clock.advance(Date.parse("2026-11-18T20:59:00.000Z") + lateBy - 1 - clock.now());
+  await settle();
+  expect(posted(board)).toEqual([]);
+  clock.advance(1);
+  await settle();
+  expect(posted(board)).toEqual([{ id: "cups", day: "2026-11-19" }]);
+  expect(told.at(-1)?.day).toBe("2026-11-19");
+});
+
+test("the 08:00 run that fires at 08:05 posts the morning's duties and not a later one's", async () => {
+  const cups = { id: "cups", name: "Cups", instructions: "", days: [3] };
+  const { begin, board, clock } = setup({
+    lateBy: 5 * MINUTE,
+    file: { version: 1, duties: [cups, LATE] },
+  });
+  await begin();
+  clock.advance(HOUR + 5 * MINUTE - 1);
+  await settle();
+  expect(posted(board)).toEqual([]);
+  clock.advance(1);
+  await settle();
+  expect(posted(board)).toEqual([{ id: "cups", day: "2026-11-18" }]);
+});
+
+test("a start after midnight does not make up a late duty whose time passed while it was down", async () => {
+  const late = { ...LATE, time: "23:30" };
+  // Thursday 00:30 in Riyadh: the board's day is still Wednesday's.
+  const { begin, board, told } = setup({
+    start: Date.parse("2026-11-18T21:30:00.000Z"),
+    file: { version: 1, duties: [late] },
+  });
+  await begin();
+  expect(posted(board)).toEqual([]);
+  expect(told.at(-1)?.day).toBe("2026-11-18");
 });

@@ -292,3 +292,43 @@ test("after stop a save is refused and sets no timer", async () => {
   await expect(schedules.upsert(NOTES_INPUT)).rejects.toThrow(/have stopped/);
   expect(clock.pending()).toBe(0);
 });
+
+test("a schedule of several daily times runs at each, the earliest first, every day", async () => {
+  const { clock, schedules } = engine();
+  const ran: string[] = [];
+  schedules.handle("duty-board", async (dueAt) => void ran.push(iso(dueAt)));
+  const saved = await schedules.upsert({
+    name: "duty-board",
+    handler: "duty-board",
+    prompt: "Duty board",
+    cadence: {
+      type: "crons",
+      expressions: ["0 8 * * *", "30 13 * * *"],
+      timezone: "Asia/Riyadh",
+    },
+  });
+  expect(saved.nextRunAt).toBe("2026-11-18T05:00:00.000Z");
+  clock.advance(60 * 60 * 1000);
+  await settle();
+  expect((await schedules.list())[0]?.nextRunAt).toBe("2026-11-18T10:30:00.000Z");
+  clock.advance(23 * 60 * 60 * 1000);
+  await settle();
+  expect(ran).toEqual(["2026-11-18T05:00:00.000Z", "2026-11-18T10:30:00.000Z"]);
+  expect((await schedules.list())[0]?.nextRunAt).toBe("2026-11-19T05:00:00.000Z");
+});
+
+test("a schedule of no times, or of one the office does not read, is refused", async () => {
+  const { schedules } = engine();
+  const cadence = (expressions: string[]) => ({
+    type: "crons" as const,
+    expressions,
+    timezone: "Asia/Riyadh",
+  });
+  await expect(schedules.upsert({ ...NOTES_INPUT, cadence: cadence([]) })).rejects.toThrow(
+    /expression/i,
+  );
+  await expect(
+    schedules.upsert({ ...NOTES_INPUT, cadence: cadence(["0 8 * * *", "*/5 * * * *"]) }),
+  ).rejects.toThrow(/expression/i);
+  expect(await schedules.list()).toEqual([]);
+});

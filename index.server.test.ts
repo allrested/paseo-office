@@ -145,6 +145,7 @@ const OWN_TOOL = defineAgentTool({
 
 function cadenceText(cadence: OfficeCadence): string {
   if (cadence.type === "every") return `every ${cadence.everyMs}`;
+  if (cadence.type === "crons") return `${cadence.expressions.join(", ")} ${cadence.timezone}`;
   return `${cadence.expression} ${cadence.timezone}`;
 }
 

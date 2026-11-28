@@ -217,6 +217,7 @@ export const RULES: readonly Rule[] = [
   [/^Save the (.+) setting$/, (name) => `บันทึกการตั้งค่า${label(name)}`],
   [/^Start an agent to analyze (.+)$/, (key) => `เริ่ม agent เพื่อวิเคราะห์ ${key}`],
   [/^Add (.+) to the lobby board$/, (key) => `เพิ่ม ${key} ไปยังบอร์ดล็อบบี้`],
+  [/^Duty (\d+) time$/, (n) => `เวลาของเวร ${n}`],
   [
     /^For the 3D view\. Company floor has (\d+) desks, Cozy room (\d+), and Headquarters (\d+)\. Headquarters may draw more slowly on a phone\. Changing it starts the 3D view again\.$/,
     (pro, cozy, hq) =>

@@ -106,6 +106,7 @@ test("the cards' longer lines are in Vietnamese too, with their names and number
     ["Unable to save the Sound setting: refused", "Không thể lưu cài đặt Âm thanh: refused"],
     ["ended with an error (exit 2)", "kết thúc với lỗi (exit 2)"],
     ["Add SHOP-12 to the lobby board", "Thêm SHOP-12 vào bảng sảnh"],
+    ["Duty 2 time", "Giờ trực nhật 2"],
   ];
   for (const [english, vietnamese] of lines) expect(translatePattern(english)).toBe(vietnamese);
 });

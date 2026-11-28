@@ -104,6 +104,7 @@ test("the cards' longer lines are in Indonesian too, with their names and number
     ["Unable to save the Sound setting: refused", "Tidak dapat simpan pengaturan Suara: refused"],
     ["ended with an error (exit 2)", "berakhir dengan galat (exit 2)"],
     ["Add SHOP-12 to the lobby board", "Tambahkan SHOP-12 ke papan lobi"],
+    ["Duty 2 time", "Waktu piket 2"],
   ];
   for (const [english, indonesian] of lines) expect(translatePattern(english)).toBe(indonesian);
 });

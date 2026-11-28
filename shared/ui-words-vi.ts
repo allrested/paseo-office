@@ -415,8 +415,10 @@ export const UI_VI: Readonly<Record<string, string>> = {
   Workspace: "Không gian làm việc",
   "Write a reply": "Viết trả lời",
   You: "Bạn",
-  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.":
-    "Nhiệm vụ trực nhật không có hướng dẫn chỉ là giả lập: văn phòng 3D diễn lại và không agent nào được yêu cầu. Nhiệm vụ có hướng dẫn được giao cho một agent đang rảnh vào mỗi ngày của nó, từ 08:00 theo múi giờ của ghi chú.",
+  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from its time (08:00 when none is set) in the notes' time zone.":
+    "Nhiệm vụ trực nhật không có hướng dẫn chỉ là giả lập: văn phòng 3D diễn lại và không agent nào được yêu cầu. Nhiệm vụ có hướng dẫn được giao cho một agent đang rảnh vào mỗi ngày của nó, từ giờ của nó (08:00 nếu chưa đặt) theo múi giờ của ghi chú.",
+  "Between 08:00 and 23:59": "Từ 08:00 đến 23:59",
+  Time: "Giờ",
   "A sub-agent started": "Một subagent đã bắt đầu",
   "A token is saved; type a new one to replace it. Stored on the host for its user only; never shown again.":
     "Đã lưu token; nhập token mới để thay thế. Chỉ lưu trên host cho người dùng của nó; không bao giờ hiển thị lại.",

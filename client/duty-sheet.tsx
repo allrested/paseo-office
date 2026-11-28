@@ -13,7 +13,7 @@ import {
   type DutyRow,
 } from "../shared/duties.js";
 import { ActionButton } from "./action-button.js";
-import { dutyRowTitle, dutyStateText } from "./duty-text.js";
+import { dutyRowTitle, dutyStateText, dutyTimeOf, dutyTimeText } from "./duty-text.js";
 import { DAY_NAMES } from "./notes-days.js";
 import { OfficeModal as Modal } from "./office-modal.js";
 import { SegmentPill } from "./segment-pill.js";
@@ -22,12 +22,16 @@ import type { DutyActions } from "./use-duty-actions.js";
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const HINT =
-  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.";
+  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from its time (08:00 when none is set) in the notes' time zone.";
 
-/** A duty as the editor holds it: `key` tells the rows apart, a new duty having no id yet. */
+/**
+ * A duty as the editor holds it: `key` tells the rows apart, a new duty having no id yet, and
+ * `time` is as typed, "" for none.
+ */
 interface Draft extends DutyDraft {
   key: string;
   days: number[];
+  time: string;
 }
 
 function draftsOf(list: readonly Duty[]): Draft[] {
@@ -37,12 +41,18 @@ function draftsOf(list: readonly Duty[]): Draft[] {
     name: duty.name,
     instructions: duty.instructions,
     days: [...duty.days],
+    time: duty.time ?? "",
   }));
 }
 
-/** What a save sends: a listed duty with its id, a new one without. */
-function sent({ id, name, instructions, days }: Draft): DutyDraft {
-  return id === undefined ? { name, instructions, days } : { id, name, instructions, days };
+/**
+ * What a save sends: a listed duty with its id, a new one without, and its time as HH:MM when one
+ * is typed (one that is not a time is sent as typed, for the check to name).
+ */
+function sent({ id, name, instructions, days, time }: Draft): DutyDraft {
+  const kept = dutyTimeOf(time) ?? time;
+  const duty = id === undefined ? { name, instructions, days } : { id, name, instructions, days };
+  return kept === "" ? duty : { ...duty, time: kept };
 }
 
 interface TodayRowProps {
@@ -58,6 +68,7 @@ interface TodayRowProps {
  */
 function TodayRow({ row, name, actions, styles }: TodayRowProps) {
   const title = dutyRowTitle(row);
+  const time = row.duty === null ? null : dutyTimeText(row.duty);
   const done = row.post.state === "done";
   const held = done || row.post.state === "claimed";
   const { id } = row.post;
@@ -66,7 +77,9 @@ function TodayRow({ row, name, actions, styles }: TodayRowProps) {
   return (
     <View style={styles.dutyCard}>
       <View style={styles.post}>
-        <Text style={done ? styles.todoTextDone : styles.rowTitle}>{title}</Text>
+        <Text style={done ? styles.todoTextDone : styles.rowTitle}>
+          {time === null ? title : `${title} · ${time}`}
+        </Text>
         <Text style={styles.postMeta}>{dutyStateText(row, name)}</Text>
       </View>
       <View style={styles.actions}>
@@ -128,7 +141,40 @@ interface DutyFieldsProps {
   styles: OfficeStyles;
 }
 
-/** One duty of the list: its name, its instructions for an agent, its days, and Remove. */
+interface DutyTimeProps {
+  label: string;
+  time: string;
+  onChange(time: string): void;
+  styles: OfficeStyles;
+}
+
+/** The time a duty comes due, HH:MM from 08:00 (none: 08:00); kept as HH:MM once the field is left. */
+function DutyTime({ label, time, onChange, styles }: DutyTimeProps) {
+  const kept = dutyTimeOf(time);
+  const leave = useCallback(() => {
+    if (kept !== null && kept !== time) onChange(kept);
+  }, [kept, time, onChange]);
+  return (
+    <View style={styles.dutyTime}>
+      <View style={styles.lobbyTaskLine}>
+        <Text style={styles.fieldHint}>Time</Text>
+        <TextInput
+          accessibilityLabel={label}
+          value={time}
+          onChangeText={onChange}
+          onBlur={leave}
+          placeholder="08:00"
+          placeholderTextColor={styles.placeholderColor}
+          maxLength={5}
+          style={styles.dutyTimeInput}
+        />
+      </View>
+      {kept === null ? <Text style={styles.actionError}>Between 08:00 and 23:59</Text> : null}
+    </View>
+  );
+}
+
+/** One duty of the list: its name, its instructions for an agent, its days and time, and Remove. */
 function DutyFields({ index, draft, onChange, onRemove, styles }: DutyFieldsProps) {
   const { key, days } = draft;
   const n = index + 1;
@@ -146,6 +192,7 @@ function DutyFields({ index, draft, onChange, onRemove, styles }: DutyFieldsProp
       }),
     [onChange, key, days],
   );
+  const setTime = useCallback((time: string) => onChange(key, { time }), [onChange, key]);
   const remove = useCallback(() => onRemove(key), [onRemove, key]);
   return (
     <View style={styles.dutyCard}>
@@ -180,7 +227,10 @@ function DutyFields({ index, draft, onChange, onRemove, styles }: DutyFieldsProp
         multiline
         style={styles.input}
       />
-      <DutyDays label={`Duty ${n} days`} days={days} onToggle={toggle} styles={styles} />
+      <View style={styles.dutyWhen}>
+        <DutyDays label={`Duty ${n} days`} days={days} onToggle={toggle} styles={styles} />
+        <DutyTime label={`Duty ${n} time`} time={draft.time} onChange={setTime} styles={styles} />
+      </View>
     </View>
   );
 }
@@ -222,7 +272,10 @@ function DutyList({ list, actions, styles }: DutyListProps) {
   const add = useCallback(() => {
     added.current += 1;
     const key = `new-${added.current}`;
-    edit((current) => [...current, { key, name: "", instructions: "", days: [...WEEKDAYS] }]);
+    edit((current) => [
+      ...current,
+      { key, name: "", instructions: "", days: [...WEEKDAYS], time: "" },
+    ]);
   }, [edit]);
   const save = useCallback(async () => {
     const duties = shown.map(sent);
@@ -232,6 +285,7 @@ function DutyList({ list, actions, styles }: DutyListProps) {
     // Saved: the host's list, with the new duties' ids, is what shows from now.
     if (mounted.current) setDrafts(null);
   }, [shown, actions]);
+  const badTime = shown.some((draft) => dutyTimeOf(draft.time) === null);
   return (
     <View style={styles.lobbySection}>
       <Text accessibilityRole="header" style={styles.lobbyHeading}>
@@ -262,7 +316,7 @@ function DutyList({ list, actions, styles }: DutyListProps) {
           name="Save duties"
           pendingLabel="Saving..."
           onPress={save}
-          disabled={drafts === null}
+          disabled={drafts === null || badTime}
           styles={styles}
           primary
         />

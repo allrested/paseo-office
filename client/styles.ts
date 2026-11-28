@@ -313,6 +313,10 @@ export interface OfficeStyles {
   lobbyTaskLine: ViewStyle;
   /** A duty of the duty board's editor: a to-do's card with room for its fields. */
   dutyCard: ViewStyle;
+  /** A duty's day buttons and, beside them, its time: the label and field, the error under them. */
+  dutyWhen: ViewStyle;
+  dutyTime: ViewStyle;
+  dutyTimeInput: TextStyle;
   lobbyDelete: ViewStyle;
   lobbyDeleteText: TextStyle;
   lobbyConfirm: ViewStyle;
@@ -1364,6 +1368,9 @@ export function useOfficeStyles(
         padding: 12,
         gap: 8,
       },
+      dutyWhen: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+      dutyTime: { gap: 4 },
+      dutyTimeInput: { ...lineInput, width: 88, paddingHorizontal: 12 },
       lobbyDelete: {
         minWidth: controlHeight,
         minHeight: controlHeight,

@@ -502,8 +502,9 @@ export function createOfficePlugin(
     changed: (state) => hub.setNotes({ ...state, scheduleError: notesSchedule.error() }),
     log,
   });
-  // The duty list, posted on the duty board at 08:00 in the notes' zone, and caught up at the
-  // start and at each save. A zone that cannot be read, or that Intl does not know, is the host's.
+  // The duty list, posted on the duty board at each duty's time (08:00 unless set) in the notes'
+  // zone, and caught up at the start and at each save. A zone that cannot be read, or that Intl
+  // does not know, is the host's.
   const duties = createDutyService({
     file: deps.dutiesFile,
     board: office,
@@ -888,7 +889,8 @@ export function createOfficePlugin(
     await writer.start(options);
   }
   const stopNotesRuns = deps.schedules.handle(NOTES_SCHEDULE, (dueAt) => startNotesRun(dueAt));
-  // The duty board's day: what is due is posted, and done duties of earlier days leave.
+  // The duty board's runs, at 08:00 and at each duty's time: what is due is posted, and done
+  // duties of earlier days leave.
   const stopDutyRuns = deps.schedules.handle(DUTY_SCHEDULE, (dueAt) => duties.sync(dueAt));
   server.handle(notifyTestRpc, () => notifier.send(testNotice(deps.clock.now(), officeName)));
   server.handle(incidentsDismissRpc, ({ ids }) =>
