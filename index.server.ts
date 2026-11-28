@@ -361,6 +361,7 @@ export function createOfficePlugin(
     });
   });
   // What each agent's turns have cost, as the directory last reported; the boards' time and cost.
+  // Empty while no directory runs: an unknown cost is left out, never guessed from an old one.
   let agentCosts = new Map<string, number>();
   // Which agents are in a turn; the boards settle a done task's cost once its agent's is over.
   let agentsWorking = new Map<string, boolean>();
@@ -393,8 +394,16 @@ export function createOfficePlugin(
     log,
   });
   const stopCosts = hub.watch((view) => {
-    // A directory that stops leaves the last costs standing: a restart reports them again.
-    if (view === null || view.agents.length === 0) return;
+    // No directory, no figures: the last ones would go stale while the pickup hands out work. A
+    // claim then keeps no cost, and a cost that waited for its turn's end is dropped unsettled.
+    if (view === null) {
+      agentCosts = new Map();
+      agentsWorking = new Map();
+      void office.settleSpentOf(new Map());
+      return;
+    }
+    // A view that lists nobody is not taken for everyone gone: the figures stand until one does.
+    if (view.agents.length === 0) return;
     agentCosts = new Map(
       view.agents.flatMap((agent) =>
         agent.costUsd === undefined ? [] : [[agent.id, agent.costUsd] as const],

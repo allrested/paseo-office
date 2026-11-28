@@ -589,6 +589,12 @@ between, shows the time alone, as does a task you claimed yourself, and a cost u
 as "under $0.01". Whoever marks the task done, the line measures the agent that held it. A
 reopened task loses the line and starts afresh at its next claim; a task done with no claim, and a
 pretend duty acted out in the 3D office, show none.
+The cost is measured only while an office is open or **Keep watching** is on, since the figures
+come from the directory, which runs only then. A task claimed with neither shows its time alone:
+an old figure is never used. So does a task that still waited for its turn to end when the last
+office closed, or when the directory restarted. A provider whose usage is polled apart from its
+turns (pi, omp) can be read before its last turn's figure has arrived, and its cost then falls
+short by that turn.
 `office_read` does not carry the line.
 
 A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the

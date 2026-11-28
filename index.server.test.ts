@@ -829,6 +829,42 @@ test("a session the daemon closes keeps the task it claimed, and its archive fre
   await stop();
 });
 
+test("once the last office closes the costs are unknown: a cost that waited is dropped, and a claim keeps none", async () => {
+  const { recorded, context, directory, open, stop } = setup(async () => ON);
+  directory.agents.push({
+    ...listedAgent("b", "Builder"),
+    status: "running",
+    lastUsage: { totalCostUsd: 2 },
+  });
+  const post = recorded.handlers.get("office.post.request");
+  await post?.({ board: "w1", kind: "task", text: "Build it" }, context);
+  await post?.({ board: "w1", kind: "task", text: "Test it" }, context);
+  const session = await open({ agentId: "b" });
+  const first = openOffice(recorded, context);
+  await settle();
+  // An open office has what the agent spent so far, and sees it in a turn.
+  await runTool(session, "office_update", { id: "p1", action: "claim" }, "b", context);
+  await runTool(session, "office_update", { id: "p1", action: "done" }, "b", context);
+  const shown = (events: readonly object[], id: string) =>
+    boardShown(events, "w1").find((item) => item.id === id);
+  expect(shown(first.events, "p1")).toMatchObject({ costAtClaim: 2, spentPending: true });
+  // Keep watching is off, so the directory stops with the last office: nothing is read from now.
+  await first.leave();
+  await settle();
+  await runTool(session, "office_update", { id: "p2", action: "claim" }, "b", context);
+  const second = openOffice(recorded, context);
+  await settle();
+  const done = shown(second.events, "p1");
+  const claimed = shown(second.events, "p2");
+  expect(done).toMatchObject({ id: "p1", state: "done" });
+  expect(done).not.toHaveProperty("spentPending");
+  expect(done).not.toHaveProperty("spentUsd");
+  expect(claimed).toMatchObject({ id: "p2", state: "claimed", claimedBy: "b" });
+  expect(claimed).not.toHaveProperty("costAtClaim");
+  await second.leave();
+  await stop();
+});
+
 test("the machine is read for a subscriber and no longer once it left", async () => {
   const { recorded, clock, context, stop } = setup(async () => ON);
   const events: unknown[] = [];

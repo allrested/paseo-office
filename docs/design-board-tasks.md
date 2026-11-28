@@ -189,7 +189,9 @@ agent marks its task done in the middle of one. So a task done while its agent w
 `spentPending`, and `spentUsd` is worked out when the directory shows the agent no longer working.
 An agent that is closed, archived or gone from the directory before that leaves the task with its
 time and no cost: a figure is right or absent. A claim made by tool in the middle of a turn counts
-that turn whole.
+that turn whole. When the directory itself stops (the last office closes with Keep watching off),
+its figures are dropped with it: a claim made then keeps no `costAtClaim`, and a cost that still
+waited is left out.
 
 ## 8. A time for each duty
 
