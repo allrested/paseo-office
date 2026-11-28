@@ -4,6 +4,13 @@ import { translatePattern } from "./ui-patterns-id.js";
 test("lines built from data keep their data and take Indonesian words", () => {
   const lines: [string, string][] = [
     ["12 min ago", "12 mnt lalu"],
+    [
+      "acme/web: the first 20 matches are already imported: narrow the search",
+      "acme/web: 20 hasil pertama sudah diimpor: persempit pencarian",
+    ],
+    ["acme/web is no longer read: not commented", "acme/web tidak lagi dibaca: tidak dikomentari"],
+    ["GitHub: last read 12:40: 2 imported", "GitHub: terakhir dibaca 12:40: 2 diimpor"],
+    ['Line 2: "-evil/x" is not owner/repo', 'Baris 2: "-evil/x" bukan owner/repo'],
     ["3 h ago", "3 jam lalu"],
     ["just now", "baru saja"],
     ["2 h 5 min", "2 jam 5 mnt"],

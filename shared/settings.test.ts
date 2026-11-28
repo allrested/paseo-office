@@ -69,6 +69,8 @@ const COMPANY = {
   intakeLands: "backlog",
   intakeWriteBack: false,
   intakeAutoStart: false,
+  githubIntakeRepos: [],
+  githubIntakeSearch: "label:agent is:open",
   ...WEATHER_DEFAULTS,
 };
 
@@ -108,7 +110,7 @@ test("a version 3 document keeps its values and its Sunday to Thursday notes", a
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(15);
+  expect(officeHostSettings.version).toBe(16);
   expect(await upgraded(stored, 3)).toEqual({
     ...stored,
     notesDays: SUNDAY_TO_THURSDAY,
@@ -129,7 +131,7 @@ test("a version 4 document without a floor plan keeps its values and draws the c
     sentryProjects: "web",
     sentryUrl: "https://sentry.acme.dev",
   };
-  expect(officeHostSettings.version).toBe(15);
+  expect(officeHostSettings.version).toBe(16);
   expect(await upgraded(stored, 4)).toEqual({ ...stored, ...COMPANY });
 });
 
@@ -394,7 +396,7 @@ test("the roster is off and empty until the owner writes it, and a bad team is r
     ],
   });
   expect(twice.success).toBe(false);
-  expect(officeHostSettings.version).toBe(15);
+  expect(officeHostSettings.version).toBe(16);
 });
 
 test("starting by itself is off, with its three numbers, and a number out of range is refused", async () => {
@@ -456,5 +458,69 @@ test("the Jira intake is off with no JQL, lands in the backlog, writes nothing b
   ).toBe(true);
   expect(schema.safeParse({ jiraIntakeJql: "j".repeat(1_001) }).success).toBe(false);
   expect(schema.safeParse({ intakeLands: "done" }).success).toBe(false);
-  expect(officeHostSettings.version).toBe(15);
+  expect(officeHostSettings.version).toBe(16);
+});
+
+test("the GitHub intake has no repository, searches label:agent is:open, and a version 15 document starts so", async () => {
+  expect(officeHostSettings.schema.parse({})).toMatchObject({
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
+  });
+  expect(await upgraded({ agentTools: true, intakeAutoStart: true }, 15)).toMatchObject({
+    intakeAutoStart: true,
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
+  });
+});
+
+test("GitHub repositories are owner/repo with no leading dash, at most 10, none twice; the search is one line of 200 that does not start with a dash", () => {
+  expect(hostIssues({ githubIntakeRepos: ["acme/web", "Acme-Co/web.app_2"] })).toEqual([]);
+  for (const bad of ["-evil/x", "acme", "acme/web extra", "a/b/c", "/x", "acme/", "--web/x"]) {
+    expect(hostIssues({ githubIntakeRepos: [bad] })).toEqual([
+      `githubIntakeRepos: "${bad}" is not a GitHub repository as owner/repo`,
+    ]);
+  }
+  expect(hostIssues({ githubIntakeRepos: ["acme/web", "ACME/Web"] })).toEqual([
+    'githubIntakeRepos: "ACME/Web" is there twice',
+  ]);
+  const eleven = Array.from({ length: 11 }, (_, index) => `acme/repo${index}`);
+  expect(hostIssues({ githubIntakeRepos: eleven })).toEqual([
+    "githubIntakeRepos: at most 10 repositories",
+  ]);
+  expect(hostIssues({ githubIntakeRepos: eleven.slice(0, 10) })).toEqual([]);
+  expect(hostIssues({ githubIntakeSearch: "-label:in-office" })).toEqual([
+    "githubIntakeSearch: must not start with a dash",
+  ]);
+  expect(hostIssues({ githubIntakeSearch: "  --web" })).toEqual([
+    "githubIntakeSearch: must not start with a dash",
+  ]);
+  expect(hostIssues({ githubIntakeSearch: "label:agent -label:in-office" })).toEqual([]);
+  expect(officeHostSettings.schema.safeParse({ githubIntakeSearch: "x".repeat(201) }).success).toBe(
+    false,
+  );
+  expect(officeHostSettings.schema.safeParse({ githubIntakeSearch: "x".repeat(200) }).success).toBe(
+    true,
+  );
+});
+
+test("a GitHub search that names a repository, organisation or user is refused", () => {
+  const refused = ["githubIntakeSearch: the search cannot name a repository: list it above"];
+  for (const search of [
+    "label:agent repo:acme/api",
+    "REPO:acme/api label:x",
+    "label:x org:acme",
+    "user:me is:open",
+    "label:x -repo:acme/api",
+    "(repo:acme/api OR label:x)",
+  ]) {
+    expect(hostIssues({ githubIntakeSearch: search }), search).toEqual(refused);
+  }
+  for (const search of [
+    "label:agent is:open",
+    "label:repo:x",
+    "title:myrepo:thing",
+    "in:title user",
+  ]) {
+    expect(hostIssues({ githubIntakeSearch: search }), search).toEqual([]);
+  }
 });

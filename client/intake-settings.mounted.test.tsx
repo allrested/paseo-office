@@ -45,8 +45,19 @@ const HINT_COMMENT =
 const AT = new Date(2026, 10, 28, 12, 40).toISOString();
 const SET_UP: IntakeState = {
   jira: { configured: true, problem: null, lastRun: AT, imported: 3 },
+  github: { configured: false, problem: null, lastRun: null, imported: 0 },
   waiting: false,
 };
+const GITHUB_ON: IntakeState["github"] = {
+  configured: true,
+  problem: null,
+  lastRun: AT,
+  imported: 2,
+};
+const HINT_GITHUB =
+  "Read with the host's gh CLI and its sign-in. The office keeps no GitHub token.";
+const REPOS = "GitHub repositories to bring in from";
+const SEARCH = "GitHub search";
 
 async function change(_setting: IntakeSetting, patch: Partial<HostValues>): Promise<boolean> {
   saved.push(patch);
@@ -167,6 +178,7 @@ test("a source not read yet says so", async () => {
 test("a problem shows under the last run, and waiting says why nothing came", async () => {
   await mount({
     waiting: true,
+    github: SET_UP.github,
     jira: {
       ...SET_UP.jira,
       problem: "the first 100 matches are already imported: narrow the JQL",
@@ -198,4 +210,89 @@ test("a failed Read now shows like another action's failure", async () => {
   expect(
     [...container.querySelectorAll('[role="alert"]')].map((alert) => alert.textContent),
   ).toEqual(["Unable to read now: Jira is down"]);
+});
+
+const githubLine = () =>
+  container.querySelector('[data-testid="intake-status-github"]')?.textContent;
+const repos = () => container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${REPOS}"]`);
+const search = () => container.querySelector<HTMLInputElement>(`input[aria-label="${SEARCH}"]`);
+const alerts = () =>
+  [...container.querySelectorAll('[role="alert"]')].map((alert) => alert.textContent);
+
+async function type(field: HTMLTextAreaElement | HTMLInputElement | null, text: string) {
+  if (!field) throw new Error("No field");
+  const prototype = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+  await act(async () => {
+    field.focus();
+    Object.getOwnPropertyDescriptor(prototype.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => field.blur());
+}
+
+test("the GitHub fields sit under Jira's, with the hint exactly, repositories one per line", async () => {
+  await mount(undefined, { ...VALUES, githubIntakeRepos: ["acme/web", "acme/api"] });
+  expect(repos()?.value).toBe("acme/web\nacme/api");
+  expect(repos()?.getAttribute("maxlength")).toBeNull();
+  expect(search()?.value).toBe("label:agent is:open");
+  expect(search()?.getAttribute("maxlength")).toBe("200");
+  expect(container.textContent).toContain(HINT_GITHUB);
+  const text = container.textContent ?? "";
+  expect(text.indexOf("Jira tickets to bring in (JQL)")).toBeLessThan(text.indexOf(REPOS));
+  expect(text.indexOf(REPOS)).toBeLessThan(text.indexOf(SEARCH));
+});
+
+test("the repositories save as a list: lines trimmed, blank ones dropped", async () => {
+  await mount();
+  await type(repos(), " acme/web \n\nacme/api\r\n");
+  expect(saved).toEqual([{ githubIntakeRepos: ["acme/web", "acme/api"] }]);
+  expect(alerts()).toEqual([]);
+});
+
+test("an entry the schema would refuse is told by its line and is not saved", async () => {
+  await mount();
+  await type(repos(), "acme/web\n-evil/x");
+  expect(alerts()).toEqual(['Line 2: "-evil/x" is not owner/repo']);
+  await type(repos(), "acme/web\nACME/Web");
+  expect(alerts()).toEqual(['Line 2: "ACME/Web" is there twice']);
+  await type(repos(), Array.from({ length: 11 }, (_, index) => `acme/r${index}`).join("\n"));
+  expect(alerts()).toEqual(["At most 10 repositories"]);
+  expect(saved).toEqual([]);
+  await type(repos(), "acme/web");
+  expect(alerts()).toEqual([]);
+  expect(saved).toEqual([{ githubIntakeRepos: ["acme/web"] }]);
+});
+
+test("the search saves trimmed, and one that starts with a dash is refused before it is saved", async () => {
+  await mount();
+  await type(search(), "  label:agent -label:in-office ");
+  expect(saved).toEqual([{ githubIntakeSearch: "label:agent -label:in-office" }]);
+  await type(search(), "-label:x");
+  expect(alerts()).toEqual(["The search must not start with a dash"]);
+  await type(search(), " -label:x");
+  expect(alerts()).toEqual(["The search must not start with a dash"]);
+  await type(search(), "label:agent repo:acme/api");
+  expect(alerts()).toEqual(["The search cannot name a repository: list it above"]);
+  expect(saved).toHaveLength(1);
+});
+
+test("GitHub's status says it is not set up, how the last run went, and its problem", async () => {
+  await mount();
+  expect(githubLine()).toBe("GitHub: not set up. Add a repository.");
+  await mount({ ...SET_UP, github: GITHUB_ON });
+  expect(githubLine()).toBe("GitHub: last read 12:40: 2 imported");
+  await mount({ ...SET_UP, github: { ...GITHUB_ON, imported: 0 } });
+  expect(githubLine()).toBe("GitHub: last read 12:40: nothing new");
+  await mount({ ...SET_UP, github: { ...GITHUB_ON, lastRun: null } });
+  expect(githubLine()).toBe("GitHub: not read yet.");
+  await mount({
+    ...SET_UP,
+    github: { ...GITHUB_ON, problem: "gh is not signed in on the host" },
+  });
+  expect(githubLine()).toBe("GitHub: last read 12:40: 2 importedgh is not signed in on the host");
+});
+
+test("Read now is on when only GitHub is set up", async () => {
+  await mount({ ...SET_UP, jira: { ...SET_UP.jira, configured: false }, github: GITHUB_ON });
+  expect(button("Read now")?.getAttribute("aria-disabled")).not.toBe("true");
 });

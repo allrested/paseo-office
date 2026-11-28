@@ -91,6 +91,15 @@ export type CacheClock = (typeof CACHE_CLOCKS)[number];
 
 /** The longest JQL the intake takes. */
 export const JQL_MAX = 1_000;
+/**
+ * A GitHub repository as `owner/repo`. Neither part starts with a dash, so an entry is never read
+ * as an option of the `gh` it is passed to.
+ */
+export const GITHUB_REPO = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/;
+/** A search qualifier that names where to look: the repository comes from the list, not the search. */
+export const GITHUB_SEARCH_PLACE = /(?:^|[\s(])-?(?:repo|org|user):/i;
+export const GITHUB_REPOS_MAX = 10;
+export const GITHUB_SEARCH_MAX = 200;
 /** Where a ticket the intake posts lands: held in the backlog, or To do at once. */
 export const INTAKE_LANDS = ["backlog", "todo"] as const;
 
@@ -143,6 +152,8 @@ const HostValuesSchema = z.object({
   intakeLands: z.enum(INTAKE_LANDS).default("backlog"),
   intakeWriteBack: z.boolean().default(false),
   intakeAutoStart: z.boolean().default(false),
+  githubIntakeRepos: z.array(z.string()).default([]),
+  githubIntakeSearch: z.string().max(GITHUB_SEARCH_MAX).default("label:agent is:open"),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
@@ -206,6 +217,37 @@ function refuseBadTrackerValues(values: HostValues, context: z.RefinementCtx): v
   }
 }
 
+function refuseBadGithubValues(values: HostValues, context: z.RefinementCtx): void {
+  const repos = values.githubIntakeRepos;
+  const issue = (message: string) =>
+    context.addIssue({ code: "custom", path: ["githubIntakeRepos"], message });
+  for (const repo of repos) {
+    if (!GITHUB_REPO.test(repo)) {
+      issue(`githubIntakeRepos: "${repo}" is not a GitHub repository as owner/repo`);
+    }
+  }
+  if (repos.length > GITHUB_REPOS_MAX) {
+    issue(`githubIntakeRepos: at most ${GITHUB_REPOS_MAX} repositories`);
+  }
+  const lower = repos.map((repo) => repo.toLowerCase());
+  const twice = repos.find((_, index) => lower.indexOf(lower[index] ?? "") !== index);
+  if (twice !== undefined) issue(`githubIntakeRepos: "${twice}" is there twice`);
+  if (values.githubIntakeSearch.trimStart().startsWith("-")) {
+    context.addIssue({
+      code: "custom",
+      path: ["githubIntakeSearch"],
+      message: "githubIntakeSearch: must not start with a dash",
+    });
+  }
+  if (GITHUB_SEARCH_PLACE.test(values.githubIntakeSearch)) {
+    context.addIssue({
+      code: "custom",
+      path: ["githubIntakeSearch"],
+      message: "githubIntakeSearch: the search cannot name a repository: list it above",
+    });
+  }
+}
+
 function refuseBadDays(values: HostValues, context: z.RefinementCtx): void {
   const days = values.notesDays;
   const bad = days.find((day) => !Number.isInteger(day) || day < 0 || day > 6);
@@ -254,15 +296,18 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * `autoStartPerDay` were started by it today; it needs `keepWatching`, which reads the limits.
  * `jiraIntakeJql` is the owner's JQL whose tickets the office posts as lobby tasks every 10 minutes,
  * none while empty; each lands where `intakeLands` says. `intakeWriteBack` on has the office comment
- * a done imported task's result on its ticket. `intakeAutoStart` on lets
+ * a done imported task's result on its ticket. `githubIntakeRepos` are the `owner/repo` whose issues
+ * `githubIntakeSearch` matches, read the same way with the host's `gh` CLI; none is no GitHub
+ * intake. `intakeAutoStart` on lets
  * the auto-start gate start held imported tasks too; off, the owner starts each one.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 15,
+  version: 16,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
+    .superRefine(refuseBadGithubValues)
     .superRefine(refuseBadDays)
     .superRefine(({ teams }, context) => refuseBadTeams(teams, context))
     .superRefine(({ notifyUrl }, ctx) => {
@@ -290,6 +335,7 @@ export const officeHostSettings = defineSettings({
   // Version 11 adds `jiraTypes`, Bug. Version 12 adds `loopGuard`, off. Version 13 adds `undoTurn`, off.
   // Version 14 adds `autoStart`, off, with `autoStartUnderPct` 70, `autoStartAtOnce` 3 and `autoStartPerDay` 10.
   // Version 15 adds `jiraIntakeJql`, empty, `intakeLands`, backlog, `intakeWriteBack`, off, and `intakeAutoStart`, off.
+  // Version 16 adds `githubIntakeRepos`, none, and `githubIntakeSearch`, "label:agent is:open".
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

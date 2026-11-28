@@ -5,6 +5,7 @@ import { createBoardService, type BoardService } from "./board-service.js";
 import { createFakeClock, settle } from "./fake-clock.js";
 import { fakeSchedules } from "./fake-schedules.js";
 import { TrackerProblem } from "./incidents-http.js";
+import { createGithubSource } from "./intake-github.js";
 import {
   createIntake,
   INTAKE_SCHEDULE,
@@ -43,6 +44,10 @@ interface FakeSource extends IntakeSource {
   reads: number;
   failure: Error | null;
   comments: [string, string][];
+  /** Problems the read reports beside its issues. */
+  problems: string[];
+  /** The next comment fails with this, whatever the count. */
+  commentFailure: Error | null;
   /** How many of the next comments fail. */
   commentFailures: number;
   /** Holds each read until the returned function is called. */
@@ -61,6 +66,8 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
     reads: 0,
     failure: null,
     comments: [],
+    problems: [],
+    commentFailure: null,
     commentFailures: 0,
     holdReads() {
       let release: () => void = () => undefined;
@@ -75,10 +82,16 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
       source.seenTest = seen;
       if (gate !== null) await gate;
       if (source.failure !== null) throw source.failure;
-      return { issues: source.issues, skipped: source.skipped, crowded: source.crowded };
+      return {
+        issues: source.issues,
+        skipped: source.skipped,
+        crowded: source.crowded,
+        problems: source.problems,
+      };
     },
     comment: async (key, text) => {
       source.comments.push([key, text]);
+      if (source.commentFailure !== null) throw source.commentFailure;
       if (source.commentFailures > 0) {
         source.commentFailures -= 1;
         throw new TrackerProblem("Jira answered HTTP 500");
@@ -221,6 +234,7 @@ test("each new ticket is posted once as the user's lobby task, held in the backl
   expect(file.kept).toEqual({ version: 1, seen: { "jira:OPS-1": iso, "jira:OPS-2": iso } });
   expect(state).toEqual({
     jira: { configured: true, problem: null, lastRun: iso, imported: 2 },
+    github: { configured: false, problem: null, lastRun: null, imported: 0 },
     waiting: false,
   });
   expect(states.at(-1)).toEqual(state);
@@ -389,6 +403,7 @@ test("a source that is not set up is not read, and the state says so", async () 
   expect(lobby()).toEqual([]);
   expect(state).toEqual({
     jira: { configured: false, problem: null, lastRun: null, imported: 0 },
+    github: { configured: false, problem: null, lastRun: null, imported: 0 },
     waiting: false,
   });
 });
@@ -673,4 +688,155 @@ test("a task done before the settings are known is written back once they are", 
   await intake.settingsChanged(WRITE_BACK);
   await settle();
   expect(source.comments).toEqual([["OPS-1", "Done in the office by the owner: Fixed early."]]);
+});
+
+const repoIssue = (number: number, fields: Partial<IntakeIssue> = {}): IntakeIssue => ({
+  key: `acme/web#${number}`,
+  url: `https://github.com/acme/web/issues/${number}`,
+  title: `Issue ${number}`,
+  body: `Body of ${number}.`,
+  ...fields,
+});
+
+test("a GitHub issue is posted with its key and link as the task's source, beside Jira's, and each source has its state", async () => {
+  const jira = fakeSource([ticket(1)]);
+  const github = fakeSource([repoIssue(7)], "github");
+  const { intake, lobby, file } = await harness({ sources: [jira, github] });
+  const state = await intake.run();
+  expect(lobby().map((post) => post.source)).toEqual([
+    { kind: "jira", key: "OPS-1", url: `${BASE}/browse/OPS-1` },
+    { kind: "github", key: "acme/web#7", url: "https://github.com/acme/web/issues/7" },
+  ]);
+  expect(lobby()[1]?.text).toBe(
+    "acme/web#7 Issue 7\nhttps://github.com/acme/web/issues/7\n\nBody of 7.",
+  );
+  expect(Object.keys(file.kept?.seen ?? {})).toEqual(["jira:OPS-1", "github:acme/web#7"]);
+  expect(state.jira).toMatchObject({ configured: true, imported: 1 });
+  expect(state.github).toMatchObject({ configured: true, problem: null, imported: 1 });
+  expect(state.github.lastRun).not.toBeNull();
+});
+
+test("a GitHub issue is posted once: the board and the seen file hold it by github:<key>, and Jira's key space is apart", async () => {
+  const github = fakeSource([repoIssue(7), repoIssue(8)], "github");
+  const file = memoryFile({
+    version: 1,
+    seen: { "github:acme/web#7": "2026-11-01T00:00:00.000Z" },
+  });
+  const onBoard = {
+    ...sourced(1, "acme/web#8"),
+    source: {
+      kind: "github" as const,
+      key: "acme/web#8",
+      url: "https://github.com/acme/web/issues/8",
+    },
+  };
+  const { intake, lobby } = await harness({
+    sources: [github],
+    file,
+    boards: boardsOf([onBoard]),
+  });
+  const state = await intake.run();
+  expect(lobby()).toHaveLength(1);
+  expect(state.github.imported).toBe(0);
+  expect(file.kept?.seen["github:acme/web#8"]).toBeDefined();
+  const seen = github.seenTest ?? (() => false);
+  expect([seen("acme/web#7"), seen("acme/web#8"), seen("acme/web#9")]).toEqual([true, true, false]);
+});
+
+test("a source is posted from 20 times at most in a run, whatever it returns, and the rest come at the next run", async () => {
+  const many = Array.from({ length: 35 }, (_, index) => repoIssue(index + 1));
+  const github = fakeSource(many, "github");
+  const { intake, lobby } = await harness({ sources: [github] });
+  const first = await intake.run();
+  expect(lobby()).toHaveLength(20);
+  expect(first.github.imported).toBe(20);
+  const second = await intake.run();
+  expect(lobby()).toHaveLength(35);
+  expect(second.github.imported).toBe(15);
+});
+
+test("the 50 open imported tasks are shared by Jira and GitHub", async () => {
+  const open = Array.from({ length: 40 }, (_, index) => sourced(index + 1, `OLD-${index + 1}`));
+  const jira = fakeSource([ticket(1), ticket(2), ticket(3), ticket(4), ticket(5)]);
+  const github = fakeSource(
+    Array.from({ length: 20 }, (_, index) => repoIssue(index + 1)),
+    "github",
+  );
+  const { intake, lobby } = await harness({ sources: [jira, github], boards: boardsOf(open) });
+  const state = await intake.run();
+  expect(state.jira.imported).toBe(5);
+  expect(state.github.imported).toBe(5);
+  expect(state.waiting).toBe(true);
+  expect(lobby().filter((post) => post.source?.kind === "github")).toHaveLength(5);
+});
+
+test("a source's problems are shown beside what it read, as sentences, and logged once", async () => {
+  const github = fakeSource([repoIssue(1)], "github");
+  github.problems = ["acme/gone: not found, or gh's account cannot read it"];
+  const { intake, logs, lobby } = await harness({ sources: [github] });
+  const state = await intake.run();
+  expect(lobby()).toHaveLength(1);
+  expect(state.github.problem).toBe("acme/gone: not found, or gh's account cannot read it");
+  await intake.run();
+  expect(
+    logs.filter(
+      (line) =>
+        line ===
+        "[office] intake from GitHub: acme/gone: not found, or gh's account cannot read it",
+    ),
+  ).toHaveLength(1);
+});
+
+test("a done task from a GitHub issue is commented on its issue, once, with Jira's text", async () => {
+  const github = fakeSource([repoIssue(7)], "github");
+  const { intake, service } = await harness({ sources: [github], settings: WRITE_BACK });
+  const id = await claimed(service, intake);
+  await service.update({ id, action: "done", actor: "a", note: "Fixed." });
+  await settle();
+  expect(github.comments).toEqual([["acme/web#7", "Done in the office by Rani: Fixed."]]);
+  expect(service.postsOf("lobby")[0]?.wroteBack).toBe(true);
+});
+
+test("a write back that can never work is tried once, shows its problem, and is not tried at the next run", async () => {
+  const github = fakeSource([repoIssue(7)], "github");
+  github.commentFailure = new TrackerProblem("acme/web is no longer read: not commented", {
+    final: true,
+  });
+  const { intake, service } = await harness({ sources: [github], settings: WRITE_BACK });
+  const id = await claimed(service, intake);
+  await service.update({ id, action: "done", actor: "a", note: "Fixed." });
+  await settle();
+  expect(github.comments).toHaveLength(1);
+  expect(intake.state().github.problem).toBe(
+    "Unable to comment on acme/web#7: acme/web is no longer read: not commented",
+  );
+  await intake.run();
+  expect(github.comments).toHaveLength(1);
+});
+
+test("the same issue read under another case of its repository is posted once", async () => {
+  let repo = "Acme/Web";
+  const source = createGithubSource({
+    repos: () => [repo],
+    search: () => "label:agent",
+    run: async () => ({
+      code: 0,
+      stdout: JSON.stringify([
+        { number: 12, title: "T", body: "B", url: `https://github.com/${repo}/issues/12` },
+      ]),
+      stderr: "",
+    }),
+  });
+  const { intake, lobby, file } = await harness({ sources: [source] });
+  await intake.run();
+  repo = "acme/web";
+  const again = await intake.run();
+  expect(lobby()).toHaveLength(1);
+  expect(again.github.imported).toBe(0);
+  expect(lobby()[0]?.source).toEqual({
+    kind: "github",
+    key: "acme/web#12",
+    url: "https://github.com/Acme/Web/issues/12",
+  });
+  expect(Object.keys(file.kept?.seen ?? {})).toEqual(["github:acme/web#12"]);
 });

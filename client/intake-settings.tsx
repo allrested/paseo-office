@@ -1,9 +1,15 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
 import { intakeRunRpc, type IntakeState } from "../shared/contracts.js";
-import { JQL_MAX } from "../shared/settings.js";
+import {
+  GITHUB_REPO,
+  GITHUB_REPOS_MAX,
+  GITHUB_SEARCH_MAX,
+  GITHUB_SEARCH_PLACE,
+  JQL_MAX,
+} from "../shared/settings.js";
 import { ActionButton } from "./action-button.js";
 import { ChoicePills } from "./choice-pills.js";
 import type { HostValues } from "./host-switches.js";
@@ -13,6 +19,8 @@ import type { OfficeStyles } from "./styles.js";
 
 export type IntakeSetting =
   | "Jira tickets to bring in (JQL)"
+  | "GitHub repositories to bring in from"
+  | "GitHub search"
   | "Imported tasks go to"
   | "Let the gate start imported tasks"
   | "Comment the result on the ticket";
@@ -24,6 +32,10 @@ const LANDS: readonly { value: HostValues["intakeLands"]; label: string }[] = [
 
 const JQL_HINT =
   "Tickets this matches become lobby tasks, each once. Leave imported tickets out of it, for example by a label.";
+const GITHUB_HINT =
+  "Read with the host's gh CLI and its sign-in. The office keeps no GitHub token.";
+const SEARCH_HINT =
+  "Issues this matches become lobby tasks, each once. Leave imported issues out of it, for example with -label:in-office.";
 const START_HINT =
   "A ticket's text reaches an agent without you reading it first. Leave it off unless only people you trust can write tickets.";
 const COMMENT_HINT =
@@ -44,6 +56,25 @@ function lastRunLine(jira: IntakeState["jira"]): string {
   return jira.imported === 0 ? `${when}: nothing new` : `${when}: ${jira.imported} imported`;
 }
 
+/** Where the last GitHub run stands, as one line; none is claimed before the office has said. */
+function githubLine(github: IntakeState["github"]): string {
+  if (!github.configured) return "GitHub: not set up. Add a repository.";
+  if (github.lastRun === null) return "GitHub: not read yet.";
+  const when = `GitHub: last read ${clock(github.lastRun)}`;
+  return github.imported === 0 ? `${when}: nothing new` : `${when}: ${github.imported} imported`;
+}
+
+/** What is wrong with the lines typed, as the schema would refuse them, by line; null when none. */
+function reposProblem(entries: readonly string[]): string | null {
+  const seen = new Set<string>();
+  for (const [index, entry] of entries.entries()) {
+    if (!GITHUB_REPO.test(entry)) return `Line ${index + 1}: "${entry}" is not owner/repo`;
+    if (seen.has(entry.toLowerCase())) return `Line ${index + 1}: "${entry}" is there twice`;
+    seen.add(entry.toLowerCase());
+  }
+  return entries.length > GITHUB_REPOS_MAX ? `At most ${GITHUB_REPOS_MAX} repositories` : null;
+}
+
 interface Props {
   values: HostValues | null;
   /** Absent until the office's server has read the settings. */
@@ -53,10 +84,110 @@ interface Props {
   styles: OfficeStyles;
 }
 
+/** The GitHub repositories and search. An entry the schema would refuse is told, and not sent. */
+function GithubFields({
+  values,
+  change,
+  saveProblem,
+  styles,
+}: Pick<Props, "values" | "change" | "saveProblem" | "styles">) {
+  // What the lines typed were refused for, until a save of them goes through.
+  const [reposRefused, setReposRefused] = useState<string | null>(null);
+  const [searchRefused, setSearchRefused] = useState<string | null>(null);
+  const saveRepos = useCallback(
+    async (next: string) => {
+      const entries = next
+        .split(/\r?\n/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry !== "");
+      const problem = reposProblem(entries);
+      setReposRefused(problem);
+      if (problem !== null) return false;
+      return change("GitHub repositories to bring in from", { githubIntakeRepos: entries });
+    },
+    [change],
+  );
+  const saveSearch = useCallback(
+    async (next: string) => {
+      let refused: string | null = null;
+      if (next.trimStart().startsWith("-")) refused = "The search must not start with a dash";
+      else if (GITHUB_SEARCH_PLACE.test(next)) {
+        refused = "The search cannot name a repository: list it above";
+      }
+      setSearchRefused(refused);
+      if (refused !== null) return false;
+      return change("GitHub search", { githubIntakeSearch: next });
+    },
+    [change],
+  );
+  return (
+    <>
+      <SettingField
+        label="GitHub repositories to bring in from"
+        hint={GITHUB_HINT}
+        value={values === null ? null : values.githubIntakeRepos.join("\n")}
+        onSave={saveRepos}
+        problem={reposRefused ?? saveProblem("GitHub repositories to bring in from")}
+        lines={3}
+        styles={styles}
+      />
+      <SettingField
+        label="GitHub search"
+        hint={SEARCH_HINT}
+        value={values?.githubIntakeSearch ?? null}
+        onSave={saveSearch}
+        problem={searchRefused ?? saveProblem("GitHub search")}
+        maxLength={GITHUB_SEARCH_MAX}
+        styles={styles}
+      />
+    </>
+  );
+}
+
+function JiraStatus({
+  jira,
+  waiting,
+  styles,
+}: {
+  jira: IntakeState["jira"] | undefined;
+  waiting: boolean;
+  styles: OfficeStyles;
+}) {
+  if (jira === undefined) return null;
+  return (
+    <View testID="intake-status">
+      <Text style={styles.fieldHint}>{lastRunLine(jira)}</Text>
+      {jira.configured && jira.problem !== null ? (
+        <Text style={styles.standupBlocker}>{jira.problem}</Text>
+      ) : null}
+      {waiting ? <Text style={styles.fieldHint}>Waiting: 50 imported tasks are open.</Text> : null}
+    </View>
+  );
+}
+
+function GithubStatus({
+  github,
+  styles,
+}: {
+  github: IntakeState["github"] | undefined;
+  styles: OfficeStyles;
+}) {
+  if (github === undefined) return null;
+  return (
+    <View testID="intake-status-github">
+      <Text style={styles.fieldHint}>{githubLine(github)}</Text>
+      {github.configured && github.problem !== null ? (
+        <Text style={styles.standupBlocker}>{github.problem}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 /**
- * The intake: the owner's JQL, where its tickets land, whether the gate may start them and
- * whether the result is commented back, and where its last run stands. The Jira connection is the
- * one above, so no token is asked for here.
+ * The intake: the owner's JQL, the GitHub repositories and search, where its tickets land,
+ * whether the gate may start them and whether the result is commented back, and where its last
+ * run stands. The Jira connection is the one above, and GitHub is read with the host's own gh, so
+ * no token is asked for here.
  */
 export function IntakeSettings({ values, intake, change, saveProblem, styles }: Props) {
   const callRun = useRpc(intakeRunRpc);
@@ -82,6 +213,7 @@ export function IntakeSettings({ values, intake, change, saveProblem, styles }: 
   const startProblem = saveProblem("Let the gate start imported tasks");
   const commentProblem = saveProblem("Comment the result on the ticket");
   const jira = intake?.jira;
+  const github = intake?.github;
   return (
     <View style={styles.headerFields}>
       <SettingField
@@ -94,6 +226,7 @@ export function IntakeSettings({ values, intake, change, saveProblem, styles }: 
         maxLength={JQL_MAX}
         styles={styles}
       />
+      <GithubFields values={values} change={change} saveProblem={saveProblem} styles={styles} />
       <ChoicePills
         label="Imported tasks go to"
         hint="Backlog holds a ticket until you start it."
@@ -132,23 +265,14 @@ export function IntakeSettings({ values, intake, change, saveProblem, styles }: 
         )}
       </View>
       <View style={styles.headerField}>
-        {jira === undefined ? null : (
-          <View testID="intake-status">
-            <Text style={styles.fieldHint}>{lastRunLine(jira)}</Text>
-            {jira.configured && jira.problem !== null ? (
-              <Text style={styles.standupBlocker}>{jira.problem}</Text>
-            ) : null}
-            {intake?.waiting ? (
-              <Text style={styles.fieldHint}>Waiting: 50 imported tasks are open.</Text>
-            ) : null}
-          </View>
-        )}
+        <JiraStatus jira={jira} waiting={intake?.waiting === true} styles={styles} />
+        <GithubStatus github={github} styles={styles} />
         <View style={styles.actions}>
           <ActionButton
             label="Read now"
             pendingLabel="Reading..."
             onPress={run}
-            disabled={jira?.configured !== true}
+            disabled={jira?.configured !== true && github?.configured !== true}
             styles={styles}
           />
         </View>

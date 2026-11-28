@@ -1450,7 +1450,8 @@ Sound is on, and only after a press in the scene.
 
 ## Intake
 
-The office can post tickets from Jira as lobby tasks by itself. **Jira intake** in the host
+The office can post tickets from Jira, and issues from GitHub (see GitHub below), as lobby tasks
+by itself. **Jira intake** in the host
 settings (`jiraIntakeJql`) takes a JQL of the owner's own, up to 1,000 characters; while it is
 empty, or Jira has no sign-in (the one under Services, or the daemon's environment, as for
 Incidents), the intake is off and has no timer.
@@ -1527,8 +1528,59 @@ assigned you lobby task p12 from Jira PROJ-12.`, and `office_read` shows the tas
   the text is indented like any task's, so it cannot pass for the office's own lines. That is no
   defence against words that only ask: read a ticket in the Backlog before you start it.
 
-The state for clients (`intake` in the office's state) has, for Jira, whether it is set up, the
-last run's problem (a short safe text, logged once each time it changes; Jira's own words are kept
+### GitHub
+
+GitHub issues come in the same way, from a second source. Two host settings set it up:
+`githubIntakeRepos`, up to 10 repositories as `owner/repo` (none twice, whatever the case; neither
+part may start with a dash, which keeps an entry from being read as an option), and
+`githubIntakeSearch`, up to 200 characters, `label:agent is:open` at first, which may not start
+with a dash or name a place (`repo:`, `org:` or `user:`: "the search cannot name a repository:
+list it above"). With no repository the source is off and, with Jira off too, there is no timer. Under
+Services, **Intake**, below the Jira field: "GitHub repositories to bring in from" (one per line;
+the field names the line it will not take, for example `Line 2: "-evil/x" is not owner/repo`, and
+saves nothing until every line is right) and "GitHub search" (one line), with the hint "Read with
+the host's gh CLI and its sign-in. The office keeps no GitHub token." A status line for GitHub
+follows Jira's ("GitHub: last read 12:40: 2 imported"), and **Read now** runs every source.
+
+- **It uses the host's `gh`.** There is no token in the office and none is asked for: the office
+  runs `gh` on the host (found on the daemon's PATH or in `~/.local/bin`, no shell, 30 seconds at
+  most, 8 MB of output at most) and `gh` uses the account it is signed in with (`gh auth login`).
+  Only github.com is read: GitHub Enterprise hosts are not supported. For each repository the
+  office runs `gh issue list --repo <repo> --search <search> --limit 20 --json
+number,title,body,url`, each value one argument, so neither a setting nor an issue's text can
+  become an option. A repository that fails does not stop the others; the problems are joined in
+  the state.
+- **The key and the link.** An issue's key is `<repo>#<number>` with the repository as written in
+  the settings, lower-cased (so editing a setting's case does not bring the issues again), and the
+  number from `gh` (a positive integer, else the issue is skipped and counted), for example
+  `acme/web#12`. An issue whose own `url` from `gh` is not `https://github.com/<repo>/issues/<number>`
+  (compared without case) is skipped and counted too: GitHub's search could otherwise bring in
+  another repository's issue. The link is built, `https://github.com/acme/web/issues/12`, never
+  taken from `gh`'s output. The task reads `acme/web#12 title`, the link, a blank line and the body,
+  cleaned and cut as Jira's are, and an agent handed it reads `The office assigned you lobby task
+p12 from GitHub acme/web#12.`
+- **Which issues, and how many.** A run reads the first 20 matches of each repository, with no
+  paging, and posts those it has not posted (the same board check and the same seen file, as
+  `github:<key>`). At most 20 are posted per source per run, and the cap of 50 open imported
+  tasks is shared with Jira. So write a search that leaves imported issues out, for example
+  `label:agent is:open -label:in-office`, with `in-office` a label the team adds once the issue is
+  in the office; otherwise, once the first 20 matches are imported, nothing newer is reached, and the problem says
+  so ("acme/web: the first 20 matches are already imported: narrow the search").
+- **Problems**, each one short sentence and never the CLI's own words: "the gh CLI is not installed
+  on the host", "gh is not signed in on the host", "acme/web: not found, or gh's account cannot
+  read it", "acme/web: gh did not answer in 30 seconds", "acme/web: gh answered with something
+  unexpected" and "acme/web: gh failed".
+- **Write back** is the switch above. A done task from an issue is commented with `gh issue
+comment <number> --repo <repo> --body <text>`, the same text and the same cut as Jira's, the text
+  one argument after `--body` (a result that starts with `--` is still only the body). One attempt
+  at done, one more at the next run, none after a timeout. `gh`'s account must be allowed to
+  comment on the repository. A repository the owner removed from the settings is not commented on
+  ("acme/web is no longer read: not commented"), and that task is not tried again. `gh` is run
+  from the home directory with `GH_HOST=github.com` and no prompts, whatever the daemon's
+  environment says.
+
+The state for clients (`intake` in the office's state) has, for each of Jira and GitHub, whether it
+is set up, the last run's problem (a short safe text, logged once each time it changes; Jira's own words are kept
 apart from its status and left out of the log, since they can quote the JQL), when it last ran and how many tasks that run posted,
 and whether the intake waits at the cap.
 

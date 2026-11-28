@@ -840,4 +840,16 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Not read yet.": "Chưa đọc.",
   "Waiting: 50 imported tasks are open.": "Đang chờ: 50 việc đã nhập vẫn đang mở.",
   "Read now": "Đọc ngay",
+  "GitHub repositories to bring in from": "Kho GitHub cần đưa issue vào",
+  "Read with the host's gh CLI and its sign-in. The office keeps no GitHub token.":
+    "Đọc bằng gh CLI của máy chủ và phiên đăng nhập của nó. Văn phòng không giữ token GitHub.",
+  "GitHub search": "Tìm kiếm GitHub",
+  "Issues this matches become lobby tasks, each once. Leave imported issues out of it, for example with -label:in-office.":
+    "Issue khớp sẽ thành việc ở sảnh, mỗi issue một lần. Hãy loại issue đã nhập khỏi tìm kiếm này, ví dụ bằng -label:in-office.",
+  "At most 10 repositories": "Tối đa 10 kho",
+  "The search must not start with a dash": "Tìm kiếm không được bắt đầu bằng dấu gạch ngang",
+  "GitHub: not set up. Add a repository.": "GitHub: chưa thiết lập. Hãy thêm một kho.",
+  "GitHub: not read yet.": "GitHub: chưa đọc.",
+  "The search cannot name a repository: list it above":
+    "Tìm kiếm không được nêu tên kho: hãy liệt kê ở trên",
 };

@@ -1668,6 +1668,7 @@ test("the gate's state reaches subscribers in the snapshot and as an event, and 
 
 const INTAKE = {
   jira: { configured: true, problem: null, lastRun: "2026-11-11T09:00:00.000Z", imported: 2 },
+  github: { configured: false, problem: null, lastRun: null, imported: 0 },
   waiting: false,
 };
 
