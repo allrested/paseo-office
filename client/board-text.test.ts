@@ -149,6 +149,19 @@ test("a result shows its first three lines and 160 characters, and says when it 
   expect(long.shown.length).toBeLessThanOrEqual(161);
 });
 
+test("a room's card counts the same posts with done tasks on the board", () => {
+  const model = buildOfficeModel({
+    agents: [],
+    workspaces: [{ id: "w1", name: "shop-api", projectName: "shop" }],
+    activity: {},
+    boards: { w1: [post(1, {}), post(2, { state: "done" }), post(3, { state: "done" })] },
+    wake: { paused: false, queued: {} },
+  });
+  const room = model.rooms.find((candidate) => candidate.id === "w1");
+  expect(room?.done.map((item) => item.id)).toEqual(["p2", "p3"]);
+  expect(boardPreview(room?.posts ?? [])).toEqual({ shown: [post(1, {})], more: 0 });
+});
+
 test("the wake count says how many posts wait, and nothing when none do", () => {
   expect(queuedWakes({ paused: false, queued: { a: 2, b: 1 } })).toBe(3);
   expect(wakeSummary({ paused: false, queued: {} })).toBe(null);

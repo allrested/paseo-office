@@ -528,9 +528,11 @@ under them.
 
 **Boards** in the settings chooses each board's layout on this device: **Lobby board** Kanban (the
 default) or List, and **Room boards** List (the default) or Kanban. A room's board as a kanban has
-the same columns under its form and its agents. A room's board does not show done tasks, so it has
-no Done column. The list is the board as it was: the lobby's to-do list with its notes under it,
-and a room's posts in one list.
+the same columns under its form and its agents, Done included. The list is the board as it was:
+the lobby's to-do list with its notes under it, and a room's posts in one list. A room's list keeps
+its finished tasks in a **Done** section at the bottom, shown once a task is done: its heading says
+how many, as in "Done · 2", starts folded and unfolds with a press, and has **Clear finished**
+beside it. A room's card still shows and counts only open and claimed tasks and notes.
 
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 
@@ -538,13 +540,12 @@ A task finished with a note keeps it as its result (up to 2,000 characters), and
 task and its copy carry the same result. A session that finishes its assignment by the completion
 line has the rest of that reply kept as the result. A card and a list row show the result under
 the task's text: its first three lines and 160 characters, and **More** for the rest when there is
-more. A note can be a reply under a task:
-the replies show under the task, oldest first, each as "author · text", and never as notes of their
-own, in the Notes column, the lobby's Notes or a room card's count. A reply always sits on the
-task's board, under the lobby task when it answers a copy. **Reply** under a task opens a one-line
-field; Enter or **Send** posts the reply. A done task keeps its result and its replies, and a task
-takes its replies with it when it is deleted, cleared or dropped. A room's board does not show
-done tasks, so their replies are not shown there either.
+more. A note can be a reply under a task: the replies show under the task, oldest first, each as
+"author · text", and never as notes of their own, in the Notes column, the lobby's Notes or a room
+card's count. A reply always sits on the task's board, under the lobby task when it answers a copy.
+**Reply** under a task opens a one-line field; Enter or **Send** posts the reply. A done task keeps
+its result and its replies, in the lobby's list and in a room's Done section or column, and a task
+takes its replies with it when it is deleted, cleared or dropped.
 
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished

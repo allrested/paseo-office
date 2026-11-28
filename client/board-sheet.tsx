@@ -23,7 +23,8 @@ import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import type { BoardLayout } from "../shared/settings.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
-import { TaskThread } from "./task-card.js";
+import { ClearFinished, TaskThread } from "./task-card.js";
+import { useT } from "./ui-language.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -255,6 +256,53 @@ export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }
   );
 }
 
+interface DoneSectionProps {
+  room: OfficeRoom;
+  name(author: string): string;
+  actions: BoardActions;
+  styles: OfficeStyles;
+}
+
+/**
+ * A room's done tasks under its list, folded at first as the kanban's stacked Done is: a press on
+ * "Done · 2" unfolds them, each with its result and replies and the buttons a list row has.
+ */
+function DoneSection({ room, name, actions, styles }: DoneSectionProps) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  const t = useT();
+  const heading = `Done · ${room.done.length}`;
+  return (
+    <View style={styles.lobbySection}>
+      <View style={styles.kanbanHeading}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t(heading)}
+          aria-expanded={open}
+          onPress={toggle}
+          style={styles.kanbanFold}
+        >
+          <Icon name={open ? "ChevronDown" : "ChevronRight"} size={16} color={styles.iconColor} />
+          <Text style={styles.lobbyHeading}>{heading}</Text>
+        </Pressable>
+        <ClearFinished board={room.id} done={room.done.length} actions={actions} styles={styles} />
+      </View>
+      {open
+        ? room.done.map((post) => (
+            <PostWithActions
+              key={post.id}
+              post={post}
+              replies={repliesOf(post, room.posts)}
+              name={name}
+              actions={actions}
+              styles={styles}
+            />
+          ))
+        : null}
+    </View>
+  );
+}
+
 export interface SheetBodyProps {
   room: OfficeRoom;
   rooms: readonly OfficeRoom[];
@@ -300,8 +348,10 @@ function SheetBody({
     (value: string) => setKind(value === "note" ? "note" : "task"),
     [],
   );
-  // A reply shows under its task; one whose task is done goes unseen, as its task does here.
+  // A reply shows under its task, a done one's in the Done section.
   const posts = useMemo(() => orderBoardPosts(topLevel(room.posts)), [room.posts]);
+  // The kanban takes the done tasks too, for its Done column.
+  const board = useMemo(() => [...room.posts, ...room.done], [room.posts, room.done]);
   const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
   const submit = useCallback(async () => {
     const sent = text.trim();
@@ -380,7 +430,7 @@ function SheetBody({
         )}
       </View>
       {layout === "kanban" ? (
-        <KanbanBoard posts={room.posts} name={name} actions={actions} styles={styles} />
+        <KanbanBoard posts={board} name={name} actions={actions} styles={styles} />
       ) : (
         <View style={styles.boardPosts}>
           {posts.length === 0 ? (
@@ -398,6 +448,9 @@ function SheetBody({
               styles={styles}
             />
           ))}
+          {room.done.length > 0 ? (
+            <DoneSection room={room} name={name} actions={actions} styles={styles} />
+          ) : null}
         </View>
       )}
     </View>

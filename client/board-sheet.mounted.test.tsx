@@ -725,14 +725,71 @@ test("a room's list draws a reply under its task and not as a post of its own", 
   ]);
 });
 
-test("a room's board of only a reply to a done task says it has no posts", async () => {
+test("a room's list has no Done section until a task is done", async () => {
+  await mount({ rooms: officeRooms([], { w1: [post(1, { board: "w1", text: "Ship it" })] }) });
+  expect(container.querySelector('[aria-label="Done · 0"]')).toBeNull();
+  expect(lines().some((line) => line.startsWith("Done"))).toBe(false);
+});
+
+test("a room's done tasks wait folded under Done, and unfold with their result and replies", async () => {
   const posts = [
-    post(1, { board: "w1", state: "done" }),
-    post(2, { board: "w1", kind: "note", state: undefined, replyTo: "p1", text: "Thanks" }),
+    post(1, { board: "w1", text: "Ship it" }),
+    post(2, { board: "w1", text: "Tag it", state: "done", result: "Tagged v1.4.2" }),
+    post(3, { board: "w1", kind: "note", state: undefined, replyTo: "p2", text: "Thanks" }),
   ];
   await mount({ rooms: officeRooms([], { w1: posts }) });
-  expect(lines()).toContain("No posts");
-  expect(lines()).not.toContain("user · Thanks");
+
+  expect(byLabel("Done · 1").getAttribute("aria-expanded")).toBe("false");
+  expect(linesFrom("Posts")).toEqual([
+    "Posts",
+    "Task · open · user",
+    "Ship it",
+    "Reply",
+    "Mark done",
+    "Delete",
+    "Done · 1",
+    "Clear finished",
+  ]);
+
+  await press("Done · 1");
+  expect(byLabel("Done · 1").getAttribute("aria-expanded")).toBe("true");
+  expect(linesFrom("Done · 1")).toEqual([
+    "Done · 1",
+    "Clear finished",
+    "Task · done · user",
+    "Tag it",
+    "Result",
+    "Tagged v1.4.2",
+    "user · Thanks",
+    "Reply",
+    "Reopen",
+    "Delete",
+  ]);
+  await press("Reopen");
+  expect(asked).toEqual(["reopen p2"]);
+});
+
+test("Clear finished under a room's Done asks, then clears the room's done tasks", async () => {
+  const posts = [post(2, { board: "w1", state: "done" })];
+  await mount({ rooms: officeRooms([], { w1: posts }) });
+  await press("Clear finished");
+  expect(container.textContent).toContain("Delete 1 finished to-do?");
+  await press("Delete");
+  expect(asked).toEqual(["clearDone w1"]);
+});
+
+test("a room's board as a kanban has a Done column for its done tasks", async () => {
+  layouts("list", "kanban");
+  const posts = [
+    post(1, { board: "w1", text: "Ship it" }),
+    post(2, { board: "w1", text: "Tag it", state: "done", result: "Tagged" }),
+  ];
+  await mount({ rooms: officeRooms([], { w1: posts }) });
+
+  expect(lines()).toContain("Done · 1");
+  await press("Done · 1");
+  expect(byLabel("Tag it").getAttribute("aria-checked")).toBe("true");
+  expect(lines()).toContain("Tagged");
 });
 
 test("the lobby as a kanban draws a reply on its task's card, not in Notes", async () => {

@@ -49,6 +49,8 @@ export interface OfficeRoom {
   posts: Post[];
   /** The lobby's task posts, done ones included, in to-do order; [] for every other room. */
   todos: Post[];
+  /** A workspace room's done tasks, oldest first, which `posts` leaves out; [] for the lobby. */
+  done: Post[];
 }
 
 export type AttentionReason = "permission" | "error";
@@ -308,6 +310,7 @@ export function buildOfficeModel(state: OfficeSnapshot): OfficeModel {
       ),
       posts: visiblePosts(posts),
       todos,
+      done: lobby ? [] : tasks.filter((post) => post.state === "done").sort(byAge),
     };
   }
   const rooms = [

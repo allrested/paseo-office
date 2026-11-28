@@ -65,6 +65,7 @@ function room(overrides: RoomOverrides = {}): OfficeRoom {
     rows: overrides.rows ?? [],
     posts: [],
     todos: [],
+    done: [],
   };
 }
 
@@ -78,6 +79,7 @@ function lobby(rows: OfficeRow[] = []): OfficeRoom {
     rows,
     posts: [],
     todos: [],
+    done: [],
   };
 }
 
