@@ -199,6 +199,38 @@ export const RULES: readonly Rule[] = [
   ],
   [/^No output yet, read at (.+)$/, (time) => `Belum ada keluaran, dibaca pukul ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `${name} habis`],
+  [
+    /^(.+?) · (.+): at this pace out by (.+)$/,
+    (note, name, time) => `${translatePattern(note)} · ${name}: dengan laju ini habis pada ${time}`,
+  ],
+  [
+    /^(.+): at this pace out by (.+)$/,
+    (name, time) => `${name}: dengan laju ini habis pada ${time}`,
+  ],
+  [/^Starting by itself: (.+)$/, (why) => `Memulai sendiri: ${translatePattern(why)}`],
+  [
+    /^waiting, (.+)'s (.+) is at (\d+)% \(starts under (\d+)%\)$/,
+    (provider, window, used, under) =>
+      `menunggu, ${window} milik ${provider} sudah ${used}% (mulai di bawah ${under}%)`,
+  ],
+  [
+    /^waiting, a limit of the plan is too high \(starts under (\d+)%\)$/,
+    (under) => `menunggu, batas paket terlalu tinggi (mulai di bawah ${under}%)`,
+  ],
+  [
+    /^waiting, (\d+) tasks? (?:is|are) in progress or to do \(at most (\d+)\)$/,
+    (n, most) =>
+      `menunggu, ${n} tugas sedang dikerjakan atau akan dikerjakan (paling banyak ${most})`,
+  ],
+  [
+    /^waiting, enough tasks are in progress or to do \(at most (\d+)\)$/,
+    (most) =>
+      `menunggu, terlalu banyak tugas sedang dikerjakan atau akan dikerjakan (paling banyak ${most})`,
+  ],
+  [
+    /^done for today, (\d+) started \(at most (\d+) a day\)$/,
+    (n, most) => `selesai untuk hari ini, ${n} dimulai (paling banyak ${most} sehari)`,
+  ],
   [/^resets in (.+)$/, (time) => `direset dalam ${translatePattern(time)}`],
   [/^Owed from (.+?)\. (.+)$/, (day, state) => `Terutang sejak ${day}. ${translatePattern(state)}`],
   [/^The conversation cannot be read: (.+)$/, (why) => `Percakapan tidak dapat dibaca: ${why}`],

@@ -1,4 +1,10 @@
-import type { ChecklistStep, OfficeAgent, Post, WakeState } from "../shared/contracts.js";
+import type {
+  AutoStartState,
+  ChecklistStep,
+  OfficeAgent,
+  Post,
+  WakeState,
+} from "../shared/contracts.js";
 import type { DutyRow } from "../shared/duties.js";
 import { LOBBY, USER_AUTHOR } from "../shared/names.js";
 import {
@@ -300,4 +306,46 @@ export function queuedWakes(wake: WakeState): number {
 export function wakeSummary(wake: WakeState): string | null {
   const queued = queuedWakes(wake);
   return queued > 0 ? `${queued} waiting` : null;
+}
+
+/**
+ * The line over the Backlog while the office starts tasks by itself: that it does, and why not
+ * now when the gate is shut. Nothing while the gate is off or not yet known. `underPct` and
+ * `atOnce` are the host's settings, which the state does not carry.
+ */
+export function autoStartLine(
+  gate: AutoStartState | undefined,
+  underPct: number,
+  atOnce: number,
+): string | null {
+  if (gate === undefined || !gate.on || gate.reason === "off") return null;
+  const why = waitingWhy(gate, underPct, atOnce);
+  return why === null ? "Starting by itself" : `Starting by itself: ${why}`;
+}
+
+function waitingWhy(gate: AutoStartState, underPct: number, atOnce: number): string | null {
+  const { detail } = gate;
+  switch (gate.reason) {
+    case null:
+    case "off":
+      return null;
+    case "no-pickup":
+      return "waiting, agents are not picking up work (Agent tools or Wake agents is off)";
+    case "empty":
+      return "nothing here is ready to start";
+    case "no-reading":
+      return "waiting for a reading of the plan's limits (needs Keep watching)";
+    case "limit":
+      return detail !== undefined && "provider" in detail
+        ? `waiting, ${detail.provider}'s ${detail.window} is at ${Math.round(detail.usedPct)}% (starts under ${underPct}%)`
+        : `waiting, a limit of the plan is too high (starts under ${underPct}%)`;
+    case "at-once":
+      return detail !== undefined && "count" in detail
+        ? `waiting, ${detail.count} ${detail.count === 1 ? "task is" : "tasks are"} in progress or to do (at most ${atOnce})`
+        : `waiting, enough tasks are in progress or to do (at most ${atOnce})`;
+    case "per-day":
+      return `done for today, ${gate.startedToday} started (at most ${gate.perDay} a day)`;
+    case "no-count":
+      return "stopped, today's count cannot be read (see the office's log)";
+  }
 }

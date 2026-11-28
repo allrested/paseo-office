@@ -104,3 +104,8 @@ export function tenureFile(env: NodeJS.ProcessEnv, home: string) {
 export function dutiesFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "duties.json");
 }
+
+/** How many backlog tasks the office started by itself today, in the notes' zone. */
+export function autoStartFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "auto-start.json");
+}

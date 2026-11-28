@@ -49,6 +49,7 @@ interface TodoListProps {
   name(author: string): string;
   teamName: TeamNamer;
   actions: BoardActions;
+  startLine: string | null;
   styles: OfficeStyles;
 }
 
@@ -61,6 +62,8 @@ interface BacklogSectionProps {
   name(author: string): string;
   teamName: TeamNamer;
   actions: BoardActions;
+  /** On whether the office starts tasks by itself; none while it does not. */
+  startLine: string | null;
   styles: OfficeStyles;
 }
 
@@ -76,6 +79,7 @@ function BacklogSection({
   name,
   teamName,
   actions,
+  startLine,
   styles,
 }: BacklogSectionProps) {
   const [open, setOpen] = useState(false);
@@ -96,6 +100,7 @@ function BacklogSection({
           <Text style={styles.lobbyHeading}>{heading}</Text>
         </Pressable>
       </View>
+      {open && startLine !== null ? <Text style={styles.muted}>{t(startLine)}</Text> : null}
       {open
         ? held.map((post) => (
             <TaskCard
@@ -130,6 +135,7 @@ function TodoList({
   name,
   teamName,
   actions,
+  startLine,
   styles,
 }: TodoListProps) {
   const done = room.todos.filter((post) => post.state === "done").length;
@@ -146,6 +152,7 @@ function TodoList({
           name={name}
           teamName={teamName}
           actions={actions}
+          startLine={startLine}
           styles={styles}
         />
       ) : null}
@@ -194,6 +201,8 @@ export interface LobbyBodyProps extends SheetBodyProps {
   teams: readonly RosterTeam[];
   /** A room's name was chosen under "Agent tasks": that room's board opens. */
   onOpenBoard(roomId: string): void;
+  /** The line over the Backlog on whether the office starts tasks by itself; none while it does not. */
+  startLine: string | null;
 }
 
 /**
@@ -214,6 +223,7 @@ export function LobbyBody({
   onPicking,
   onSelectAgent,
   onOpenBoard,
+  startLine,
   layout,
   styles,
 }: LobbyBodyProps) {
@@ -355,6 +365,7 @@ export function LobbyBody({
           name={name}
           teamName={teamName}
           actions={actions}
+          startLine={startLine}
           styles={styles}
         />
       ) : (
@@ -366,6 +377,7 @@ export function LobbyBody({
           name={name}
           teamName={teamName}
           actions={actions}
+          startLine={startLine}
           styles={styles}
         />
       )}

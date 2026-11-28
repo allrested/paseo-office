@@ -1,4 +1,5 @@
 import type {
+  AutoStartState,
   ChatChange,
   ChatSnapshot,
   IncidentsState,
@@ -86,6 +87,8 @@ export interface Hub {
   setNotes(notes: NotesState): void;
   /** The duty list and the duty board's day; the same again sends nothing. */
   setDuties(duties: DutyBoard): void;
+  /** The auto-start gate's state; the same state again sends nothing. */
+  setAutoStart(autoStart: AutoStartState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
@@ -164,6 +167,8 @@ export function createHub(ports: HubPorts): Hub {
   let sentNotes = "";
   let duties: DutyBoard | null = null;
   let sentDuties = "";
+  let autoStart: AutoStartState | null = null;
+  let sentAutoStart = "";
   let incidents: IncidentsState | null = null;
   let brand: OfficeSnapshot["brand"];
   let weather: WeatherState | null = null;
@@ -201,6 +206,7 @@ export function createHub(ports: HubPorts): Hub {
       ...(incidents === null ? {} : { incidents: { ...incidents } }),
       ...(chatSource === null ? {} : { chat: chatSource() }),
       ...(duties === null ? {} : { duties: { ...duties, duties: [...duties.duties] } }),
+      ...(autoStart === null ? {} : { autoStart: { ...autoStart } }),
     };
   }
 
@@ -618,6 +624,13 @@ export function createHub(ports: HubPorts): Hub {
       sentDuties = text;
       duties = { ...next, duties: [...next.duties] };
       broadcast({ type: "snapshot", state: snapshot() });
+    },
+    setAutoStart(next) {
+      const text = JSON.stringify(next);
+      if (text === sentAutoStart) return;
+      sentAutoStart = text;
+      autoStart = { ...next };
+      broadcast({ type: "auto-start", autoStart: { ...next } });
     },
     setBrand(next) {
       if (JSON.stringify(brand) === JSON.stringify(next)) return;

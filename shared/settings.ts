@@ -130,6 +130,10 @@ const HostValuesSchema = z.object({
   awsRegion: z.string().default(""),
   awsLogGroups: z.string().default(""),
   awsLogPattern: z.string().max(AWS_PATTERN_MAX).default("ERROR"),
+  autoStart: z.boolean().default(false),
+  autoStartUnderPct: z.number().int().min(10).max(100).default(70),
+  autoStartAtOnce: z.number().int().min(1).max(20).default(3),
+  autoStartPerDay: z.number().int().min(1).max(200).default(10),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
@@ -235,12 +239,15 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * and `sentryProjects` are the comma separated projects checked for incidents, `sentryOrg` their
  * Sentry organisation and `sentryUrl` the Sentry the token is sent to. `awsProfile` and `awsRegion`
  * name a profile of the host's AWS CLI whose CloudWatch alarms are checked too, `awsLogGroups` the
- * comma separated log groups read for lines that match `awsLogPattern`.
+ * comma separated log groups read for lines that match `awsLogPattern`. `autoStart` on has the
+ * office start the oldest backlog task by itself while every counted plan limit is under
+ * `autoStartUnderPct`, fewer than `autoStartAtOnce` lobby tasks are claimed or started and fewer than
+ * `autoStartPerDay` were started by it today; it needs `keepWatching`, which reads the limits.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 13,
+  version: 14,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
@@ -268,6 +275,7 @@ export const officeHostSettings = defineSettings({
   // Version 7 adds the roster, off and empty. Version 8 adds `uiCards`, off.
   // Version 9 adds `keepWatching`, off. Version 10 adds `notifyUrl`, empty, and `notifyLevel`, danger.
   // Version 11 adds `jiraTypes`, Bug. Version 12 adds `loopGuard`, off. Version 13 adds `undoTurn`, off.
+  // Version 14 adds `autoStart`, off, with `autoStartUnderPct` 70, `autoStartAtOnce` 3 and `autoStartPerDay` 10.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

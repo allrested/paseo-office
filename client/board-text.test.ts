@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
-import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
+import type { AutoStartState, OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import { buildOfficeModel, type OfficeModel, type OfficeRow } from "../shared/model.js";
 import {
   afterLine,
   allPosts,
   authorName,
+  autoStartLine,
   boardPreview,
   clearQuestion,
   officeWork,
@@ -529,5 +530,68 @@ describe("taskSpent", () => {
   test("a cost still being settled shows the time alone", () => {
     expect(spent(23 * MIN, { spentPending: true })).toBe("took 23 min");
     expect(spent(23 * MIN, { spentPending: true, spentUsd: 0.42 })).toBe("took 23 min");
+  });
+});
+
+describe("autoStartLine", () => {
+  const gate = (fields: Partial<AutoStartState>): AutoStartState => ({
+    on: true,
+    reason: null,
+    startedToday: 2,
+    perDay: 10,
+    ...fields,
+  });
+  const line = (fields: Partial<AutoStartState>) => autoStartLine(gate(fields), 70, 3);
+
+  test("an open gate says only that it is starting", () => {
+    expect(line({})).toBe("Starting by itself");
+  });
+
+  test("a gate that is off, or not yet known, has no line", () => {
+    expect(line({ on: false, reason: "off" })).toBeNull();
+    expect(line({ reason: "off" })).toBeNull();
+    expect(autoStartLine(undefined, 70, 3)).toBeNull();
+  });
+
+  test("each reason says why it waits", () => {
+    expect(line({ reason: "no-pickup" })).toBe(
+      "Starting by itself: waiting, agents are not picking up work (Agent tools or Wake agents is off)",
+    );
+    expect(line({ reason: "empty" })).toBe("Starting by itself: nothing here is ready to start");
+    expect(line({ reason: "no-reading" })).toBe(
+      "Starting by itself: waiting for a reading of the plan's limits (needs Keep watching)",
+    );
+    expect(line({ reason: "per-day", startedToday: 10 })).toBe(
+      "Starting by itself: done for today, 10 started (at most 10 a day)",
+    );
+    expect(line({ reason: "no-count" })).toBe(
+      "Starting by itself: stopped, today's count cannot be read (see the office's log)",
+    );
+  });
+
+  test("a limit names the provider, the window and its percent, rounded", () => {
+    const detail = { provider: "Claude", window: "5 hours", usedPct: 81.6 };
+    expect(line({ reason: "limit", detail })).toBe(
+      "Starting by itself: waiting, Claude's 5 hours is at 82% (starts under 70%)",
+    );
+    expect(autoStartLine(gate({ reason: "limit", detail }), 50, 3)).toContain("(starts under 50%)");
+  });
+
+  test("tasks in progress or to do are counted against the most at once", () => {
+    expect(line({ reason: "at-once", detail: { count: 3 } })).toBe(
+      "Starting by itself: waiting, 3 tasks are in progress or to do (at most 3)",
+    );
+    expect(autoStartLine(gate({ reason: "at-once", detail: { count: 1 } }), 70, 1)).toBe(
+      "Starting by itself: waiting, 1 task is in progress or to do (at most 1)",
+    );
+  });
+
+  test("a reason that lost its detail still says what it can", () => {
+    expect(line({ reason: "limit" })).toBe(
+      "Starting by itself: waiting, a limit of the plan is too high (starts under 70%)",
+    );
+    expect(line({ reason: "at-once" })).toBe(
+      "Starting by itself: waiting, enough tasks are in progress or to do (at most 3)",
+    );
   });
 });

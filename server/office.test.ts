@@ -89,11 +89,16 @@ function setup(initial?: BoardsFile) {
     ["t2", "QA-PR"],
   ]);
   const seats = new Map<string, string>();
+  // How often the office told the auto-start gate to look again.
+  const changes = { count: 0 };
   const build = (overrides?: Partial<OfficeAgentPorts>) =>
     createOffice({
       store,
       clock,
       hub,
+      onChange: () => {
+        changes.count += 1;
+      },
       agents: {
         lobbyCandidates: async () =>
           [...targets.keys()].filter((id) => targets.get(id) === "wakeable"),
@@ -121,7 +126,7 @@ function setup(initial?: BoardsFile) {
       },
       log: (message) => logs.push(message),
     });
-  return { build, clock, hub, store, targets, prompts, sources, logs, teams, seats };
+  return { build, clock, hub, store, targets, prompts, sources, logs, teams, seats, changes };
 }
 
 function start(initial?: BoardsFile) {
@@ -1594,5 +1599,55 @@ test("a stored held lobby task for an agent is told as a new post once it is sta
   await office.start("p2");
   await settle();
   expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("the gate is told to look again once the boards are read, at each board change and at a turn's end", async () => {
+  const { office, changes } = start();
+  await office.ready;
+  const loaded = changes.count;
+  expect(loaded).toBeGreaterThan(0);
+  await office.post({ board: "lobby", kind: "task", text: "held", backlog: true });
+  expect(changes.count).toBeGreaterThan(loaded);
+  const posted = changes.count;
+  office.turnEnded("b");
+  expect(changes.count).toBe(posted + 1);
+  await office.stop();
+});
+
+test("the gate's start tells a named task's agent, and the office says whether a pickup could take work", async () => {
+  const { office, prompts, clock } = start();
+  await office.ready;
+  expect(office.pickupOpen()).toBe(false);
+  office.setPickupEnabled(true);
+  expect(office.pickupOpen()).toBe(true);
+  const posted = await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "Held for Bob",
+    to: "b",
+    backlog: true,
+  });
+  if (!posted.ok) throw new Error(posted.error);
+  expect(office.allPosts()?.map((post) => post.id)).toEqual([posted.post.id]);
+  const result = await office.startHeld(posted.post.id, posted.post.seq);
+  expect(result).toMatchObject({ ok: true, started: true });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("The office assigned you lobby task p1");
+  await office.setWakesPaused(true);
+  expect(office.pickupOpen()).toBe(false);
+  await office.stop();
+});
+
+test("turning the pickup on or off, and pausing wakes, tell the gate to look again", async () => {
+  const { office, changes } = start();
+  await office.ready;
+  const before = changes.count;
+  office.setPickupEnabled(true);
+  expect(changes.count).toBe(before + 1);
+  await office.setWakesPaused(true);
+  expect(changes.count).toBeGreaterThan(before + 1);
   await office.stop();
 });

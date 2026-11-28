@@ -35,7 +35,7 @@ export function notesTimeZone(values: NotesSettings, hostTimeZone: string): stri
 }
 
 /** An instant's date in a zone, as YYYY-MM-DD. */
-function zoneDate(at: number, timeZone: string): string {
+export function zoneDate(at: number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",

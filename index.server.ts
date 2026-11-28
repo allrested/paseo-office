@@ -11,6 +11,7 @@ import { streetSubscription } from "./shared/contracts.js";
 import { createLifeFeed } from "./server/life-feed.js";
 import { createLifeFile, createSaveQueue, type LifeFile } from "./server/life-store.js";
 import {
+  autoStartFile,
   liftFile,
   tenureFile,
   timelineFile,
@@ -57,6 +58,12 @@ import { probeSentry } from "./server/incidents-sentry.js";
 import { createIncidentsStore, type IncidentsStore } from "./server/incidents-store.js";
 import { projectPlanUsage } from "./server/plan-usage.js";
 import { createPlanWatch } from "./server/plan-watch.js";
+import {
+  autoStartFileStore,
+  createAutoStart,
+  type AutoStart,
+  type AutoStartCountFile,
+} from "./server/auto-start.js";
 import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
@@ -208,6 +215,8 @@ export interface OfficePluginDeps {
   liftFile: LifeFile<LiftKept>;
   /** The owner's duty list. */
   dutiesFile: LifeFile<DutiesFile>;
+  /** How many backlog tasks the office started by itself today. */
+  autoStartFile: AutoStartCountFile;
   /** The daemon's environment: a tracker with no saved connection takes its token from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -382,6 +391,8 @@ export function createOfficePlugin(
   hub.setBrand(hostBrand({}, deps.env));
   // The roster the names and the team tasks follow; off until the settings are read.
   let roster: Roster = NO_ROSTER;
+  // Made once the office is: the office tells it of each board change and turn end.
+  let autoStart: AutoStart | null = null;
   const office = createOffice({
     store: deps.store,
     clock: deps.clock,
@@ -393,6 +404,7 @@ export function createOfficePlugin(
       (agentId) => agentsWorking.get(agentId) === true,
     ),
     log,
+    onChange: () => autoStart?.boardChanged(),
   });
   const stopCosts = hub.watch((view) => {
     // No directory, no figures: the last ones would go stale while the pickup hands out work. A
@@ -453,7 +465,17 @@ export function createOfficePlugin(
     counted: (provider) => !planHidden.has(provider),
     raised: ({ provider, window }) =>
       tell(planNotice(provider.name, window.label, window.usedPct, deps.clock.now(), officeName)),
+    // The gate's only reading: with Keep watching off there is none, and nothing starts by itself.
+    observed: (reading) => autoStart?.planRead(reading),
     timers: deps.clock,
+    log,
+  });
+  // Starts the lobby's oldest backlog task while the plan, the claims and the day's count allow.
+  autoStart = createAutoStart({
+    board: office,
+    file: deps.autoStartFile,
+    now: () => deps.clock.now(),
+    changed: (state) => hub.setAutoStart(state),
     log,
   });
   const ssh = createSshMonitor(deps.env, homedir(), deps.machine.procRoot);
@@ -690,6 +712,7 @@ export function createOfficePlugin(
     undoOn = false;
     followWatching();
     office.setPickupEnabled(false);
+    autoStart?.settingsChanged(null);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
     notesSchedule.fail(message);
@@ -723,6 +746,15 @@ export function createOfficePlugin(
     undoOn = state.values.undoTurn;
     followWatching();
     office.setPickupEnabled(agentToolsOn && holder.held());
+    autoStart?.settingsChanged({
+      autoStart: state.values.autoStart,
+      autoStartUnderPct: state.values.autoStartUnderPct,
+      autoStartAtOnce: state.values.autoStartAtOnce,
+      autoStartPerDay: state.values.autoStartPerDay,
+      planHidden: state.values.planHidden,
+      // The notes' day: a calendar day from midnight in their zone.
+      zone: knownZone(notesTimeZone(state.values, deps.hostTimeZone), deps.hostTimeZone),
+    });
     weather.settingsChanged(state.values);
     const notesSaved = await notesSchedule.sync(state.values);
     // The schedule was just set: at the daemon's start, or by a changed zone, folder or days. A
@@ -1258,6 +1290,7 @@ export function createOfficePlugin(
     await deps.timelineStore?.flush();
     for (const close of listeners.values()) close();
     await Promise.all([tenureSaves.flush(), liftSaved]);
+    autoStart?.stop();
     planWatch.keep(false);
     machine.keep(false);
     machine.stop();
@@ -1302,6 +1335,7 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     ),
     liftFile: createLifeFile(liftFile(process.env, homedir()), LiftKeptSchema),
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
+    autoStartFile: autoStartFileStore(autoStartFile(process.env, homedir())),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),

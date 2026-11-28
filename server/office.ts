@@ -14,7 +14,12 @@ import {
   type WakeState,
 } from "../shared/contracts.js";
 import { officeTools, type ToolAgent } from "./agent-tools.js";
-import { createBoardService, type DutySync, type PostUpdate } from "./board-service.js";
+import {
+  createBoardService,
+  type DutySync,
+  type PostUpdate,
+  type StartResult,
+} from "./board-service.js";
 import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
@@ -59,12 +64,18 @@ export interface OfficeDeps {
   hub: OfficeHub;
   agents: OfficeAgentPorts;
   log(message: string): void;
+  /** After the boards are read, any board's change and a turn's end: the auto-start gate looks again. */
+  onChange?(): void;
 }
 
 export interface Office {
   /** Settles once boards.json is loaded; never rejects (a failure is logged). */
   ready: Promise<void>;
   lobbyPosts(): readonly Post[] | null;
+  /** Every board's posts; null until the boards are read. */
+  allPosts(): readonly Post[] | null;
+  /** Whether the pickup could hand work out now: it is on and wakes are not paused. */
+  pickupOpen(): boolean;
   tools: AgentToolDefinition[];
   noteAgent(agent: ToolAgent): void;
   post(input: {
@@ -79,6 +90,8 @@ export interface Office {
   }): Promise<PostResult>;
   /** Takes a held lobby task out of the backlog, so the pickup hands it out. */
   start(id: string): Promise<PostResult>;
+  /** The auto-start gate's start: only the revision it looked at, told as the owner's Start is. */
+  startHeld(id: string, expectedSeq: number): Promise<StartResult>;
   update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
   remove(id: string): Promise<DeleteResult>;
   clearDone(board: string): Promise<DeleteResult>;
@@ -165,6 +178,7 @@ export function createOffice(deps: OfficeDeps): Office {
       // save the pickup makes while it scans does not start another scan.
       pickup?.refresh();
       wakeReleased();
+      deps.onChange?.();
     },
     onBoardRemoved: (board) => {
       hub.removeBoard(board);
@@ -172,6 +186,7 @@ export function createOffice(deps: OfficeDeps): Office {
       // handed out, or its agent told, with no other board changed.
       pickup?.refresh();
       wakeReleased();
+      deps.onChange?.();
     },
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
@@ -282,6 +297,7 @@ export function createOffice(deps: OfficeDeps): Office {
       hub.setBoards(service.boards());
       hub.setWake(queue.state());
       schedulePrune();
+      deps.onChange?.();
     } catch (error) {
       log(`[office] unable to start the boards: ${errorMessage(error)}`);
     }
@@ -298,6 +314,8 @@ export function createOffice(deps: OfficeDeps): Office {
   return {
     ready,
     lobbyPosts: () => (queue === null ? null : service.postsOf("lobby")),
+    allPosts: () => (queue === null ? null : allPosts()),
+    pickupOpen: () => queue !== null && pickupEnabled && !service.wakesPaused(),
     tools: officeTools({
       service,
       resolveAgent: (id) => deps.agents.resolve(id),
@@ -328,6 +346,12 @@ export function createOffice(deps: OfficeDeps): Office {
       if (result.ok && wasHeld) mentioned(result.post);
       return result;
     },
+    async startHeld(id, expectedSeq) {
+      await ready;
+      const result = await service.startHeld(id, expectedSeq);
+      if (result.ok && result.started) mentioned(result.post);
+      return result;
+    },
     async update(input) {
       await ready;
       return service.update({ ...input, actor: USER_AUTHOR });
@@ -345,11 +369,13 @@ export function createOffice(deps: OfficeDeps): Office {
       await service.setWakesPaused(paused);
       wakeQueue.setPaused(paused);
       pickup?.refresh();
+      deps.onChange?.();
       return wakeQueue.state();
     },
     setPickupEnabled(enabled) {
       pickupEnabled = enabled;
       pickup?.refresh();
+      deps.onChange?.();
     },
     setDuties(next) {
       duties = [...next];
@@ -374,6 +400,7 @@ export function createOffice(deps: OfficeDeps): Office {
     turnEnded(agentId) {
       queue?.turnEnded(agentId);
       pickup?.refresh();
+      deps.onChange?.();
     },
     async checkCompletion(agentId, lastAnswer) {
       await ready;

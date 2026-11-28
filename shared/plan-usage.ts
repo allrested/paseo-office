@@ -58,17 +58,123 @@ export function resetText(resetsAt: number | null, now: number): string {
   return `resets in ${Math.floor(hours / 24)} d ${hours % 24} h`;
 }
 
-/** The closest limit in a few words, for the toolbar; null while every limit is under the warning. */
+/** A window's use as read, and when. */
+export interface PlanReading {
+  usedPct: number;
+  /** Epoch ms of the reading. */
+  readAt: number;
+}
+
+/** Two readings of one window must be this far apart to say a rate. */
+export const PACE_MIN_MS = 5 * 60_000;
+
+/**
+ * When a window reaches 100% at the rate between two readings of it, as epoch ms; null when that
+ * is not before its reset (`later.resetsAt`, which must be known), when the readings are under 5
+ * minutes apart or the use did not rise, and when the window is already out: the pill says that.
+ */
+export function planPace(
+  earlier: PlanReading,
+  later: PlanReading & { resetsAt: number | null },
+): number | null {
+  const span = later.readAt - earlier.readAt;
+  const rose = later.usedPct - earlier.usedPct;
+  if (span < PACE_MIN_MS || rose <= 0 || later.resetsAt === null) return null;
+  if (later.usedPct >= PLAN_OUT_PCT) return null;
+  const outAt = later.readAt + ((100 - later.usedPct) / rose) * span;
+  return outAt < later.resetsAt ? outAt : null;
+}
+
+/** A window's earlier reading, and the pace the last two that were far enough apart gave. */
+export type PaceTrack = ReadonlyMap<string, { earlier: PlanReading; pace: number | null }>;
+
+const paceKey = (provider: PlanUsage, window: PlanWindow) =>
+  `${provider.provider}\u0000${window.id}`;
+
+/**
+ * The track after a reading of every window. A window's earlier reading is replaced only by a
+ * reading at least 5 minutes after it, which is when its pace is worked out again: the polls come
+ * every two minutes, and a rate over so short a span would jump about. Windows no longer read are dropped.
+ */
+export function nextPace(track: PaceTrack, usage: readonly PlanUsage[], now: number): PaceTrack {
+  const next = new Map<string, { earlier: PlanReading; pace: number | null }>();
+  for (const provider of usage) {
+    for (const window of provider.windows) {
+      const key = paceKey(provider, window);
+      const reading = { usedPct: window.usedPct, readAt: now };
+      const before = track.get(key);
+      if (before === undefined) {
+        next.set(key, { earlier: reading, pace: null });
+      } else if (now - before.earlier.readAt >= PACE_MIN_MS) {
+        next.set(key, {
+          earlier: reading,
+          pace: planPace(before.earlier, { ...reading, resetsAt: window.resetsAt }),
+        });
+      } else {
+        next.set(key, before);
+      }
+    }
+  }
+  return next;
+}
+
+/** A window running out at its pace: when, and whose it is. */
+export interface PaceOut {
+  at: number;
+  /** The provider's display name and the window's label, as the pill writes them. */
+  provider: string;
+  window: string;
+}
+
+/** The soonest window of these providers to run out at its pace; null when none does. */
+export function soonestPace(track: PaceTrack, usage: readonly PlanUsage[]): PaceOut | null {
+  let soonest: PaceOut | null = null;
+  for (const provider of usage) {
+    for (const window of provider.windows) {
+      const at = track.get(paceKey(provider, window))?.pace ?? null;
+      if (at !== null && (soonest === null || at < soonest.at)) {
+        soonest = { at, provider: provider.name, window: window.label };
+      }
+    }
+  }
+  return soonest;
+}
+
+/** An instant as "Thu 14:00": the weekday and the 24-hour time in the device's locale and zone. */
+export function paceText(at: number): string {
+  const when = new Date(at);
+  const day = when.toLocaleDateString(undefined, { weekday: "short" });
+  const time = when.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return `${day} ${time}`;
+}
+
+/** "Claude 5 hours: at this pace out by Thu 14:00": it names its own window, whoever the closest limit is. */
+const paceNote = (out: PaceOut) =>
+  `${out.provider} ${out.window}: at this pace out by ${paceText(out.at)}`;
+
+/**
+ * The closest limit in a few words, for the toolbar; null while every limit is under the warning.
+ * `pace` is the soonest window that runs out at its pace, when there is one: it follows the note
+ * after " · ", or is the note alone, in the warning tone, when no limit is near yet.
+ */
 export function planNote(
   usage: readonly PlanUsage[],
+  pace: PaceOut | null = null,
 ): { text: string; tone: "warning" | "danger" } | null {
   const closest = closestLimit(usage);
-  if (closest === null || closest.window.usedPct < PLAN_WARN_PCT) return null;
+  if (closest === null || closest.window.usedPct < PLAN_WARN_PCT) {
+    return pace === null ? null : { text: paceNote(pace), tone: "warning" };
+  }
   const { provider, window } = closest;
-  const text =
+  const used =
     window.usedPct >= PLAN_OUT_PCT
       ? `Out of ${provider.name}`
       : `${provider.name} ${Math.floor(window.usedPct)}%`;
+  const text = pace === null ? used : `${used} · ${paceNote(pace)}`;
   return { text, tone: window.usedPct >= PLAN_DANGER_PCT ? "danger" : "warning" };
 }
 

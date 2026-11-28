@@ -25,6 +25,7 @@ import {
   notesReadRpc,
   type ChatMessage,
   type WeatherScene,
+  type AutoStartState,
   type IncidentsState,
   type Machine,
 } from "../shared/contracts.js";
@@ -43,7 +44,7 @@ import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
 import { DutySheet } from "./duty-sheet.js";
 import { useDutyActions } from "./use-duty-actions.js";
-import { authorName, type TeamNamer } from "./board-text.js";
+import { authorName, autoStartLine, type TeamNamer } from "./board-text.js";
 import { useRosterTeams } from "./use-roster.js";
 import { useChatSeen } from "./chat-seen.js";
 import { TeamChatPreview } from "./team-chat-preview.js";
@@ -128,6 +129,7 @@ import { useStandup } from "./use-standup.js";
 import { useMachine } from "./use-machine.js";
 import {
   PlanPickerContext,
+  PlanPaceContext,
   PlanUsageContext,
   usePlanUsage,
   type PlanState,
@@ -499,6 +501,15 @@ function useNotesTimeZone(): string {
   const settings = useSettings(officeHostSettings);
   const setting = settings.status === "ready" ? settings.values.notesTimeZone : "";
   return useMemo(() => todayZone(setting), [setting]);
+}
+
+/** The line over the lobby's Backlog: the gate's state, with the limits it was set to from the host's settings. */
+function useAutoStartLine(gate: AutoStartState | undefined): string | null {
+  const settings = useSettings(officeHostSettings);
+  const values = settings.status === "ready" ? settings.values : null;
+  const underPct = values?.autoStartUnderPct ?? 70;
+  const atOnce = values?.autoStartAtOnce ?? 3;
+  return useMemo(() => autoStartLine(gate, underPct, atOnce), [gate, underPct, atOnce]);
 }
 
 interface SceneProblemProps {
@@ -950,7 +961,7 @@ function HostResourceButton({
 }) {
   const percent = machine ? memoryPercent(machine) : null;
   // A plan close to its limit takes the button's words: that is what stops the work first.
-  const plan = planNote(useContext(PlanUsageContext));
+  const plan = planNote(useContext(PlanUsageContext), useContext(PlanPaceContext));
   const planText = useMemo(
     () => [styles.sidebarButtonText, plan && styles.stripNote[plan.tone]],
     [styles, plan],
@@ -1945,11 +1956,15 @@ function OfficeContexts({
   return (
     <OfficeBrandContext.Provider value={brand}>
       <PlanUsageContext.Provider value={planUsage.counted}>
-        <PlanPickerContext.Provider value={planUsage.picker}>
-          <OpenTimelineContext.Provider value={onTimeline}>
-            <OpenHistoryContext.Provider value={onHistory}>{children}</OpenHistoryContext.Provider>
-          </OpenTimelineContext.Provider>
-        </PlanPickerContext.Provider>
+        <PlanPaceContext.Provider value={planUsage.outAt}>
+          <PlanPickerContext.Provider value={planUsage.picker}>
+            <OpenTimelineContext.Provider value={onTimeline}>
+              <OpenHistoryContext.Provider value={onHistory}>
+                {children}
+              </OpenHistoryContext.Provider>
+            </OpenTimelineContext.Provider>
+          </PlanPickerContext.Provider>
+        </PlanPaceContext.Provider>
       </PlanUsageContext.Provider>
     </OfficeBrandContext.Provider>
   );
@@ -2001,6 +2016,7 @@ export function OfficeSurface(
   const office = useOffice();
   const actions = useAgentActions();
   const boardActions = useBoardActions();
+  const startLine = useAutoStartLine(office.state.autoStart);
   const { machine: reading, cleanUp } = useMachine();
   const tidy = useJanitor();
   const dismissIncidents = useIncidents();
@@ -2534,6 +2550,7 @@ export function OfficeSurface(
         teamName={teamName}
         actions={boardActions}
         wakesPaused={office.state.wake.paused}
+        startLine={startLine}
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}
         styles={styles}
         onSelectAgent={selectFromBoard}

@@ -150,3 +150,11 @@ test("the chat's changes", () => {
   expect(long?.messages[0].id).toBe("m1");
   expect(long?.messages[299].id).toBe("m300");
 });
+
+test("the gate's state replaces the one before", () => {
+  const autoStart = { on: true, reason: "per-day" as const, startedToday: 10, perDay: 10 };
+  expect(applyOfficeEvent(EMPTY_OFFICE, { type: "auto-start", autoStart })).toEqual({
+    ...EMPTY_OFFICE,
+    autoStart,
+  });
+});

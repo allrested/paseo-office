@@ -177,6 +177,8 @@ interface HarnessProps {
   /** The host's sheet has left by the time it reports a close: a phone's, or any on native. */
   sheetLeavesFirst?: boolean;
   wakesPaused?: boolean;
+  /** The line over the lobby's Backlog; none while the gate is off. */
+  startLine?: string | null;
   /** The board was opened from the lobby's. */
   fromLobby?: boolean;
   /** In fullscreen: the office's own dialog, not the host's sheet. */
@@ -197,6 +199,7 @@ function Harness({
   compact = false,
   sheetLeavesFirst = false,
   wakesPaused = false,
+  startLine = null,
   fromLobby = false,
   fullscreen = false,
   teams = NO_TEAMS,
@@ -219,6 +222,7 @@ function Harness({
         teamName={teamName}
         actions={ACTIONS}
         wakesPaused={wakesPaused}
+        startLine={startLine}
         sheetLeavesFirst={sheetLeavesFirst}
         styles={styles}
         onSelectAgent={onSelectAgent}
@@ -1446,6 +1450,39 @@ describe("the lobby's backlog", () => {
     });
     expect(lines().some((line) => line.startsWith("Backlog"))).toBe(false);
     expect(checkboxes()).toHaveLength(2);
+  });
+
+  test("the list says over the unfolded Backlog whether the office starts by itself", async () => {
+    const rooms = lobbyRooms([held(1)]);
+    await mount({
+      rooms,
+      roomId: "lobby",
+      startLine: "Starting by itself: nothing here is ready to start",
+    });
+    // Folded, the section shows its heading only.
+    expect(lines()).not.toContain("Starting by itself: nothing here is ready to start");
+    await press("Backlog · 1");
+    expect(linesFrom("Backlog · 1").slice(0, 3)).toEqual([
+      "Backlog · 1",
+      "Starting by itself: nothing here is ready to start",
+      "Held 1",
+    ]);
+  });
+
+  test("the list has no such line while the gate is off", async () => {
+    await mount({ rooms: lobbyRooms([held(1)]), roomId: "lobby", startLine: null });
+    await press("Backlog · 1");
+    expect(lines().some((line) => line.startsWith("Starting by itself"))).toBe(false);
+  });
+
+  test("the kanban shows the line in the Backlog column, and not with the gate off", async () => {
+    layouts("kanban", "list");
+    await mount({ rooms: lobbyRooms([held(1)]), roomId: "lobby", startLine: "Starting by itself" });
+    // The sheet is stacked here, and a stacked Backlog starts folded.
+    await press("Backlog · 1");
+    expect(lines().filter((line) => line === "Starting by itself")).toHaveLength(1);
+    await mount({ rooms: lobbyRooms([held(1)]), roomId: "lobby", startLine: null });
+    expect(lines().some((line) => line.startsWith("Starting by itself"))).toBe(false);
   });
 
   test("the kanban has the Backlog column", async () => {

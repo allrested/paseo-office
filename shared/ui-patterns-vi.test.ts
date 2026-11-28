@@ -99,6 +99,35 @@ test("the cards' longer lines are in Vietnamese too, with their names and number
     ["Checks fail on #12", "Kiểm tra lỗi trên #12"],
     ["Context 91% full, 182k of 200k tokens", "Ngữ cảnh đầy 91%, 182k trên 200k token"],
     ["Out of Claude", "Hết Claude"],
+    [
+      "Claude 85% · Codex week: at this pace out by Thu 14:00",
+      "Claude 85% · Codex week: theo tốc độ này sẽ hết lúc Thu 14:00",
+    ],
+    [
+      "Claude 5 hours: at this pace out by Thu 14:00",
+      "Claude 5 hours: theo tốc độ này sẽ hết lúc Thu 14:00",
+    ],
+    [
+      "Host resources. Plan limit: Claude 5 hours: at this pace out by Thu 14:00",
+      "Tài nguyên của host. Giới hạn gói: Claude 5 hours: theo tốc độ này sẽ hết lúc Thu 14:00",
+    ],
+    ["Starting by itself", "Tự động bắt đầu"],
+    [
+      "Starting by itself: nothing here is ready to start",
+      "Tự động bắt đầu: ở đây chưa có việc nào sẵn sàng bắt đầu",
+    ],
+    [
+      "Starting by itself: waiting, Claude's 5 hours is at 82% (starts under 70%)",
+      "Tự động bắt đầu: đang chờ, 5 hours của Claude đã dùng 82% (bắt đầu khi dưới 70%)",
+    ],
+    [
+      "Starting by itself: waiting, 3 tasks are in progress or to do (at most 3)",
+      "Tự động bắt đầu: đang chờ, 3 việc đang làm hoặc cần làm (tối đa 3)",
+    ],
+    [
+      "Starting by itself: done for today, 10 started (at most 10 a day)",
+      "Tự động bắt đầu: xong cho hôm nay, đã bắt đầu 10 việc (tối đa 10 mỗi ngày)",
+    ],
     ["resets in 2 h 5 min", "đặt lại sau 2 giờ 5 phút"],
     ["120 times the clock", "120 lần tốc độ đồng hồ"],
     [

@@ -20,6 +20,8 @@ export interface KanbanBoardProps {
   name(author: string): string;
   teamName: TeamNamer;
   actions: BoardActions;
+  /** The line over the Backlog on whether the office starts tasks by itself; none while it does not. */
+  startLine?: string | null | undefined;
   styles: OfficeStyles;
 }
 
@@ -31,6 +33,7 @@ interface ColumnProps {
   name(author: string): string;
   teamName: TeamNamer;
   actions: BoardActions;
+  startLine?: string | null | undefined;
   styles: OfficeStyles;
 }
 
@@ -55,6 +58,17 @@ function ColumnClear({
       styles={styles}
     />
   );
+}
+
+/** The Backlog's line on starting by itself, over its cards; no other column has one. */
+function ColumnLine({
+  column,
+  startLine,
+  styles,
+}: Pick<ColumnProps, "column" | "startLine" | "styles">) {
+  const t = useT();
+  if (column.id !== "backlog" || startLine === null || startLine === undefined) return null;
+  return <Text style={styles.muted}>{t(startLine)}</Text>;
 }
 
 /** A task is a card with its box; a note keeps the buttons it has on the list. */
@@ -93,7 +107,16 @@ function ColumnCards({ column, all, onFollowUp, name, teamName, actions, styles 
 }
 
 /** Wide: a column of its own width beside the others. */
-function SideColumn({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
+function SideColumn({
+  column,
+  all,
+  onFollowUp,
+  name,
+  teamName,
+  actions,
+  startLine,
+  styles,
+}: ColumnProps) {
   return (
     <View style={styles.kanbanColumn}>
       <View style={styles.kanbanHeading}>
@@ -102,6 +125,7 @@ function SideColumn({ column, all, onFollowUp, name, teamName, actions, styles }
         </Text>
         <ColumnClear column={column} actions={actions} styles={styles} />
       </View>
+      <ColumnLine column={column} startLine={startLine} styles={styles} />
       <ColumnCards
         column={column}
         all={all}
@@ -119,7 +143,16 @@ function SideColumn({ column, all, onFollowUp, name, teamName, actions, styles }
  * Narrow: a section whose heading folds it. Done starts folded, since what is finished waits
  * below, and so does Backlog, since what is held is not for now.
  */
-function StackedColumn({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
+function StackedColumn({
+  column,
+  all,
+  onFollowUp,
+  name,
+  teamName,
+  actions,
+  startLine,
+  styles,
+}: ColumnProps) {
   const [open, setOpen] = useState(column.id !== "done" && column.id !== "backlog");
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
@@ -139,6 +172,7 @@ function StackedColumn({ column, all, onFollowUp, name, teamName, actions, style
         </Pressable>
         <ColumnClear column={column} actions={actions} styles={styles} />
       </View>
+      {open ? <ColumnLine column={column} startLine={startLine} styles={styles} /> : null}
       {open ? (
         <ColumnCards
           column={column}
@@ -167,6 +201,7 @@ export function KanbanBoard({
   name,
   teamName,
   actions,
+  startLine,
   styles,
 }: KanbanBoardProps) {
   const [width, setWidth] = useState(0);
@@ -193,6 +228,7 @@ export function KanbanBoard({
               name={name}
               teamName={teamName}
               actions={actions}
+              startLine={startLine}
               styles={styles}
             />
           ))}
@@ -207,6 +243,7 @@ export function KanbanBoard({
             name={name}
             teamName={teamName}
             actions={actions}
+            startLine={startLine}
             styles={styles}
           />
         ))

@@ -19,7 +19,9 @@ function setup(first: PlanUsage[] = []) {
   let reading: PlanUsage[] | Error = first;
   let reads = 0;
   let hidden = new Set<string>();
+  const readings: ({ usage: PlanUsage[]; at: number } | null)[] = [];
   const watch = createPlanWatch({
+    observed: (seen) => readings.push(seen),
     async read() {
       reads += 1;
       if (reading instanceof Error) throw reading;
@@ -41,6 +43,7 @@ function setup(first: PlanUsage[] = []) {
     watch,
     raised,
     logs,
+    readings,
     next,
     reads: () => reads,
     hide: (...ids: string[]) => void (hidden = new Set(ids)),
@@ -154,4 +157,22 @@ test("a read under way when watching is turned off tells nothing", async () => {
   await settle();
   expect(raised).toEqual([]);
   expect(clock.pending()).toBe(0);
+});
+
+test("each reading is told with its instant, a failed one is not, and stopping forgets it", async () => {
+  const { clock, watch, readings, next } = setup([usage("claude", 10)]);
+  clock.advance(1000);
+  watch.keep(true);
+  await settle();
+  expect(readings).toEqual([{ usage: [usage("claude", 10)], at: 1000 }]);
+  await next(new Error("down"));
+  expect(readings).toHaveLength(1);
+  // A provider left out is still in the reading: the gate leaves it out as the pill does.
+  await next([usage("claude", 20), usage("codex", 5)]);
+  expect(readings.at(-1)).toEqual({
+    usage: [usage("claude", 20), usage("codex", 5)],
+    at: 1000 + 2 * PLAN_WATCH_MS,
+  });
+  watch.keep(false);
+  expect(readings.at(-1)).toBeNull();
 });

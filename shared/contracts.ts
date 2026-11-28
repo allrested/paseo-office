@@ -531,6 +531,43 @@ export const ChatResultSchema = z.union([
 ]);
 export type ChatResult = z.output<typeof ChatResultSchema>;
 
+/** Why the office does not start a backlog task by itself now, in the order it looks. */
+export const AUTO_START_REASONS = [
+  "off",
+  "no-pickup",
+  "empty",
+  "no-reading",
+  "limit",
+  "at-once",
+  "per-day",
+  "no-count",
+] as const;
+export const AutoStartReasonSchema = z.enum(AUTO_START_REASONS);
+export type AutoStartReason = z.output<typeof AutoStartReasonSchema>;
+
+/** The plan limit that stopped the gate: the provider's name, the window's label, its percent. */
+export const AutoStartLimitSchema = z.object({
+  provider: z.string(),
+  window: z.string(),
+  usedPct: z.number(),
+});
+export type AutoStartLimit = z.output<typeof AutoStartLimitSchema>;
+
+/** The lobby's work already committed (claimed, or started and waiting), that stopped the gate. */
+export const AutoStartCommittedSchema = z.object({ count: z.number().int().nonnegative() });
+export type AutoStartCommitted = z.output<typeof AutoStartCommittedSchema>;
+
+/** The auto-start gate: on, why it waits (null while open) and the day's count. */
+export const AutoStartStateSchema = z.object({
+  on: z.boolean(),
+  reason: AutoStartReasonSchema.nullable(),
+  /** With `limit`: the worst window; with `at-once`: the committed work's count. */
+  detail: z.union([AutoStartLimitSchema, AutoStartCommittedSchema]).optional(),
+  startedToday: z.number().int().nonnegative(),
+  perDay: z.number().int().nonnegative(),
+});
+export type AutoStartState = z.output<typeof AutoStartStateSchema>;
+
 export const OfficeSnapshotSchema = z.object({
   brand: BrandingSchema.optional(),
   agents: z.array(OfficeAgentSchema),
@@ -555,6 +592,8 @@ export const OfficeSnapshotSchema = z.object({
   chat: ChatSnapshotSchema.optional(),
   /** The duty list; absent until the office's server has read it. Its posts are `boards.duty`. */
   duties: DutyBoardSchema.optional(),
+  /** The auto-start gate; absent until the office's server has looked once. */
+  autoStart: AutoStartStateSchema.optional(),
 });
 export type OfficeSnapshot = z.output<typeof OfficeSnapshotSchema>;
 
@@ -573,6 +612,7 @@ export const OfficeEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("board"), board: z.string(), posts: z.array(PostSchema) }),
   z.object({ type: z.literal("board-removed"), board: z.string() }),
   z.object({ type: z.literal("wake"), wake: WakeStateSchema }),
+  z.object({ type: z.literal("auto-start"), autoStart: AutoStartStateSchema }),
   z.object({ type: z.literal("chat"), change: ChatChangeSchema }),
 ]);
 export type OfficeEvent = z.output<typeof OfficeEventSchema>;

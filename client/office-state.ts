@@ -41,6 +41,8 @@ export function applyOfficeEvent(state: OfficeSnapshot, event: OfficeEvent): Off
       };
     case "wake":
       return { ...state, wake: event.wake };
+    case "auto-start":
+      return { ...state, autoStart: event.autoStart };
     // The chat is kept apart: see applyChatEvent.
     case "chat":
       return state;
