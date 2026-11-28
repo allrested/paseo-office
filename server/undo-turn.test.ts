@@ -1,11 +1,27 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import type { Exec } from "./repo-age.js";
-import { createUndo, editedFiles, type Undo } from "./undo-turn.js";
+import {
+  CHECKPOINT_FILES,
+  CHECKPOINTS_KEPT,
+  createUndo,
+  undoCheckpoint,
+  type Undo,
+} from "./undo-turn.js";
 
 const run = promisify(execFile);
 const exec: Exec = (command, args, options) => run(command, args, options);
@@ -25,12 +41,26 @@ async function git(...args: string[]): Promise<string> {
   return stdout;
 }
 
-async function write(path: string, text: string, folder = repo): Promise<void> {
+async function write(path: string, text: string | Buffer, folder = repo): Promise<void> {
   await mkdir(join(folder, path, ".."), { recursive: true });
   await writeFile(join(folder, path), text);
 }
 
 const read = (path: string) => readFile(join(repo, path), "utf8");
+
+async function missing(path: string): Promise<boolean> {
+  return stat(join(repo, path)).then(
+    () => false,
+    () => true,
+  );
+}
+
+/** One turn of agent a1: begun, the work done in it, ended. */
+async function turn(turnId: string, work: () => Promise<void>, agentId = "a1"): Promise<void> {
+  await undo.begin(agentId, repo);
+  await work();
+  await undo.end(agentId, turnId);
+}
 
 /** Everything of the repository's state that an undo must leave alone. */
 async function state(): Promise<string> {
@@ -68,178 +98,301 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-test("an edited file is put back, and nothing else in the work tree is touched", async () => {
-  await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await write("other.txt", "someone else's work\n");
-  await undo.end("a1", repo, [join(repo, "a.txt")]);
-  expect(undo.available("a1")).toBe(1);
-  expect(await undo.undo("a1")).toEqual({ restored: 1, skipped: [] });
-  expect(await read("a.txt")).toBe("A0\n");
-  expect(await read("other.txt")).toBe("someone else's work\n");
-  expect(undo.available("a1")).toBe(0);
-  expect(await undo.undo("a1")).toBeNull();
+test("ten turns are kept, newest first, and the eleventh drops the first", async () => {
+  expect(CHECKPOINTS_KEPT).toBe(10);
+  for (let n = 1; n <= 11; n += 1) {
+    await turn(`t${n}`, () => write("a.txt", `A${n}\n`));
+  }
+  const turns = await undo.status("a1");
+  expect(turns.map((one) => one.turnId)).toEqual([
+    "t11",
+    "t10",
+    "t9",
+    "t8",
+    "t7",
+    "t6",
+    "t5",
+    "t4",
+    "t3",
+    "t2",
+  ]);
+  expect(turns[0]).toMatchObject({
+    files: [{ path: "a.txt", kind: "modified", added: 1, removed: 1 }],
+    more: 0,
+    usable: true,
+  });
+  expect(Number.isNaN(Date.parse(turns[0]?.endedAt ?? ""))).toBe(false);
 });
 
-test("a file the turn created is deleted, and one it deleted comes back", async () => {
-  await undo.begin("a1", repo);
-  await write("new.txt", "N\n");
-  await rm(join(repo, "gone.txt"));
-  await undo.end("a1", repo, ["new.txt", "gone.txt"]);
-  expect(await undo.undo("a1")).toEqual({ restored: 2, skipped: [] });
-  await expect(stat(join(repo, "new.txt"))).rejects.toThrow();
+test("a turn that changed nothing is not kept", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
+  await turn("t2", async () => {});
+  expect((await undo.status("a1")).map((one) => one.turnId)).toEqual(["t1"]);
+});
+
+test("the diff lists an edit, a new file, a deletion and what a shell command changed", async () => {
+  await turn("t1", async () => {
+    await write("a.txt", "A0\nA1\nA2\n");
+    await write("new.txt", "N1\nN2\n");
+    await rm(join(repo, "gone.txt"));
+    // As `sed -i` would: no tool call names it.
+    await run("sh", ["-c", "printf 'B1\\n' > src/b.txt"], { cwd: repo });
+  });
+  const [only] = await undo.status("a1");
+  expect(only?.files).toEqual([
+    { path: "a.txt", kind: "modified", added: 2, removed: 0 },
+    { path: "gone.txt", kind: "deleted", added: 0, removed: 1 },
+    { path: "new.txt", kind: "added", added: 2, removed: 0 },
+    { path: "src/b.txt", kind: "modified", added: 1, removed: 1 },
+  ]);
+});
+
+test("a binary file has no counts, and an odd name is read whole", async () => {
+  const odd = 'my "odd"\tfile\nname.txt';
+  await turn("t1", async () => {
+    await write("blob.bin", Buffer.from([0, 1, 2, 0, 255]));
+    await write(odd, "x\n");
+  });
+  const [only] = await undo.status("a1");
+  expect(only?.files).toEqual([
+    { path: "blob.bin", kind: "added", added: null, removed: null },
+    { path: odd, kind: "added", added: 1, removed: 0 },
+  ]);
+  expect(await undo.undo("a1")).toEqual({ turnId: "t1", restored: 2, skipped: [] });
+  expect(await missing(odd)).toBe(true);
+});
+
+test("a turn lists 200 files at most and counts the rest", async () => {
+  expect(CHECKPOINT_FILES).toBe(200);
+  await turn("t1", async () => {
+    for (let n = 0; n < 201; n += 1) await write(`many/f${String(n).padStart(3, "0")}.txt`, "x\n");
+  });
+  const [only] = await undo.status("a1");
+  expect(only?.files).toHaveLength(200);
+  expect(only?.more).toBe(1);
+  expect((await undo.undo("a1"))?.restored).toBe(201);
+  expect(await missing("many")).toBe(true);
+});
+
+test("undo puts back the newest turn, then the one before, down to the original", async () => {
+  await turn("t1", async () => {
+    await write("a.txt", "A1\n");
+    await write("new.txt", "N\n");
+  });
+  await turn("t2", async () => {
+    await write("a.txt", "A2\n");
+    await rm(join(repo, "gone.txt"));
+  });
+  expect(await undo.undo("a1")).toEqual({ turnId: "t2", restored: 2, skipped: [] });
+  expect(await read("a.txt")).toBe("A1\n");
   expect(await read("gone.txt")).toBe("G0\n");
+  expect((await undo.status("a1")).map((one) => one.turnId)).toEqual(["t1"]);
+  expect(await undo.undo("a1")).toEqual({ turnId: "t1", restored: 2, skipped: [] });
+  expect(await read("a.txt")).toBe("A0\n");
+  expect(await missing("new.txt")).toBe(true);
+  expect(await undo.status("a1")).toEqual([]);
+  expect(await undo.undo("a1")).toBeNull();
+  // The undo happened outside a turn, so it is no checkpoint of its own.
+  expect(await git("status", "--porcelain")).toBe("");
 });
 
-test("an untracked file the turn edited is put back from the snapshot", async () => {
-  await write("notes.txt", "U0\n");
-  await undo.begin("a1", repo);
-  await write("notes.txt", "U1\n");
-  await undo.end("a1", repo, ["notes.txt"]);
-  expect(await undo.undo("a1")).toEqual({ restored: 1, skipped: [] });
-  expect(await read("notes.txt")).toBe("U0\n");
-});
-
-test("a mode, a folder that is gone and a relative path of the agent's folder are put back", async () => {
-  await write("src/run.sh", "#!/bin/sh\n");
-  await chmod(join(repo, "src/run.sh"), 0o755);
-  await git("add", "-A");
-  await git("commit", "-q", "-m", "script");
-  await undo.begin("a1", join(repo, "src"));
-  await write("src/run.sh", "#!/bin/sh\necho hi\n");
-  await rm(join(repo, "src/b.txt"));
-  await undo.end("a1", join(repo, "src"), ["run.sh", "b.txt"]);
-  expect((await undo.undo("a1"))?.restored).toBe(2);
-  expect(await read("src/run.sh")).toBe("#!/bin/sh\n");
-  expect((await stat(join(repo, "src/run.sh"))).mode & 0o111).not.toBe(0);
-  expect(await read("src/b.txt")).toBe("B0\n");
-});
-
-test("a file changed after the turn is skipped, the others are put back", async () => {
-  await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await write("src/b.txt", "B1\n");
-  await undo.end("a1", repo, ["a.txt", "src/b.txt"]);
+test("a file edited, deleted or made again after the turn is skipped; the rest is put back", async () => {
+  await turn("t1", async () => {
+    await write("a.txt", "A1\n");
+    await write("src/b.txt", "B1\n");
+    await write("new.txt", "N1\n");
+    await write("other.txt", "O1\n");
+    await rm(join(repo, "gone.txt"));
+  });
   await write("a.txt", "A2, by the owner\n");
+  await rm(join(repo, "src/b.txt"));
+  await write("new.txt", "N2, by the owner\n");
+  await write("gone.txt", "somebody's new one\n");
   expect(await undo.undo("a1")).toEqual({
+    turnId: "t1",
     restored: 1,
-    skipped: [{ reason: "changed", count: 1 }],
+    skipped: [{ reason: "changed", count: 4 }],
   });
   expect(await read("a.txt")).toBe("A2, by the owner\n");
+  expect(await missing("src/b.txt")).toBe(true);
+  expect(await read("new.txt")).toBe("N2, by the owner\n");
+  expect(await read("gone.txt")).toBe("somebody's new one\n");
+  expect(await missing("other.txt")).toBe(true);
+  // Every path was dealt with, so the checkpoint is gone.
+  expect(await undo.status("a1")).toEqual([]);
+});
+
+test("the executable bit is put back, and a folder the turn made goes with its file", async () => {
+  await write("src/run.sh", "#!/bin/sh\n");
+  await chmod(join(repo, "src/run.sh"), 0o755);
+  await mkdir(join(repo, "kept"));
+  await git("add", "-A");
+  await git("commit", "-q", "-m", "script");
+  await turn("t1", async () => {
+    await chmod(join(repo, "src/run.sh"), 0o644);
+    await write("deep/er/new.txt", "N\n");
+    await write("kept/new.txt", "N\n");
+    await write("src/c.txt", "C\n");
+  });
+  expect((await undo.undo("a1"))?.restored).toBe(4);
+  expect((await stat(join(repo, "src/run.sh"))).mode & 0o111).not.toBe(0);
+  expect(await missing("deep")).toBe(true);
+  // An empty folder that was there before the turn stays; so does one the tree had.
+  expect((await stat(join(repo, "kept"))).isDirectory()).toBe(true);
   expect(await read("src/b.txt")).toBe("B0\n");
 });
 
-test("a file made again after the turn deleted it is not overwritten", async () => {
-  await undo.begin("a1", repo);
-  await rm(join(repo, "gone.txt"));
-  await undo.end("a1", repo, ["gone.txt"]);
-  await write("gone.txt", "somebody's new one\n");
-  expect((await undo.undo("a1"))?.skipped).toEqual([{ reason: "changed", count: 1 }]);
-  expect(await read("gone.txt")).toBe("somebody's new one\n");
-});
-
-test("a path git ignores is not restored, and is said not to be", async () => {
-  await write("build/out.js", "O0\n");
-  await undo.begin("a1", repo);
-  await write("build/out.js", "O1\n");
-  await write("build/new.js", "N\n");
-  await undo.end("a1", repo, ["build/out.js", "build/new.js", "a.txt"]);
-  await write("a.txt", "A1\n");
-  // a.txt did not change in the turn but is named: it is the same as it was.
-  const result = await undo.undo("a1");
-  expect(result?.restored).toBe(0);
-  expect(result?.skipped).toEqual(
-    expect.arrayContaining([
-      { reason: "ignored", count: 2 },
-      { reason: "changed", count: 1 },
-    ]),
-  );
-  expect(await read("build/out.js")).toBe("O1\n");
-  expect(await read("build/new.js")).toBe("N\n");
-});
-
-test("a path outside the work tree, by a .. or by a link, or in .git, is refused", async () => {
-  await write("secret.txt", "S0\n", outside);
-  await symlink(outside, join(repo, "link"));
-  await undo.begin("a1", repo);
-  await write("secret.txt", "S1\n", outside);
-  await write("a.txt", "A1\n");
-  await undo.end("a1", repo, [
-    join(outside, "secret.txt"),
-    "../outside/secret.txt",
-    "link/secret.txt",
-    ".git/HEAD",
-    "a.txt",
-  ]);
-  expect(await undo.undo("a1")).toEqual({
-    restored: 1,
-    skipped: [{ reason: "outside", count: 4 }],
+test("an ignored path, a link, a path under a linked folder and a submodule are refused", async () => {
+  const sub = join(repo, "sub");
+  await mkdir(sub);
+  await run("git", ["init", "-q"], { cwd: sub });
+  await write("s.txt", "S0\n", sub);
+  await run("git", ["-c", "user.email=a@x", "-c", "user.name=A", "add", "-A"], { cwd: sub });
+  await run("git", ["-c", "user.email=a@x", "-c", "user.name=A", "commit", "-q", "-m", "s"], {
+    cwd: sub,
   });
-  expect(await readFile(join(outside, "secret.txt"), "utf8")).toBe("S1\n");
-  expect(await read("a.txt")).toBe("A0\n");
-});
-
-test("a file that is a link is left alone", async () => {
+  await write("d/f.txt", "F0\n");
   await symlink("a.txt", join(repo, "ln"));
   await git("add", "-A");
-  await git("commit", "-q", "-m", "link");
-  await undo.begin("a1", repo);
-  await rm(join(repo, "ln"));
-  await symlink("src/b.txt", join(repo, "ln"));
-  await undo.end("a1", repo, ["ln"]);
-  expect(await undo.undo("a1")).toBeNull();
-  expect(undo.available("a1")).toBe(0);
+  await git("commit", "-q", "-m", "more");
+  await turn("t1", async () => {
+    await write("notes.log", "L1\n");
+    await rm(join(repo, "ln"));
+    await symlink("src/b.txt", join(repo, "ln"));
+    await write("d/f.txt", "F1\n");
+    await write("s.txt", "S1\n", sub);
+    await run("git", ["-c", "user.email=a@x", "-c", "user.name=A", "commit", "-qam", "s1"], {
+      cwd: sub,
+    });
+    await write("a.txt", "A1\n");
+  });
+  // After the turn: the owner ignores *.log, and moves d out of the tree behind a link.
+  await write(".gitignore", "build/\n*.log\n");
+  await rename(join(repo, "d"), join(outside, "d"));
+  await symlink(join(outside, "d"), join(repo, "d"));
+  const result = await undo.undo("a1");
+  expect(result?.restored).toBe(1);
+  expect(result?.skipped).toEqual(
+    expect.arrayContaining([
+      { reason: "ignored", count: 1 },
+      { reason: "link", count: 1 },
+      { reason: "linkedFolder", count: 1 },
+      { reason: "submodule", count: 1 },
+    ]),
+  );
+  expect(result?.skipped).toHaveLength(4);
+  expect(await read("a.txt")).toBe("A0\n");
+  expect(await read("notes.log")).toBe("L1\n");
+  expect(await readFile(join(outside, "d", "f.txt"), "utf8")).toBe("F1\n");
+  expect(await run("readlink", [join(repo, "ln")]).then((out) => out.stdout)).toBe("src/b.txt\n");
 });
 
-test("a path that is a pattern is a path", async () => {
-  await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await write("src/b.txt", "B1\n");
-  await undo.end("a1", repo, ["*.txt", ":(top)a.txt"]);
-  expect(await undo.undo("a1")).toEqual({ restored: 0, skipped: [{ reason: "same", count: 2 }] });
-  expect(await read("a.txt")).toBe("A1\n");
-  expect(await read("src/b.txt")).toBe("B1\n");
+test("a file made where a deleted file's folder was is not removed to put the folder back", async () => {
+  await turn("t1", () => rm(join(repo, "src"), { recursive: true }));
+  await write("src", "the owner's file\n");
+  expect(await undo.undo("a1")).toEqual({
+    turnId: "t1",
+    restored: 0,
+    skipped: [{ reason: "changed", count: 1 }],
+  });
+  expect(await read("src")).toBe("the owner's file\n");
 });
 
-test("a folder that is no repository has no undo", async () => {
-  await undo.begin("a1", outside);
-  await write("x.txt", "1\n", outside);
-  await undo.end("a1", outside, ["x.txt"]);
-  expect(undo.available("a1")).toBe(0);
-  expect(await undo.undo("a1")).toBeNull();
+test("a file that became a link after the turn is left alone", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
+  await write("target.txt", "A1\n", outside);
+  await rm(join(repo, "a.txt"));
+  await symlink(join(outside, "target.txt"), join(repo, "a.txt"));
+  expect(await undo.undo("a1")).toEqual({
+    turnId: "t1",
+    restored: 0,
+    skipped: [{ reason: "link", count: 1 }],
+  });
+  expect(await readFile(join(outside, "target.txt"), "utf8")).toBe("A1\n");
 });
 
-test("with the setting off nothing is snapshotted, and a turn after one that could be undone drops it", async () => {
+/** A tree holding `text` at a path of folders, made by hand: git's own commands refuse such names. */
+async function craft(parts: string[], text: string): Promise<string> {
+  const hashed = await piped(["hash-object", "-w", "--stdin"], text);
+  let entry = `100644 blob ${hashed}\t${parts.at(-1)}\n`;
+  for (const part of parts.slice(0, -1).toReversed()) {
+    const tree = await piped(["mktree"], entry);
+    entry = `040000 tree ${tree}\t${part}\n`;
+  }
+  return piped(["mktree"], entry);
+}
+
+/** A git command in the repository that reads `input`, and its output trimmed. */
+function piped(args: string[], input: string): Promise<string> {
+  return new Promise((done, fail) => {
+    const child = execFile("git", args, { cwd: repo }, (error, out) => {
+      if (error) fail(error);
+      else done(out.trim());
+    });
+    child.stdin?.end(input);
+  });
+}
+
+test("a path out of the tree by .. and a path in .git are refused, never touched", async () => {
+  await write("secret.txt", "S1\n", outside);
+  const config = await readFile(join(repo, ".git", "config"), "utf8");
+  const up = {
+    top: repo,
+    turnId: "t1",
+    before: await craft(["..", "outside", "secret.txt"], "S0\n"),
+    end: await craft(["..", "outside", "secret.txt"], "S1\n"),
+  };
+  expect(await undoCheckpoint(exec, up)).toMatchObject({
+    restored: 0,
+    skipped: [{ reason: "outside", count: 1 }],
+  });
+  const inGit = {
+    top: repo,
+    turnId: "t2",
+    before: await craft([".git", "config"], "[core]\n\thooksPath = /tmp/evil\n"),
+    end: await craft([".git", "config"], config),
+  };
+  expect(await undoCheckpoint(exec, inGit)).toMatchObject({
+    restored: 0,
+    skipped: [{ reason: "git", count: 1 }],
+  });
+  expect(await readFile(join(outside, "secret.txt"), "utf8")).toBe("S1\n");
+  expect(await readFile(join(repo, ".git", "config"), "utf8")).toBe(config);
+});
+
+test("a snapshot git pruned makes its checkpoint unusable, and its undo touches nothing", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
+  await turn("t2", () => write("a.txt", "A2, the turn's\n"));
+  // The end tree of t2 is a loose object no ref holds: delete it as `git prune` would.
+  const tree = await treeNow();
+  await rm(join(repo, ".git", "objects", tree.slice(0, 2), tree.slice(2)));
+  const [newest, older] = await undo.status("a1");
+  expect(newest).toMatchObject({ turnId: "t2", usable: false });
+  expect(older).toMatchObject({ turnId: "t1", usable: true });
+  await expect(undo.undo("a1")).rejects.toThrow("this checkpoint's snapshot is gone");
+  expect(await read("a.txt")).toBe("A2, the turn's\n");
+  expect((await undo.status("a1")).map((one) => one.turnId)).toEqual(["t2", "t1"]);
+});
+
+/** The tree of the work tree as it is now, as a snapshot makes it (the same objects, by content). */
+async function treeNow(): Promise<string> {
+  const env = { ...process.env, GIT_INDEX_FILE: join(root, "probe-index") };
+  await run("git", ["read-tree", "HEAD"], { cwd: repo, env });
+  await run("git", ["add", "-A"], { cwd: repo, env });
+  return (await run("git", ["write-tree"], { cwd: repo, env })).stdout.trim();
+}
+
+test("undo is refused while the agent is at work, and touches nothing", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
   await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await undo.end("a1", repo, ["a.txt"]);
-  expect(undo.available("a1")).toBe(1);
-  on = false;
-  const before = await git("count-objects", "-v");
-  await undo.begin("a1", repo);
-  expect(undo.available("a1")).toBe(0);
   await write("a.txt", "A2\n");
-  await undo.end("a1", repo, ["a.txt"]);
-  expect(undo.available("a1")).toBe(0);
-  expect(await git("count-objects", "-v")).toBe(before);
-});
-
-test("the next turn replaces the snapshot, and a turn still running has no undo", async () => {
-  await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await undo.end("a1", repo, ["a.txt"]);
-  await undo.begin("a1", repo);
-  expect(undo.available("a1")).toBe(0);
-  await write("a.txt", "A2\n");
-  await undo.end("a1", repo, ["a.txt"]);
-  await undo.undo("a1");
+  await expect(undo.undo("a1")).rejects.toThrow(
+    "the agent is working: undo when its turn has ended",
+  );
+  expect(await read("a.txt")).toBe("A2\n");
+  await undo.end("a1", "t2");
+  expect((await undo.undo("a1"))?.turnId).toBe("t2");
   expect(await read("a.txt")).toBe("A1\n");
-});
-
-test("a turn that names no file has no undo", async () => {
-  await undo.begin("a1", repo);
-  await undo.end("a1", repo, []);
-  expect(undo.available("a1")).toBe(0);
 });
 
 test("the index, HEAD, stash and refs are byte for byte the same after a snapshot and after an undo", async () => {
@@ -249,19 +402,75 @@ test("the index, HEAD, stash and refs are byte for byte the same after a snapsho
   await write("src/b.txt", "B stashed\n");
   await git("stash", "push", "-q", "src/b.txt");
   await write("loose.txt", "untracked\n");
-  const first = await state();
+  const porcelain = await git("status", "--porcelain=v2");
+  const head = await git("rev-parse", "HEAD");
+  const settled = await state();
   await undo.begin("a1", repo);
-  expect(await state()).toBe(first);
+  expect(await state()).toBe(settled);
   await write("a.txt", "the turn's\n");
   await write("loose.txt", "the turn's loose\n");
-  await undo.end("a1", repo, ["a.txt", "loose.txt"]);
-  const during = await state();
-  expect(during).toBe(first);
+  await undo.end("a1", "t1");
+  expect(await state()).toBe(settled);
   expect((await undo.undo("a1"))?.restored).toBe(2);
-  expect(await state()).toBe(first);
+  expect(await state()).toBe(settled);
   expect(await read("a.txt")).toBe("staged, then edited\n");
   expect(await read("loose.txt")).toBe("untracked\n");
-  expect(await git("status", "--porcelain")).toBe("MM a.txt\n?? loose.txt\n");
+  expect(await git("status", "--porcelain=v2")).toBe(porcelain);
+  expect(await git("rev-parse", "HEAD")).toBe(head);
+});
+
+test("git timing out part-way keeps the checkpoint and says it stopped", async () => {
+  let slow = true;
+  let writes = 0;
+  const flaky: Exec = async (command, args, options) => {
+    if (slow && args[0] === "checkout-index") {
+      writes += 1;
+      if (writes === 2) {
+        throw Object.assign(new Error("timed out"), { killed: true, signal: "SIGTERM" });
+      }
+    }
+    return exec(command, args, options);
+  };
+  undo = createUndo({ exec: flaky, enabled: () => true, log: (line) => logged.push(line) });
+  await turn("t1", async () => {
+    await write("a.txt", "A1\n");
+    await write("gone.txt", "G1\n");
+    await write("src/b.txt", "B1\n");
+  });
+  expect(await undo.undo("a1")).toEqual({
+    turnId: "t1",
+    restored: 1,
+    skipped: [{ reason: "stopped", count: 2 }],
+  });
+  expect((await undo.status("a1")).map((one) => one.turnId)).toEqual(["t1"]);
+  slow = false;
+  // Again: what the first undo put back is already as before the turn, and the rest follows.
+  expect(await undo.undo("a1")).toEqual({
+    turnId: "t1",
+    restored: 2,
+    skipped: [{ reason: "same", count: 1 }],
+  });
+  expect(await read("a.txt")).toBe("A0\n");
+  expect(await read("gone.txt")).toBe("G0\n");
+  expect(await read("src/b.txt")).toBe("B0\n");
+});
+
+test("a folder that is no repository keeps no checkpoint", async () => {
+  await undo.begin("a1", outside);
+  await write("x.txt", "1\n", outside);
+  await undo.end("a1", "t1");
+  expect(await undo.status("a1")).toEqual([]);
+  expect(await undo.undo("a1")).toBeNull();
+});
+
+test("with the setting off nothing is snapshotted, and the checkpoints kept are dropped", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
+  expect(await undo.status("a1")).toHaveLength(1);
+  on = false;
+  const before = await git("count-objects", "-v");
+  await turn("t2", () => write("a.txt", "A2\n"));
+  expect(await undo.status("a1")).toEqual([]);
+  expect(await git("count-objects", "-v")).toBe(before);
 });
 
 test("a repository with no commit yet can be undone", async () => {
@@ -272,13 +481,13 @@ test("a repository with no commit yet can be undone", async () => {
   await undo.begin("a1", fresh);
   await write("one.txt", "2\n", fresh);
   await write("two.txt", "2\n", fresh);
-  await undo.end("a1", fresh, ["one.txt", "two.txt"]);
+  await undo.end("a1", "t1");
   expect((await undo.undo("a1"))?.restored).toBe(2);
   expect(await readFile(join(fresh, "one.txt"), "utf8")).toBe("1\n");
   await expect(stat(join(fresh, "two.txt"))).rejects.toThrow();
 });
 
-test("a git that fails gives no undo and no error", async () => {
+test("a git that fails keeps no checkpoint and gives no error", async () => {
   const broken = createUndo({
     exec: async () => {
       throw new Error("git is not here");
@@ -287,33 +496,12 @@ test("a git that fails gives no undo and no error", async () => {
     log: (line) => logged.push(line),
   });
   await broken.begin("a1", repo);
-  await broken.end("a1", repo, ["a.txt"]);
-  expect(broken.available("a1")).toBe(0);
+  await broken.end("a1", "t1");
+  expect(await broken.status("a1")).toEqual([]);
 });
 
-test("forgetting an agent drops its turn", async () => {
-  await undo.begin("a1", repo);
-  await write("a.txt", "A1\n");
-  await undo.end("a1", repo, ["a.txt"]);
+test("forgetting an agent drops its checkpoints", async () => {
+  await turn("t1", () => write("a.txt", "A1\n"));
   undo.forget("a1");
   expect(await undo.undo("a1")).toBeNull();
-});
-
-test("the files of a turn are those its edit and write calls named, once, but for calls that failed", () => {
-  const call = (type: string, filePath: string, status = "completed") => ({
-    type: "tool_call",
-    status,
-    detail: { type, filePath },
-  });
-  expect(
-    editedFiles([
-      call("edit", "/r/a.txt"),
-      call("write", "/r/b.txt"),
-      call("edit", "/r/a.txt"),
-      call("edit", "/r/c.txt", "failed"),
-      call("read", "/r/d.txt"),
-      { type: "tool_call", status: "completed", detail: { type: "shell", command: "rm e" } },
-      { type: "assistant_message" },
-    ]),
-  ).toEqual(["/r/a.txt", "/r/b.txt"]);
 });

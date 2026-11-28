@@ -1162,46 +1162,70 @@ Not done here: blocking a call before it runs where no permission is asked. That
 Claude Code hooks written into the host's `~/.claude/settings.json`; Paseo gives a plugin no call
 that does it.
 
-### Undo last turn
+### Checkpoints
 
-**Undo last turn** (Settings, host-wide, off by default) puts back the files an agent's last turn
-edited or wrote. It is git's and Paseo's turn hooks, not Claude Code's, so it works for every
-provider and writes nothing into the host's Claude settings (`server/undo-turn.ts`).
+<a id="undo-last-turn"></a>
+
+**Checkpoints** (formerly "Undo last turn"; the setting is still called **Undo last turn**:
+Settings, host-wide, off by default) keep the last ten turns of each agent, show what each turn
+changed, and undo them one turn at a time, newest first. It is git's and Paseo's turn hooks, not
+Claude Code's, so it works for every provider and writes nothing into the host's Claude settings
+(`server/undo-turn.ts`).
 
 - When a turn starts (`agent.turn.before`) and the agent's folder is inside a git work tree, the
   office saves the work tree as a git tree object: a copy of the repository's index in a
   temporary folder, `git add -A` on the copy, `git write-tree`. Untracked files are in it, what
-  `.gitignore` excludes is not. The repository's own index, HEAD, branches, stash and files are
-  not touched; only objects are added, and no ref. Unreferenced objects are not removed by
-  `git gc` until they are two weeks old, far longer than the snapshot is kept, so a ref would
-  only be one more thing in the repository to clean up.
-- When the turn ends (`agent.turn.after`) the office reads the turn's tool calls and keeps the
-  paths of its edit and write calls, and saves the work tree a second time. Each call has a
-  limit of 15 seconds, the hooks do not hold the turn, and any error means no undo for that turn.
-- A session with an undo that is not at work has **Undo last turn** beside Options. It asks,
-  naming the number of files, and says: "N files restored, M skipped", with the count for each
-  reason.
+  `.gitignore` excludes is not. When the turn ends (`agent.turn.after`) it saves the work tree a
+  second time the same way. The repository's own index, HEAD, branches, stash and files are not
+  touched; only objects are added, and no ref.
+- A turn whose two trees differ is kept as a checkpoint: its id, when it ended, and the two trees.
+  A turn that changed nothing is not kept. Each agent keeps the ten newest; the eleventh drops the
+  oldest. A turn the office could not snapshot (the setting off, a git error) drops the agent's
+  checkpoints, since the turns before it would no longer be one step back each. Each git call has
+  a limit of 15 seconds and the hooks do not hold the turn.
+- The checkpoints are only in the daemon's memory: a restart forgets them. The trees have no ref,
+  so `git gc` may prune old ones (by default once they are two weeks old). The office checks that
+  both trees are still there each time it lists or undoes a checkpoint; one that lost a tree reads
+  "This checkpoint's snapshot is gone" and cannot be undone.
 
-Undo puts back exactly those paths and nothing else, so another agent's or the owner's changes to
-other files stay. A path that is in the snapshot is written back from it (with its mode and git's
-line-end rules); a path that is not (the turn made it) is deleted. It leaves a path as it is, and
-counts it skipped, when:
+**What this turn changed.** A session with checkpoints that is not at work shows, under its
+header, the newest turn's files from `git diff-tree` between its two trees: each path with its
+added and removed lines (`+12 −3`), or "binary", "added", "deleted". It is every file the turn
+changed, by an edit or write tool or by a shell command (`sed -i`, a formatter, `rm`). The first 20
+are shown and the rest behind "N more"; the host lists 200 files a turn at most and counts the rest.
+The earlier turns are folded under **Earlier turns**, one line each ("14:02 · 5 files"), each
+opening to its files.
 
-- the file changed after the turn ended: its content is not what the second snapshot holds, so
-  it is somebody's later work;
-- the path is outside the work tree (a `..`, a link out of it, another repository) or inside `.git`;
-- git ignores the path, so a snapshot has nothing to restore it from;
-- the path is a symbolic link;
-- the file is already as it was before the turn;
-- the write failed.
+**Undo this turn** is on the newest turn only. It asks once ("Put back the files this turn changed?
+Files changed since are left alone."), then says "Put back N files" and, for the files it left,
+each reason with its count. It is refused while the agent is at work. It goes over every path the
+turn's diff lists and compares the file in the work tree now with the turn's end tree (content and
+executable bit, hashed by git with its filters; a missing file matches a file the end tree does not
+have):
 
-Limits, said in the confirmation too: a change a shell command made (`sed -i`, `git checkout`,
-`rm`, a formatter) is **not** undone, only the files the turn's edit and write calls named, since
-undoing the whole tree would destroy what other agents in the repository did meanwhile. One level
-only: the next turn, and an undo, replace the snapshot. It is kept in the daemon's memory, so a
-restart loses it. A snapshot is taken when the hook runs, which Paseo does not wait for, so an
-edit made in the first moments of the turn may already be in it, and then undo leaves that file
-as the snapshot saw it.
+- the same as the turn left it: a file the turn added is deleted, with the folders it made that are
+  left empty (a folder born after the turn began; where the file system keeps no birth time, the
+  folder stays); a file the turn changed or deleted is written back from the before tree, with its
+  executable bit;
+- different: it is somebody's later work, and is left, counted "changed since the turn"; one
+  already as it was before the turn is counted as that.
+
+A path is never touched, and is counted under its own reason, when it is outside the work tree once
+resolved, inside `.git`, ignored by git, a symbolic link (in the work tree or in either tree), a
+submodule, or under a folder that is a symbolic link. A file whose write fails is counted too.
+Writing back goes through a temporary index read from the before tree (`git checkout-index`); undo
+never runs `git checkout`, `reset`, `stash` or `clean`, and never changes the index, HEAD, a branch
+or a stash.
+
+After an undo the checkpoint leaves the list, so the next undo steps one turn further back. If git
+runs out of time part-way, the checkpoint stays, the answer counts the files put back and the ones
+"not reached: git stopped", and a second undo finishes it. An undo happens outside a turn, so it is
+not a checkpoint itself. One agent's turns and undos wait for each other; checkpoints are per
+agent, and the comparison with the end tree is what keeps an undo from overwriting another agent's
+later work in the same repository.
+
+A snapshot is taken when the hook runs, which Paseo does not wait for, so an edit made in the first
+moments of a turn may already be in its before tree, and is then not undone.
 
 ## Plan and machine tools
 
@@ -1789,7 +1813,8 @@ device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an 
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.
 With **Undo last turn** on, the office also writes git objects (blobs and trees, no ref) into the
 repositories agents work in, and a temporary index in the system's temporary folder while it
-does; nothing else of it is kept on disk, and the last turn's snapshot is only in memory.
+does; nothing else of it is kept on disk, and the checkpoints (ten turns an agent) are only in
+memory.
 A save of a device setting spreads the values it read and never passes a key with no value: the host
 refuses a document that holds `undefined`, and the device then keeps nothing.
 

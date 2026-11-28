@@ -28,15 +28,13 @@ const spent = (time: string, cost: string | undefined) => {
 };
 
 export const RULES: readonly Rule[] = [
+  [/^Put back (\d+) files?$/, (n) => `${n} berkas dikembalikan`],
   [
-    /^Undo the last turn's edits to (\d+) files?\?$/,
-    (n) => `Urungkan suntingan giliran terakhir pada ${n} berkas?`,
-  ],
-  [/^(\d+) files? restored, (\d+) skipped$/, (n, m) => `${n} berkas dikembalikan, ${m} dilewati`],
-  [
-    /^(\d+) files? (changed after the turn|outside the repository|ignored by git|left alone, being a link|with nothing to put back|that could not be written)$/,
+    /^(\d+) (changed since the turn|already as before the turn|outside the repository|inside \.git|ignored by git|left alone as links|in a linked folder|left alone as submodules|could not be written|not reached: git stopped)$/,
     (n, why) => `${n} berkas ${translatePattern(why)}`,
   ],
+  [/^(\d+) more$/, (n) => `${n} lagi`],
+  [/^(\d\d:\d\d) · (\d+) files?$/, (time, n) => `${time} · ${n} berkas`],
   [/^(\d+) min ago$/, (n) => `${n} mnt lalu`],
   [/^(\d+) h ago$/, (n) => `${n} jam lalu`],
   [/^(\d+) min$/, (n) => `${n} mnt`],
