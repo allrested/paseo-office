@@ -362,15 +362,8 @@ export function createOfficePlugin(
   });
   // What each agent's turns have cost, as the directory last reported; the boards' time and cost.
   let agentCosts = new Map<string, number>();
-  const stopCosts = hub.watch((view) => {
-    // A directory that stops leaves the last costs standing: a restart reports them again.
-    if (view === null) return;
-    agentCosts = new Map(
-      view.agents.flatMap((agent) =>
-        agent.costUsd === undefined ? [] : [[agent.id, agent.costUsd] as const],
-      ),
-    );
-  });
+  // Which agents are in a turn; the boards settle a done task's cost once its agent's is over.
+  let agentsWorking = new Map<string, boolean>();
   let stopTimeline: (() => void) | undefined;
   const timelineReady = (async () => {
     const kept = (await deps.timelineStore?.load()) ?? null;
@@ -395,8 +388,25 @@ export function createOfficePlugin(
       holder,
       () => roster,
       (agentId) => agentCosts.get(agentId),
+      (agentId) => agentsWorking.get(agentId) === true,
     ),
     log,
+  });
+  const stopCosts = hub.watch((view) => {
+    // A directory that stops leaves the last costs standing: a restart reports them again.
+    if (view === null || view.agents.length === 0) return;
+    agentCosts = new Map(
+      view.agents.flatMap((agent) =>
+        agent.costUsd === undefined ? [] : [[agent.id, agent.costUsd] as const],
+      ),
+    );
+    agentsWorking = new Map(
+      view.agents.map(
+        (agent) =>
+          [agent.id, agent.status === "running" || agent.status === "initializing"] as const,
+      ),
+    );
+    void office.settleSpentOf(agentsWorking);
   });
 
   const samples: HostSample[] = [];

@@ -58,6 +58,7 @@ interface Listeners {
   refuse?: BoardServicePorts["refuse"];
   teams?: TeamPorts;
   costOf?: BoardServicePorts["costOf"];
+  working?: BoardServicePorts["working"];
 }
 
 type TeamPorts = Pick<BoardServicePorts, "teamOf" | "findTeam" | "teamName">;
@@ -114,6 +115,7 @@ function build(
     ...(listeners.refuse ? { refuse: listeners.refuse } : {}),
     ...listeners.teams,
     ...(listeners.costOf ? { costOf: listeners.costOf } : {}),
+    ...(listeners.working ? { working: listeners.working } : {}),
     workspaceOf,
   });
   return { service, store, clock, events };
@@ -1761,5 +1763,177 @@ describe("the time and cost of a task", () => {
       roomOf,
     );
     expect(find(service, "p2")).toMatchObject({ claimedAt: later(-5), costAtClaim: 2 });
+  });
+});
+
+describe("a cost settled when the agent's turn has ended", () => {
+  const MIN = 60 * 1000;
+  const costs = new Map<string, number>();
+  const busy = new Set<string>();
+  const start = (initial: Post[] = [lobbyTask(1)]) =>
+    harness(
+      file(initial),
+      { costOf: (id) => costs.get(id), working: (id) => busy.has(id) },
+      roomOf,
+    );
+  const act = (
+    service: BoardService,
+    id: string,
+    action: "claim" | "done" | "reopen",
+    actor = "a",
+  ) => service.update({ id, action, actor });
+
+  test("done in the middle of the holder's turn is pending: doneAt, a marker, no spentUsd, on both posts", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service, clock } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    clock.advance(5 * MIN);
+    costs.set("a", 1);
+    await act(service, "p3", "done");
+    for (const id of ["p1", "p3"]) {
+      expect(find(service, id)).toMatchObject({
+        state: "done",
+        spentPending: true,
+        costAtClaim: 1,
+      });
+      expect(find(service, id)).not.toHaveProperty("spentUsd");
+    }
+  });
+
+  test("settling after the turn takes the new cost, drops the marker, on both posts, in one save", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service, store, events } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p3", "done");
+    busy.delete("a");
+    costs.set("a", 1.3333);
+    const saves = store.saved.length;
+    events.length = 0;
+    await service.settleSpent("a");
+    expect(store.saved).toHaveLength(saves + 1);
+    for (const id of ["p1", "p3"]) {
+      expect(find(service, id)).toMatchObject({ spentUsd: 0.3333 });
+      expect(find(service, id)).not.toHaveProperty("spentPending");
+    }
+    expect(events.sort()).toEqual(["board lobby p1", "board w1 p3"]);
+  });
+
+  test("settling saves nothing when nothing is pending, or it is another agent's", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service, store } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p1", "done");
+    const saves = store.saved.length;
+    await service.settleSpent("b");
+    await service.settleSpent("a");
+    await service.settleSpent("a");
+    expect(store.saved).toHaveLength(saves + 1);
+  });
+
+  test("done while the holder is not working settles at once, also when the user marks it", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service } = await start();
+    await act(service, "p1", "claim");
+    costs.set("a", 1.5);
+    await act(service, "p1", "done", "user");
+    expect(find(service, "p1")).toMatchObject({ spentUsd: 0.5 });
+    expect(find(service, "p1")).not.toHaveProperty("spentPending");
+  });
+
+  test("a task claimed without a known cost has no marker whatever the agent is at", async () => {
+    costs.clear();
+    busy.clear();
+    const { service } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p1", "done");
+    expect(find(service, "p1")).not.toHaveProperty("spentPending");
+  });
+
+  test("settling with the cost unknown or gone down drops the marker and sets no spentUsd", async () => {
+    for (const after of [undefined, 0.2]) {
+      costs.clear();
+      busy.clear();
+      costs.set("a", 1);
+      const { service } = await start();
+      await act(service, "p1", "claim");
+      busy.add("a");
+      await act(service, "p1", "done");
+      if (after === undefined) costs.delete("a");
+      else costs.set("a", after);
+      await service.settleSpent("a");
+      expect(find(service, "p1")).toMatchObject({ doneAt: AT_T0 });
+      expect(find(service, "p1")).not.toHaveProperty("spentUsd");
+      expect(find(service, "p1")).not.toHaveProperty("spentPending");
+      expect(find(service, "p3")).not.toHaveProperty("spentPending");
+    }
+  });
+
+  test("a reopen drops the marker", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service } = await start();
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p1", "done");
+    await act(service, "p1", "reopen", "user");
+    expect(find(service, "p1")).not.toHaveProperty("spentPending");
+    expect(service.spentPendingAgents()).toEqual([]);
+  });
+
+  test("the agents with a pending task are known, and again after a restart", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 1);
+    const { service, store } = await start();
+    expect(service.spentPendingAgents()).toEqual([]);
+    await act(service, "p1", "claim");
+    busy.add("a");
+    await act(service, "p1", "done");
+    expect(service.spentPendingAgents()).toEqual(["a"]);
+    const restarted = createBoardService({
+      store,
+      clock: createFakeClock(T0),
+      log: () => undefined,
+      label: (author) => author,
+      onBoard: () => undefined,
+      onBoardRemoved: () => undefined,
+      workspaceOf: async () => null,
+    });
+    await restarted.start();
+    expect(restarted.spentPendingAgents()).toEqual(["a"]);
+    await service.settleSpent("a");
+    expect(service.spentPendingAgents()).toEqual([]);
+  });
+
+  test("a claim at cost 0 keeps it, and the sum is rounded off float noise", async () => {
+    costs.clear();
+    busy.clear();
+    costs.set("a", 0);
+    const zero = await start();
+    await act(zero.service, "p1", "claim");
+    expect(find(zero.service, "p1")).toMatchObject({ costAtClaim: 0 });
+    costs.set("a", 0.30000000000000004);
+    await act(zero.service, "p1", "done");
+    expect(find(zero.service, "p1")).toMatchObject({ spentUsd: 0.3 });
+
+    costs.set("a", 0.1);
+    const sum = await start();
+    await act(sum.service, "p1", "claim");
+    costs.set("a", 0.1 + 0.2);
+    await act(sum.service, "p1", "done");
+    expect(find(sum.service, "p1")?.spentUsd).toBe(0.2);
   });
 });

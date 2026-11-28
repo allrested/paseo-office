@@ -72,6 +72,8 @@ export interface BoardServicePorts {
   teamName?(teamId: string): string | null;
   /** What an agent's turns have cost so far; undefined when its provider reports no cost. */
   costOf?(agentId: string): number | undefined;
+  /** Whether an agent is in a turn now (running or initializing); false when unknown. */
+  working?(agentId: string): boolean;
 }
 
 /** What the duty board is brought up to: the list, the board's day, and the duties due now. */
@@ -117,6 +119,13 @@ export interface BoardService {
   releaseClaims(agentId: string): Promise<string[]>;
   /** A pretend duty the 3D office acted out: done by that agent. Once done, it stays as it is. */
   actDuty(id: string, agentId: string): Promise<PostResult>;
+  /**
+   * Works out `spentUsd` of every done task of `agentId` that waited for its turn to end, from the
+   * cost now known, and drops the wait. One save; none when nothing waits.
+   */
+  settleSpent(agentId: string): Promise<void>;
+  /** The agents that hold a done task whose cost still waits for their turn to end. */
+  spentPendingAgents(): string[];
 }
 
 /** The boards whose tasks the office hands to idle agents. */
@@ -197,6 +206,17 @@ function leavesAtSync(post: Post, plan: DutySync, listed: ReadonlyMap<string, Du
 export function createBoardService(ports: BoardServicePorts): BoardService {
   let data: BoardsFile = { version: 1, nextSeq: 1, wakesPaused: false, posts: [] };
   let chain: Promise<unknown> = Promise.resolve();
+  // Who holds a done task whose cost waits; kept with `data`, so a directory view costs nothing.
+  let pendingAgents = new Set<string>();
+
+  function hold(next: BoardsFile): BoardsFile {
+    pendingAgents = new Set(
+      next.posts.flatMap((item) =>
+        item.spentPending && item.claimedBy !== undefined ? [item.claimedBy] : [],
+      ),
+    );
+    return next;
+  }
 
   function exclusive<T>(work: () => Promise<T>): Promise<T> {
     const run = chain.then(work);
@@ -260,7 +280,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       ports.log(`[office] unable to save the board: ${errorMessage(error)}`);
       return { ok: false, error: `Unable to save the board: ${errorMessage(error)}` };
     }
-    data = next;
+    data = hold(next);
     for (const board of new Set(touched)) tell(() => ports.onBoard(board, postsOf(board)));
     return { ok: true, value: null };
   }
@@ -567,8 +587,17 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       const done = { ...post, state: "done" as const, doneAt: now() };
       delete done.pickupMessageId;
       delete done.blocked;
-      const spent = spentSince(post);
-      if (spent !== undefined) done.spentUsd = spent;
+      // A turn's cost is reported when the turn ends: done in the middle of one, it is settled then.
+      if (
+        post.claimedBy !== undefined &&
+        post.costAtClaim !== undefined &&
+        ports.working?.(post.claimedBy)
+      ) {
+        done.spentPending = true;
+      } else {
+        const spent = spentSince(post);
+        if (spent !== undefined) done.spentUsd = spent;
+      }
       const result = input.note?.trim();
       if (result) done.result = result;
       return post.state === "done" ? { ok: true, value: null } : { ok: true, value: done };
@@ -586,6 +615,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (post.result !== undefined) done.result = post.result;
     if (post.doneAt !== undefined) done.doneAt = post.doneAt;
     if (post.spentUsd !== undefined) done.spentUsd = post.spentUsd;
+    if (post.spentPending) done.spentPending = true;
     return done;
   }
 
@@ -836,11 +866,33 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return saved.ok ? { ok: true, post: acted } : saved;
   }
 
+  async function settlePending(agentId: string): Promise<void> {
+    const waiting = data.posts.filter(
+      (item) => item.spentPending && item.state === "done" && item.claimedBy === agentId,
+    );
+    if (waiting.length === 0) return;
+    let seq = data.nextSeq;
+    const settled = new Map<string, Post>();
+    for (const item of waiting) {
+      const next: Post = { ...item, seq: seq++, updatedAt: now() };
+      delete next.spentPending;
+      const spent = spentSince(item);
+      if (spent !== undefined) next.spentUsd = spent;
+      settled.set(item.id, next);
+    }
+    const posts = data.posts.map((item) => settled.get(item.id) ?? item);
+    const saved = await commit(
+      { ...data, nextSeq: seq, posts },
+      waiting.map((item) => item.board),
+    );
+    if (!saved.ok) throw new Error(saved.error);
+  }
+
   return {
     // Queued like every mutation, so a post made while the file loads waits for it.
     start: () =>
       exclusive(async () => {
-        data = await ports.store.load();
+        data = hold(await ports.store.load());
         await copyClaims();
         await prunePosts();
       }),
@@ -985,5 +1037,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     syncDuties: (plan) => exclusive(() => syncDutyBoard(plan)),
     releaseClaims: (agentId) => exclusive(() => releaseHeld(agentId)),
     actDuty: (id, agentId) => exclusive(() => recordActed(id, agentId)),
+    settleSpent: (agentId) => exclusive(() => settlePending(agentId)),
+    spentPendingAgents: () => [...pendingAgents],
   };
 }

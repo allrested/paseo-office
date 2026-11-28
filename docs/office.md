@@ -575,13 +575,16 @@ takes its replies with it when it is deleted, cleared or dropped.
 
 A done task says what it took, in one line under its result and above its replies, on a card and
 on a list row: "took 23 min · $0.42". The time runs from the claim to done ("took under a minute",
-"took 1 h 5 min", "took 1 d 3 h"). The cost is what the agent that held the task spent from its
-claim to done, read from the cost the agent's provider reports; chat with the agent in that time
-counts too, since it is the agent's turns that are measured, not only the task's. A provider that
-reports no cost, or whose counter went back down in between, shows the time alone, as does a task
-you claimed yourself, and a cost under one cent shows as "under $0.01". Whoever marks the task done,
-the line measures the agent that held it. A reopened task loses the line and starts afresh at its
-next claim; a task done with no claim, and a pretend duty acted out in the 3D office, show none.
+"took 1 h 5 min", "took 1 d 3 h"). The cost is what the agent that held the task spent, read from
+the cost its provider reports: a provider reports it when a turn ends, so it is counted from the
+turn the task was claimed in to the end of the turn it was finished in, and chat with the agent in
+that time counts too, since it is the agent's turns that are measured, not only the task's. A task
+marked done while its agent is still at work shows the time alone until that turn ends, and the
+cost joins the line then. A provider that reports no cost, or whose counter went back down in
+between, shows the time alone, as does a task you claimed yourself, and a cost under one cent shows
+as "under $0.01". Whoever marks the task done, the line measures the agent that held it. A
+reopened task loses the line and starts afresh at its next claim; a task done with no claim, and a
+pretend duty acted out in the 3D office, show none.
 `office_read` does not carry the line.
 
 A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the

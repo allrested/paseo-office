@@ -210,6 +210,8 @@ export const PostSchema = z.object({
   costAtClaim: z.number().nonnegative().optional(),
   /** What the holder's turns cost from the claim to done; absent when either end had no cost. */
   spentUsd: z.number().nonnegative().optional(),
+  /** On a done task: its agent was still at work when it was marked done, so `spentUsd` waits for the turn's end. */
+  spentPending: z.literal(true).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

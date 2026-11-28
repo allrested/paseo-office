@@ -45,6 +45,8 @@ export interface OfficeAgentPorts {
   teamName(teamId: string): string | null;
   /** What the agent's turns have cost so far, as the directory last had it; undefined when unknown. */
   costOf(agentId: string): number | undefined;
+  /** Whether the agent is in a turn now, as the directory last had it; false when unknown. */
+  working(agentId: string): boolean;
 }
 
 export type OfficeHub = Pick<Hub, "setBoards" | "setBoard" | "removeBoard" | "setWake">;
@@ -86,6 +88,11 @@ export interface Office {
   turnEnded(agentId: string): void;
   checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
   agentGone(agentId: string): void;
+  /**
+   * The directory's view: whether each agent is in a turn. An agent holding done tasks whose cost
+   * waits for its turn to end, and no longer in one (or gone from the view), has them settled.
+   */
+  settleSpentOf(working: ReadonlyMap<string, boolean>): Promise<void>;
   workspaceArchived(workspaceId: string): Promise<void>;
   stop(): Promise<void>;
 }
@@ -153,6 +160,7 @@ export function createOffice(deps: OfficeDeps): Office {
     findTeam: (nameOrId) => deps.agents.findTeam(nameOrId),
     teamName: (teamId) => deps.agents.teamName(teamId),
     costOf: (agentId) => deps.agents.costOf(agentId),
+    working: (agentId) => deps.agents.working(agentId),
   });
 
   function noteAgent(agent: ToolAgent): void {
@@ -309,8 +317,24 @@ export function createOffice(deps: OfficeDeps): Office {
       const result = (text ?? "").trimEnd().split("\n").slice(0, -1).join("\n").trim();
       await service.finishLobbyClaim(claim, result.slice(0, POST_TEXT_MAX) || undefined);
     },
+    async settleSpentOf(working) {
+      await ready;
+      for (const agentId of service.spentPendingAgents()) {
+        if (working.get(agentId) === true) continue;
+        try {
+          await service.settleSpent(agentId);
+        } catch (error) {
+          log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`);
+        }
+      }
+    },
     agentGone(agentId) {
       queue?.agentGone(agentId);
+      void ready
+        .then(() => service.settleSpent(agentId))
+        .catch((error: unknown) =>
+          log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`),
+        );
       // A closed or archived agent never finishes what it held: the tasks go back to the pickup.
       void ready
         .then(() => service.releaseClaims(agentId))

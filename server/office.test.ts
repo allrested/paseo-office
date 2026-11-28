@@ -116,6 +116,7 @@ function setup(initial?: BoardsFile) {
               null),
         teamName: (id) => teams.get(id) ?? null,
         costOf: () => undefined,
+        working: () => false,
         ...overrides,
       },
       log: (message) => logs.push(message),
@@ -1101,4 +1102,70 @@ test("a scan's own saves never start another scan", async () => {
   await settle();
   expect(scans).toBe(2);
   await office.stop();
+});
+
+test("a cost the ports know reaches the board: an agent's claim keeps it, and its done is settled after the turn", async () => {
+  const { build, clock, store } = setup();
+  let cost = 2;
+  let working = true;
+  const office = build({
+    workspaceOf: async () => null,
+    costOf: (id) => (id === "b" ? cost : undefined),
+    working: () => working,
+  });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ claimedBy: "b", costAtClaim: 2 });
+  await office.update({ id: "p1", action: "done" });
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  expect(store.current().posts[0]).not.toHaveProperty("spentUsd");
+  // The directory still shows the agent at work: nothing is settled.
+  await office.settleSpentOf(new Map([["b", true]]));
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  // Not at work, with the cost of the turn: settled; another agent's state changes nothing.
+  working = false;
+  cost = 2.5;
+  await office.settleSpentOf(
+    new Map([
+      ["a", false],
+      ["b", true],
+    ]),
+  );
+  expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+  await office.settleSpentOf(
+    new Map([
+      ["a", true],
+      ["b", false],
+    ]),
+  );
+  expect(store.current().posts[0]).toMatchObject({ spentUsd: 0.5 });
+  expect(store.current().posts[0]).not.toHaveProperty("spentPending");
+  await office.stop();
+});
+
+test("an agent that left the directory, or was closed, settles its pending tasks with no cost", async () => {
+  for (const how of ["absent", "closed"]) {
+    const { build, clock, store } = setup();
+    let working = true;
+    let known = true;
+    const office = build({ costOf: () => (known ? 1 : undefined), working: () => working });
+    await office.ready;
+    office.setPickupEnabled(true);
+    await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+    clock.advance(0);
+    await settle();
+    await office.update({ id: "p1", action: "done" });
+    expect(store.current().posts[0]).toMatchObject({ spentPending: true });
+    working = false;
+    known = false;
+    if (how === "absent") await office.settleSpentOf(new Map([["a", true]]));
+    else office.agentGone("b");
+    await settle();
+    expect(store.current().posts[0]).not.toHaveProperty("spentPending");
+    expect(store.current().posts[0]).not.toHaveProperty("spentUsd");
+    await office.stop();
+  }
 });

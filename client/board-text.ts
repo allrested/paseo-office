@@ -119,10 +119,10 @@ export function taskSpent(post: Post): string | null {
   }
   const from = Date.parse(post.claimedAt);
   const to = Date.parse(post.doneAt);
-  if (Number.isNaN(from) || Number.isNaN(to)) return null;
-  const time = `took ${spanText(Math.max(0, to - from))}`;
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return null;
+  const time = `took ${spanText(to - from)}`;
   const cost = post.spentUsd;
-  if (cost === undefined || cost <= 0) return time;
+  if (post.spentPending || cost === undefined || cost <= 0) return time;
   return `${time} · ${cost < 0.01 ? "under $0.01" : `$${cost.toFixed(2)}`}`;
 }
 

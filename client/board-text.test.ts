@@ -471,7 +471,12 @@ describe("taskSpent", () => {
     expect(spent(MIN, { doneAt: "later" })).toBeNull();
   });
 
-  test("a done time before the claim reads as no time at all", () => {
-    expect(spent(-5 * MIN)).toBe("took under a minute");
+  test("a done time before the claim has no line", () => {
+    expect(spent(-5 * MIN)).toBeNull();
+  });
+
+  test("a cost still being settled shows the time alone", () => {
+    expect(spent(23 * MIN, { spentPending: true })).toBe("took 23 min");
+    expect(spent(23 * MIN, { spentPending: true, spentUsd: 0.42 })).toBe("took 23 min");
   });
 });
