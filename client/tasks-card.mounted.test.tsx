@@ -90,6 +90,23 @@ const STALLED: TaskAttentionRow[] = [
     cause: "error",
   },
 ];
+const MERGED: TaskAttentionRow[] = [
+  {
+    kind: "merged",
+    post: post(4, { board: "w1", text: "Fix the ledger" }),
+    board: "Checkout",
+    holder: "Tester",
+    reason: null,
+    pullRequest: "#42 Fix the ledger total",
+  },
+  {
+    kind: "merged",
+    post: post(7, { text: "Ship it" }),
+    board: "Lobby",
+    holder: "Builder",
+    reason: null,
+  },
+];
 const NO_ROWS: TaskAttentionRow[] = [];
 
 let opened: string[];
@@ -286,4 +303,45 @@ test("a stalled row's words are in the interface's language", async () => {
   expect(allLabelled("Nudge")).toHaveLength(0);
   expect(lines()).not.toContain("Tester is idle");
   expect(lines()).not.toContain("2 stalled");
+});
+
+test("a merged row says whose pull request is merged, offers Mark done and Open board, and has no Answer or Nudge", async () => {
+  await mount(<Harness rows={MERGED} />);
+  expect(lines()).toEqual([
+    "2 merged",
+    "Fix the ledger",
+    "Tester's pull request is merged: #42 Fix the ledger total",
+    "Checkout",
+    "Mark done",
+    "Open board",
+    "Ship it",
+    "Builder's pull request is merged",
+    "Lobby",
+    "Mark done",
+    "Open board",
+  ]);
+  expect(allLabelled("Answer")).toHaveLength(0);
+  expect(allLabelled("Nudge")).toHaveLength(0);
+  expect(allLabelled("Reopen")).toHaveLength(0);
+});
+
+test("Mark done marks the task done and nothing else happens by itself", async () => {
+  await mount(<Harness rows={MERGED} />);
+  expect(sent.calls).toEqual([]);
+  await press("Mark done", 1);
+  expect(sent.calls).toEqual([{ id: "p7", action: "done" }]);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("a merged row's words are in the interface's language", async () => {
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={MERGED} />
+    </UiLanguage>,
+  );
+  expect(allLabelled("Mark done")).toHaveLength(0);
+  expect(allLabelled(UI_VI["Mark done"])).toHaveLength(2);
+  expect(lines()).not.toContain("2 merged");
+  expect(lines().filter((line) => line.includes("pull request is merged"))).toEqual([]);
 });

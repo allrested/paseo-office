@@ -44,7 +44,7 @@ export function useTaskAttention({ model, live, showBoard }: TaskAttentionInput)
   if (opened && rows.length === 0) setOpened(false);
   const entry = useMemo((): StripCard | null => {
     const note = taskAttentionNote(rows);
-    // A blocked or stalled task waits on the user, so the card asks for a look and counts in Attention.
+    // A blocked, stalled or merged task waits on the user, so the card asks for a look and counts in Attention.
     return note === null ? null : { title: "Tasks", note: { text: note, tone: "warning" }, onOpen };
   }, [rows, onOpen]);
   const openBoard = useCallback(

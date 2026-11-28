@@ -1,18 +1,24 @@
 import { describe, expect, it } from "vitest";
 import type { OfficeAgent, Post } from "../shared/contracts.js";
-import type { OfficeRoom } from "../shared/model.js";
+import type { OfficeModel, OfficeRoom } from "../shared/model.js";
 import {
   blockedLine,
+  mergedLine,
   NUDGE_TEXT,
   STALL_MS,
   stalledLine,
   taskAttentionNote,
-  taskAttentionRows,
+  taskAttentionRows as rowsOfModel,
   taskPreview,
   type TaskAttentionRow,
 } from "./task-attention.js";
 
 const NOW = Date.parse("2026-11-28T12:00:00.000Z");
+
+type Input = Pick<OfficeModel, "rooms" | "agents"> & Partial<Pick<OfficeModel, "roomOfAgent">>;
+/** The rows of a model; a model without `roomOfAgent` has every agent in the lobby. */
+const taskAttentionRows = (model: Input, now: number) =>
+  rowsOfModel({ roomOfAgent: new Map(), ...model }, now);
 
 function post(seq: number, fields: Partial<Post> = {}): Post {
   const at = `2026-11-28T09:00:${String(seq).padStart(2, "0")}.000Z`;
@@ -31,14 +37,30 @@ function post(seq: number, fields: Partial<Post> = {}): Post {
   };
 }
 
-function room(id: string, name: string, posts: Post[]): OfficeRoom {
+function room(
+  id: string,
+  name: string,
+  posts: Post[],
+  pullRequest?: Partial<NonNullable<OfficeRoom["workspace"]>["pullRequest"]>,
+): OfficeRoom {
   const lobby = id === "lobby";
   return {
     id,
     name,
     subtitle: null,
     lobby,
-    workspace: null,
+    workspace:
+      lobby || pullRequest === undefined
+        ? null
+        : ({
+            id,
+            pullRequest: {
+              number: null,
+              url: "https://example.test/pr",
+              title: "",
+              ...pullRequest,
+            },
+          } as OfficeRoom["workspace"]),
     rows: [],
     posts,
     todos: lobby ? posts.filter((item) => item.kind === "task") : [],
@@ -241,5 +263,123 @@ describe("task attention words", () => {
     expect(taskPreview("Ship it")).toBe("Ship it");
     expect(taskPreview("one\ntwo\nthree")).toBe("one\ntwo…");
     expect(taskPreview("x".repeat(200))).toBe(`${"x".repeat(120)}…`);
+  });
+});
+
+describe("merged rows", () => {
+  /** a1 works in w1, whose pull request is in `state`. */
+  const workspaceModel = (state: string, posts: Post[], extra: Partial<Input> = {}): Input => ({
+    agents,
+    roomOfAgent: new Map([["a1", "w1"]]),
+    rooms: [room("lobby", "Lobby", []), room("w1", "Checkout", posts, { state } as never)],
+    ...extra,
+  });
+
+  it("lists a claimed task whose holder's pull request is merged", () => {
+    const rows = taskAttentionRows(workspaceModel("merged", [post(1, { board: "w1" })]), NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "merged",
+      board: "Checkout",
+      holder: "Builder",
+      reason: null,
+    });
+  });
+
+  it.each(["open", "draft", "closed"])("does not list it while the pull request is %s", (state) => {
+    expect(taskAttentionRows(workspaceModel(state, [post(1, { board: "w1" })]), NOW)).toEqual([]);
+  });
+
+  it("does not list an open or done task, nor one whose holder is not an agent here", () => {
+    const posts = [
+      post(1, { board: "w1", state: "open", claimedBy: undefined }),
+      post(2, { board: "w1", state: "done" }),
+      post(3, { board: "w1", claimedBy: "gone" }),
+      post(4, { board: "w1", claimedBy: "user" }),
+    ];
+    expect(taskAttentionRows(workspaceModel("merged", posts), NOW)).toEqual([]);
+  });
+
+  it("does not list a task whose holder is in the lobby", () => {
+    const model = workspaceModel("merged", [], { roomOfAgent: new Map([["a1", "lobby"]]) });
+    model.rooms[0]?.posts.push(post(1));
+    expect(taskAttentionRows(model, NOW)).toEqual([]);
+  });
+
+  it("lists a lobby task held by that agent, whatever board the task is on", () => {
+    const model = workspaceModel("merged", []);
+    model.rooms[0]?.posts.push(post(1));
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "merged", board: "Lobby", holder: "Builder" });
+  });
+
+  it("leaves a blocked or stalled task in its own kind", () => {
+    const old = stalledAt(5 * 60_000);
+    const model = workspaceModel(
+      "merged",
+      [
+        post(1, { board: "w1", blocked: "Which region?" }),
+        post(2, { board: "w1", updatedAt: old }),
+        post(3, { board: "w1", updatedAt: stalledAt(1000) }),
+      ],
+      { agents: withStatus(["a1", "idle"]) },
+    );
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows.map((row) => [row.post.id, row.kind])).toEqual([
+      ["p1", "blocked"],
+      ["p2", "stalled"],
+      ["p3", "merged"],
+    ]);
+  });
+
+  it("lists a lobby task and its copy once, as the lobby task", () => {
+    const model = workspaceModel("merged", [post(4, { board: "w1", link: "p3" })]);
+    model.rooms[0]?.posts.push(post(3, { link: "p4" }));
+    const rows = taskAttentionRows(model, NOW);
+    expect(ids(rows)).toEqual(["p3"]);
+    expect(rows[0]?.board).toBe("Lobby");
+  });
+
+  it("puts merged rows after blocked and stalled ones, each oldest first", () => {
+    const old = stalledAt(5 * 60_000);
+    const model = workspaceModel(
+      "merged",
+      [post(8, { board: "w1" }), post(5, { board: "w1" }), post(9, { board: "w1", blocked: "?" })],
+      { agents: withStatus(["a2", "idle"]) },
+    );
+    model.rooms[0]?.posts.push(post(2, { claimedBy: "a2", updatedAt: old }));
+    expect(ids(taskAttentionRows(model, NOW))).toEqual(["p9", "p2", "p5", "p8"]);
+  });
+
+  it("carries the pull request's number and title when it has them", () => {
+    const model = workspaceModel("merged", [post(1, { board: "w1" })]);
+    const pr = model.rooms[1]?.workspace?.pullRequest;
+    if (pr) Object.assign(pr, { number: 42, title: "Fix the ledger total" });
+    expect(taskAttentionRows(model, NOW)[0]?.pullRequest).toBe("#42 Fix the ledger total");
+    if (pr) Object.assign(pr, { number: null, title: "" });
+    expect(taskAttentionRows(model, NOW)[0]?.pullRequest).toBeUndefined();
+  });
+
+  it("counts merged tasks in the note, as the third part", () => {
+    const row = (kind: TaskAttentionRow["kind"]) =>
+      ({ kind, post: post(1), board: "Lobby", holder: null, reason: null }) as TaskAttentionRow;
+    const blocked = row("blocked");
+    const stalled = row("stalled");
+    const merged = row("merged");
+    expect(taskAttentionNote([merged])).toBe("1 merged");
+    expect(taskAttentionNote([merged, merged])).toBe("2 merged");
+    expect(taskAttentionNote([blocked, merged])).toBe("1 needs you · 1 merged");
+    expect(taskAttentionNote([stalled, merged])).toBe("1 stalled · 1 merged");
+    expect(taskAttentionNote([blocked, stalled, merged, merged])).toBe(
+      "1 needs you · 1 stalled · 2 merged",
+    );
+  });
+
+  it("says whose pull request is merged", () => {
+    expect(mergedLine({ holder: "Builder", pullRequest: "#42 Fix the ledger total" })).toBe(
+      "Builder's pull request is merged: #42 Fix the ledger total",
+    );
+    expect(mergedLine({ holder: "Builder" })).toBe("Builder's pull request is merged");
   });
 });
