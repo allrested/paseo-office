@@ -23,12 +23,19 @@ const SKIPPED: Readonly<Record<UndoSkip, string>> = {
   submodule: "left alone as submodules",
   write: "could not be written",
   stopped: "not reached: git stopped",
+  began: "not reached: an agent began working",
+  retry: "not put back yet: undo again to finish",
 };
 
 /** The files of a turn shown before "N more". */
 const SHOWN = 20;
 
-export const UNDO_ASK = "Put back the files this turn changed? Files changed since are left alone.";
+export const UNDO_ASK =
+  "Put back everything that changed in this folder during the turn? Files changed since are left alone.";
+
+/** Said when a turn could not be snapshotted and the list was emptied. */
+export const UNDO_GAP =
+  "The last turn could not be snapshotted, so the checkpoints before it were dropped.";
 
 const files = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
 
@@ -112,6 +119,7 @@ interface UndoTurnProps {
 export function UndoTurn({ agentId, running, styles }: UndoTurnProps) {
   const call = useRpc(undoRpc);
   const [turns, setTurns] = useState<Checkpoint[]>([]);
+  const [gap, setGap] = useState(false);
   const [asking, setAsking] = useState(false);
   const [earlier, setEarlier] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
@@ -120,17 +128,19 @@ export function UndoTurn({ agentId, running, styles }: UndoTurnProps) {
     setAsking(false);
     if (running) {
       setTurns([]);
+      setGap(false);
       setDone(null);
       setProblem(null);
       return undefined;
     }
     let current = true;
     call({ agentId, op: "status" })
-      .then((answer) => answer.turns)
-      .catch(() => [])
-      .then((kept) => {
-        if (current) setTurns(kept);
-        return kept;
+      .catch(() => null)
+      .then((answer) => {
+        if (!current) return answer;
+        setTurns(answer?.turns ?? []);
+        setGap(Boolean(answer?.gap));
+        return answer;
       });
     return () => {
       current = false;
@@ -139,21 +149,32 @@ export function UndoTurn({ agentId, running, styles }: UndoTurnProps) {
   const ask = useCallback(() => setAsking(true), []);
   const keep = useCallback(() => setAsking(false), []);
   const toggleEarlier = useCallback(() => setEarlier((was) => !was), []);
+  const [newest, ...before] = turns;
+  const shown = newest?.turnId;
   const undo = useCallback(async () => {
+    if (shown === undefined) return;
     try {
-      const answer = await call({ agentId, op: "undo" });
+      // The turn the owner was shown: if it is no longer the newest, the host refuses.
+      const answer = await call({ agentId, op: "undo", turnId: shown });
       setProblem(null);
       setDone({ restored: answer.restored, skipped: answer.skipped });
       setTurns(answer.turns);
+      setGap(answer.gap !== null);
     } catch (failure) {
       setProblem(failureText("Undo this turn", failure));
+      // What the owner saw is out of date: the list as it is now.
+      const answer = await call({ agentId, op: "status" }).catch(() => null);
+      if (answer !== null) {
+        setTurns(answer.turns);
+        setGap(answer.gap !== null);
+      }
     }
     setAsking(false);
-  }, [call, agentId]);
-  if (running || (turns.length === 0 && done === null && problem === null)) return null;
-  const [newest, ...before] = turns;
+  }, [call, agentId, shown]);
+  if (running || (turns.length === 0 && !gap && done === null && problem === null)) return null;
   return (
     <View style={styles.headerField}>
+      {gap && <Text style={styles.fieldHint}>{UNDO_GAP}</Text>}
       {newest !== undefined && (
         <>
           <Text style={styles.sheetLabel}>What this turn changed</Text>

@@ -1241,9 +1241,9 @@ export function createOfficePlugin(
   server.handle(undoRpc, (input, context) =>
     guarded("undo", async () => {
       holder.remember(context.paseo);
-      const result = input.op === "undo" ? await undo.undo(input.agentId) : null;
+      const result = input.op === "undo" ? await undo.undo(input.agentId, input.turnId) : null;
       return {
-        turns: await undo.status(input.agentId),
+        ...(await undo.status(input.agentId)),
         turnId: result?.turnId ?? null,
         restored: result?.restored ?? 0,
         skipped: result?.skipped ?? [],

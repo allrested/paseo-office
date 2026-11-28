@@ -1231,7 +1231,8 @@ export const homeDepartureRpc = defineRpc({
 /**
  * Why an undo leaves a file as it is: changed since the turn, already as before it, out of the
  * work tree, in `.git`, ignored by git, a link, under a linked folder, a submodule, a write that
- * failed, or not reached because git stopped part-way.
+ * failed, not reached because git stopped part-way or an agent began a turn, or left for an undo
+ * again because the undo had just removed something on its way.
  */
 export const UNDO_SKIPS = [
   "changed",
@@ -1244,6 +1245,8 @@ export const UNDO_SKIPS = [
   "submodule",
   "write",
   "stopped",
+  "began",
+  "retry",
 ] as const;
 export type UndoSkip = (typeof UNDO_SKIPS)[number];
 /** What a turn did to one file, by git's diff of its two snapshots; a binary file has no counts. */
@@ -1264,14 +1267,19 @@ export const CheckpointSchema = z.object({
 });
 export type Checkpoint = z.infer<typeof CheckpointSchema>;
 /**
- * A session's checkpoints: `status` answers the turns kept, newest first; `undo` puts back the
- * newest, says what it did (`turnId` null when there was none) and answers the turns left.
+ * A session's checkpoints: `status` answers the turns kept, newest first, and why the list was
+ * emptied when a turn could not be snapshotted; `undo` puts back the turn the owner was shown
+ * (refused when it is no longer the newest), says what it did and answers the turns left.
  */
 export const undoRpc = defineRpc({
   name: "office.undo",
-  input: z.object({ agentId: z.string().min(1), op: z.enum(["status", "undo"]) }),
+  input: z.discriminatedUnion("op", [
+    z.object({ agentId: z.string().min(1), op: z.literal("status") }),
+    z.object({ agentId: z.string().min(1), op: z.literal("undo"), turnId: z.string().min(1) }),
+  ]),
   output: z.object({
     turns: z.array(CheckpointSchema),
+    gap: z.string().nullable(),
     turnId: z.string().nullable(),
     restored: z.number().int().nonnegative(),
     skipped: z.array(z.object({ reason: z.enum(UNDO_SKIPS), count: z.number().int().positive() })),

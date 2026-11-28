@@ -803,8 +803,12 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "This checkpoint's snapshot is gone": "Ảnh chụp của checkpoint này đã mất",
   "Undo this turn": "Hoàn tác lượt này",
   "Earlier turns": "Các lượt trước",
-  "Put back the files this turn changed? Files changed since are left alone.":
-    "Khôi phục các tệp lượt này đã thay đổi? Tệp bị sửa sau đó được giữ nguyên.",
+  "Put back everything that changed in this folder during the turn? Files changed since are left alone.":
+    "Khôi phục mọi thứ đã thay đổi trong thư mục này trong lượt đó? Tệp bị sửa sau đó được giữ nguyên.",
+  "The last turn could not be snapshotted, so the checkpoints before it were dropped.":
+    "Không thể chụp lượt gần nhất, nên các checkpoint trước đó đã bị bỏ.",
+  "not reached: an agent began working": "chưa tới: một agent đã bắt đầu làm việc",
+  "not put back yet: undo again to finish": "chưa khôi phục: hoàn tác lần nữa để xong",
   binary: "nhị phân",
   added: "đã thêm",
   deleted: "đã xóa",

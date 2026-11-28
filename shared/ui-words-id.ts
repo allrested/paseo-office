@@ -811,8 +811,12 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "This checkpoint's snapshot is gone": "Snapshot checkpoint ini sudah hilang",
   "Undo this turn": "Urungkan giliran ini",
   "Earlier turns": "Giliran sebelumnya",
-  "Put back the files this turn changed? Files changed since are left alone.":
-    "Kembalikan berkas yang diubah giliran ini? Berkas yang diubah setelahnya dibiarkan.",
+  "Put back everything that changed in this folder during the turn? Files changed since are left alone.":
+    "Kembalikan semua yang berubah di folder ini selama giliran itu? Berkas yang diubah setelahnya dibiarkan.",
+  "The last turn could not be snapshotted, so the checkpoints before it were dropped.":
+    "Giliran terakhir tidak bisa di-snapshot, jadi checkpoint sebelumnya dibuang.",
+  "not reached: an agent began working": "tidak tersentuh: ada agen yang mulai bekerja",
+  "not put back yet: undo again to finish": "belum dikembalikan: urungkan lagi untuk menyelesaikan",
   binary: "biner",
   added: "ditambahkan",
   deleted: "dihapus",

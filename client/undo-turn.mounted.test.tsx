@@ -14,6 +14,7 @@ import { useOfficeStyles } from "./styles.js";
 interface Call {
   agentId: string;
   op: "status" | "undo";
+  turnId?: string;
 }
 const call = vi.hoisted(() => vi.fn());
 vi.mock("@getpaseo/plugin/client", () => ({ useRpc: () => call }));
@@ -25,7 +26,7 @@ vi.mock("@getpaseo/plugin/client/ui", async () => {
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as PluginTheme;
-const NONE = { turns: [], turnId: null, restored: 0, skipped: [] };
+const NONE = { turns: [], gap: null, turnId: null, restored: 0, skipped: [] };
 
 const edit = (path: string, added = 1, removed = 0): CheckpointFile => ({
   path,
@@ -161,6 +162,7 @@ test("undo asks once, then says how many files it put back and why the others st
       ? { ...NONE, turns: [NEWEST, EARLIER] }
       : {
           turns: [EARLIER],
+          gap: null,
           turnId: "t2",
           restored: 2,
           skipped: [
@@ -172,13 +174,14 @@ test("undo asks once, then says how many files it put back and why the others st
   await draw(false);
   await press("Undo this turn");
   expect(container.textContent).toContain(
-    "Put back the files this turn changed? Files changed since are left alone.",
+    "Put back everything that changed in this folder during the turn? Files changed since are left alone.",
   );
   await press("Cancel");
   expect(call).toHaveBeenCalledTimes(1);
   await press("Undo this turn");
   await press("Undo");
-  expect(call).toHaveBeenLastCalledWith({ agentId: "a1", op: "undo" });
+  // The turn the owner was shown, so a second press cannot undo the one before.
+  expect(call).toHaveBeenLastCalledWith({ agentId: "a1", op: "undo", turnId: "t2" });
   const text = container.textContent ?? "";
   expect(text).toContain("Put back 2 files");
   expect(text).toContain("3 changed since the turn");
@@ -207,4 +210,56 @@ test("a host that refuses the undo says so", async () => {
   expect(container.textContent).toContain(
     "Unable to undo this turn: the agent is working: undo when its turn has ended",
   );
+});
+
+test("a list emptied because a turn could not be snapshotted says so", async () => {
+  call.mockResolvedValue({
+    ...NONE,
+    gap: "the last turn could not be snapshotted: earlier checkpoints were dropped",
+  });
+  await draw(false);
+  expect(container.textContent).toContain(
+    "The last turn could not be snapshotted, so the checkpoints before it were dropped.",
+  );
+  expect(button("Undo this turn")).toBeNull();
+});
+
+test("an undo that stopped says why, and the turn can be undone again", async () => {
+  call.mockImplementation(async ({ op }: Call) =>
+    op === "status"
+      ? { ...NONE, turns: [NEWEST] }
+      : {
+          turns: [NEWEST],
+          gap: null,
+          turnId: "t2",
+          restored: 1,
+          skipped: [
+            { reason: "began", count: 2 },
+            { reason: "retry", count: 1 },
+          ],
+        },
+  );
+  await draw(false);
+  await press("Undo this turn");
+  await press("Undo");
+  expect(container.textContent).toContain("2 not reached: an agent began working");
+  expect(container.textContent).toContain("1 not put back yet: undo again to finish");
+  expect(button("Undo this turn")).not.toBeNull();
+});
+
+test("a refused undo reads the list again", async () => {
+  let statusCalls = 0;
+  call.mockImplementation(async ({ op }: Call) => {
+    if (op === "undo") throw new Error("that turn is no longer the newest: look again");
+    statusCalls += 1;
+    return { ...NONE, turns: statusCalls === 1 ? [NEWEST, EARLIER] : [EARLIER] };
+  });
+  await draw(false);
+  await press("Undo this turn");
+  await press("Undo");
+  expect(container.textContent).toContain(
+    "Unable to undo this turn: that turn is no longer the newest: look again",
+  );
+  expect(container.textContent).not.toContain("src/app.ts");
+  expect(container.textContent).toContain("a.txt");
 });

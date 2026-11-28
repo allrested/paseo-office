@@ -1179,50 +1179,71 @@ Claude Code's, so it works for every provider and writes nothing into the host's
   second time the same way. The repository's own index, HEAD, branches, stash and files are not
   touched; only objects are added, and no ref.
 - A turn whose two trees differ is kept as a checkpoint: its id, when it ended, and the two trees.
-  A turn that changed nothing is not kept. Each agent keeps the ten newest; the eleventh drops the
-  oldest. A turn the office could not snapshot (the setting off, a git error) drops the agent's
-  checkpoints, since the turns before it would no longer be one step back each. Each git call has
-  a limit of 15 seconds and the hooks do not hold the turn.
+  A checkpoint is everything that changed in the work tree between the turn's start and its end,
+  including what you or another agent changed in that time, not only what this agent did. A turn
+  that changed nothing is not kept. Each agent keeps the ten newest; the eleventh drops the oldest.
+  Each git call has a limit of 15 seconds and the hooks do not hold the turn.
+- A turn the office could not snapshot (the setting off, a git error or a timeout) drops the
+  agent's checkpoints, since the turns before it would no longer be one step back each. The panel
+  then says "The last turn could not be snapshotted, so the checkpoints before it were dropped."
+  until the next turn is snapshotted.
 - The checkpoints are only in the daemon's memory: a restart forgets them. The trees have no ref,
   so `git gc` may prune old ones (by default once they are two weeks old). The office checks that
   both trees are still there each time it lists or undoes a checkpoint; one that lost a tree reads
   "This checkpoint's snapshot is gone" and cannot be undone.
+- Each snapshot leaves loose objects (the blobs of changed files and the trees) in `.git` until git
+  prunes them. A large untracked file that `.gitignore` does not exclude is read and stored by
+  every snapshot that finds it changed, which makes snapshots slow; one that takes more than 15
+  seconds fails, and the turn is not kept.
 
 **What this turn changed.** A session with checkpoints that is not at work shows, under its
 header, the newest turn's files from `git diff-tree` between its two trees: each path with its
-added and removed lines (`+12 −3`), or "binary", "added", "deleted". It is every file the turn
-changed, by an edit or write tool or by a shell command (`sed -i`, a formatter, `rm`). The first 20
-are shown and the rest behind "N more"; the host lists 200 files a turn at most and counts the rest.
-The earlier turns are folded under **Earlier turns**, one line each ("14:02 · 5 files"), each
-opening to its files.
+added and removed lines (`+12 −3`), or "binary", "added", "deleted". It is every file that changed
+in the folder during the turn, by an edit or write tool, by a shell command (`sed -i`, a formatter,
+`rm`), or by anyone else working there at the time. The first 20 are shown and the rest behind
+"N more"; the host lists 200 files a turn at most and counts the rest. The earlier turns are folded
+under **Earlier turns**, one line each ("14:02 · 5 files"), each opening to its files.
 
-**Undo this turn** is on the newest turn only. It asks once ("Put back the files this turn changed?
-Files changed since are left alone."), then says "Put back N files" and, for the files it left,
-each reason with its count. It is refused while the agent is at work. It goes over every path the
-turn's diff lists and compares the file in the work tree now with the turn's end tree (content and
-executable bit, hashed by git with its filters; a missing file matches a file the end tree does not
-have):
+**Undo this turn** is on the newest turn only. It asks once ("Put back everything that changed in
+this folder during the turn? Files changed since are left alone."), then says "Put back N files"
+and, for the files it left, each reason with its count. It undoes the turn the panel showed: if
+that is no longer the newest (another undo got there first), it is refused with "that turn is no
+longer the newest: look again" and the panel reads the list again. It is refused while the agent is
+at work, and while another agent whose folder is in the same work tree is in a turn ("another agent
+is working in this folder: undo when it has stopped").
+
+It goes over every path the turn's diff lists, in two steps. First the files the turn added; then
+the files it changed or deleted, looked at afresh once the first step is done, so a folder the turn
+swapped for a file (or the reverse, or a file renamed by case alone) comes back. Each path is looked
+at right before it is touched: the file in the work tree now is compared with the turn's end tree
+(content and executable bit, hashed by git with its filters; a missing file matches a file the end
+tree does not have):
 
 - the same as the turn left it: a file the turn added is deleted, with the folders it made that are
-  left empty (a folder born after the turn began; where the file system keeps no birth time, the
-  folder stays); a file the turn changed or deleted is written back from the before tree, with its
+  left empty (a folder not in the before tree whose birth time is known and after the turn began;
+  where the file system keeps no birth time, or one that reads as its change time, the folder
+  stays); a file the turn changed or deleted is written back from the before tree, with its
   executable bit;
 - different: it is somebody's later work, and is left, counted "changed since the turn"; one
   already as it was before the turn is counted as that.
 
 A path is never touched, and is counted under its own reason, when it is outside the work tree once
 resolved, inside `.git`, ignored by git, a symbolic link (in the work tree or in either tree), a
-submodule, or under a folder that is a symbolic link. A file whose write fails is counted too.
-Writing back goes through a temporary index read from the before tree (`git checkout-index`); undo
-never runs `git checkout`, `reset`, `stash` or `clean`, and never changes the index, HEAD, a branch
-or a stash.
+submodule, or under a folder that is a symbolic link (checked again right before each delete and
+each write). A file whose write fails is counted too. A path is a path: a name such as `:!x` is not
+read as a git pattern. Writing back goes through a temporary index read from the before tree
+(`git checkout-index`); undo never runs `git checkout`, `reset`, `stash` or `clean`, and never
+changes the index, HEAD, a branch or a stash.
 
-After an undo the checkpoint leaves the list, so the next undo steps one turn further back. If git
-runs out of time part-way, the checkpoint stays, the answer counts the files put back and the ones
-"not reached: git stopped", and a second undo finishes it. An undo happens outside a turn, so it is
-not a checkpoint itself. One agent's turns and undos wait for each other; checkpoints are per
-agent, and the comparison with the end tree is what keeps an undo from overwriting another agent's
-later work in the same repository.
+After an undo the checkpoint leaves the list, so the next undo steps one turn further back. It
+stays, and a second undo does the rest, when the undo did not finish: git failed or ran out of time
+("not reached: git stopped"), an agent began a turn in the work tree meanwhile ("not reached: an
+agent began working"; the undo checks before every delete and write and touches nothing after), or
+a file to write back was left where the undo had just removed something on its way ("not put back
+yet: undo again to finish"). An undo happens outside a turn, so it is not a checkpoint itself. One
+agent's turns and undos wait for each other. The comparison with the end tree keeps an undo from
+overwriting work done after the turn ended; work another agent or you did during the turn is part
+of the turn's checkpoint, and an undo puts that back too.
 
 A snapshot is taken when the hook runs, which Paseo does not wait for, so an edit made in the first
 moments of a turn may already be in its before tree, and is then not undone.

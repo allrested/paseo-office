@@ -779,8 +779,12 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "This checkpoint's snapshot is gone": "snapshot ของ checkpoint นี้หายไปแล้ว",
   "Undo this turn": "เลิกทำรอบนี้",
   "Earlier turns": "รอบก่อนหน้า",
-  "Put back the files this turn changed? Files changed since are left alone.":
-    "คืนค่าไฟล์ที่รอบนี้เปลี่ยนหรือไม่? ไฟล์ที่ถูกแก้ไขหลังจากนั้นจะคงไว้ตามเดิม",
+  "Put back everything that changed in this folder during the turn? Files changed since are left alone.":
+    "คืนค่าทุกอย่างที่เปลี่ยนในโฟลเดอร์นี้ระหว่างรอบนั้นหรือไม่? ไฟล์ที่ถูกแก้ไขหลังจากนั้นจะคงไว้ตามเดิม",
+  "The last turn could not be snapshotted, so the checkpoints before it were dropped.":
+    "snapshot รอบล่าสุดไม่ได้ จึงทิ้ง checkpoint ก่อนหน้านั้นไปแล้ว",
+  "not reached: an agent began working": "ที่ไปไม่ถึง: มี agent เริ่มทำงาน",
+  "not put back yet: undo again to finish": "ที่ยังไม่ได้คืนค่า: เลิกทำอีกครั้งให้เสร็จ",
   binary: "ไบนารี",
   added: "เพิ่มใหม่",
   deleted: "ลบแล้ว",
