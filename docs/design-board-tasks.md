@@ -68,7 +68,13 @@ agent's chat. Nobody can answer a task on the board either.
 - The assignment's footer asks for a short result. The footer an earlier prompt carries is still
   recognised (`readLobbyAssignment`), and the completion line is unchanged.
 - `office_read` lists a result under its task and a reply as `p14 note re p12`.
-- A card and a row show the result, and the replies under the task with a Reply field.
+- A card and a row show the result, and the replies under the task with a Reply field. A long
+  result is cut by its text (three lines, 160 characters) with More, not by a line clamp, which
+  cannot be measured: nothing is hidden without a way to it.
+- A room's board hid its done tasks, so a result there could not be read. It keeps them in a
+  folded **Done** section under the list, with Clear finished, and in the Done column of a kanban.
+- A reply is kept under the task itself, also when it answers another reply, and a reply to a
+  done task still goes to the agent that did it.
 
 **Files.** `shared/contracts.ts`, `shared/lobby-assignment.ts`, `server/board-service.ts`,
 `server/agent-tools.ts`, `server/office.ts`, `client/` board rows and cards, the words,
