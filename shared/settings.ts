@@ -102,9 +102,12 @@ export const GITHUB_REPOS_MAX = 10;
 export const GITHUB_SEARCH_MAX = 200;
 /** Where a ticket the intake posts lands: held in the backlog, or To do at once. */
 export const INTAKE_LANDS = ["backlog", "todo"] as const;
-/** A Telegram chat id: digits, with a minus for a group. A user id is digits alone. */
+/**
+ * A Telegram chat id: digits, with a minus for a group. A user id is digits alone with no leading
+ * zero, which no sender's id has.
+ */
 export const TELEGRAM_CHAT = /^-?\d{1,32}$/;
-export const TELEGRAM_USER = /^\d{1,32}$/;
+export const TELEGRAM_USER = /^[1-9]\d{0,19}$/;
 /** The most Telegram users the bridge hears: each can make an agent act. */
 export const TELEGRAM_USERS_MAX = 20;
 

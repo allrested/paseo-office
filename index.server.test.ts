@@ -2749,7 +2749,7 @@ test("a /task from a listed user in the chat lands in the lobby's backlog, and s
   const values = { ...ON.values, telegramChat: "-1001", telegramUsers: ["501"] };
   const telegramStore = memoryTelegramStore(
     { token: TELEGRAM_TOKEN, unreadable: false },
-    { version: 1, offset: 5, sent: [], taskTimes: [] },
+    { version: 1, bot: "123456789", offset: 5, sent: [], taskTimes: [] },
   );
   const { recorded, context, stop } = setup(async () => ({ ...ON, values }), {
     fetchFn,

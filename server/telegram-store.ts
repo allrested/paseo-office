@@ -21,10 +21,23 @@ export const NO_SAVED_TOKEN: SavedToken = { token: null, unreadable: false };
 
 const KeptSchema = z.object({
   version: z.literal(1),
+  /** The bot the offset and the pairs belong to: the digits before the token's colon. */
+  bot: z.string().nullable().catch(null),
   /** The next update to ask for; null before the first run threw away what was waiting. */
   offset: z.number().int().nullable(),
+  /**
+   * Each message the bridge sent about a task, in its chat: a message id is its chat's own. Pairs
+   * from before they kept their chat cannot be told apart, so a file with one keeps none.
+   */
   sent: z
-    .array(z.object({ messageId: z.number().int(), postId: z.string().max(40) }))
+    .array(
+      z.object({
+        chat: z.string().max(40),
+        messageId: z.number().int(),
+        postId: z.string().max(40),
+      }),
+    )
+    .catch([])
     .transform((sent) => sent.slice(-SENT_KEEP)),
   /** When each task of the last hour was posted from Telegram, epoch ms. */
   taskTimes: z.array(z.number()).transform((times) => times.slice(-TASK_TIMES_KEEP)),

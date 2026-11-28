@@ -76,6 +76,26 @@ test("getUpdates long-polls for messages only, from the offset, and reads each u
       { update_id: 9, message: { message_id: 42, chat: { id: 5, type: "private" } } },
       { update_id: 10, message: "nonsense" },
       { nothing: true },
+      {
+        update_id: 11,
+        message: {
+          message_id: 43,
+          from: { id: 5, is_bot: false },
+          chat: { id: 5, type: "private" },
+          text: "/task from someone else",
+          forward_origin: { type: "user", date: 1, sender_user: { id: 9, is_bot: false } },
+        },
+      },
+      {
+        update_id: 12,
+        message: {
+          message_id: 44,
+          from: { id: 5, is_bot: false },
+          chat: { id: 5, type: "private" },
+          text: "older client",
+          forward_date: 1,
+        },
+      },
     ]),
   );
   const updates = await api.getUpdates(
@@ -94,6 +114,7 @@ test("getUpdates long-polls for messages only, from the offset, and reads each u
         chat: { id: -100, type: "supergroup" },
         text: "hello",
         replyTo: 40,
+        forwarded: false,
       },
     },
     { updateId: 8, message: null },
@@ -105,11 +126,41 @@ test("getUpdates long-polls for messages only, from the offset, and reads each u
         chat: { id: 5, type: "private" },
         text: null,
         replyTo: null,
+        forwarded: false,
       },
     },
     {
       updateId: 10,
-      message: { messageId: 0, from: null, chat: null, text: null, replyTo: null },
+      message: {
+        messageId: 0,
+        from: null,
+        chat: null,
+        text: null,
+        replyTo: null,
+        forwarded: true,
+      },
+    },
+    {
+      updateId: 11,
+      message: {
+        messageId: 43,
+        from: { id: 5, isBot: false },
+        chat: { id: 5, type: "private" },
+        text: "/task from someone else",
+        replyTo: null,
+        forwarded: true,
+      },
+    },
+    {
+      updateId: 12,
+      message: {
+        messageId: 44,
+        from: { id: 5, isBot: false },
+        chat: { id: 5, type: "private" },
+        text: "older client",
+        replyTo: null,
+        forwarded: true,
+      },
     },
   ]);
 });

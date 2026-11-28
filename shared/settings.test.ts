@@ -559,8 +559,8 @@ test("the Telegram chat is digits with an optional leading minus, and each user 
   expect(hostIssues({ telegramChat: "1".repeat(33) })).toEqual([
     `telegramChat: "${"1".repeat(33)}" is not a Telegram chat id`,
   ]);
-  expect(hostIssues({ telegramUsers: ["123", "4567890123"] })).toEqual([]);
-  for (const user of ["-123", "@me", "", "12a", "1".repeat(33)]) {
+  expect(hostIssues({ telegramUsers: ["123", "4567890123", "9".repeat(20)] })).toEqual([]);
+  for (const user of ["-123", "@me", "", "12a", "0", "0123", "1".repeat(21)]) {
     expect(hostIssues({ telegramUsers: [user] }), user).toEqual([
       `telegramUsers: "${user}" is not a Telegram user id`,
     ]);

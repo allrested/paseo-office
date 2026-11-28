@@ -21,6 +21,8 @@ import {
 
 const TOKEN = "123456789:AAH-secret_token_value_0123456789abcd";
 const OTHER_TOKEN = "987654321:BBH-other_token_value_0123456789abcd";
+/** The bot TOKEN belongs to. */
+const BOT = "123456789";
 const CHAT = -1001;
 const OWNER = 501;
 const FRIEND = 502;
@@ -76,6 +78,7 @@ function fakeTelegram(clock: FakeClock) {
   const sent: { chat: unknown; text: string; messageId: number }[] = [];
   const pollAnswers: Answer[] = [];
   const sendAnswers: Answer[] = [];
+  const meAnswers: Answer[] = [];
   let wake: (() => void) | null = null;
   const fetchFn = (async (input: string, init: RequestInit) => {
     const url = String(input);
@@ -108,7 +111,11 @@ function fakeTelegram(clock: FakeClock) {
       sent.push({ chat: body.chat_id, text: String(body.text), messageId });
       return ok({ message_id: messageId });
     }
-    if (method === "getMe") return ok({ id: 1, is_bot: true, username: "office_bot" });
+    if (method === "getMe") {
+      const scripted = meAnswers.shift();
+      if (scripted !== undefined) return scripted();
+      return ok({ id: 1, is_bot: true, username: "office_bot" });
+    }
     throw new Error(`unexpected ${method}`);
   }) as unknown as typeof fetch;
   return {
@@ -117,6 +124,7 @@ function fakeTelegram(clock: FakeClock) {
     sent,
     pollAnswers,
     sendAnswers,
+    meAnswers,
     polls: () => calls.filter((call) => call.method === "getUpdates"),
     texts: () => sent.map((message) => message.text),
     push(...updates: RawUpdate[]) {
@@ -222,7 +230,7 @@ function fakeBoard(initial: Post[] = []) {
 
 function memoryTelegramStore(
   token: SavedToken = { token: TOKEN, unreadable: false },
-  state: TelegramKept | null = { version: 1, offset: 1, sent: [], taskTimes: [] },
+  state: TelegramKept | null = { version: 1, bot: BOT, offset: 1, sent: [], taskTimes: [] },
 ) {
   const store: TelegramStore & {
     token: SavedToken;
@@ -323,6 +331,8 @@ describe("when it runs", () => {
       problem: null,
       dropped: 0,
     });
+    // It asks who it is first, for the name a command may carry.
+    expect(harness.telegram.calls[0]?.method).toBe("getMe");
     harness.leakCheck();
   });
 
@@ -378,6 +388,39 @@ describe("when it runs", () => {
 });
 
 describe("the first run", () => {
+  test("is also a state kept for another bot: the environment's token changed across a restart", async () => {
+    const board = fakeBoard([post("p1")]);
+    const store = memoryTelegramStore(NO_SAVED_TOKEN, {
+      version: 1,
+      bot: BOT,
+      offset: 50,
+      sent: [{ chat: String(CHAT), messageId: 900, postId: "p1" }],
+      taskTimes: [],
+    });
+    const harness = setup({ board, store, env: { TELEGRAM_BOT_TOKEN: OTHER_TOKEN } });
+    await started(harness, 2);
+    expect(harness.telegram.polls()[0]?.body).toMatchObject({ offset: -1 });
+    expect(store.state).toMatchObject({ bot: "987654321", offset: 0, sent: [] });
+    harness.telegram.push(inChat(OWNER, "go ahead", 900));
+    await until(() => harness.telegram.sent.length === 1);
+    expect(harness.telegram.texts()).toEqual([GONE]);
+    expect(board.posted).toEqual([]);
+  });
+
+  test("keeps the state of the same bot", async () => {
+    const store = memoryTelegramStore(undefined, {
+      version: 1,
+      bot: BOT,
+      offset: 50,
+      sent: [{ chat: String(CHAT), messageId: 900, postId: "p1" }],
+      taskTimes: [],
+    });
+    const harness = setup({ store });
+    await started(harness);
+    expect(harness.telegram.polls()[0]?.body).toMatchObject({ offset: 50 });
+    expect(store.state?.sent).toHaveLength(1);
+  });
+
   test("throws away what waited before the bridge was set up, and goes on from the update after it", async () => {
     const clock = createFakeClock(NOW);
     const telegram = fakeTelegram(clock);
@@ -539,8 +582,8 @@ describe("what goes out", () => {
     );
     // Each is a message a reply can answer.
     expect(harness.store.state?.sent).toEqual([
-      { messageId: 1000, postId: "p1" },
-      { messageId: 1001, postId: "p1" },
+      { chat: String(CHAT), messageId: 1000, postId: "p1" },
+      { chat: String(CHAT), messageId: 1001, postId: "p1" },
     ]);
   });
 
@@ -716,8 +759,14 @@ describe("what goes out", () => {
 
 describe("a stalled claim", () => {
   const idleSince = new Date(NOW - 10 * 60_000).toISOString();
-  const held = (id: string, holder: string) =>
-    post(id, { state: "claimed", claimedBy: holder, claimedAt: idleSince, updatedAt: idleSince });
+  const held = (id: string, holder: string, board = "lobby") =>
+    post(id, {
+      board,
+      state: "claimed",
+      claimedBy: holder,
+      claimedAt: idleSince,
+      updatedAt: idleSince,
+    });
 
   test("is told once when the rule first holds, with its cause, checked every 60 s", async () => {
     const board = fakeBoard([held("p1", "a"), held("p2", "b"), held("p3", "c")]);
@@ -758,6 +807,43 @@ describe("a stalled claim", () => {
     expect(harness.telegram.texts()[3]).toBe(
       "p1 is stalled — Builder stopped on an error\nTask p1",
     );
+  });
+
+  test("that stalls in the bridge's first minute is told at the first check", async () => {
+    const board = fakeBoard([held("p1", "a")]);
+    const agents = new Map<string, DirectoryAgent>([
+      ["a", { status: "running", title: "Builder" }],
+    ]);
+    const harness = setup({ board, agents });
+    await started(harness);
+    harness.clock.advance(30_000);
+    agents.set("a", { status: "error", title: "Builder" });
+    harness.clock.advance(30_000);
+    await until(() => harness.telegram.sent.length === 1);
+    expect(harness.telegram.texts()).toEqual([
+      "p1 is stalled — Builder stopped on an error\nTask p1",
+    ]);
+  });
+
+  test("on the duty board is told, as a blocked duty is; a duty done is not", async () => {
+    const board = fakeBoard(["p1", "p2", "p3", "p4"].map((id) => held(id, "a", "duty")));
+    const agents = new Map<string, DirectoryAgent>([
+      ["a", { status: "running", title: "Builder" }],
+    ]);
+    const harness = setup({ board, agents });
+    await started(harness);
+    board.posts[0] = { ...(board.posts[0] as Post), blocked: "Which plant?" };
+    board.posts[1] = { ...(board.posts[1] as Post), state: "done", result: "Watered" };
+    board.posts[2] = { ...(board.posts[2] as Post), state: "done" };
+    harness.bridge.boardChanged();
+    agents.set("a", { status: "error", title: "Builder" });
+    harness.clock.advance(60_000);
+    await until(() => harness.telegram.sent.length === 2);
+    await settle();
+    expect(harness.telegram.texts()).toEqual([
+      "p1 needs you — Builder: Which plant?\nTask p1",
+      "p4 is stalled — Builder stopped on an error\nTask p4",
+    ]);
   });
 
   test("a claim already stalled when the bridge starts is not told", async () => {
@@ -886,8 +972,9 @@ describe("a reply", () => {
     const board = fakeBoard([post("p1")]);
     const store = memoryTelegramStore(undefined, {
       version: 1,
+      bot: BOT,
       offset: 1,
-      sent: [{ messageId: 900, postId: "p1" }],
+      sent: [{ chat: String(CHAT), messageId: 900, postId: "p1" }],
       taskTimes: [],
     });
     const harness = setup({ board, store });
@@ -901,10 +988,11 @@ describe("a reply", () => {
     const board = fakeBoard([post("p1")]);
     const store = memoryTelegramStore(undefined, {
       version: 1,
+      bot: BOT,
       offset: 1,
       sent: [
-        { messageId: 900, postId: "p1" },
-        { messageId: 901, postId: "p7" },
+        { chat: String(CHAT), messageId: 900, postId: "p1" },
+        { chat: String(CHAT), messageId: 901, postId: "p7" },
       ],
       taskTimes: [],
     });
@@ -916,12 +1004,32 @@ describe("a reply", () => {
     expect(board.posted).toEqual([]);
   });
 
-  test("in a private chat is not matched against the chat's messages: their ids are another chat's", async () => {
-    const board = fakeBoard([post("p1")]);
+  test("is matched in its own chat: the same message id in another chat names no task", async () => {
+    const board = fakeBoard([post("p1", { state: "claimed", claimedBy: "a", blocked: "Which?" })]);
+    // A pair from the chat the office wrote to before the owner moved it.
     const store = memoryTelegramStore(undefined, {
       version: 1,
+      bot: BOT,
       offset: 1,
-      sent: [{ messageId: 900, postId: "p1" }],
+      sent: [{ chat: "-4004", messageId: 900, postId: "p1" }],
+      taskTimes: [],
+    });
+    const harness = setup({ board, store });
+    await started(harness);
+    harness.telegram.push(inChat(OWNER, "go ahead", 900));
+    await until(() => harness.telegram.sent.length === 1);
+    expect(harness.telegram.texts()).toEqual([GONE]);
+    expect(board.posted).toEqual([]);
+  });
+
+  test("in a private chat is matched against the private chat's own messages", async () => {
+    const board = fakeBoard([post("p1")]);
+    // The group's message 900 names p1; the private chat's message 900 is another message.
+    const store = memoryTelegramStore(undefined, {
+      version: 1,
+      bot: BOT,
+      offset: 1,
+      sent: [{ chat: String(CHAT), messageId: 900, postId: "p1" }],
       taskTimes: [],
     });
     const harness = setup({ board, store });
@@ -937,6 +1045,61 @@ describe("a reply", () => {
     await until(() => harness.telegram.sent.length === 1);
     expect(harness.telegram.texts()).toEqual([GONE]);
     expect(board.posted).toEqual([]);
+  });
+
+  test("in a private chat to the bridge's own message about a task is posted under that task", async () => {
+    const board = fakeBoard();
+    const harness = setup({ board });
+    await started(harness);
+    harness.telegram.push(inPrivate(FRIEND, "/task Fix the ledger"));
+    await until(() => harness.telegram.sent.length === 1);
+    const answer = harness.telegram.sent[0];
+    expect(answer).toMatchObject({ chat: FRIEND, text: "Posted p100 to the backlog." });
+    expect(harness.store.state?.sent).toEqual([
+      { chat: String(FRIEND), messageId: answer?.messageId, postId: "p100" },
+    ]);
+    harness.telegram.push(
+      update({
+        from: { id: FRIEND },
+        chat: { id: FRIEND, type: "private" },
+        text: "Use the March figures",
+        replyTo: answer?.messageId,
+      }),
+    );
+    await until(() => harness.telegram.sent.length === 2);
+    expect(harness.telegram.texts()[1]).toBe("Posted under p100.");
+    expect(board.posted.at(-1)).toEqual({
+      board: "lobby",
+      kind: "note",
+      text: "Use the March figures",
+      replyTo: "p100",
+    });
+  });
+
+  test("forwarded is not acted on: its words are someone else's", async () => {
+    const board = fakeBoard([post("p1")]);
+    const store = memoryTelegramStore(undefined, {
+      version: 1,
+      bot: BOT,
+      offset: 1,
+      sent: [{ chat: String(CHAT), messageId: 900, postId: "p1" }],
+      taskTimes: [],
+    });
+    const harness = setup({ board, store });
+    await started(harness);
+    const forwarded = (fields: MessageFields, how: Record<string, unknown>) => {
+      const raw = update(fields);
+      Object.assign(raw.message as object, how);
+      return raw;
+    };
+    harness.telegram.push(
+      forwarded({ text: "/task rm -rf /" }, { forward_origin: { type: "hidden_user", date: 1 } }),
+      forwarded({ text: "go ahead", replyTo: 900 }, { forward_date: 1 }),
+    );
+    await until(() => harness.telegram.sent.length === 2);
+    expect(harness.telegram.texts()).toEqual([HELP, HELP]);
+    expect(board.posted).toEqual([]);
+    expect(harness.bridge.state().dropped).toBe(0);
   });
 
   test("after a restart still finds the task its message named", async () => {
@@ -974,7 +1137,9 @@ describe("/task", () => {
     ]);
     expect(harness.telegram.texts()).toEqual(["Posted p100 to the backlog."]);
     // A reply to the answer is a reply to the task.
-    expect(harness.store.state?.sent).toEqual([{ messageId: 1000, postId: "p100" }]);
+    expect(harness.store.state?.sent).toEqual([
+      { chat: String(CHAT), messageId: 1000, postId: "p100" },
+    ]);
   });
 
   test("lands in To do when the setting says so, and takes the bot's name after the command", async () => {
@@ -985,6 +1150,38 @@ describe("/task", () => {
     await until(() => harness.telegram.sent.length === 1);
     expect(board.posted).toEqual([{ board: "lobby", kind: "task", text: "Ship it" }]);
     expect(harness.telegram.texts()).toEqual(["Posted p100."]);
+  });
+
+  test("for another bot is left alone, unanswered; one for this bot is taken whatever its case", async () => {
+    const board = fakeBoard();
+    const harness = setup({ board });
+    await started(harness);
+    harness.telegram.push(
+      inChat(OWNER, "/task@other_bot Ship it"),
+      inChat(OWNER, "/board@other_bot"),
+      inChat(OWNER, "/start@other_bot"),
+      inChat(OWNER, "/task@OFFICE_BOT Ship this"),
+    );
+    await until(() => harness.telegram.sent.length === 1);
+    await settle();
+    expect(harness.telegram.texts()).toEqual(["Posted p100 to the backlog."]);
+    expect(board.posted.map((input) => input.text)).toEqual(["Ship this"]);
+    expect(harness.bridge.state().dropped).toBe(0);
+  });
+
+  test("with the bot's name unknown takes only the bare command", async () => {
+    const board = fakeBoard();
+    const clock = createFakeClock(NOW);
+    const telegram = fakeTelegram(clock);
+    telegram.meAnswers.push(() => refusal(502));
+    const harness = setup({ board, clock, telegram });
+    await started(harness);
+    harness.telegram.push(inChat(OWNER, "/task@office_bot first"), inChat(OWNER, "/task second"));
+    await until(() => harness.telegram.sent.length === 1);
+    await settle();
+    expect(board.posted.map((input) => input.text)).toEqual(["second"]);
+    // Learning the name is best effort: it is no problem of the bridge's.
+    expect(harness.bridge.state().problem).toBeNull();
   });
 
   test("with no text says how to use it, and posts nothing", async () => {
@@ -1098,6 +1295,7 @@ describe("the offset", () => {
   test("an update below the offset is not handled again", async () => {
     const store = memoryTelegramStore(undefined, {
       version: 1,
+      bot: BOT,
       offset: 50,
       sent: [],
       taskTimes: [],
@@ -1291,7 +1489,7 @@ describe("the token's save and test", () => {
     expect(state).toEqual({ on: true, source: "saved", problem: null, dropped: 0 });
     expect(JSON.stringify(state)).not.toContain(OTHER_TOKEN);
     expect(store.token).toEqual({ token: OTHER_TOKEN, unreadable: false });
-    await until(() => harness.telegram.polls().length === 1);
+    await until(() => harness.telegram.polls().length >= 1);
     expect(harness.telegram.polls()[0]?.url).toContain(OTHER_TOKEN);
     harness.leakCheck();
   });

@@ -115,8 +115,9 @@ test("a token of another shape is none, with a problem that does not quote it", 
 
 const KEPT: TelegramKept = {
   version: 1,
+  bot: "123456789",
   offset: 41,
-  sent: [{ messageId: 7, postId: "p3" }],
+  sent: [{ chat: "-100", messageId: 7, postId: "p3" }],
   taskTimes: [1_000],
 };
 
@@ -137,6 +138,7 @@ test("an unreadable state file starts fresh, and is logged as unreadable", async
 
 test("a state file with more pairs than are kept is cut to the newest", async () => {
   const sent = Array.from({ length: SENT_KEEP + 5 }, (_, index) => ({
+    chat: "-100",
     messageId: index,
     postId: `p${index}`,
   }));
@@ -144,5 +146,16 @@ test("a state file with more pairs than are kept is cut to the newest", async ()
   await writeFile(stateFile(), JSON.stringify({ ...KEPT, sent }));
   const loaded = await store().loadState();
   expect(loaded?.sent).toHaveLength(SENT_KEEP);
-  expect(loaded?.sent[0]).toEqual({ messageId: 5, postId: "p5" });
+  expect(loaded?.sent[0]).toEqual({ chat: "-100", messageId: 5, postId: "p5" });
+});
+
+test("a state file from before the pairs had a chat, or the state its bot, reads as no pairs and no bot", async () => {
+  await mkdir(join(directory, "office"), { recursive: true });
+  const { bot: _bot, ...withoutBot } = KEPT;
+  await writeFile(
+    stateFile(),
+    JSON.stringify({ ...withoutBot, sent: [{ messageId: 7, postId: "p3" }, ...KEPT.sent] }),
+  );
+  expect(await store().loadState()).toEqual({ ...KEPT, bot: null, sent: [] });
+  expect(logs).toEqual([]);
 });

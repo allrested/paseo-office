@@ -51,6 +51,8 @@ export interface IncomingMessage {
   text: string | null;
   /** The message it answers, by id. */
   replyTo: number | null;
+  /** Forwarded from elsewhere: its words are someone else's. Unreadable is taken as forwarded. */
+  forwarded: boolean;
 }
 
 /** One update; `message` is null for every other kind (an edit, a channel post, a button). */
@@ -78,6 +80,8 @@ const MessageSchema = z.object({
   chat: z.object({ id: z.number().int(), type: z.string() }).optional().catch(undefined),
   text: z.string().optional().catch(undefined),
   reply_to_message: z.object({ message_id: z.number().int() }).optional().catch(undefined),
+  forward_origin: z.unknown().optional(),
+  forward_date: z.unknown().optional(),
 });
 const AnswerSchema = z.object({ ok: z.literal(true), result: z.unknown() });
 const RetrySchema = z.object({
@@ -91,18 +95,21 @@ const NO_MESSAGE: Omit<IncomingMessage, "messageId"> = {
   chat: null,
   text: null,
   replyTo: null,
+  forwarded: true,
 };
 
 function readMessage(raw: unknown): IncomingMessage {
   const parsed = MessageSchema.safeParse(raw);
   if (!parsed.success) return { messageId: 0, ...NO_MESSAGE };
-  const { message_id, from, chat, text, reply_to_message } = parsed.data;
+  const { message_id, from, chat, text, reply_to_message, forward_origin, forward_date } =
+    parsed.data;
   return {
     messageId: message_id,
     from: from === undefined ? null : { id: from.id, isBot: from.is_bot },
     chat: chat === undefined ? null : { id: chat.id, type: chat.type },
     text: text ?? null,
     replyTo: reply_to_message?.message_id ?? null,
+    forwarded: forward_origin !== undefined || forward_date !== undefined,
   };
 }
 

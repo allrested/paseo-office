@@ -1,5 +1,6 @@
 import { stallCause, waitingOn, type StallCause } from "../shared/board-rules.js";
 import {
+  DUTY,
   LOBBY,
   POST_TEXT_MAX,
   USER_AUTHOR,
@@ -126,7 +127,7 @@ interface Seen {
 // Control characters but the newline and the tab: what a message may carry onto a board.
 const CONTROL = /[^\P{Cc}\n\t]/gu;
 // `/task`, `/task@bot`, with what follows.
-const COMMAND = /^\/([A-Za-z]+)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S]*))?$/;
+const COMMAND = /^\/([A-Za-z]+)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/;
 
 /** Text from Telegram as a post takes it: no control characters, trimmed, cut to a post's limit. */
 function cleaned(text: string): string {
@@ -137,8 +138,8 @@ function cleaned(text: string): string {
 }
 
 /** The bot's own number, the part of the token before the colon; it is no secret. */
-function botOf(token: string | null): string | null {
-  return token?.split(":")[0] ?? null;
+function botOf(token: string): string {
+  return token.split(":")[0] ?? "";
 }
 
 /** How `/board` names a lobby task's state, in the order it lists them. */
@@ -164,7 +165,9 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
   let settings: TelegramSettings | null = null;
   let saved: SavedToken = NO_SAVED_TOKEN;
   let inUse: TokenInUse = telegramToken(NO_SAVED_TOKEN, {});
-  let kept: TelegramKept = { version: 1, offset: null, sent: [], taskTimes: [] };
+  let kept: TelegramKept = { version: 1, bot: null, offset: null, sent: [], taskTimes: [] };
+  // The bot's username, from getMe when the poll starts; null while unknown.
+  let username: string | null = null;
   let loaded = false;
   let stopped = false;
   let dropped = 0;
@@ -272,10 +275,32 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
     publish();
   }
 
+  /** Before a poll's first call: the kept state is this bot's, and its name is known. */
+  async function begin(token: string, api: TelegramApi): Promise<void> {
+    // Another bot's updates are numbered apart and its messages are not ours to answer: its
+    // offset and pairs go, and it starts as a first run.
+    const bot = botOf(token);
+    if (kept.bot !== bot) {
+      try {
+        await keep({ ...kept, bot, offset: null, sent: [] });
+      } catch (error) {
+        say(`[office] telegram: ${errorMessage(error)}`);
+      }
+    }
+    // The name a command for this bot carries. Best effort: without it only bare commands count.
+    username = null;
+    try {
+      username = await api.getMe();
+    } catch {
+      username = null;
+    }
+  }
+
   async function poll(token: string, controller: AbortController): Promise<void> {
     const { signal } = controller;
     const api = createTelegramApi(token, deps.fetchFn);
     let backoff = BACKOFF_MS;
+    await begin(token, api);
     while (!signal.aborted) {
       try {
         if (kept.offset === null) {
@@ -353,32 +378,35 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
       return;
     }
     const answer = await answerTo(message, current);
-    // Only the configured chat's messages are kept: a message id is the chat's own.
-    const inChat = String(message.chat.id) === current.chat;
-    await send(api, message.chat.id, answer.text, inChat ? answer.postId : undefined);
+    // A command for another bot is left to it, unanswered, so two bots do not both speak.
+    if (answer === null) return;
+    await send(api, message.chat.id, answer.text, answer.postId);
   }
 
   async function answerTo(
     message: IncomingMessage,
     current: TelegramSettings,
-  ): Promise<{ text: string; postId?: string }> {
+  ): Promise<{ text: string; postId?: string } | null> {
+    // A forwarded message carries someone else's words on a listed user's hands.
+    if (message.forwarded) return { text: HELP };
     const text = (message.text ?? "").trim();
     const command = COMMAND.exec(text);
-    if (command?.[1] === "task") return postTask(cleaned(command[2] ?? ""), current);
+    if (command !== null && command[2] !== undefined) {
+      const ours = username !== null && command[2].toLowerCase() === username.toLowerCase();
+      if (!ours) return null;
+    }
+    if (command?.[1] === "task") return postTask(cleaned(command[3] ?? ""), current);
     if (command?.[1] === "board") return { text: boardText() };
-    if (message.replyTo !== null) return reply(message, current);
+    if (message.replyTo !== null) return reply(message);
     return { text: HELP };
   }
 
-  async function reply(
-    message: IncomingMessage,
-    current: TelegramSettings,
-  ): Promise<{ text: string; postId?: string }> {
-    // A reply in a private chat names that chat's message, not one the bridge sent to the chat.
-    const pair =
-      String(message.chat?.id) === current.chat
-        ? kept.sent.findLast((sent) => sent.messageId === message.replyTo)
-        : undefined;
+  async function reply(message: IncomingMessage): Promise<{ text: string; postId?: string }> {
+    // A message id is its chat's own: the same number in another chat is another message.
+    const chat = String(message.chat?.id);
+    const pair = kept.sent.findLast(
+      (sent) => sent.chat === chat && sent.messageId === message.replyTo,
+    );
     const task = board.allPosts()?.find((post) => post.id === pair?.postId && post.kind === "task");
     if (task === undefined) return { text: GONE };
     const result = await board.post({
@@ -468,7 +496,8 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
       );
       sendProblem = null;
       if (postId !== undefined) {
-        await keep({ ...kept, sent: [...kept.sent, { messageId, postId }].slice(-SENT_KEEP) });
+        const sent = { chat: String(chatId), messageId, postId };
+        await keep({ ...kept, sent: [...kept.sent, sent].slice(-SENT_KEEP) });
       }
     } catch (error) {
       sendProblem = error instanceof TelegramProblem ? error.message : STATE_UNSAVED;
@@ -523,7 +552,8 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
         const asked = `needs you — ${nameOf(post.claimedBy)}: ${oneLine(now.blocked)}`;
         announce(taskMessage(post, asked), post.id);
       }
-      if (now.done && before?.done !== true && settings?.done) {
+      // A duty done is no news: the pretend ones are acted out every day.
+      if (now.done && before?.done !== true && post.board !== DUTY && settings?.done) {
         const result = post.result === undefined ? "no result given" : oneLine(post.result);
         announce(taskMessage(post, `done by ${nameOf(post.claimedBy)}: ${result}`), post.id);
       }
@@ -569,13 +599,18 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
   }
 
   /**
-   * The stall checks run while the bridge does. Each start looks first without telling, so what
-   * stalled while it was off is not told when it comes on.
+   * The stall checks run while the bridge does. Each start looks at once without telling, so what
+   * stalled while it was off is not told when it comes on, and what stalls next is.
    */
   function watchStalls(): void {
     const on = running !== null && !stopped;
     if (on && cancelCheck === null) {
       stalled = null;
+      try {
+        checkStalls();
+      } catch (error) {
+        say(`[office] telegram stall check failed: ${errorMessage(error)}`);
+      }
       scheduleCheck();
     } else if (!on && cancelCheck !== null) {
       cancelCheck();
@@ -623,17 +658,12 @@ export function createTelegramBridge(deps: TelegramBridgeDeps): TelegramBridge {
           );
         }
         await store.saveToken(typed === "" ? null : typed);
-        const before = botOf(inUse.token);
         saved = typed === "" ? NO_SAVED_TOKEN : { token: typed, unreadable: false };
         inUse = telegramToken(saved, deps.env);
-        // Another bot's updates are numbered apart: it starts as a first run. Kept before the
-        // poll restarts, so the next one reads it.
-        const anotherBot = inUse.token !== null && botOf(inUse.token) !== before;
-        const reset = anotherBot && kept.offset !== null ? keep({ ...kept, offset: null }) : null;
+        // A token of another bot starts as a first run: the poll sees the kept bot differ.
         refused = false;
         sendProblem = null;
         follow();
-        await reset;
         publish();
         return state();
       });
