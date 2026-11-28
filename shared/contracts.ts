@@ -608,6 +608,7 @@ export const IntakeSourceStateSchema = z.object({
 /** The intake: each source's state, and whether it waits for imported tasks to be done. */
 export const IntakeStateSchema = z.object({
   jira: IntakeSourceStateSchema,
+  github: IntakeSourceStateSchema,
   /** The last run stopped at the open imported tasks' limit. */
   waiting: z.boolean(),
 });

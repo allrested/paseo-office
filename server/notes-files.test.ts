@@ -67,6 +67,8 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       intakeLands: "backlog",
       intakeWriteBack: false,
       intakeAutoStart: false,
+      githubIntakeRepos: [],
+      githubIntakeSearch: "label:agent is:open",
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],

@@ -72,6 +72,7 @@ import {
   type Intake,
   type IntakeSeenFile,
 } from "./server/intake-service.js";
+import { createGithubSource, type RunGh } from "./server/intake-github.js";
 import { createJiraSource } from "./server/intake-jira.js";
 import { createHostAlert } from "./server/host-alert.js";
 import { promptReport } from "./shared/vault.js";
@@ -229,6 +230,8 @@ export interface OfficePluginDeps {
   autoStartFile: AutoStartCountFile;
   /** The tickets the intake posted. */
   intakeFile: IntakeSeenFile;
+  /** The host's `gh`; tests stand in for it. */
+  runGh?: RunGh;
   /** The daemon's environment: a tracker with no saved connection takes its token from it. */
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -586,6 +589,9 @@ export function createOfficePlugin(
   const credentials = () => trackerCredentials(savedTrackers, deps.env);
   // The owner's JQL, as the settings last had it; empty while they cannot be read. Never logged.
   let intakeJql = "";
+  // The repositories and search of the GitHub intake, as the settings last had them.
+  let githubRepos: string[] = [];
+  let githubSearch = "";
   // Every 10 minutes while a source is set up: each new ticket becomes a lobby task.
   intake = createIntake({
     sources: [
@@ -593,6 +599,11 @@ export function createOfficePlugin(
         env: () => credentials().jira,
         jql: () => intakeJql,
         ...(deps.fetchFn === undefined ? {} : { fetchFn: deps.fetchFn }),
+      }),
+      createGithubSource({
+        repos: () => githubRepos,
+        search: () => githubSearch,
+        ...(deps.runGh === undefined ? {} : { run: deps.runGh }),
       }),
     ],
     board: {
@@ -754,6 +765,8 @@ export function createOfficePlugin(
     office.setPickupEnabled(false);
     autoStart?.settingsChanged(null);
     intakeJql = "";
+    githubRepos = [];
+    githubSearch = "";
     void intake?.settingsChanged(null);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
@@ -800,6 +813,8 @@ export function createOfficePlugin(
     });
     weather.settingsChanged(state.values);
     intakeJql = state.values.jiraIntakeJql;
+    githubRepos = state.values.githubIntakeRepos;
+    githubSearch = state.values.githubIntakeSearch;
     await trackersLoaded;
     await intake?.settingsChanged({
       lands: state.values.intakeLands,

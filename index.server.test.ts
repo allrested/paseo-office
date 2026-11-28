@@ -30,6 +30,7 @@ import {
 } from "./server/incidents-store.js";
 import type { NotesStore, StoredNotes } from "./server/notes-writer.js";
 import type { DutiesFile } from "./server/duty-service.js";
+import type { RunGh } from "./server/intake-github.js";
 import { chatT } from "./shared/chat-words.js";
 import { chatRpc, type ChatChange, type ChatMessage } from "./shared/contracts.js";
 import type { officeHostSettings } from "./shared/settings.js";
@@ -112,6 +113,8 @@ const ON: SettingsState = {
     intakeLands: "backlog",
     intakeWriteBack: false,
     intakeAutoStart: false,
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -147,6 +150,8 @@ const OFF: SettingsState = {
     intakeLands: "backlog",
     intakeWriteBack: false,
     intakeAutoStart: false,
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -479,6 +484,8 @@ function setup(
     server?: (base: PluginServerContext) => PluginServerContext;
     /** The clock's start; Wednesday 11 November 2026, 12:00 in Riyadh by default. */
     start?: number;
+    /** The host's `gh`, replaced. */
+    runGh?: RunGh;
   } = {},
 ) {
   const recorded: Recorded = {
@@ -527,6 +534,7 @@ function setup(
         autoStartKept.value = structuredClone(count);
       },
     },
+    ...(options.runGh === undefined ? {} : { runGh: options.runGh }),
     intakeFile: {
       load: async () => structuredClone(intakeKept.value) as never,
       save: async (seen) => {
@@ -709,6 +717,8 @@ function notesSettings(
       intakeLands: "backlog",
       intakeWriteBack: false,
       intakeAutoStart: false,
+      githubIntakeRepos: [],
+      githubIntakeSearch: "label:agent is:open",
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1328,6 +1338,8 @@ const NOTES: SettingsState = {
     intakeLands: "backlog",
     intakeWriteBack: false,
     intakeAutoStart: false,
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -1461,6 +1473,8 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       intakeLands: "backlog",
       intakeWriteBack: false,
       intakeAutoStart: false,
+      githubIntakeRepos: [],
+      githubIntakeSearch: "label:agent is:open",
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1933,6 +1947,8 @@ const JIRA_ON: SettingsState = {
     intakeLands: "backlog",
     intakeWriteBack: false,
     intakeAutoStart: false,
+    githubIntakeRepos: [],
+    githubIntakeSearch: "label:agent is:open",
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -2503,6 +2519,7 @@ test("with a JQL and a Jira sign-in the intake's timer is kept, and run now post
       lastRun: "2026-11-11T09:00:00.000Z",
       imported: 1,
     },
+    github: { configured: false, problem: null, lastRun: null, imported: 0 },
     waiting: false,
   });
   expect(new URL(String(fetchFn.mock.calls[0]?.[0])).searchParams.get("jql")).toBe("project = OPS");
@@ -2544,5 +2561,50 @@ test("with no JQL the intake has no timer and reads nothing", async () => {
   const state = await recorded.handlers.get("office.intake.run.request")?.({}, context);
   expect(state).toMatchObject({ jira: { configured: false, imported: 0 } });
   expect(fetchFn).not.toHaveBeenCalled();
+  await stop();
+});
+
+test("with a repository the GitHub intake's timer is kept, and run now reads with gh and posts the issue as a held lobby task", async () => {
+  const calls: string[][] = [];
+  const runGh: RunGh = async (args) => {
+    calls.push(args);
+    return {
+      code: 0,
+      stdout: JSON.stringify([{ number: 7, title: "Checkout fails", body: "It fails.", url: "x" }]),
+      stderr: "",
+    };
+  };
+  const values = {
+    ...ON.values,
+    agentTools: false,
+    githubIntakeRepos: ["acme/web"],
+    githubIntakeSearch: "label:agent is:open",
+  };
+  const { recorded, context, intakeKept, stop } = setup(async () => ({ ...ON, values }), { runGh });
+  await settle();
+  expect(recorded.schedules).toContain("upsert intake every 600000");
+  const state = await recorded.handlers.get("office.intake.run.request")?.({}, context);
+  expect(state).toMatchObject({
+    jira: { configured: false },
+    github: { configured: true, problem: null, imported: 1 },
+  });
+  expect(calls).toEqual([
+    [
+      "issue",
+      "list",
+      "--repo",
+      "acme/web",
+      "--search",
+      "label:agent is:open",
+      "--limit",
+      "20",
+      "--json",
+      "number,title,body,url",
+    ],
+  ]);
+  expect(intakeKept.value).toEqual({
+    version: 1,
+    seen: { "github:acme/web#7": "2026-11-11T09:00:00.000Z" },
+  });
   await stop();
 });

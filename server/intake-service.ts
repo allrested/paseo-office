@@ -30,6 +30,8 @@ const EVERY_MS = 600_000;
 export const INTAKE_READ_MAX = 20;
 /** The most pages one run reads: past seen tickets, 100 matches at most. */
 export const INTAKE_PAGES_MAX = 5;
+/** The most tickets one run looks at from a source: GitHub's 10 repositories of 20 each. */
+const INTAKE_LOOK_MAX = 200;
 /** With this many imported tasks open or held, a run posts nothing more. */
 export const IMPORTED_OPEN_MAX = 50;
 export const TITLE_MAX = 300;
@@ -64,6 +66,8 @@ export interface IntakeRead {
   /** Seen ones too: one found only on the board is then recorded. */
   issues: IntakeIssue[];
   skipped: number;
+  /** Safe sentences about what a source could not read while it read the rest. */
+  problems?: readonly string[];
   /** It read the most pages it may and every ticket was seen: nothing new can come. */
   crowded?: boolean;
 }
@@ -300,7 +304,7 @@ export function createIntake(ports: IntakePorts): Intake {
   }
 
   function state(): IntakeState {
-    return { jira: stateOf("jira"), waiting };
+    return { jira: stateOf("jira"), github: stateOf("github"), waiting };
   }
 
   /** Sends the state when it changed, and logs each source's problem once per change. */
@@ -387,7 +391,9 @@ export function createIntake(ports: IntakePorts): Intake {
     }
     skipped = read.skipped;
     if (read.crowded) add(said(CROWDED));
-    for (const found of read.issues.slice(0, INTAKE_READ_MAX * INTAKE_PAGES_MAX)) {
+    // A source's own sentences about what it could not read, beside what it did.
+    for (const problem of read.problems ?? []) add(said(problem));
+    for (const found of read.issues.slice(0, INTAKE_LOOK_MAX)) {
       const issue = cleaned(kind, found);
       const text = issue === null ? null : ticketText(issue);
       if (issue === null || text === null) {
@@ -405,6 +411,8 @@ export function createIntake(ports: IntakePorts): Intake {
         break;
       }
       if (known) continue;
+      // The run's own cap, whatever a source returns: the rest come at the next run.
+      if (imported >= INTAKE_READ_MAX) break;
       if (openImported() >= IMPORTED_OPEN_MAX) {
         waiting = true;
         break;

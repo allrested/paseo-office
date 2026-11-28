@@ -271,6 +271,19 @@ export const RULES: readonly Rule[] = [
   // The intake's status line, and the chip that opens a task's ticket.
   [/^Last read (\d{2}:\d{2}): (\d+) imported$/, (time, n) => `อ่านล่าสุด ${time}: นำเข้า ${n}`],
   [/^Last read (\d{2}:\d{2}): nothing new$/, (time) => `อ่านล่าสุด ${time}: ไม่มีอะไรใหม่`],
+  [
+    /^GitHub: last read (\d{2}:\d{2}): (\d+) imported$/,
+    (time, n) => `GitHub: อ่านล่าสุด ${time}: นำเข้า ${n}`,
+  ],
+  [
+    /^GitHub: last read (\d{2}:\d{2}): nothing new$/,
+    (time) => `GitHub: อ่านล่าสุด ${time}: ไม่มีอะไรใหม่`,
+  ],
+  [
+    /^Line (\d+): "(.+)" is not owner\/repo$/,
+    (n, entry) => `บรรทัด ${n}: "${entry}" ไม่ใช่ owner/repo`,
+  ],
+  [/^Line (\d+): "(.+)" is there twice$/, (n, entry) => `บรรทัด ${n}: "${entry}" ซ้ำกัน`],
   [/^Open (\S+) in Jira$/, (key) => `เปิด ${key} ใน Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `เปิด ${key} บน GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.

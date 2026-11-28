@@ -154,6 +154,7 @@ test("the chat's changes", () => {
 test("the intake's state replaces the one before", () => {
   const intake = {
     jira: { configured: true, problem: null, lastRun: "2026-11-11T09:00:00.000Z", imported: 1 },
+    github: { configured: false, problem: null, lastRun: null, imported: 0 },
     waiting: false,
   };
   expect(applyOfficeEvent(EMPTY_OFFICE, { type: "intake", intake })).toEqual({

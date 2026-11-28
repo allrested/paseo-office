@@ -4,6 +4,8 @@ import { translatePattern } from "./ui-patterns-id.js";
 test("lines built from data keep their data and take Indonesian words", () => {
   const lines: [string, string][] = [
     ["12 min ago", "12 mnt lalu"],
+    ["GitHub: last read 12:40: 2 imported", "GitHub: terakhir dibaca 12:40: 2 diimpor"],
+    ['Line 2: "-evil/x" is not owner/repo', 'Baris 2: "-evil/x" bukan owner/repo'],
     ["3 h ago", "3 jam lalu"],
     ["just now", "baru saja"],
     ["2 h 5 min", "2 jam 5 mnt"],

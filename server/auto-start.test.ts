@@ -765,3 +765,20 @@ test("a held task from a ticket is left alone unless imported tasks may start by
   await settle();
   expect(s.started).toEqual(["p1"]);
 });
+
+test("a held task from a GitHub issue is left alone too, unless imported tasks may start by themselves", async () => {
+  const source = {
+    kind: "github" as const,
+    key: "acme/web#7",
+    url: "https://github.com/acme/web/issues/7",
+  };
+  const s = setup({ posts: [held("p1", "2026-11-10T10:00:00.000Z", { source })] });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ reason: "empty" });
+  s.service.settingsChanged({ ...SETTINGS, intakeAutoStart: true });
+  await settle();
+  expect(s.started).toEqual(["p1"]);
+});

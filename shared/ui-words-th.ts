@@ -815,4 +815,14 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Not read yet.": "ยังไม่ได้อ่าน",
   "Waiting: 50 imported tasks are open.": "กำลังรอ: งานที่นำเข้า 50 งานยังเปิดอยู่",
   "Read now": "อ่านตอนนี้",
+  "GitHub repositories to bring in from": "รีโพซิทอรี GitHub ที่จะนำเข้า",
+  "Read with the host's gh CLI and its sign-in. The office keeps no GitHub token.":
+    "อ่านด้วย gh CLI ของโฮสต์และการลงชื่อเข้าใช้ของมัน ออฟฟิศไม่เก็บโทเคน GitHub",
+  "GitHub search": "การค้นหา GitHub",
+  "Issues this matches become lobby tasks, each once. Leave imported issues out of it, for example with -label:in-office.":
+    "issue ที่ตรงจะกลายเป็นงานในล็อบบี้ อย่างละหนึ่งครั้ง ควรตัด issue ที่นำเข้าแล้วออกจากการค้นหานี้ เช่นด้วย -label:in-office",
+  "At most 10 repositories": "สูงสุด 10 รีโพซิทอรี",
+  "The search must not start with a dash": "การค้นหาต้องไม่ขึ้นต้นด้วยขีดกลาง",
+  "GitHub: not set up. Add a repository.": "GitHub: ยังไม่ได้ตั้งค่า เพิ่มรีโพซิทอรี",
+  "GitHub: not read yet.": "GitHub: ยังไม่ได้อ่าน",
 };

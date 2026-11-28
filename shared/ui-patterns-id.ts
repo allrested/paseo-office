@@ -300,6 +300,19 @@ export const RULES: readonly Rule[] = [
     /^Last read (\d{2}:\d{2}): nothing new$/,
     (time) => `Terakhir dibaca ${time}: tidak ada yang baru`,
   ],
+  [
+    /^GitHub: last read (\d{2}:\d{2}): (\d+) imported$/,
+    (time, n) => `GitHub: terakhir dibaca ${time}: ${n} diimpor`,
+  ],
+  [
+    /^GitHub: last read (\d{2}:\d{2}): nothing new$/,
+    (time) => `GitHub: terakhir dibaca ${time}: tidak ada yang baru`,
+  ],
+  [
+    /^Line (\d+): "(.+)" is not owner\/repo$/,
+    (n, entry) => `Baris ${n}: "${entry}" bukan owner/repo`,
+  ],
+  [/^Line (\d+): "(.+)" is there twice$/, (n, entry) => `Baris ${n}: "${entry}" muncul dua kali`],
   [/^Open (\S+) in Jira$/, (key) => `Buka ${key} di Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `Buka ${key} di GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.

@@ -845,4 +845,14 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Not read yet.": "Belum dibaca.",
   "Waiting: 50 imported tasks are open.": "Menunggu: 50 tugas impor masih terbuka.",
   "Read now": "Baca sekarang",
+  "GitHub repositories to bring in from": "Repositori GitHub yang dibawa masuk",
+  "Read with the host's gh CLI and its sign-in. The office keeps no GitHub token.":
+    "Dibaca dengan gh CLI milik host beserta login-nya. Kantor tidak menyimpan token GitHub.",
+  "GitHub search": "Pencarian GitHub",
+  "Issues this matches become lobby tasks, each once. Leave imported issues out of it, for example with -label:in-office.":
+    "Issue yang cocok menjadi tugas lobi, masing-masing sekali. Keluarkan issue yang sudah diimpor dari pencarian ini, misalnya dengan -label:in-office.",
+  "At most 10 repositories": "Maksimal 10 repositori",
+  "The search must not start with a dash": "Pencarian tidak boleh diawali tanda hubung",
+  "GitHub: not set up. Add a repository.": "GitHub: belum diatur. Tambahkan repositori.",
+  "GitHub: not read yet.": "GitHub: belum dibaca.",
 };

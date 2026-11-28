@@ -1695,3 +1695,28 @@ test("the office marks a written back task and names an agent by its title", asy
   expect(office.label("user")).toBe("the user");
   await office.stop();
 });
+
+test("a task from a GitHub issue is assigned under a heading that names it, and reads as an assignment", async () => {
+  const { office, prompts, clock } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  const text = "Acme-Co/web.app#12 Checkout fails\nhttps://github.com/Acme-Co/web.app/issues/12";
+  await office.post({
+    board: "lobby",
+    kind: "task",
+    text,
+    source: {
+      kind: "github",
+      key: "Acme-Co/web.app#12",
+      url: "https://github.com/Acme-Co/web.app/issues/12",
+    },
+  });
+  clock.advance(0);
+  await settle();
+  const prompt = (prompts[0] ?? "").replace(/^b: /, "");
+  expect(prompt.split("\n")[0]).toBe(
+    "The office assigned you lobby task p1 from GitHub Acme-Co/web.app#12.",
+  );
+  expect(readLobbyAssignment(prompt)).toEqual({ id: "p1", kind: "lobby", body: text });
+  await office.stop();
+});
