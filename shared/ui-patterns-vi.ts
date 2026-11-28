@@ -228,6 +228,7 @@ export const RULES: readonly Rule[] = [
   [/^Save the (.+) setting$/, (name) => `Lưu cài đặt ${translatePattern(name)}`],
   [/^Start an agent to analyze (.+)$/, (key) => `Bắt đầu một agent để phân tích ${key}`],
   [/^Add (.+) to the lobby board$/, (key) => `Thêm ${key} vào bảng sảnh`],
+  [/^Duty (\d+) time$/, (n) => `Giờ trực nhật ${n}`],
   [
     /^For the 3D view\. Company floor has (\d+) desks, Cozy room (\d+), and Headquarters (\d+)\. Headquarters may draw more slowly on a phone\. Changing it starts the 3D view again\.$/,
     (pro, cozy, hq) =>

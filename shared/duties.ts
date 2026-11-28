@@ -1,4 +1,4 @@
-import type { Duty, DutyBoard, Post } from "./contracts.js";
+import { DUTY_TIME_PATTERN, type Duty, type DutyBoard, type Post } from "./contracts.js";
 import { DUTY } from "./names.js";
 
 /** The most duties the list holds. */
@@ -7,7 +7,10 @@ export const DUTY_NAME_MAX = 40;
 export const DUTY_INSTRUCTIONS_MAX = 2000;
 /** The most characters of a holder's name the 3D board and its tooltip show. */
 export const DUTY_HOLDER_CHARS = 24;
-/** A duty comes due at 08:00 in the notes' zone, the stand-up's hour: minutes of the day. */
+/**
+ * A duty comes due at 08:00 in the notes' zone, the stand-up's hour, unless it has a later time:
+ * minutes of the day. The duty board's day begins then too.
+ */
 export const DUTY_DUE_MINUTE = 8 * 60;
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -26,6 +29,8 @@ export interface DutyDraft {
   name: string;
   instructions: string;
   days: readonly number[];
+  /** HH:MM from 08:00 to 23:59; none for 08:00. */
+  time?: string;
 }
 
 function dutyProblem(duty: DutyDraft, index: number): string | null {
@@ -41,6 +46,9 @@ function dutyProblem(duty: DutyDraft, index: number): string | null {
   }
   if (duty.days.some((day, at) => duty.days.indexOf(day) !== at))
     return `"${name}" has a day twice`;
+  if (duty.time !== undefined && !DUTY_TIME_PATTERN.test(duty.time)) {
+    return `Duty "${name}": the time must be between 08:00 and 23:59`;
+  }
   return null;
 }
 

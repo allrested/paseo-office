@@ -86,6 +86,7 @@ test("the cards' longer lines are in Thai too, with their names and numbers kept
     ["Unable to clean up 1 of 3. The first reason: busy", "เคลียร์ไม่ได้ 1 จาก 3 เหตุผลแรก: busy"],
     ["ended with an error (exit 2)", "จบด้วยข้อผิดพลาด (exit 2)"],
     ["Add SHOP-12 to the lobby board", "เพิ่ม SHOP-12 ไปยังบอร์ดล็อบบี้"],
+    ["Duty 2 time", "เวลาของเวร 2"],
   ];
   for (const [english, thai] of lines) expect(translatePattern(english)).toBe(thai);
 });

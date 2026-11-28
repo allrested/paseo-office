@@ -405,8 +405,10 @@ export const UI_TH: Readonly<Record<string, string>> = {
   Workspace: "พื้นที่ทำงาน",
   "Write a reply": "เขียนคำตอบ",
   You: "คุณ",
-  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.":
-    "เวรที่ไม่มีคำสั่งเป็นเพียงการแสดง: ออฟฟิศ 3D จะแสดงให้ดูและไม่มี agent ถูกขอให้ทำ ส่วนเวรที่มีคำสั่งจะส่งให้ agent ที่ว่างในแต่ละวันของเวร ตั้งแต่ 08:00 ตามเขตเวลาของบันทึก",
+  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from its time (08:00 when none is set) in the notes' time zone.":
+    "เวรที่ไม่มีคำสั่งเป็นเพียงการแสดง: ออฟฟิศ 3D จะแสดงให้ดูและไม่มี agent ถูกขอให้ทำ ส่วนเวรที่มีคำสั่งจะส่งให้ agent ที่ว่างในแต่ละวันของเวร ตั้งแต่เวลาของเวร (08:00 หากไม่ได้ตั้ง) ตามเขตเวลาของบันทึก",
+  "Between 08:00 and 23:59": "ระหว่าง 08:00 ถึง 23:59",
+  Time: "เวลา",
   "A sub-agent started": "subagent เริ่มทำงานแล้ว",
   "A token is saved; type a new one to replace it. Stored on the host for its user only; never shown again.":
     "บันทึกโทเค็นแล้ว พิมพ์โทเค็นใหม่เพื่อแทนที่ เก็บไว้บน hostสำหรับผู้ใช้ของ hostเท่านั้น และจะไม่แสดงอีก",

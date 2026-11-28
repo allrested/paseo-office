@@ -221,6 +221,12 @@ export type Post = z.output<typeof PostSchema>;
 export const DUTY_CHORES = ["cups", "trash", "plants", "table"] as const;
 export type DutyChore = (typeof DUTY_CHORES)[number];
 
+/**
+ * A duty's time of day, HH:MM from 08:00 to 23:59: the duty board's day begins at 08:00, so an
+ * earlier time would fall on the day before.
+ */
+export const DUTY_TIME_PATTERN = /^(0[89]|1\d|2[0-3]):[0-5]\d$/;
+
 /** A duty of the owner's list. Without instructions it is pretend: the 3D office acts it out. */
 export const DutySchema = z.object({
   id: z.string(),
@@ -231,6 +237,8 @@ export const DutySchema = z.object({
   days: z.array(z.number().int().min(0).max(6)),
   /** The chore the 3D office acts it out as; absent for a duty the owner added. */
   chore: z.enum(DUTY_CHORES).optional(),
+  /** When it comes due on its days, in the notes' zone; absent for 08:00. */
+  time: z.string().regex(DUTY_TIME_PATTERN).optional(),
 });
 export type Duty = z.output<typeof DutySchema>;
 
@@ -789,6 +797,8 @@ export const DutyDraftSchema = z.object({
   name: z.string().max(400),
   instructions: z.string().max(20_000),
   days: z.array(z.number()).max(14),
+  /** Checked by the save, which names the duty a time outside 08:00 to 23:59 is refused for. */
+  time: z.string().max(20).optional(),
 });
 
 export const DutiesResultSchema = z.union([

@@ -676,20 +676,26 @@ unless that agent wrote it: a reply from the holder is for you and wakes nobody.
 ## The duty board
 
 The pantry's duty board is kept on the host. You choose its duties: up to 12, each with a name (up
-to 40 characters), the weekdays it is due and, if an agent should do it, instructions (up to 2,000
-characters). A host starts with the four pantry chores, Monday to Friday, without instructions. The
-list is kept in `<PASEO_HOME>/office/duties.json` (`server/duty-service.ts`). A file the office
-cannot read, or one written by a newer version, is moved aside to `duties.json.corrupt-<time>` and
-the list starts again from the four chores; your old list is in that file.
+to 40 characters), the weekdays it is due, a time of day (08:00 unless set) and, if an agent should
+do it, instructions (up to 2,000 characters). A host starts with the four pantry chores, Monday to
+Friday, without instructions. The list is kept in `<PASEO_HOME>/office/duties.json`
+(`server/duty-service.ts`). A file the office cannot read, or one written by a newer version, is
+moved aside to `duties.json.corrupt-<time>` and the list starts again from the four chores; your old
+list is in that file.
 
-At 8:00 in the notes' time zone ("Time zone", the host's when empty or not a zone the host knows)
-each duty due that day is posted as a task on the board `duty`, a host-wide board like the lobby's.
-The run also takes the duties finished on earlier days off the board. When the office starts, and
-when you save the list, a duty due today that has no post yet is posted at once if it is past 8:00.
+The duty board's day begins at 8:00 in the notes' time zone ("Time zone", the host's when empty or
+not a zone the host knows); before 8:00 it is still the day before. At its time on each of its days
+a duty is posted as a task on the board `duty`, a host-wide board like the lobby's: at 8:00 for one
+without a time, at 14:30 for one set to 14:30. A time is `HH:MM` from 08:00 to 23:59, never earlier,
+since an earlier time would fall on the board's day before; a time in the file that is not one
+(written by hand) counts as 08:00, and a save with one is refused, naming the duty. The 8:00 run
+also takes the duties finished on earlier days off the board. When the office starts, and when you
+save the list, a duty due today that has no post yet is posted at once if its time has passed.
 A duty still open or claimed when its day ends is owed: it stays on the board and is not posted
 again. An owed duty finished today counts for today, so it is not posted again until its next day.
 Removing a duty takes its open post off the board, and a claimed one stays until it is done. A new
-name or new instructions change today's open post.
+name or new instructions change today's open post. A new time leaves a duty posted today as it
+is; one not yet posted today is posted at its new time, or at the save when that time has passed.
 
 A duty with instructions goes to an idle agent as a lobby to-do does, under the same rules: one
 task or duty at a time per agent, the wake limits, **Wake agents** and **Agent tools**. Its prompt
@@ -699,21 +705,23 @@ a duty with `office_update`. An agent finishes or reopens only a duty it holds; 
 you mark any. Nobody posts to the duty board, not even from the office. A duty is never addressed
 to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
 
-A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor
-finish it. On the 3D floor a person acts it out as soon as it is idle (resting at its desk with
-nothing else on), at any hour: no duty waits for a time of day. Owed duties go first, then the
-board's order, each to the idle person that has done fewest today, one duty at a time. Work coming
-in calls the person back and the duty waits for the next idle one. Only the cups wait for something
-else, a cup in the sink, unless they are owed. The view tells
-the host, which records it as done by that agent. When two devices both act it out, the first to
-report wins. With no 3D office open, or nobody idle, before its day ends, it stays open and is owed.
+A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor finish
+it. On the 3D floor a person acts it out as soon as it is idle (resting at its desk with nothing
+else on), at any hour once it is posted: a duty with a time is on the board from that time. Owed
+duties go first, then the board's order, each to the idle person that has done fewest today, one
+duty at a time. Work coming in calls the person back and the duty waits for the next idle one. Only
+the cups wait for something else, a cup in the sink, unless they are owed. The view tells the host,
+which records it as done by that agent. When two devices both act it out, the first to report wins.
+With no 3D office open, or nobody idle, before its day ends, it stays open and is owed.
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
 It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
 Reopen (a duty is freed on its own when its agent is closed or archived, so Reopen is for one an
 agent still holds but is not working on), and the list with each duty's name, instructions and day
-buttons, saved whole. Unticking today's day on a duty takes
+buttons and time, saved whole. The time field takes `H:MM` or `HH:MM` and keeps it as `HH:MM`;
+empty is 08:00, and Save waits while a time is outside 08:00 to 23:59. Today's duties show a time
+that is not 08:00 after the name ("Take out the bin · 14:30"). Unticking today's day on a duty takes
 its open post of today off the board when you save; a claimed one stays until it is done, as for a
 removed duty. The scene is told each duty's name, its chore, its holder's title cut to 24 characters
 and its state, never its instructions (`worldDuties` in `client/world/adapter.ts`). The board and
@@ -1213,7 +1221,8 @@ the next run.
 
 The office runs three schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
 on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, the duty board
-at 08:00 every day in the same zone, and the incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
+at 08:00 every day in the same zone and at each later time a listed duty has (one schedule of
+several times, set again when the list is saved), and the incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
@@ -1229,8 +1238,9 @@ office sets them from its settings each time it starts and at each save, and sto
 - A notes run that could only start on a later day than it was due is dropped, so no entry is
   written for the wrong day.
 - The duty board's run needs no Paseo API: it posts at once, and only handing a duty to an idle
-  agent waits for the API. When the office starts, today's duties not yet posted are posted;
-  an earlier day's are not.
+  agent waits for the API. When the office starts, today's duties not yet posted whose time has
+  passed are posted; an earlier day's are not. A run at a later time posts the duties whose time it
+  is; the duties of earlier days leave at the 08:00 run.
 
 ## Incidents
 

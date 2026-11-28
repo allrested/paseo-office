@@ -120,3 +120,17 @@ test("a holder's name is cut to 24 characters with an ellipsis", () => {
   expect(cut.startsWith("Refactor the payment")).toBe(true);
   expect(shortHolder("  spaced   name  ")).toBe("spaced name");
 });
+
+test("a duty's time is HH:MM from 08:00 to 23:59; another is refused, naming the duty", () => {
+  const draft = (time?: string) => ({ name: "Bin", instructions: "", days: [1], time });
+  for (const time of [undefined, "08:00", "14:30", "23:59"]) {
+    expect(dutyListProblem([draft(time)]), String(time)).toBeNull();
+  }
+  for (const time of ["07:59", "24:00", "8:00", "14:60", "", "2pm"]) {
+    expect(dutyListProblem([draft(time)]), time).toBe(
+      'Unable to save: Duty "Bin": the time must be between 08:00 and 23:59',
+    );
+  }
+  expect(DutySchema.safeParse({ ...STARTING_DUTIES[0], time: "14:30" }).success).toBe(true);
+  expect(DutySchema.safeParse({ ...STARTING_DUTIES[0], time: "07:00" }).success).toBe(false);
+});

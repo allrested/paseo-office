@@ -414,8 +414,10 @@ export const UI_ID: Readonly<Record<string, string>> = {
   Workspace: "Workspace",
   "Write a reply": "Tulis balasan",
   You: "Anda",
-  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from 08:00 in the notes' time zone.":
-    "Piket tanpa instruksi hanya pura-pura: kantor 3D memperagakannya dan tidak ada agen yang diminta. Piket dengan instruksi diberikan ke agen yang menganggur pada tiap harinya, mulai 08.00 di zona waktu catatan.",
+  "A duty without instructions is pretend: the 3D office acts it out and no agent is asked. One with instructions goes to an idle agent on each of its days, from its time (08:00 when none is set) in the notes' time zone.":
+    "Piket tanpa instruksi hanya pura-pura: kantor 3D memperagakannya dan tidak ada agen yang diminta. Piket dengan instruksi diberikan ke agen yang menganggur pada tiap harinya, mulai jamnya (08.00 bila tidak diatur) di zona waktu catatan.",
+  "Between 08:00 and 23:59": "Antara 08:00 dan 23:59",
+  Time: "Waktu",
   "A sub-agent started": "Sub-agen dimulai",
   "A token is saved; type a new one to replace it. Stored on the host for its user only; never shown again.":
     "Token tersimpan; ketik yang baru untuk menggantinya. Disimpan di host hanya untuk penggunanya; tidak pernah ditampilkan lagi.",

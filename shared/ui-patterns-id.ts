@@ -235,6 +235,7 @@ export const RULES: readonly Rule[] = [
   [/^Save the (.+) setting$/, (name) => `Simpan pengaturan ${translatePattern(name)}`],
   [/^Start an agent to analyze (.+)$/, (key) => `Mulai agen untuk menganalisis ${key}`],
   [/^Add (.+) to the lobby board$/, (key) => `Tambahkan ${key} ke papan lobi`],
+  [/^Duty (\d+) time$/, (n) => `Waktu piket ${n}`],
   [
     /^For the 3D view\. Company floor has (\d+) desks, Cozy room (\d+), and Headquarters (\d+)\. Headquarters may draw more slowly on a phone\. Changing it starts the 3D view again\.$/,
     (pro, cozy, hq) =>

@@ -1,9 +1,13 @@
 import { errorMessage } from "./errors.js";
 import type { Clock } from "./timers.js";
 
-/** When one of the office's schedules runs: at a wall-clock time on some weekdays, or at an interval. */
+/**
+ * When one of the office's schedules runs: at a wall-clock time on some weekdays, at each of
+ * several (the duty board's times), or at an interval.
+ */
 export type OfficeCadence =
   | { type: "cron"; expression: string; timezone: string }
+  | { type: "crons"; expressions: readonly string[]; timezone: string }
   | { type: "every"; everyMs: number };
 
 export interface OfficeScheduleInput {
@@ -146,7 +150,12 @@ export function nextCronRun(expression: string, timezone: string, after: number)
 
 function nextRun(cadence: OfficeCadence, after: number): number {
   if (cadence.type === "every") return after + cadence.everyMs;
-  return nextCronRun(cadence.expression, cadence.timezone, after);
+  if (cadence.type === "cron") return nextCronRun(cadence.expression, cadence.timezone, after);
+  // The soonest of its times; each is read, so one the office does not read refuses them all.
+  if (cadence.expressions.length === 0) throw new Error("Unsupported schedule expression: none");
+  return Math.min(
+    ...cadence.expressions.map((expression) => nextCronRun(expression, cadence.timezone, after)),
+  );
 }
 
 interface Kept {

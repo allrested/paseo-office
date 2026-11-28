@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Duty, Post } from "../shared/contracts.js";
 import { STARTING_DUTIES, dutyRows, type DutyDraft } from "../shared/duties.js";
 import { DutySheet } from "./duty-sheet.js";
+import { translate } from "./ui-language.js";
 import { useOfficeStyles } from "./styles.js";
 import type { DutyActions } from "./use-duty-actions.js";
 
@@ -125,6 +126,12 @@ async function type(label: string, text: string): Promise<void> {
   });
 }
 
+async function blur(label: string): Promise<void> {
+  await act(async () =>
+    byLabel(label).dispatchEvent(new FocusEvent("focusout", { bubbles: true })),
+  );
+}
+
 const text = () => container.textContent ?? "";
 const fieldText = (label: string) => (byLabel(label) as HTMLInputElement).value;
 const pressed = (group: string) =>
@@ -196,4 +203,45 @@ test("the list is full at 12 duties, and waits for the host's list", async () =>
   expect(byLabel("Add a duty").getAttribute("aria-disabled")).toBe("true");
   await mount(null, []);
   expect(text()).toContain("Loading the duty list...");
+});
+
+test("each duty has a time: shown when not 08:00, kept as HH:MM, and refused outside 08:00 to 23:59", async () => {
+  const timed: Duty = { ...BUILD, time: "14:30" };
+  await mount([STARTING_DUTIES[0] as Duty, timed], [post(1, "cups"), post(2, "build")]);
+  expect(text()).toContain("Build · 14:30");
+  expect(text()).not.toContain("Wash the cups ·");
+  expect(text()).toContain("Time");
+  expect(fieldText("Duty 1 time")).toBe("");
+  expect(byLabel("Duty 1 time").getAttribute("placeholder")).toBe("08:00");
+  expect(fieldText("Duty 2 time")).toBe("14:30");
+  await type("Duty 1 time", "9:05");
+  await blur("Duty 1 time");
+  expect(fieldText("Duty 1 time")).toBe("09:05");
+  await type("Duty 2 time", "07:00");
+  await blur("Duty 2 time");
+  expect(fieldText("Duty 2 time")).toBe("07:00");
+  expect(text()).toContain("Between 08:00 and 23:59");
+  expect(byLabel("Save duties").getAttribute("aria-disabled")).toBe("true");
+  await press("Save duties");
+  expect(saved).toEqual([]);
+  // Empty is no time: 08:00.
+  await type("Duty 2 time", "");
+  expect(text()).not.toContain("Between 08:00 and 23:59");
+  await press("Save duties");
+  expect(saved).toEqual([
+    [
+      { id: "cups", name: "Wash the cups", instructions: "", days: [1, 2, 3, 4, 5], time: "09:05" },
+      { id: "build", name: "Build", instructions: "Run the build", days: [3] },
+    ],
+  ]);
+  expect(saved[0]?.[1]).not.toHaveProperty("time");
+});
+
+test("the time field's words are in the interface's language", () => {
+  for (const language of ["id", "vi", "th"] as const) {
+    expect(translate(language, "Time"), language).not.toBe("Time");
+    expect(translate(language, "Between 08:00 and 23:59"), language).toContain("08:00");
+    expect(translate(language, "Duty 2 time"), language).toContain("2");
+    expect(translate(language, "Duty 2 time"), language).not.toBe("Duty 2 time");
+  }
 });
