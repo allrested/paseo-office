@@ -126,6 +126,19 @@ test("a task's replies are the notes under it, oldest first; a task's result is 
   expect(repliesOf(loose, posts)).toEqual([]);
 });
 
+test("a copy's replies are its lobby task's, found among every board's posts", () => {
+  const task = post(1, { board: "lobby", state: "claimed", claimedBy: "a1", link: "p2" });
+  const copy = post(2, { board: "w1", state: "claimed", claimedBy: "a1", link: "p1" });
+  const answer = post(3, { board: "lobby", kind: "note", state: undefined, replyTo: "p1" });
+  const stray = post(4, { board: "w1", kind: "note", state: undefined, replyTo: "p2" });
+  const every = [task, copy, answer, stray];
+  // The server keeps a reply under the lobby task, so that is where the copy's thread is.
+  expect(repliesOf(copy, every).map((item) => item.id)).toEqual(["p3"]);
+  expect(repliesOf(task, every).map((item) => item.id)).toEqual(["p3"]);
+  // The room's own posts hold none of it.
+  expect(repliesOf(copy, [copy])).toEqual([]);
+});
+
 test("replies show under their task, so the top level and a card's count leave them out", () => {
   const posts = [
     post(1, {}),

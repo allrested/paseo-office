@@ -340,7 +340,7 @@ function DoneSection({ room, name, teamName, all, onFollowUp, actions, styles }:
             <PostWithActions
               key={post.id}
               post={post}
-              replies={repliesOf(post, room.posts)}
+              replies={repliesOf(post, all)}
               name={name}
               teamName={teamName}
               all={all}
@@ -530,7 +530,7 @@ function SheetBody({
             <PostWithActions
               key={post.id}
               post={post}
-              replies={repliesOf(post, room.posts)}
+              replies={repliesOf(post, everyPost)}
               name={name}
               teamName={teamName}
               all={everyPost}

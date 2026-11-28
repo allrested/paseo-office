@@ -131,10 +131,14 @@ export function topLevel(posts: readonly Post[]): Post[] {
   return posts.filter((post) => post.replyTo === undefined);
 }
 
-/** The notes under a task, oldest first. */
+/**
+ * The notes under a task, oldest first. A reply to a room's copy of a lobby task is kept under
+ * the lobby task, so a copy's thread is that task's: `posts` are every board's (`allPosts`).
+ */
 export function repliesOf(task: Post, posts: readonly Post[]): Post[] {
+  const root = task.board !== LOBBY && task.link !== undefined ? task.link : task.id;
   return posts
-    .filter((post) => post.kind === "note" && post.replyTo === task.id)
+    .filter((post) => post.kind === "note" && post.replyTo === root)
     .sort((left, right) => left.seq - right.seq);
 }
 

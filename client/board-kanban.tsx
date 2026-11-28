@@ -13,7 +13,7 @@ import type { BoardActions } from "./use-board-actions.js";
 
 export interface KanbanBoardProps {
   posts: readonly Post[];
-  /** The posts of every board: a task can wait on one of another's. */
+  /** The posts of every board: a task can wait on one of another's, and a copy's replies are its lobby task's. */
   all: readonly Post[];
   /** Follow-up on a card: the board's form posts a task after it. */
   onFollowUp(id: string): void;
@@ -25,8 +25,7 @@ export interface KanbanBoardProps {
 
 interface ColumnProps {
   column: KanbanColumn;
-  /** The whole board, replies included: a task's card shows the ones under it. */
-  board: readonly Post[];
+  /** Every board's posts, replies included: a card shows the ones under its task, or its lobby task. */
   all: readonly Post[];
   onFollowUp(id: string): void;
   name(author: string): string;
@@ -45,7 +44,7 @@ function ColumnClear({
   column,
   actions,
   styles,
-}: Omit<ColumnProps, "name" | "teamName" | "board" | "all" | "onFollowUp">) {
+}: Omit<ColumnProps, "name" | "teamName" | "all" | "onFollowUp">) {
   const first = column.posts[0];
   if (column.id !== "done" || first === undefined) return null;
   return (
@@ -59,16 +58,7 @@ function ColumnClear({
 }
 
 /** A task is a card with its box; a note keeps the buttons it has on the list. */
-function ColumnCards({
-  column,
-  board,
-  all,
-  onFollowUp,
-  name,
-  teamName,
-  actions,
-  styles,
-}: ColumnProps) {
+function ColumnCards({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
   return (
     <View style={styles.kanbanCards}>
       {column.posts.map((post) =>
@@ -88,7 +78,7 @@ function ColumnCards({
           <TaskCard
             key={post.id}
             post={post}
-            replies={repliesOf(post, board)}
+            replies={repliesOf(post, all)}
             name={name}
             teamName={teamName}
             all={all}
@@ -103,16 +93,7 @@ function ColumnCards({
 }
 
 /** Wide: a column of its own width beside the others. */
-function SideColumn({
-  column,
-  board,
-  all,
-  onFollowUp,
-  name,
-  teamName,
-  actions,
-  styles,
-}: ColumnProps) {
+function SideColumn({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
   return (
     <View style={styles.kanbanColumn}>
       <View style={styles.kanbanHeading}>
@@ -123,7 +104,6 @@ function SideColumn({
       </View>
       <ColumnCards
         column={column}
-        board={board}
         all={all}
         onFollowUp={onFollowUp}
         name={name}
@@ -136,16 +116,7 @@ function SideColumn({
 }
 
 /** Narrow: a section whose heading folds it. Done starts folded: what is finished waits below. */
-function StackedColumn({
-  column,
-  board,
-  all,
-  onFollowUp,
-  name,
-  teamName,
-  actions,
-  styles,
-}: ColumnProps) {
+function StackedColumn({ column, all, onFollowUp, name, teamName, actions, styles }: ColumnProps) {
   const [open, setOpen] = useState(column.id !== "done");
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
@@ -168,7 +139,6 @@ function StackedColumn({
       {open ? (
         <ColumnCards
           column={column}
-          board={board}
           all={all}
           onFollowUp={onFollowUp}
           name={name}
@@ -215,7 +185,6 @@ export function KanbanBoard({
             <SideColumn
               key={column.id}
               column={column}
-              board={posts}
               all={all}
               onFollowUp={onFollowUp}
               name={name}
@@ -230,7 +199,6 @@ export function KanbanBoard({
           <StackedColumn
             key={column.id}
             column={column}
-            board={posts}
             all={all}
             onFollowUp={onFollowUp}
             name={name}

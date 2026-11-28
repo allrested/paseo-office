@@ -740,6 +740,57 @@ test("a room's list draws a reply under its task and not as a post of its own", 
   ]);
 });
 
+/** A lobby task its agent claimed, the copy on the agent's board, and the reply kept under the lobby task. */
+function copiedTask(state: "claimed" | "done" = "claimed") {
+  const held = { state, claimedBy: "a1" } as const;
+  return {
+    lobby: [
+      post(1, { text: "Rotate keys", ...held, link: "p2" }),
+      post(3, { kind: "note", state: undefined, replyTo: "p1", text: "Use the vault" }),
+    ],
+    w1: [post(2, { board: "w1", text: "Rotate keys", ...held, link: "p1" })],
+  };
+}
+
+test("a room's list draws a copy's replies, which the host keeps under its lobby task", async () => {
+  await mount({ rooms: officeRooms([], copiedTask()) });
+
+  expect(linesFrom("Posts")).toEqual([
+    "Posts",
+    "Task · claimed by a1 · user · from lobby task p1",
+    "Rotate keys",
+    "user · Use the vault",
+    "Reply",
+    "Follow-up",
+    "Mark done",
+    "Delete",
+  ]);
+  await press("Reply");
+  await type("Write a reply", "And the old ones?");
+  await press("Send");
+  expect(asked).toEqual(["reply p2 And the old ones?"]);
+});
+
+test("a room's Done section draws a done copy's replies too", async () => {
+  await mount({ rooms: officeRooms([], copiedTask("done")) });
+  await press("Done · 1");
+  expect(lines()).toContain("user · Use the vault");
+});
+
+test("a room's kanban draws a copy's replies on its card", async () => {
+  layouts("list", "kanban");
+  await mount({ rooms: officeRooms([], copiedTask()) });
+
+  expect(linesFrom("In progress · 1")).toEqual([
+    "In progress · 1",
+    "Rotate keys",
+    "claimed by a1 · from lobby task p1",
+    "user · Use the vault",
+    "Reply",
+    "Follow-up",
+  ]);
+});
+
 test("a room's list has no Done section until a task is done", async () => {
   await mount({ rooms: officeRooms([], { w1: [post(1, { board: "w1", text: "Ship it" })] }) });
   expect(container.querySelector('[aria-label="Done · 0"]')).toBeNull();

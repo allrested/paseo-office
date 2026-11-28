@@ -572,7 +572,8 @@ line has the rest of that reply kept as the result. A card and a list row show t
 the task's text: its first three lines and 160 characters, and **More** for the rest when there is
 more. A note can be a reply under a task: the replies show under the task, oldest first, each as
 "author · text", and never as notes of their own, in the Notes column, the lobby's Notes or a room
-card's count. A reply always sits on the task's board, under the lobby task when it answers a copy.
+card's count. A reply always sits on the task's board, under the lobby task when it answers a copy;
+the copy shows its lobby task's replies, so an answer typed in the room is there too.
 **Reply** under a task opens a one-line field; Enter or **Send** posts the reply. A done task keeps
 its result and its replies, in the lobby's list and in a room's Done section or column, and a task
 takes its replies with it when it is deleted, cleared or dropped.
