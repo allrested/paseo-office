@@ -18,7 +18,7 @@ export interface Notifier {
 }
 
 // Only these labels leave a failed request: its message may hold the address.
-const NETWORK_ERRORS = new Set([
+export const NETWORK_ERRORS = new Set([
   "ECONNREFUSED",
   "ECONNRESET",
   "EHOSTUNREACH",

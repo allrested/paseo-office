@@ -113,7 +113,7 @@ function tooMuch(name: string): TrackerProblem {
 }
 
 /** The answer's text, read until `BODY_MAX` bytes and refused past it. */
-async function cappedText(name: string, response: Response): Promise<string> {
+export async function cappedText(name: string, response: Response): Promise<string> {
   const declared = Number(response.headers.get("content-length") ?? "");
   if (declared > BODY_MAX) {
     await response.body?.cancel().catch(() => undefined);

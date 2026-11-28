@@ -857,4 +857,35 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "GitHub: not read yet.": "GitHub: belum dibaca.",
   "The search cannot name a repository: list it above":
     "Pencarian tidak boleh menyebut repositori: daftarkan di atas",
+  "Telegram bot token": "Token bot Telegram",
+  Saved: "Tersimpan",
+  "From the host's environment (TELEGRAM_BOT_TOKEN)": "Dari lingkungan host (TELEGRAM_BOT_TOKEN)",
+  "No token yet": "Belum ada token",
+  Test: "Tes",
+  "Test Telegram": "Tes Telegram",
+  "Save Telegram token": "Simpan token Telegram",
+  "Remove saved Telegram token": "Hapus token Telegram yang tersimpan",
+  "Remove the saved token?": "Hapus token yang tersimpan?",
+  "Confirm remove the saved Telegram token": "Konfirmasi hapus token Telegram yang tersimpan",
+  "Keep it": "Pertahankan",
+  "Keep the saved Telegram token": "Pertahankan token Telegram yang tersimpan",
+  "Chat id": "ID chat",
+  "The group or private chat the office writes to. A group's id starts with -.":
+    "Grup atau chat pribadi tempat kantor menulis. ID grup diawali -.",
+  "User ids that are heard": "ID pengguna yang didengar",
+  "Only these Telegram user ids are heard. A message that reaches an agent can make it run commands, so list yourself and people you trust.":
+    "Hanya ID pengguna Telegram ini yang didengar. Pesan yang sampai ke agen dapat membuatnya menjalankan perintah, jadi daftarkan diri Anda dan orang yang Anda percaya.",
+  "A chat id is digits, with a minus first for a group":
+    "ID chat berupa angka, diawali tanda minus untuk grup",
+  "What is sent": "Yang dikirim",
+  "A task needs you": "Tugas butuh Anda",
+  "A claim stalled": "Klaim macet",
+  "A task is done": "Tugas selesai",
+  "Plan warnings": "Peringatan paket",
+  "Tasks from Telegram go to": "Tugas dari Telegram masuk ke",
+  "Backlog holds a task until you start it.": "Antrean menahan tugas sampai Anda memulainya.",
+  "Off: needs a token, a chat and at least one user id.":
+    "Mati: perlu token, chat, dan setidaknya satu ID pengguna.",
+  "On.": "Menyala.",
+  "At most 20 user ids": "Maksimal 20 ID pengguna",
 };

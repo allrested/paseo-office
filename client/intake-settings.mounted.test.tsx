@@ -296,3 +296,10 @@ test("Read now is on when only GitHub is set up", async () => {
   await mount({ ...SET_UP, jira: { ...SET_UP.jira, configured: false }, github: GITHUB_ON });
   expect(button("Read now")?.getAttribute("aria-disabled")).not.toBe("true");
 });
+
+test("refused repositories stay typed for correcting", async () => {
+  await mount();
+  await type(repos(), "acme/web\n-evil/x");
+  expect(repos()?.value).toBe("acme/web\n-evil/x");
+  expect(alerts()).toEqual(['Line 2: "-evil/x" is not owner/repo']);
+});

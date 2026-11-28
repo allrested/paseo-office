@@ -614,6 +614,21 @@ export const IntakeStateSchema = z.object({
 });
 export type IntakeState = z.output<typeof IntakeStateSchema>;
 
+/** Where the Telegram bot's token comes from: saved from the settings, or the daemon's environment. */
+export const TelegramSourceSchema = z.enum(["saved", "env"]);
+
+/**
+ * The Telegram bridge: whether it is polling, where its token comes from (null for none), why it
+ * stopped or what last failed, and how many messages it dropped since the daemon started.
+ */
+export const TelegramStateSchema = z.object({
+  on: z.boolean(),
+  source: TelegramSourceSchema.nullable(),
+  problem: z.string().nullable(),
+  dropped: z.number().int().nonnegative(),
+});
+export type TelegramState = z.output<typeof TelegramStateSchema>;
+
 export const OfficeSnapshotSchema = z.object({
   brand: BrandingSchema.optional(),
   agents: z.array(OfficeAgentSchema),
@@ -642,6 +657,8 @@ export const OfficeSnapshotSchema = z.object({
   autoStart: AutoStartStateSchema.optional(),
   /** The intake; absent until the office's server has read the settings. */
   intake: IntakeStateSchema.optional(),
+  /** The Telegram bridge; absent until the office's server has read its token. */
+  telegram: TelegramStateSchema.optional(),
 });
 export type OfficeSnapshot = z.output<typeof OfficeSnapshotSchema>;
 
@@ -662,6 +679,7 @@ export const OfficeEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("wake"), wake: WakeStateSchema }),
   z.object({ type: z.literal("auto-start"), autoStart: AutoStartStateSchema }),
   z.object({ type: z.literal("intake"), intake: IntakeStateSchema }),
+  z.object({ type: z.literal("telegram"), telegram: TelegramStateSchema }),
   z.object({ type: z.literal("chat"), change: ChatChangeSchema }),
 ]);
 export type OfficeEvent = z.output<typeof OfficeEventSchema>;
@@ -1102,6 +1120,26 @@ export const notifyTestRpc = defineRpc({
   input: z.object({}),
   output: z.union([
     z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), problem: z.string() }),
+  ]),
+});
+
+/**
+ * Saves the Telegram bot's token on the host, in a file only the daemon's user can read; an empty
+ * token removes the saved one. The token is never sent back: the answer is the bridge's state.
+ */
+export const telegramSaveRpc = defineRpc({
+  name: "office.telegram.save.request",
+  input: z.object({ token: z.string().max(200) }),
+  output: TelegramStateSchema,
+});
+
+/** Asks Telegram who the bot is, then sends one message to the chat; `problem` says why not. */
+export const telegramTestRpc = defineRpc({
+  name: "office.telegram.test.request",
+  input: z.object({}),
+  output: z.union([
+    z.object({ ok: z.literal(true), bot: z.string() }),
     z.object({ ok: z.literal(false), problem: z.string() }),
   ]),
 });

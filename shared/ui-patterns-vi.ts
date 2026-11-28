@@ -308,6 +308,15 @@ export const RULES: readonly Rule[] = [
   ],
   [/^Open (\S+) in Jira$/, (key) => `Mở ${key} trong Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `Mở ${key} trên GitHub`],
+  [
+    /^Line (\d+): "(.+)" is not a Telegram user id$/,
+    (n, entry) => `Dòng ${n}: "${entry}" không phải ID người dùng Telegram`,
+  ],
+  [
+    /^Connected as @(\S+)\. A message was sent to the chat\.$/,
+    (bot) => `Đã kết nối với tư cách @${bot}. Một tin nhắn đã được gửi vào cuộc trò chuyện.`,
+  ],
+  [/^Messages from others ignored: (\d+)$/, (n) => `Tin nhắn từ người khác bị bỏ qua: ${n}`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,

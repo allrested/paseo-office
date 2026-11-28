@@ -852,4 +852,35 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "GitHub: not read yet.": "GitHub: chưa đọc.",
   "The search cannot name a repository: list it above":
     "Tìm kiếm không được nêu tên kho: hãy liệt kê ở trên",
+  "Telegram bot token": "Token bot Telegram",
+  Saved: "Đã lưu",
+  "From the host's environment (TELEGRAM_BOT_TOKEN)": "Từ môi trường của host (TELEGRAM_BOT_TOKEN)",
+  "No token yet": "Chưa có token",
+  Test: "Kiểm tra",
+  "Test Telegram": "Kiểm tra Telegram",
+  "Save Telegram token": "Lưu token Telegram",
+  "Remove saved Telegram token": "Xóa token Telegram đã lưu",
+  "Remove the saved token?": "Xóa token đã lưu?",
+  "Confirm remove the saved Telegram token": "Xác nhận xóa token Telegram đã lưu",
+  "Keep it": "Giữ lại",
+  "Keep the saved Telegram token": "Giữ token Telegram đã lưu",
+  "Chat id": "ID cuộc trò chuyện",
+  "The group or private chat the office writes to. A group's id starts with -.":
+    "Nhóm hoặc cuộc trò chuyện riêng mà văn phòng viết vào. ID của nhóm bắt đầu bằng -.",
+  "User ids that are heard": "ID người dùng được lắng nghe",
+  "Only these Telegram user ids are heard. A message that reaches an agent can make it run commands, so list yourself and people you trust.":
+    "Chỉ các ID người dùng Telegram này được lắng nghe. Một tin nhắn đến được tác tử có thể khiến nó chạy lệnh, nên hãy ghi tên bạn và những người bạn tin tưởng.",
+  "A chat id is digits, with a minus first for a group":
+    "ID cuộc trò chuyện là các chữ số, nhóm có dấu trừ ở đầu",
+  "What is sent": "Những gì được gửi",
+  "A task needs you": "Một tác vụ cần bạn",
+  "A claim stalled": "Một yêu cầu bị kẹt",
+  "A task is done": "Một tác vụ đã xong",
+  "Plan warnings": "Cảnh báo gói",
+  "Tasks from Telegram go to": "Tác vụ từ Telegram vào",
+  "Backlog holds a task until you start it.": "Backlog giữ tác vụ cho đến khi bạn bắt đầu.",
+  "Off: needs a token, a chat and at least one user id.":
+    "Tắt: cần token, một cuộc trò chuyện và ít nhất một ID người dùng.",
+  "On.": "Đang bật.",
+  "At most 20 user ids": "Tối đa 20 ID người dùng",
 };

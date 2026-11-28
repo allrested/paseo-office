@@ -987,6 +987,126 @@ alerts are raised only while the office reads the agents: with no office open th
 workspace whose checks still fail is told again. The address is stored in the host's settings as
 typed, key included, and anyone who can open the settings page can read it.
 
+## Telegram
+
+The office can speak in a Telegram chat through a bot you make (`server/telegram-bridge.ts`,
+`server/telegram.ts`, `server/telegram-store.ts`). The office calls Telegram, a long poll of
+`getUpdates`; Telegram never calls the office, so the host opens no port.
+
+**Setting it up.**
+
+1. In Telegram, send `/newbot` to @BotFather and keep the token it gives. Type it in Settings →
+   Services → Telegram and press Save (`office.telegram.save.request`; an empty token removes the
+   saved one), or set
+   `TELEGRAM_BOT_TOKEN` in the daemon's environment; a saved token wins. The token is never sent
+   back to a client: the field is masked, is emptied once Save has answered (whether it took the
+   token or not), and the line under it says only "Saved", "From the host's environment
+   (TELEGRAM_BOT_TOKEN)" or "No token yet". Remove shows only for a saved token and asks "Remove the
+   saved token?" first; a token from the environment cannot be removed here.
+2. Add the bot to your group (or open a private chat with it) and write it a line. While no chat
+   is set the office does not poll, so `https://api.telegram.org/bot<token>/getUpdates` in a
+   browser shows that line with `"chat":{"id":...}` (a group's id starts with `-`) and
+   `"from":{"id":...}`, your own user id. The address holds the token: clear it from the
+   browser's history afterwards.
+3. Put the chat id in **Chat id** (`telegramChat`) and your user id in **User ids that are
+   heard** (`telegramUsers`): one per line, digits with no leading zero, up to 20. An entry the
+   settings would refuse is told by its line ("Line 2: "0123" is not a Telegram user id") and is not
+   saved. **Test** (`office.telegram.test.request`) asks Telegram who the bot is, then writes "The
+   office is connected." to the chat, and shows "Connected as @<bot>. A message was sent to the
+   chat." or what went wrong; it is off while there is no token or no chat.
+
+**What is sent** in the settings holds the five switches (`telegramNeeds`, `telegramStalled`,
+`telegramDone`, `telegramIncidents`, `telegramPlan`, described below), and **Tasks from Telegram go
+to** is `telegramLands`, Backlog or To do. The line at the bottom of the section says "Off: needs a
+token, a chat and at least one user id." while the bridge is not polling, "On." while it is, the
+bridge's problem (plain text) when it has one, and "Messages from others ignored: N" when the
+bridge has dropped messages from users who are not listed, so you can see someone unlisted writing.
+
+The bridge runs only with a token, a chat and at least one user id. A change of any of them, or
+of the settings at all after Telegram refused the token, stops the running poll and starts again.
+
+**What goes out**, to the configured chat, each by its switch, plain text with the task id first
+and the task's text, cut to 200 characters, on a second line:
+
+- `telegramNeeds` (on): a task newly blocked, `p12 needs you — Builder: Which region?`, and again
+  when its question changes.
+- `telegramStalled` (off): a claim newly stalled by the Tasks card's rule (its holder stopped on an
+  error, is at home, or has sat idle on it for 2 minutes), checked every 60 seconds:
+  `p12 is stalled — Builder is idle`. It needs the agents' statuses, which the office has only
+  while an office is open or **Keep watching** is on; without them no stall is told.
+- `telegramDone` (on): a task newly done, `p12 done by Builder: <result>`, or
+  `no result given`; a task nobody else held is `done by the owner`. A duty done is not told: the
+  pretend ones are acted out every day. A duty blocked or stalled is told like any task.
+- `telegramIncidents` and `telegramPlan` (on): an incident and a plan warning, as the webhook gets
+  them (the notice's `text`), whatever **Notify for** says.
+
+Tasks of every board are told; a lobby task and its copy on its holder's board are one task, told
+as the lobby task. Each event is told once. When the bridge starts (or comes on) it first looks
+at once without telling, so a restart does not repeat the day's messages and what happened while
+it was off is not told; what changes after that look is, a claim that stalls in the first minute
+included. A message is cut to 3,500 characters with "…". A send that fails is not tried
+again; it is the bridge's problem until one goes through.
+
+**What comes in, and from whom.** A message is heard only when all of these hold: it is a message
+with text, its sender is no bot, the sender's id is in `telegramUsers`, and it was written in the
+configured chat or in the sender's own private chat with the bot. Anything else, a listed user in
+another group included, is dropped: counted (`dropped`), never answered, and never logged with its
+text, sender or chat. Edits, channel posts and button presses are not asked for and are ignored. A
+message heard can make an agent act, and an agent runs commands with its permissions, so list
+only yourself or people you trust. In a group the bot sees only commands and replies to its own
+messages unless you turn its privacy mode off; it needs no more. A forwarded message is never
+acted on, whoever forwards it: its words are someone else's, so it gets the line of help. A user
+id is digits with no leading zero.
+
+- **A reply** to one of the bridge's messages about a task, in the configured chat, posts its text
+  under that task as your reply: a blocked task is unblocked and its holder woken, as a reply on
+  the board does. The bridge answers `Posted under p12.` or the board's refusal. A reply to a
+  message it does not know, or whose task is gone, gets `That task is no longer on the board.` A
+  message id is its chat's own, so a reply is matched only in the chat it was written in: in a
+  private chat, a reply to the bridge's own message there (`Posted p12 to the backlog.`, say)
+  answers that task. Moving the office to another chat leaves the old chat's messages behind.
+- **`/task <text>`** (or `/task@yourbot <text>`) posts a lobby task as you, held in the Backlog
+  unless `telegramLands` is `todo`, and answers `Posted p12 to the backlog.` or `Posted p12.`;
+  with no text it answers `Usage: /task <what to do>`. At most 20 tasks an hour come from
+  Telegram, from everyone together; past that it answers
+  `Too many tasks this hour: wait a little.` and posts nothing.
+- **`/board`** answers the lobby's counts (in progress, needs you, waiting, to do, in the backlog)
+  and up to 20 lines `p12 <state>: <text>` of its tasks not done, blocked first, each text cut to
+  80 characters.
+- Anything else from a listed user gets one line of help:
+  `Reply to a task's message to answer it, or use /task or /board.`
+- A command with a bot's name (`/task@name`) is taken only when the name is this bot's, in any
+  case; the bridge asks Telegram for it when its poll starts. A command for another bot, or any
+  named command while the name is not known, is left alone with no answer, so two bots in a group
+  do not both speak. A bare `/task` or `/board` always counts.
+
+The text of a message is posted as the post's text only: control characters but the newline and
+the tab are removed and it is cut to 2,000 characters. Read a task from Telegram in the Backlog
+before you start it, as you would a ticket.
+
+**Polling and failures.** One poll at a time, held by Telegram for 25 seconds (35 seconds at most
+on the office's side), for messages only. A network failure or a 5xx waits 5 seconds, doubling to
+60; a 401 or 404 ("Telegram refused the token") stops the bridge until the token or the settings
+change; a 409 ("Another program is reading this bot": a bot can have one reader, so another
+program or a second office on the same bot) waits 60 seconds; a 429 waits what Telegram asks, 60
+seconds at most. The token is in the path of every address Telegram is called at, so a failure is
+said in the office's own words: never Telegram's, an address, or the error a request threw. No
+redirect is followed, and an answer over 5,000,000 bytes is refused.
+
+**What is stored where.** The saved token is in `<PASEO_HOME>/office/telegram.json`
+(`{ version: 1, token }`, readable by the daemon's user only); one that cannot be read is no token,
+and the state says so. `<PASEO_HOME>/office/telegram-state.json` keeps where the poll has got to
+(`offset`) and for which bot (`bot`, the digits before the token's colon), the newest 200
+messages the bridge sent about a task (`sent`, each with its chat, its message id and its task, so
+a reply still finds its task after a restart) and the times of the last hour's tasks
+(`taskTimes`). The offset is saved before each message is acted on, so a crash in the middle loses
+that one message and acts on none twice. On the first run, or with a state file that cannot be
+read, what waited in Telegram before is thrown away, not acted on. A token of another bot, saved
+or in the environment, starts the same way and drops the old bot's messages. The state for
+clients (`telegram` in the office's state) is whether the bridge is polling, where its token comes
+from (`saved`, `env` or none), its problem, and how many messages it dropped since the daemon
+started.
+
 ## What the office notices
 
 Upstream does these with Claude Code hooks. Here the office's server does them from what it reads
@@ -1661,7 +1781,9 @@ the workspace, where it is in the changes to review. The office installs and rem
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.json`, `chat.json`,
 `notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger), `lift.json` (the build last serviced) and
 `auto-start.json` (`{ version: 1, day, count }`: the backlog tasks the office started by itself that day) and
-`intake.json` (`{ version: 1, seen }`: the tickets the intake posted, see Intake). Its settings are Paseo settings documents
+`intake.json` (`{ version: 1, seen }`: the tickets the intake posted, see Intake), and
+`telegram.json` and `telegram-state.json` (the bot's token and where its poll has got to, see
+Telegram). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { View } from "react-native";
 import { Text } from "./text.js";
 import { useRpc } from "@getpaseo/plugin/client";
@@ -91,9 +91,6 @@ function GithubFields({
   saveProblem,
   styles,
 }: Pick<Props, "values" | "change" | "saveProblem" | "styles">) {
-  // What the lines typed were refused for, until a save of them goes through.
-  const [reposRefused, setReposRefused] = useState<string | null>(null);
-  const [searchRefused, setSearchRefused] = useState<string | null>(null);
   const saveRepos = useCallback(
     async (next: string) => {
       const entries = next
@@ -101,8 +98,7 @@ function GithubFields({
         .map((entry) => entry.trim())
         .filter((entry) => entry !== "");
       const problem = reposProblem(entries);
-      setReposRefused(problem);
-      if (problem !== null) return false;
+      if (problem !== null) return { refused: problem };
       return change("GitHub repositories to bring in from", { githubIntakeRepos: entries });
     },
     [change],
@@ -114,8 +110,7 @@ function GithubFields({
       else if (GITHUB_SEARCH_PLACE.test(next)) {
         refused = "The search cannot name a repository: list it above";
       }
-      setSearchRefused(refused);
-      if (refused !== null) return false;
+      if (refused !== null) return { refused };
       return change("GitHub search", { githubIntakeSearch: next });
     },
     [change],
@@ -127,7 +122,7 @@ function GithubFields({
         hint={GITHUB_HINT}
         value={values === null ? null : values.githubIntakeRepos.join("\n")}
         onSave={saveRepos}
-        problem={reposRefused ?? saveProblem("GitHub repositories to bring in from")}
+        problem={saveProblem("GitHub repositories to bring in from")}
         lines={3}
         styles={styles}
       />
@@ -136,7 +131,7 @@ function GithubFields({
         hint={SEARCH_HINT}
         value={values?.githubIntakeSearch ?? null}
         onSave={saveSearch}
-        problem={searchRefused ?? saveProblem("GitHub search")}
+        problem={saveProblem("GitHub search")}
         maxLength={GITHUB_SEARCH_MAX}
         styles={styles}
       />

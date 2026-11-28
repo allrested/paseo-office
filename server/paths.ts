@@ -40,6 +40,16 @@ export function trackersFile(env: NodeJS.ProcessEnv, home: string): string {
   return join(officeDir(env, home), "trackers.json");
 }
 
+/** The Telegram bot's token, saved from the settings. It is a secret: owner-only. */
+export function telegramFile(env: NodeJS.ProcessEnv, home: string): string {
+  return join(officeDir(env, home), "telegram.json");
+}
+
+/** Where the Telegram bridge's poll has got to, and which of its messages names which task. */
+export function telegramStateFile(env: NodeJS.ProcessEnv, home: string): string {
+  return join(officeDir(env, home), "telegram-state.json");
+}
+
 /** The team chat's conversation, kept as upstream's engine writes it. */
 export function chatFile(env: NodeJS.ProcessEnv, home: string): string {
   return join(officeDir(env, home), "chat.json");

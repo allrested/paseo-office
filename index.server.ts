@@ -75,6 +75,12 @@ import {
 import { createGithubSource, type RunGh } from "./server/intake-github.js";
 import { createJiraSource } from "./server/intake-jira.js";
 import { createHostAlert } from "./server/host-alert.js";
+import {
+  createTelegramBridge,
+  type DirectoryAgent,
+  type TelegramBridge,
+} from "./server/telegram-bridge.js";
+import { createTelegramStore, type TelegramStore } from "./server/telegram-store.js";
 import { promptReport } from "./shared/vault.js";
 import { pinnedNote } from "./shared/alerts.js";
 import { extra } from "./shared/host-extras.js";
@@ -154,6 +160,8 @@ import {
   dutiesFile,
   hostSkillFolders,
   incidentsFile,
+  telegramFile,
+  telegramStateFile,
   trackersFile,
   notesWriterFile,
   type SkillFolder,
@@ -181,6 +189,8 @@ import {
   vaultSearchRpc,
   vaultTalkRpc,
   teamRenameRpc,
+  telegramSaveRpc,
+  telegramTestRpc,
   trackersSaveRpc,
   trackersTestRpc,
   type TrackersChange,
@@ -216,6 +226,8 @@ export interface OfficePluginDeps {
   incidentsStore: IncidentsStore;
   /** Where the tracker connections saved from the settings are kept. */
   trackerStore: TrackerCredentialsStore;
+  /** Where the Telegram bot's token and the bridge's state are kept. */
+  telegramStore: TelegramStore;
   /** Where the team chat keeps its conversation. */
   chatStore: ChatStore;
   tenureFile: LifeFile<TenureLedger>;
@@ -297,8 +309,11 @@ export function createOfficePlugin(
   // The owner's webhook and the office's name in its messages; nothing is posted until the settings are read.
   let notifyUrl = "";
   let notifyLevel: NotifyLevel = "danger";
+  // Made once the office is: the bridge gets the notices the webhook gets, by its own switches.
+  let telegram: TelegramBridge | null = null;
   // A message goes out when there is an address and the owner asked for its severity.
   const tell = (notice: Notice) => {
+    telegram?.tell(notice);
     if (notifyUrl !== "" && wanted(notice, notifyLevel)) void notifier.send(notice);
   };
   let officeName = "Office 3D";
@@ -424,7 +439,33 @@ export function createOfficePlugin(
     onChange: () => {
       autoStart?.boardChanged();
       intake?.boardChanged();
+      telegram?.boardChanged();
     },
+  });
+  // Each agent's status and name as the directory last reported; null while there is none, and
+  // then no claim is told as stalled.
+  let directoryAgents: ReadonlyMap<string, DirectoryAgent> | null = null;
+  const stopTelegramAgents = hub.watch((view) => {
+    directoryAgents =
+      view === null
+        ? null
+        : new Map(
+            view.agents.map((agent) => [
+              agent.id,
+              { status: agent.status, title: agent.name ?? agent.title },
+            ]),
+          );
+  });
+  // The office in a Telegram chat, once a token, a chat and a user id are set.
+  telegram = createTelegramBridge({
+    store: deps.telegramStore,
+    env: deps.env,
+    ...(deps.fetchFn === undefined ? {} : { fetchFn: deps.fetchFn }),
+    clock: deps.clock,
+    board: office,
+    agents: () => directoryAgents,
+    changed: (state) => hub.setTelegram(state),
+    log,
   });
   const stopCosts = hub.watch((view) => {
     // No directory, no figures: the last ones would go stale while the pickup hands out work. A
@@ -768,6 +809,7 @@ export function createOfficePlugin(
     githubRepos = [];
     githubSearch = "";
     void intake?.settingsChanged(null);
+    telegram?.settingsChanged(null);
     const message = `The office's settings cannot be read: ${reason}`;
     log(`[office] ${message}`);
     notesSchedule.fail(message);
@@ -815,6 +857,16 @@ export function createOfficePlugin(
     intakeJql = state.values.jiraIntakeJql;
     githubRepos = state.values.githubIntakeRepos;
     githubSearch = state.values.githubIntakeSearch;
+    telegram?.settingsChanged({
+      chat: state.values.telegramChat,
+      users: state.values.telegramUsers,
+      needs: state.values.telegramNeeds,
+      stalled: state.values.telegramStalled,
+      done: state.values.telegramDone,
+      incidents: state.values.telegramIncidents,
+      plan: state.values.telegramPlan,
+      lands: state.values.telegramLands,
+    });
     await trackersLoaded;
     await intake?.settingsChanged({
       lands: state.values.intakeLands,
@@ -1132,6 +1184,19 @@ export function createOfficePlugin(
   server.handle(trackersTestRpc, (input) =>
     guarded("tracker connection test", () => testTracker(input)),
   );
+  // The token goes in and never comes back: the answer is the bridge's state.
+  server.handle(telegramSaveRpc, ({ token }) =>
+    guarded("telegram token save", async () => {
+      if (telegram === null) throw new Error("The Telegram bridge did not start");
+      return telegram.save(token);
+    }),
+  );
+  server.handle(telegramTestRpc, () =>
+    guarded("telegram test", async () => {
+      if (telegram === null) throw new Error("The Telegram bridge did not start");
+      return telegram.test();
+    }),
+  );
   server.handle(chatRpc, (input, context) => {
     holder.remember(context.paseo);
     return guarded("chat", async () => {
@@ -1361,6 +1426,7 @@ export function createOfficePlugin(
     stopWatchers();
     stopCheckouts();
     stopCosts();
+    stopTelegramAgents();
     stopVault?.();
     await deps.vaultStore?.flush();
     await deps.timelineStore?.flush();
@@ -1371,6 +1437,7 @@ export function createOfficePlugin(
     machine.keep(false);
     machine.stop();
     await ssh.stop();
+    await telegram?.stop();
     await office.stop();
     // A chat still loading would start its clock after this stop.
     await chatReady;
@@ -1413,6 +1480,11 @@ export default function contribute(server: PluginServerContext): () => Promise<v
     dutiesFile: dutiesFileStore(dutiesFile(process.env, homedir()), { now: () => Date.now(), log }),
     autoStartFile: autoStartFileStore(autoStartFile(process.env, homedir())),
     intakeFile: intakeFileStore(intakeFile(process.env, homedir())),
+    telegramStore: createTelegramStore({
+      tokenFile: telegramFile(process.env, homedir()),
+      stateFile: telegramStateFile(process.env, homedir()),
+      log,
+    }),
     chatStore: createChatStore({
       file: chatFile(process.env, homedir()),
       now: () => Date.now(),
