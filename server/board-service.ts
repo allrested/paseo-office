@@ -520,6 +520,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     };
     if (task.claimedAt !== undefined) copy.claimedAt = task.claimedAt;
     if (task.costAtClaim !== undefined) copy.costAtClaim = task.costAtClaim;
+    // A linked pair agrees on the block, also when the block is what brings the copy.
+    if (task.blocked !== undefined) copy.blocked = task.blocked;
     return { posts: [...posts.filter((item) => item.board !== room), ...kept, copy], copy };
   }
 

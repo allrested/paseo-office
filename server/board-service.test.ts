@@ -1186,6 +1186,20 @@ test("blocking again replaces the reason", async () => {
   expect(find(service, "p1")?.blocked).toBe("Second");
 });
 
+test("a block that gives a lobby task its copy puts the mark on the copy too", async () => {
+  // Claimed while its agent had no workspace, so it has no copy; the agent has one now.
+  const held = lobbyTask(1, { state: "claimed", claimedBy: "a" });
+  let room: string | null = null;
+  const { service } = await harness(file([held]), undefined, async () => room);
+  expect(service.boards().w1).toBeUndefined();
+  room = "w1";
+  await block(service, "p1", "a", "Which database?");
+  expect(find(service, "p1")).toMatchObject({ blocked: "Which database?", link: "p3" });
+  expect(service.boards().w1).toMatchObject([
+    { id: "p3", state: "claimed", claimedBy: "a", link: "p1", blocked: "Which database?" },
+  ]);
+});
+
 test("the holder's claim clears the mark; an unblocked repeated claim changes nothing", async () => {
   const { service, store } = await harness(
     file([taskOn(1, { state: "claimed", claimedBy: "a", blocked: "Need it" })]),
