@@ -17,6 +17,8 @@ export const POST_TEXT_MAX = 2000;
 /** The checks of one pull request the office carries. */
 export const CHECK_RUNS_MAX = 40;
 export const BOARD_POST_MAX = 200;
+/** The tasks one task waits on. */
+export const AFTER_MAX = 5;
 export const DONE_TASK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const READ_POST_MAX = 30;
 export const WAKES_PER_HOUR = 6;
@@ -198,6 +200,8 @@ export const PostSchema = z.object({
   replyTo: z.string().optional(),
   /** On a lobby task: the roster team, by id, whose idle agents alone are handed it. */
   team: z.string().optional(),
+  /** On a task: the tasks, on any board, it waits on; it is not handed out while one is not done. */
+  after: z.array(z.string()).max(AFTER_MAX).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -734,6 +738,8 @@ export const postRpc = defineRpc({
     replyTo: z.string().min(1).optional(),
     /** A roster team's id (or name): the lobby task goes to that team. */
     team: z.string().min(1).optional(),
+    /** Task ids it waits on; the service checks them and their count. */
+    after: z.array(z.string().min(1)).optional(),
   }),
   output: PostResultSchema,
 });

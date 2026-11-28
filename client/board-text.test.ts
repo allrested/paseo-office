@@ -2,6 +2,8 @@ import { expect, test } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import { buildOfficeModel, type OfficeModel, type OfficeRow } from "../shared/model.js";
 import {
+  afterLine,
+  allPosts,
   authorName,
   boardPreview,
   clearQuestion,
@@ -360,4 +362,58 @@ test("the lobby's board leaves out who rests with nothing left, and a room of on
   const teams = officeWork(model.rooms, model.agentTasks);
   expect(teams.map((team) => team.room.name)).toEqual(["landing"]);
   expect(officeWork(office([worker("rest")]).rooms, [])).toEqual([]);
+});
+
+test("allPosts gathers every board's posts once, done tasks too", () => {
+  const at = "2026-11-28T00:00:00.000Z";
+  const task = (id: string, board: string, state: Post["state"]): Post => ({
+    id,
+    seq: Number(id.slice(1)),
+    board,
+    kind: "task",
+    text: id,
+    author: "user",
+    state,
+    createdAt: at,
+    updatedAt: at,
+  });
+  const model = buildOfficeModel({
+    agents: [],
+    workspaces: [{ id: "w1", name: "shop-api", projectName: "shop" }],
+    activity: {},
+    boards: {
+      lobby: [task("p1", "lobby", "open"), task("p2", "lobby", "done")],
+      w1: [task("p3", "w1", "open"), task("p4", "w1", "done")],
+    },
+    wake: { paused: false, queued: {} },
+  });
+  expect(
+    allPosts(model.rooms)
+      .map((p) => p.id)
+      .sort(),
+  ).toEqual(["p1", "p2", "p3", "p4"]);
+});
+
+test("a task's after line says what it waits on, then where it came from", () => {
+  const at = "2026-11-28T00:00:00.000Z";
+  const task = (id: string, extra: Partial<Post> = {}): Post => ({
+    id,
+    seq: Number(id.slice(1)),
+    board: "lobby",
+    kind: "task",
+    text: id,
+    author: "user",
+    state: "open",
+    createdAt: at,
+    updatedAt: at,
+    ...extra,
+  });
+  const waits = task("p3", { after: ["p1", "p2"] });
+  expect(afterLine(waits, [task("p1"), task("p2", { state: "done" }), waits])).toBe(
+    "Waiting on p1",
+  );
+  expect(afterLine(waits, [task("p1", { state: "done" }), waits])).toBe("After p1, p2");
+  const taken = task("p4", { after: ["p1"], state: "claimed" });
+  expect(afterLine(taken, [task("p1"), taken])).toBe("After p1");
+  expect(afterLine(task("p5"), [])).toBeNull();
 });

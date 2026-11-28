@@ -1432,3 +1432,153 @@ test("a reopened team task is still the team's", async () => {
   expect(await service.releaseClaims("b")).toEqual(["p1"]);
   expect(service.postsOf("lobby")[0]).toMatchObject({ state: "open", team: "t2" });
 });
+
+describe("after", () => {
+  const task = (text: string, fields: Partial<Parameters<BoardService["post"]>[0]> = {}) => ({
+    board: "lobby",
+    kind: "task" as const,
+    text,
+    author: "user",
+    ...fields,
+  });
+
+  test("a task keeps the tasks it waits on, trimmed and once each, from any board", async () => {
+    const { service } = await harness();
+    await service.post(task("Build it", { board: "w1" }));
+    await service.post(task("Design it"));
+    const result = await service.post(task("Review it", { after: [" p1 ", "p2", "p1"] }));
+    expect(result.ok && result.post).toMatchObject({ id: "p3", after: ["p1", "p2"] });
+    const plain = await service.post(task("Other"));
+    expect(plain.ok && plain.post).not.toHaveProperty("after");
+  });
+
+  test("only a task waits, on at most 5 tasks that exist", async () => {
+    const { service, store } = await harness();
+    await service.post(task("Build it"));
+    await service.post({ board: "lobby", kind: "note", text: "A note", author: "user" });
+    const saves = store.saved.length;
+    const refused = async (input: Parameters<BoardService["post"]>[0]) => {
+      const result = await service.post(input);
+      return result.ok ? "" : result.error;
+    };
+    expect(await refused(task("x", { kind: "note", after: ["p1"] }))).toBe(
+      "Unable to post: only a task waits on other tasks",
+    );
+    expect(await refused(task("x", { replyTo: "p1", after: ["p1"] }))).toBe(
+      "Unable to post: only a task waits on other tasks",
+    );
+    expect(await refused(task("x", { after: ["p1", "p3", "p4", "p5", "p6", "p7"] }))).toBe(
+      "Unable to post: after holds at most 5 tasks",
+    );
+    expect(await refused(task("x", { after: ["p1", "p99"] }))).toBe("Unable to post: no task p99");
+    expect(await refused(task("x", { after: ["p2"] }))).toBe("Unable to post: no task p2");
+    expect(store.saved).toHaveLength(saves);
+    // Six names of five tasks are five.
+    const five = await service.post(task("Five"));
+    expect(five.ok).toBe(true);
+    for (const text of ["c", "d", "e"]) await service.post(task(text));
+    const ok = await service.post(task("x", { after: ["p1", "p3", "p4", "p5", "p6", "p1"] }));
+    expect(ok.ok && ok.post.after).toEqual(["p1", "p3", "p4", "p5", "p6"]);
+  });
+
+  test("an agent neither claims nor finishes a waiting task; the user does both", async () => {
+    const { service } = await harness();
+    await service.post(task("Build it", { board: "w1" }));
+    await service.post(task("Design it"));
+    await service.post(task("Review it", { after: ["p1", "p2"] }));
+    await service.post(task("Ship it", { after: ["p1"] }));
+    expect(await service.update({ id: "p3", action: "claim", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to claim p3: waiting on p1, p2",
+    });
+    expect(await service.update({ id: "p3", action: "done", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to finish p3: waiting on p1, p2",
+    });
+    await service.update({ id: "p2", action: "done", actor: "user" });
+    expect(await service.update({ id: "p3", action: "claim", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to claim p3: waiting on p1",
+    });
+    expect(await service.update({ id: "p3", action: "claim", actor: "user" })).toMatchObject({
+      ok: true,
+      post: { state: "claimed", claimedBy: "user" },
+    });
+    expect(await service.update({ id: "p4", action: "done", actor: "user" })).toMatchObject({
+      ok: true,
+      post: { state: "done" },
+    });
+  });
+
+  test("a task is free once its tasks are done or deleted", async () => {
+    const { service } = await harness();
+    await service.post(task("Build it", { board: "w1" }));
+    await service.post(task("Design it"));
+    await service.post(task("Review it", { after: ["p1", "p2"] }));
+    await service.update({ id: "p1", action: "done", actor: "user", note: "Built." });
+    await service.remove("p2");
+    expect(await service.update({ id: "p3", action: "claim", actor: "a" })).toMatchObject({
+      ok: true,
+      post: { state: "claimed", claimedBy: "a", after: ["p1", "p2"] },
+    });
+  });
+
+  test("the pickup's claim passes over a waiting task until its task is done", async () => {
+    const { service } = await harness();
+    await service.post(task("Build it", { board: "w1" }));
+    await service.post(task("Review it", { after: ["p1"] }));
+    expect(await service.claimLobbyTask("p2", "a", 2)).toBeNull();
+    await service.update({ id: "p1", action: "done", actor: "user" });
+    expect(await service.claimLobbyTask("p2", "a", 2)).toMatchObject({
+      state: "claimed",
+      claimedBy: "a",
+    });
+  });
+
+  test("a task that names a lobby task's copy waits on the lobby task, counted once", async () => {
+    const { service } = await harness(undefined, {}, async (id) => (id === "a" ? "w1" : null));
+    await service.post(task("Build it"));
+    await service.update({ id: "p1", action: "claim", actor: "a" });
+    expect(find(service, "p3")).toMatchObject({ board: "w1", link: "p1" });
+    const viaCopy = await service.post(task("Review it", { after: ["p3"] }));
+    expect(viaCopy.ok && viaCopy.post.after).toEqual(["p1"]);
+    const both = await service.post(task("Ship it", { after: ["p3", "p1"] }));
+    expect(both.ok && both.post.after).toEqual(["p1"]);
+  });
+
+  test("a task that waits on a copy still waits once the copy's agent is closed", async () => {
+    const { service } = await harness(undefined, {}, async (id) => (id === "a" ? "w1" : null));
+    await service.post(task("Build it"));
+    await service.update({ id: "p1", action: "claim", actor: "a" });
+    await service.post(task("Review it", { after: ["p3"] }));
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+    expect(find(service, "p3")).toBeUndefined();
+    const waiting = find(service, "p4");
+    expect(waiting?.after).toEqual(["p1"]);
+    expect(await service.claimLobbyTask("p4", "b", waiting?.seq ?? 0)).toBeNull();
+    expect(await service.update({ id: "p4", action: "claim", actor: "b" })).toEqual({
+      ok: false,
+      error: "Unable to claim p4: waiting on p1",
+    });
+  });
+
+  test("a reopened task still waits on its tasks", async () => {
+    const { service } = await harness();
+    await service.post(task("Build it", { board: "w1" }));
+    await service.post(task("Review it", { after: ["p1"] }));
+    await service.update({ id: "p2", action: "claim", actor: "user" });
+    const reopened = await service.update({ id: "p2", action: "reopen", actor: "user" });
+    expect(reopened.ok && reopened.post).toMatchObject({ state: "open", after: ["p1"] });
+    expect(await service.update({ id: "p2", action: "claim", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to claim p2: waiting on p1",
+    });
+    await service.update({ id: "p2", action: "claim", actor: "user" });
+    await service.update({ id: "p1", action: "done", actor: "user" });
+    await service.update({ id: "p2", action: "reopen", actor: "user" });
+    await service.update({ id: "p2", action: "claim", actor: "b" });
+    expect(await service.releaseClaims("b")).toEqual(["p2"]);
+    expect(find(service, "p2")).toMatchObject({ state: "open", after: ["p1"] });
+  });
+});

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { waitingOn } from "../shared/board-rules.js";
 import {
+  AFTER_MAX,
   BOARD_POST_MAX,
   DONE_TASK_TTL_MS,
   DUTY,
@@ -28,6 +30,8 @@ export interface NewPost {
   replyTo?: string;
   /** A lobby task's roster team, by name or id; it is kept by id. */
   team?: string;
+  /** Task ids, on any board, that a new task waits on. */
+  after?: readonly string[];
   /** An agent id, or "user". */
   author: string;
 }
@@ -154,6 +158,7 @@ function withoutClaim(post: Post): Post {
   if (post.state !== undefined) next.state = post.state;
   if (post.duty !== undefined) next.duty = post.duty;
   if (post.team !== undefined) next.team = post.team;
+  if (post.after !== undefined) next.after = post.after;
   // A reopened task has no result: the next finish brings its own.
   return next;
 }
@@ -304,7 +309,10 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return { posts: cleared, seq, boards };
   }
 
-  async function createPost(input: NewPost, team: Pick<Post, "team">): Promise<PostResult> {
+  async function createPost(
+    input: NewPost,
+    fields: Pick<Post, "team" | "after">,
+  ): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
     const root = input.replyTo === undefined ? undefined : rootOf(input.replyTo);
@@ -321,7 +329,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       kind,
       text: text.value,
       author: input.author,
-      ...team,
+      ...fields,
       createdAt: stamp,
       updatedAt: stamp,
     };
@@ -365,6 +373,51 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       return refuse("only a lobby task goes to a team");
     const found = (await ports.findTeam?.(input.team)) ?? null;
     return found === null ? refuse(`no team ${input.team}`) : { ok: true, value: { team: found } };
+  }
+
+  /**
+   * The tasks a new task waits on: trimmed, once each, and each a task on some board. A lobby
+   * task's copy stands for its lobby task, which outlives it: the copy goes when the task reopens.
+   */
+  function afterFor(input: NewPost): Outcome<Pick<Post, "after">> {
+    if (input.after === undefined) return { ok: true, value: {} };
+    const refuse = (reason: string): Outcome<Pick<Post, "after">> => ({
+      ok: false,
+      error: `Unable to post: ${reason}`,
+    });
+    if (input.kind !== "task" || input.replyTo !== undefined)
+      return refuse("only a task waits on other tasks");
+    const named = input.after.map((id) => id.trim()).filter((id) => id !== "");
+    const missing = named.find((id) => data.posts.find((item) => item.id === id)?.kind !== "task");
+    const ids = [...new Set(named.map(lobbyIdOf))];
+    if (ids.length > AFTER_MAX) return refuse(`after holds at most ${AFTER_MAX} tasks`);
+    if (missing !== undefined) return refuse(`no task ${missing}`);
+    // The new task has no id yet, so it cannot name itself, and no loop can form.
+    return { ok: true, value: ids.length === 0 ? {} : { after: ids } };
+  }
+
+  /** The id of the lobby task a copy stands for; any other id as it is. */
+  function lobbyIdOf(id: string): string {
+    const post = data.posts.find((item) => item.id === id);
+    const partner = post === undefined || post.board === LOBBY ? undefined : partnerOf(post);
+    return partner?.board === LOBBY ? partner.id : id;
+  }
+
+  /**
+   * An agent's claim or finish of an open task that still waits on others: it is not handed out
+   * yet. The user claims or finishes any task.
+   */
+  function waitingRefusal(input: PostUpdate): PostResult | null {
+    if ((input.action !== "claim" && input.action !== "done") || input.actor === USER_AUTHOR)
+      return null;
+    const post = data.posts.find((item) => item.id === input.id);
+    if (post?.kind !== "task" || post.state !== "open" || post.claimedBy !== undefined) return null;
+    const waiting = waitingOn(post, data.posts);
+    if (waiting.length === 0) return null;
+    return {
+      ok: false,
+      error: `Unable to ${VERBS[input.action]} ${post.id}: waiting on ${waiting.join(", ")}`,
+    };
   }
 
   /** The name of the team a task is for, while the roster still has it; else the task is anyone's. */
@@ -776,9 +829,14 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     post: (input) =>
       exclusive(async () => {
         const team = await teamFor(input);
-        return team.ok ? createPost(input, team.value) : team;
+        if (!team.ok) return team;
+        const after = afterFor(input);
+        return after.ok ? createPost(input, { ...team.value, ...after.value }) : after;
       }),
-    update: (input) => exclusive(async () => (await teamRefusal(input)) ?? updatePost(input)),
+    update: (input) =>
+      exclusive(
+        async () => waitingRefusal(input) ?? (await teamRefusal(input)) ?? updatePost(input),
+      ),
     claimLobbyTask: (id, agentId, expectedSeq) =>
       exclusive(async () => {
         const pickup = data.posts.filter((post) => PICKUP_BOARDS.has(post.board));
@@ -790,7 +848,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
           task.state !== "open" ||
           (task.to !== undefined && (!task.namedPickup || task.to !== agentId)) ||
           task.claimedBy !== undefined ||
-          task.author === agentId
+          task.author === agentId ||
+          waitingOn(task, data.posts).length > 0
         )
           return null;
         if (pickup.some((post) => post.state === "claimed" && post.claimedBy === agentId))

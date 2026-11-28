@@ -54,6 +54,31 @@ describe("kanban columns", () => {
       "done",
     ]);
   });
+  it("puts an open task that waits on an open task, on any board, in Waiting before To do", () => {
+    const other = post("p1", { board: "w1" });
+    const waits = post("p2", { after: ["p1"] });
+    const all = [other, waits];
+    expect(columnOf(waits, all)).toBe("waiting");
+    expect(layout(kanbanColumns([waits], all))).toEqual([
+      ["waiting", ["p2"]],
+      ["todo", []],
+      ["progress", []],
+    ]);
+  });
+  it("releases a task when what it waited on is done or deleted", () => {
+    const waits = post("p2", { after: ["p1"] });
+    expect(columnOf(waits, [post("p1", { state: "done" }), waits])).toBe("todo");
+    expect(columnOf(waits, [waits])).toBe("todo");
+    expect(columnOf(waits, [post("p1", { state: "claimed" }), waits])).toBe("waiting");
+  });
+  it("never puts a claimed or done task in Waiting, whatever its after", () => {
+    const open = post("p1");
+    const claimed = post("p2", { after: ["p1"], state: "claimed", claimedBy: "a1" });
+    const done = post("p3", { after: ["p1"], state: "done" });
+    const all = [open, claimed, done];
+    expect(columnOf(claimed, all)).toBe("progress");
+    expect(columnOf(done, all)).toBe("done");
+  });
   it("keeps board order inside a column", () => {
     const columns = kanbanColumns([post("p9"), post("p2")]);
     expect(columns[0]?.posts.map((p) => p.id)).toEqual(["p2", "p9"]);

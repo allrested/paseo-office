@@ -19,6 +19,8 @@ export interface BoardActions {
     /** A roster team's id: only on a lobby task, and never with `to`. */
     team?: string;
     replyTo?: string;
+    /** The tasks this one waits on (at most AFTER_MAX); the server holds it back until they are done. */
+    after?: string[];
   }): Promise<void>;
   /** A note under the task, on the task's board; the server wakes the task's holder. */
   reply(task: Post, text: string): Promise<void>;

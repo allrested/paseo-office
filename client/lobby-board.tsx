@@ -11,8 +11,9 @@ import { AgentPicker } from "./agent-picker.js";
 import { NOBODY, teamIdOf } from "./agent-picker-text.js";
 import { BoardTeams } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
+import { AfterField, useFollowUp } from "./follow-up.js";
 import { PostWithActions, WakeField, useWakeChoice, type SheetBodyProps } from "./board-sheet.js";
-import { officeWork, repliesOf, topLevel, type TeamNamer } from "./board-text.js";
+import { allPosts, officeWork, repliesOf, topLevel, type TeamNamer } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { ClearFinished, TaskCard, useMounted } from "./task-card.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -41,6 +42,8 @@ interface TodoListProps {
   room: OfficeRoom;
   /** The lobby's notes, oldest first, without the replies, which show under their to-dos. */
   notes: readonly Post[];
+  all: readonly Post[];
+  onFollowUp(id: string): void;
   name(author: string): string;
   teamName: TeamNamer;
   actions: BoardActions;
@@ -48,7 +51,16 @@ interface TodoListProps {
 }
 
 /** The list layout: the to-dos with their heading, then the notes when there are any. */
-function TodoList({ room, notes, name, teamName, actions, styles }: TodoListProps) {
+function TodoList({
+  room,
+  notes,
+  all,
+  onFollowUp,
+  name,
+  teamName,
+  actions,
+  styles,
+}: TodoListProps) {
   const done = room.todos.filter((post) => post.state === "done").length;
   return (
     <>
@@ -62,6 +74,8 @@ function TodoList({ room, notes, name, teamName, actions, styles }: TodoListProp
             replies={repliesOf(post, room.posts)}
             name={name}
             teamName={teamName}
+            all={all}
+            onFollowUp={onFollowUp}
             actions={actions}
             styles={styles}
           />
@@ -78,6 +92,8 @@ function TodoList({ room, notes, name, teamName, actions, styles }: TodoListProp
               post={post}
               name={name}
               teamName={teamName}
+              all={all}
+              onFollowUp={onFollowUp}
               actions={actions}
               styles={styles}
             />
@@ -123,6 +139,10 @@ export function LobbyBody({
     onPicking,
   });
   const mounted = useMounted();
+  // What a task waits on can be on any board: the cards and the form judge by all of them.
+  const every = useMemo(() => allPosts(rooms), [rooms]);
+  const followUp = useFollowUp(every);
+  const { after, clear: clearFollowUp } = followUp;
   // Enter adds as well as the button, so the form keeps its own pending state and failure.
   const [adding, setAdding] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -143,18 +163,20 @@ export function LobbyBody({
         kind: "task",
         text: sent,
         ...(to === NOBODY ? {} : recipient),
+        ...(after.length === 0 ? {} : { after: [...after] }),
       });
       if (!mounted.current) return;
       // Cleared only if the field still holds what was added, so later typing stays.
       setText((current) => textAfterSend(current, sent));
       reset();
+      clearFollowUp();
     } catch (caught) {
       if (mounted.current) setFailure(failureText("Add", caught));
     } finally {
       inFlight.current = false;
       if (mounted.current) setAdding(false);
     }
-  }, [actions, room.id, text, to, reset, mounted]);
+  }, [actions, room.id, text, to, after, reset, clearFollowUp, mounted]);
   // The lobby's tasks are the to-dos; what is left of its posts are notes, oldest first, and the
   // replies among them show under their to-dos.
   const allNotes = useMemo(() => room.posts.filter((post) => post.kind === "note"), [room.posts]);
@@ -194,6 +216,7 @@ export function LobbyBody({
               placeholderTextColor={styles.placeholderColor}
               maxLength={POST_TEXT_MAX}
               style={styles.fieldInput}
+              ref={followUp.field}
             />
           </View>
           <ActionButton
@@ -210,6 +233,7 @@ export function LobbyBody({
             {failure}
           </Text>
         )}
+        <AfterField followUp={followUp} styles={styles} />
         <WakeField
           id={fieldId}
           roomId={room.id}
@@ -224,6 +248,8 @@ export function LobbyBody({
       {layout === "kanban" ? (
         <KanbanBoard
           posts={board}
+          all={every}
+          onFollowUp={followUp.add}
           name={name}
           teamName={teamName}
           actions={actions}
@@ -233,6 +259,8 @@ export function LobbyBody({
         <TodoList
           room={room}
           notes={notes}
+          all={every}
+          onFollowUp={followUp.add}
           name={name}
           teamName={teamName}
           actions={actions}

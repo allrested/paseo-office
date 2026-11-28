@@ -1,3 +1,4 @@
+import { waitingOn } from "../shared/board-rules.js";
 import { DUTY, LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
 import { assignmentFooter } from "../shared/lobby-assignment.js";
 import type { BoardService } from "./board-service.js";
@@ -9,6 +10,8 @@ import type { Clock } from "./timers.js";
 
 // Some transitions to idle (e.g. clearing a permission) don't produce a turn-end hook.
 export const LOBBY_RETRY_MS = 30_000;
+/** One waited-on task's result in an assignment: five of them never make a huge prompt. */
+export const WAITED_RESULT_MAX = 600;
 
 export interface LobbyPickup {
   refresh(): void;
@@ -26,13 +29,32 @@ interface PickupPorts {
   log(message: string): void;
 }
 
-function awaitingPickup(task: Post): boolean {
+/** `posts` are every board's: a task waits while a task of its `after`, on any board, is not done. */
+function awaitingPickup(task: Post, posts: readonly Post[]): boolean {
   return (
     task.kind === "task" &&
     task.state === "open" &&
     (!task.to || !!task.namedPickup) &&
-    !task.claimedBy
+    !task.claimedBy &&
+    waitingOn(task, posts).length === 0
   );
+}
+
+/**
+ * The results of the tasks an assignment's task waited on, as lines of its indented body; a task
+ * that is gone is left out, and with none left there are no lines.
+ */
+function waitedOnLines(task: Post, posts: readonly Post[]): string[] {
+  const waited = (task.after ?? []).flatMap((id) => {
+    const done = posts.find((item) => item.id === id && item.kind === "task");
+    if (done === undefined) return [];
+    const result = done.result ?? "no result given";
+    const cut =
+      result.length > WAITED_RESULT_MAX ? `${result.slice(0, WAITED_RESULT_MAX - 1)}…` : result;
+    // Further lines sit under their entry, so none reads as another task's.
+    return [`  ${id}: ${indented(indented(cut))}`];
+  });
+  return waited.length === 0 ? [] : ["  It waited on:", ...waited];
 }
 
 /** The first line of an assignment: whose task it is, or the duty board's. */
@@ -47,6 +69,19 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   let stopped = false;
   let scanning: Promise<void> | null = null;
   let cancel: (() => void) | undefined;
+  // A refresh during a scan, from a change the scan did not make itself: scan again when it ends.
+  let rescan = false;
+  // While above zero the scan is in its own board call, whose save announces its own change.
+  let own = 0;
+
+  async function mine<T>(work: () => Promise<T>): Promise<T> {
+    own += 1;
+    try {
+      return await work();
+    } finally {
+      own -= 1;
+    }
+  }
 
   const active = () => !stopped && !service.wakesPaused();
   const canDispatch = (task: Post) => Boolean(task.namedPickup) || ports.enabled();
@@ -62,12 +97,14 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     return [...service.postsOf(LOBBY), ...service.postsOf(DUTY).filter(handedOut)];
   }
 
+  /** Every board's posts, which say whether a task still waits. */
+  const allPosts = () => Object.values(service.boards()).flat();
+
   function hasWork(): boolean {
-    return (
-      active() &&
-      pickupPosts().some(
-        (task) => canDispatch(task) && (awaitingPickup(task) || Boolean(task.pickupMessageId)),
-      )
+    if (!active()) return false;
+    const posts = allPosts();
+    return pickupPosts().some(
+      (task) => canDispatch(task) && (awaitingPickup(task, posts) || Boolean(task.pickupMessageId)),
     );
   }
 
@@ -87,11 +124,13 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
         : agents.lobbyEligible(agentId);
     if (task.namedPickup && !(await eligible())) return false;
     const recovering = Boolean(task.pickupMessageId);
-    const claim = recovering ? task : await service.claimLobbyTask(task.id, agentId, task.seq);
+    const claim = recovering
+      ? task
+      : await mine(() => service.claimLobbyTask(task.id, agentId, task.seq));
     if (!claim?.pickupMessageId) return false;
     // Check again after saving the claim. Never reassign an earlier send whose receipt was lost.
     if (!(await eligible()) || !canDispatch(task) || !active() || !available()) {
-      if (!recovering) await service.releaseLobbyTask(claim);
+      if (!recovering) await mine(() => service.releaseLobbyTask(claim));
       return false;
     }
     if (!currentClaim(claim)) return false;
@@ -99,11 +138,12 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     const prompt = [
       assignmentHeading(task),
       `  ${indented(task.text)}`,
+      ...waitedOnLines(task, allPosts()),
       assignmentFooter(claim),
     ].join("\n");
     // The daemon deduplicates this ID even after a network failure or a plugin restart.
     await agents.send(agentId, prompt, source, claim.pickupMessageId);
-    await service.confirmLobbyDelivery(claim);
+    await mine(() => service.confirmLobbyDelivery(claim));
     return true;
   }
 
@@ -124,12 +164,13 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   /** `team` is the agent's roster team, read once per scan: a team's task waits for its own. */
   function nextFor(agentId: string, automatic: boolean, team: string | null): Post | undefined {
     const board = pickupPosts();
+    const posts = allPosts();
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
     if (existing) return existing.pickupMessageId && canDispatch(existing) ? existing : undefined;
     return board
       .filter(
         (p) =>
-          awaitingPickup(p) &&
+          awaitingPickup(p, posts) &&
           p.author !== agentId &&
           (p.to ? p.to === agentId : automatic && forTeam(p, team)),
       )
@@ -142,15 +183,19 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   }
 
   async function scan(): Promise<void> {
+    const posts = allPosts();
     const named = service
       .postsOf(LOBBY)
       .flatMap((p) =>
-        p.namedPickup && p.to && (awaitingPickup(p) || p.pickupMessageId) ? [p.to] : [],
+        p.namedPickup && p.to && (awaitingPickup(p, posts) || p.pickupMessageId) ? [p.to] : [],
       );
     const automatic = new Set(ports.enabled() ? await agents.lobbyCandidates() : []);
     for (const agentId of new Set([...named, ...automatic])) {
       if (!hasWork()) break;
-      const teamWork = pickupPosts().some((p) => p.team !== undefined && awaitingPickup(p));
+      const current = allPosts();
+      const teamWork = pickupPosts().some(
+        (p) => p.team !== undefined && awaitingPickup(p, current),
+      );
       const team = automatic.has(agentId) && teamWork ? await teamOf(agentId) : null;
       const next = nextFor(agentId, automatic.has(agentId), team);
       if (!next) continue;
@@ -174,13 +219,18 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
         )
         .finally(() => {
           scanning = null;
-          schedule(LOBBY_RETRY_MS);
+          const again = rescan;
+          rescan = false;
+          schedule(again ? 0 : LOBBY_RETRY_MS);
         });
     }, delay);
   }
 
   return {
-    refresh: () => schedule(0),
+    refresh() {
+      if (scanning && own === 0) rescan = true;
+      schedule(0);
+    },
     async stop() {
       stopped = true;
       cancel?.();
