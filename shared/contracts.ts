@@ -188,6 +188,11 @@ export const PostSchema = z.object({
   namedPickup: z.literal(true).optional(),
   /** Persisted until Paseo acknowledges an automatic lobby assignment. */
   pickupMessageId: z.string().optional(),
+  /**
+   * On a task the pickup handed out: its seq at that claim, the number its prompt's completion
+   * line names. Later changes raise the seq and leave this; a reopen drops it.
+   */
+  assignment: z.number().int().nonnegative().optional(),
   /** On the duty board: the duty of the list it was posted for, and its day (YYYY-MM-DD). */
   duty: z.object({ id: z.string(), day: z.string() }).optional(),
   /** A claimed lobby task's copy on the claimer's board, and the copy's lobby task: each other's id. */

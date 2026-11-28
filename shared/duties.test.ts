@@ -110,6 +110,25 @@ test("the day's rows: one per duty post, in the list's order, owed when open fro
   expect(dutyRows(undefined, posts)).toEqual([]);
 });
 
+test("a row carries the replies under its duty, oldest first, and no other duty's", () => {
+  const board = {
+    duties: [{ id: "a", name: "A", instructions: "Do A", days: [1] }],
+    day: "2026-11-18",
+  };
+  const posts = [
+    post("p1", { duty: { id: "a", day: "2026-11-18" }, state: "claimed", claimedBy: "agent-1" }),
+    post("p2", { duty: { id: "gone", day: "2026-11-18" } }),
+    post("p5", { kind: "note", replyTo: "p1", text: "main" }),
+    post("p3", { kind: "note", replyTo: "p1", text: "Which branch?" }),
+    post("p4", { kind: "note", replyTo: "p2", text: "Elsewhere" }),
+  ];
+  const rows = dutyRows(board, posts);
+  expect(rows.map((row) => [row.post.id, row.replies.map((reply) => reply.text)])).toEqual([
+    ["p1", ["Which branch?", "main"]],
+    ["p2", ["Elsewhere"]],
+  ]);
+});
+
 test("a holder's name is cut to 24 characters with an ellipsis", () => {
   expect(DUTY_HOLDER_CHARS).toBe(24);
   expect(shortHolder("Short name")).toBe("Short name");

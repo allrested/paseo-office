@@ -19,6 +19,7 @@ import type { BoardActions } from "./use-board-actions.js";
 interface RowProps {
   row: TaskAttentionRow;
   actions: BoardActions;
+  /** `roomId` is the task's board: a room's id, "lobby", or "duty" for a duty. */
   onOpenBoard(roomId: string): void;
   styles: OfficeStyles;
 }
@@ -98,9 +99,10 @@ export interface TasksCardProps {
 }
 
 /**
- * The tasks that need you, from every board: each blocked task with what its holder asked and a
- * field to answer it here, then the claims nobody works on, with Nudge and Reopen, then the tasks
- * whose pull request is merged, with Mark done. Nothing shows while nothing is on it.
+ * The tasks that need you, from every board, the duty board's duties among them: each blocked
+ * task with what its holder asked and a field to answer it here, then the claims nobody works on,
+ * with Nudge and Reopen, then the tasks whose pull request is merged, with Mark done. Nothing
+ * shows while nothing is on it.
  */
 export function TasksCard({ rows, open, actions, onOpenBoard, styles, onClose }: TasksCardProps) {
   const change = useCallback(

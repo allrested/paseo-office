@@ -90,6 +90,42 @@ const STALLED: TaskAttentionRow[] = [
     cause: "error",
   },
 ];
+const AT_HOME: TaskAttentionRow[] = [
+  {
+    kind: "stalled",
+    post: post(8, { text: "Check the notes" }),
+    board: "Lobby",
+    holder: "Builder",
+    reason: null,
+    cause: "home",
+  },
+];
+const DUTY_ROWS: TaskAttentionRow[] = [
+  {
+    kind: "blocked",
+    post: post(9, {
+      board: "duty",
+      text: "Build\n\nRun the build",
+      duty: { id: "build", day: "2026-11-28" },
+      blocked: "Which branch?",
+    }),
+    board: "Duty board",
+    holder: "Builder",
+    reason: "Which branch?",
+  },
+  {
+    kind: "stalled",
+    post: post(10, {
+      board: "duty",
+      text: "Tidy\n\nPrune old branches",
+      duty: { id: "tidy", day: "2026-11-28" },
+    }),
+    board: "Duty board",
+    holder: "Tester",
+    reason: null,
+    cause: "idle",
+  },
+];
 const MERGED: TaskAttentionRow[] = [
   {
     kind: "merged",
@@ -273,6 +309,29 @@ test("a stalled row says why, offers Nudge, Reopen and Open board, and has no An
   expect(allLabelled("Answer")).toHaveLength(0);
 });
 
+test("a claim whose holder is at home says so, with Nudge and Reopen, in the interface's language too", async () => {
+  await mount(<Harness rows={AT_HOME} />);
+  expect(lines()).toEqual([
+    "1 stalled",
+    "Check the notes",
+    "Builder is at home",
+    "Lobby",
+    "Nudge",
+    "Reopen",
+    "Open board",
+  ]);
+  act(() => root.unmount());
+  root = createRoot(container);
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={AT_HOME} />
+    </UiLanguage>,
+  );
+  expect(lines()).not.toContain("Builder is at home");
+  expect(lines().filter((line) => line.includes("Builder"))).toHaveLength(1);
+});
+
 test("Nudge posts the fixed status check as a reply under the task", async () => {
   await mount(<Harness rows={STALLED} />);
   await press("Nudge", 1);
@@ -344,4 +403,47 @@ test("a merged row's words are in the interface's language", async () => {
   expect(allLabelled(UI_VI["Mark done"])).toHaveLength(2);
   expect(lines()).not.toContain("2 merged");
   expect(lines().filter((line) => line.includes("pull request is merged"))).toEqual([]);
+});
+
+test("a duty's row names the duty board, and its Answer and Nudge post replies under the duty", async () => {
+  await mount(<Harness rows={DUTY_ROWS} />);
+  expect(lines()).toEqual([
+    "1 needs you · 1 stalled",
+    "Build…",
+    "Builder needs: Which branch?",
+    "Duty board",
+    "Send",
+    "Open board",
+    "Tidy…",
+    "Tester is idle",
+    "Duty board",
+    "Nudge",
+    "Reopen",
+    "Open board",
+  ]);
+  await type("Answer", "main");
+  await press("Send");
+  await press("Nudge");
+  expect(sent.calls).toEqual([
+    { board: "duty", kind: "note", text: "main", replyTo: "p9" },
+    {
+      board: "duty",
+      kind: "note",
+      text: "Status check: finish with office_update done and a short result, or block with what you need.",
+      replyTo: "p10",
+    },
+  ]);
+  await press("Open board", 0);
+  expect(opened).toEqual(["duty"]);
+});
+
+test("a duty's row names the duty board in the interface's language", async () => {
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={DUTY_ROWS} />
+    </UiLanguage>,
+  );
+  expect(lines()).not.toContain("Duty board");
+  expect(lines().filter((line) => line === UI_VI["Duty board"])).toHaveLength(2);
 });

@@ -113,7 +113,7 @@ export interface BoardService {
   /** Brings the duty board up to the list and the day, in one save. */
   syncDuties(plan: DutySync): Promise<void>;
   /**
-   * Reopens every task `agentId` still holds, as the user would, in one save: the agent is closed or
+   * Reopens every task `agentId` still holds, as the user would, in one save: the agent is
    * archived and will not finish them. Returns the ids left open (a pair's lobby task), in order.
    */
   releaseClaims(agentId: string): Promise<string[]>;
@@ -179,9 +179,12 @@ function isDutyTask(post: Post): boolean {
   return post.board === DUTY && post.kind === "task" && post.duty !== undefined;
 }
 
-/** The board's day a done duty was finished on: an owed one is finished on a later day than its own. */
+/**
+ * The board's day a done duty was finished on: an owed one is finished on a later day than its
+ * own. By when it was done, not when it last changed: a cost settled the next day changes it too.
+ */
 function finishedDay(post: Post, plan: DutySync): string {
-  return plan.dayOf(Date.parse(post.updatedAt));
+  return plan.dayOf(Date.parse(post.doneAt ?? post.updatedAt));
 }
 
 /** The weekday of a day (YYYY-MM-DD), 0 for Sunday. */
@@ -520,6 +523,8 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     };
     if (task.claimedAt !== undefined) copy.claimedAt = task.claimedAt;
     if (task.costAtClaim !== undefined) copy.costAtClaim = task.costAtClaim;
+    // A linked pair agrees on the block, also when the block is what brings the copy.
+    if (task.blocked !== undefined) copy.blocked = task.blocked;
     return { posts: [...posts.filter((item) => item.board !== room), ...kept, copy], copy };
   }
 
@@ -652,7 +657,11 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       : null;
     let seq = data.nextSeq;
     const changed: Post = { ...next.value, seq: seq++, updatedAt: now() };
-    if (pickupMessageId) changed.pickupMessageId = pickupMessageId;
+    if (pickupMessageId) {
+      changed.pickupMessageId = pickupMessageId;
+      // The number the prompt's completion line names: it stays while later changes raise the seq.
+      changed.assignment = changed.seq;
+    }
     let posts = data.posts.map((item) => (item.id === post.id ? changed : item));
     const touched = [post.board];
     if (partner !== undefined && changed.state === "open") {

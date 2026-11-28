@@ -27,6 +27,7 @@ import {
   topLevel,
   type TeamNamer,
 } from "./board-text.js";
+import type { DutyRow } from "../shared/duties.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
 import type { RosterTeam } from "../shared/roster.js";
 import type { BoardLayout } from "../shared/settings.js";
@@ -340,7 +341,7 @@ function DoneSection({ room, name, teamName, all, onFollowUp, actions, styles }:
             <PostWithActions
               key={post.id}
               post={post}
-              replies={repliesOf(post, room.posts)}
+              replies={repliesOf(post, all)}
               name={name}
               teamName={teamName}
               all={all}
@@ -357,6 +358,8 @@ function DoneSection({ room, name, teamName, all, onFollowUp, actions, styles }:
 export interface SheetBodyProps {
   room: OfficeRoom;
   rooms: readonly OfficeRoom[];
+  /** The duty board's rows: a task can wait on a duty, which is on no room's board. */
+  duties: readonly DutyRow[];
   /** Every agent's unfinished checklist steps: a board shows them under its agents. */
   agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
@@ -379,6 +382,7 @@ const NO_AFTER: readonly string[] = [];
 function SheetBody({
   room,
   rooms,
+  duties,
   agentTasks,
   name,
   teamName,
@@ -410,7 +414,7 @@ function SheetBody({
   const board = useMemo(() => [...room.posts, ...room.done], [room.posts, room.done]);
   const agents = useMemo(() => roomAgents(room, agentTasks), [room, agentTasks]);
   // What a task waits on can be on any board: the cards and the Follow-up form judge by all of them.
-  const everyPost = useMemo(() => allPosts(rooms), [rooms]);
+  const everyPost = useMemo(() => allPosts(rooms, duties), [rooms, duties]);
   const followUp = useFollowUp(everyPost);
   // Follow-up makes the post a task: only a task waits.
   const addFollowUp = followUp.add;
@@ -530,7 +534,7 @@ function SheetBody({
             <PostWithActions
               key={post.id}
               post={post}
-              replies={repliesOf(post, room.posts)}
+              replies={repliesOf(post, everyPost)}
               name={name}
               teamName={teamName}
               all={everyPost}
@@ -560,6 +564,8 @@ export interface BoardSheetProps {
   room: OfficeRoom | null;
   /** Every room of the office: the agents a post can wake, and where each one sits. */
   rooms: readonly OfficeRoom[];
+  /** The duty board's rows: a task can wait on a duty. */
+  duties: readonly DutyRow[];
   /** Every agent's unfinished checklist steps: a board shows them under its agents. */
   agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
@@ -603,6 +609,7 @@ function dialogSize(room: OfficeRoom | null, layouts: BoardLayouts): "wide" | un
 export function BoardSheet({
   room,
   rooms,
+  duties,
   agentTasks,
   name,
   teams,
@@ -653,6 +660,7 @@ export function BoardSheet({
             key={room.id}
             room={room}
             rooms={rooms}
+            duties={duties}
             agentTasks={agentTasks}
             name={name}
             teams={teams}
@@ -686,6 +694,7 @@ export function BoardSheet({
             key={room.id}
             room={room}
             rooms={rooms}
+            duties={duties}
             agentTasks={agentTasks}
             name={name}
             teamName={teamName}

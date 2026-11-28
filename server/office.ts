@@ -19,6 +19,7 @@ import type { BoardStore } from "./board-store.js";
 import { errorMessage } from "./errors.js";
 import type { Hub } from "./hub.js";
 import { createMentionQueue, type MentionQueue, type WakeTarget } from "./mention-queue.js";
+import { waitingOn } from "../shared/board-rules.js";
 import { completionLine } from "../shared/lobby-assignment.js";
 import { createLobbyPickup, type LobbyPickup } from "./lobby-pickup.js";
 import { oneLine } from "./prompt-text.js";
@@ -88,7 +89,11 @@ export interface Office {
   actDuty(id: string, agentId: string): Promise<PostResult>;
   turnEnded(agentId: string): void;
   checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
-  agentGone(agentId: string): void;
+  /**
+   * From the close and the archive hooks. A closed session is at home and a reply wakes it, so it
+   * keeps its claims; only an archived one has them released.
+   */
+  agentGone(agentId: string, how: "closed" | "archived"): void;
   /**
    * The directory's view: each agent's status. An agent holding done tasks whose cost waits for
    * its turn to end, and no longer in one, has them settled with the view's figure; one gone from
@@ -116,6 +121,8 @@ export function createOffice(deps: OfficeDeps): Office {
   let stopped = false;
   let cancelPrune: (() => void) | null = null;
   let duties: readonly Duty[] = [];
+  // Tasks that name an agent and still wait on others, by id: each wakes its agent at its release.
+  const held = new Set<string>();
 
   const label = (author: string) =>
     author === USER_AUTHOR ? "the user" : (titles.get(author) ?? author);
@@ -154,8 +161,15 @@ export function createOffice(deps: OfficeDeps): Office {
       // Any board: a lobby task can wait on a room's task, and is handed out once that is done. A
       // save the pickup makes while it scans does not start another scan.
       pickup?.refresh();
+      wakeReleased();
     },
-    onBoardRemoved: (board) => hub.removeBoard(board),
+    onBoardRemoved: (board) => {
+      hub.removeBoard(board);
+      // The board's tasks are gone, and a task that is gone holds no other: what waited on one is
+      // handed out, or its agent told, with no other board changed.
+      pickup?.refresh();
+      wakeReleased();
+    },
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),
     refuse,
     teamOf: (agentId) => deps.agents.teamOf(agentId),
@@ -171,15 +185,55 @@ export function createOffice(deps: OfficeDeps): Office {
     if (title) titles.set(agent.id, title);
   }
 
-  function mentioned(post: Post): void {
-    if (post.to === undefined || post.namedPickup || queue === null) return;
-    queue.enqueue(post.to, {
+  /** Every board's posts: a task waits while a task of its `after`, on any board, is not done. */
+  const allPosts = () => Object.values(service.boards()).flat();
+
+  /** A task for an agent whose wake is held: open, nobody's yet, and still waiting on another. */
+  function waitsForRelease(post: Post, posts: readonly Post[]): boolean {
+    return (
+      post.kind === "task" &&
+      post.to !== undefined &&
+      !post.namedPickup &&
+      post.state === "open" &&
+      post.claimedBy === undefined &&
+      waitingOn(post, posts).length > 0
+    );
+  }
+
+  function wakeFor(agentId: string, post: Post): void {
+    queue?.enqueue(agentId, {
       postId: post.id,
       author: post.author,
       authorLabel: wakeAuthorLabel(post.author, titles.get(post.author)),
       text: post.text,
       ...(post.replyTo === undefined ? {} : { replyTo: post.replyTo }),
     });
+  }
+
+  function mentioned(post: Post): void {
+    if (post.to === undefined || post.namedPickup || queue === null) return;
+    // The agent cannot claim a task that still waits: it is told when nothing holds the task.
+    if (waitsForRelease(post, allPosts())) {
+      held.add(post.id);
+      return;
+    }
+    wakeFor(post.to, post);
+  }
+
+  /**
+   * After any board's change: each held task that no longer waits wakes its agent. One that was
+   * deleted, claimed or done first is only dropped.
+   */
+  function wakeReleased(): void {
+    if (held.size === 0) return;
+    const posts = allPosts();
+    for (const id of held) {
+      const post = posts.find((item) => item.id === id);
+      if (post !== undefined && waitsForRelease(post, posts)) continue;
+      held.delete(id);
+      const free = post?.state === "open" && post.claimedBy === undefined;
+      if (post?.to !== undefined && free) wakeFor(post.to, post);
+    }
   }
 
   function schedulePrune(): void {
@@ -207,6 +261,10 @@ export function createOffice(deps: OfficeDeps): Office {
         },
         service.wakesPaused(),
       );
+      // What waited when the office stopped still waits: its wake goes out at its release. A task
+      // already free was told before, and is not held.
+      const loaded = allPosts();
+      for (const post of loaded) if (waitsForRelease(post, loaded)) held.add(post.id);
       pickup = createLobbyPickup({
         service,
         agents: deps.agents,
@@ -331,14 +389,17 @@ export function createOffice(deps: OfficeDeps): Office {
         }
       }
     },
-    agentGone(agentId) {
+    agentGone(agentId, how) {
       queue?.agentGone(agentId);
       void ready
         .then(() => service.settleSpent(agentId, false))
         .catch((error: unknown) =>
           log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`),
         );
-      // A closed or archived agent never finishes what it held: the tasks go back to the pickup.
+      // Paseo closes an idle session's runtime, and a reply or a task starts it again: what it
+      // holds, and what it asked, wait for it.
+      if (how === "closed") return;
+      // An archived agent never finishes what it held: the tasks go back to the pickup.
       void ready
         .then(() => service.releaseClaims(agentId))
         .then((ids) => {

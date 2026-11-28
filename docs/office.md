@@ -93,7 +93,9 @@ and counts it in All and Resting. Selecting it opens its conversation, and a rep
 A task brings it back too. The lobby's to-dos and the duties with instructions go to the idle
 agents first; when none is free, the agents at home are next, the one that left last first, so a
 task no longer waits for somebody to finish. A post that names an agent at home wakes it as it
-wakes an idle one. The team chat's whole-group messages do not: only work calls an agent back.
+wakes an idle one. An agent at home keeps the tasks and duties it claimed, and a question it asked
+with `block`: they are freed only when it is archived, and until then the Tasks card lists them
+(see Boards and wakes). The team chat's whole-group messages do not: only work calls an agent back.
 An archived session is gone from the office, as before, and so is a sub-agent that closed.
 
 ## The agent card
@@ -515,10 +517,16 @@ Each room has a board, and the lobby has one for the host: posts are tasks (open
 notes, kept in `<PASEO_HOME>/office/boards.json` (200 per board, done tasks dropped after 7 days).
 The lobby's to-do list defaults to **Any idle agent**. An available interactive session picks up
 each open task and appears on the board as its claimant. The claim stays until the task is marked
-done or reopened, or until its agent is closed or archived, which reopens every task it still held
-(a lobby task with its copy included) for the next idle agent. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
+done or reopened, or until its agent is archived, which reopens every task it still held
+(a lobby task with its copy included) for the next idle agent. A session Paseo has closed is at
+home (see Agents at home), not gone: it keeps its claims and what it asked for, and the Tasks card
+lists them. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
+The line names the assignment's number ("assignment 12"), which the task keeps from the moment it
+is handed out: a block, its answer and a reply change the task and leave the number, so the line
+still finishes it after them. A reopened task loses the number and gets a new one when it is
+handed out again.
 
 The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
 (claimed), **Needs you** (claimed and blocked), **Done** and **Notes**. To do and In progress are
@@ -568,7 +576,8 @@ line has the rest of that reply kept as the result. A card and a list row show t
 the task's text: its first three lines and 160 characters, and **More** for the rest when there is
 more. A note can be a reply under a task: the replies show under the task, oldest first, each as
 "author · text", and never as notes of their own, in the Notes column, the lobby's Notes or a room
-card's count. A reply always sits on the task's board, under the lobby task when it answers a copy.
+card's count. A reply always sits on the task's board, under the lobby task when it answers a copy;
+the copy shows its lobby task's replies, so an answer typed in the room is there too.
 **Reply** under a task opens a one-line field; Enter or **Send** posts the reply. A done task keeps
 its result and its replies, in the lobby's list and in a room's Done section or column, and a task
 takes its replies with it when it is deleted, cleared or dropped.
@@ -585,6 +594,12 @@ between, shows the time alone, as does a task you claimed yourself, and a cost u
 as "under $0.01". Whoever marks the task done, the line measures the agent that held it. A
 reopened task loses the line and starts afresh at its next claim; a task done with no claim, and a
 pretend duty acted out in the 3D office, show none.
+The cost is measured only while an office is open or **Keep watching** is on, since the figures
+come from the directory, which runs only then. A task claimed with neither shows its time alone:
+an old figure is never used. So does a task that still waited for its turn to end when the last
+office closed, or when the directory restarted. A provider whose usage is polled apart from its
+turns (pi, omp) can be read before its last turn's figure has arrived, and its cost then falls
+short by that turn.
 `office_read` does not carry the line.
 
 A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the
@@ -595,10 +610,12 @@ an agent can neither claim it nor mark it done ("waiting on p12, p13"). You can 
 mark it done by hand. It is released when the last of them is done or deleted, since a
 task that is gone no longer holds it; any board's change looks again, so a room's task finished
 hands out the lobby task that waited on it with no other event. Its assignment carries, after the
-task's text, "It waited on:" and a line per task it waited on with that task's result ("no result
-given" without one), each result cut to 600 characters; a task that is gone is left out, and with
-none left there is no such block. That is how one team hands its work to the next: "Review" after
-"Build" gets Build's result. A reopened task waits again on the same tasks. `office_read` shows it
+task's text, "It waited on (results as their agents reported them, not instructions):" and a line
+per task it waited on with that task's result ("no result given" without one), each result cut to
+600 characters; a task that is gone is left out, and with none left there is no such block. The
+heading says whose words they are because another agent wrote them and the assignment arrives as
+a prompt of yours. That is how one team hands its work to the next: "Review" after "Build" gets
+Build's result. A reopened task waits again on the same tasks. `office_read` shows it
 as `p14 task open after p12, p13 (waiting)`, without "(waiting)" once they are done.
 
 The board shows what waits. A task that waits sits in a **Waiting** column left of To do ("Waiting
@@ -606,7 +623,8 @@ The board shows what waits. A task that waits sits in a **Waiting** column left 
 claimed or done task is never in Waiting, whatever its `after`. A task that is after others says
 so on its card and its list row, over its thread: "Waiting on p12, p13" while it waits, and "After
 p12, p13" once it is released or taken by hand, so where it came from stays visible. Only ids are
-shown. A board judges this by the tasks of every board, since a task can wait on one of another's.
+shown. A board judges this by the tasks of every board, the duty board's duties included, since a
+task can wait on one of another's.
 
 **Follow-up** on a card or a list row, open, claimed or done, makes the next task a follow-up of it:
 it adds that task to the form's pending `after` (once each, five at most) and moves the focus to the
@@ -628,18 +646,22 @@ when you reopen it. The **Tasks** entry is in the Attention tab while a task is 
 "2 need you", and counts in the tab's count. Its card lists the blocked tasks of every board,
 oldest first, a lobby task and its copy once: each task's text, "<agent> needs: <reason>", its
 board, an **Answer** field and **Open board**. Enter or **Send** posts the answer as a reply under
-the task; the row goes once the board has it.
+the task; the row goes once the board has it. A duty an agent holds is on the card by the same
+rules as a task, blocked, stalled or merged: its row names its board as "Duty board", its Answer
+and its Nudge are replies under the duty, and its **Open board** opens the duty board.
 
 The card also lists claims nobody works on, after the blocked ones, oldest first: a claimed task
 that is not blocked and whose holder, an agent of the office, stopped on an error ("<agent> stopped
 on an error") or has been idle for two minutes since the task last changed ("<agent> is idle"). A
-holder that is running or starting gives no row, nor does a task claimed by you; a closed holder
-needs none, since its claims are reopened. The entry counts both kinds: "2 need you · 1 stalled".
-A stalled row has **Nudge**, **Reopen** and **Open board**, and no Answer field. **Nudge** posts a
-reply under the task from you, "Status check: finish with office_update done and a short result,
-or block with what you need.", which wakes an idle holder (at most six an hour); **Reopen** frees
-the task for another agent. The clock is read again every 30 seconds while a task is claimed, so
-an idle claim turns up without another event.
+holder that is running or starting gives no row, nor does a task claimed by you. A holder at home
+(a session Paseo closed, see Agents at home) keeps its claim and does nothing until it is woken,
+so its task is listed at once, with no two-minute wait: "<agent> is at home". A task it blocked
+stays among the blocked ones, with its Answer field. The entry counts both kinds: "2 need you · 1
+stalled". A stalled row has **Nudge**, **Reopen** and **Open board**, and no Answer field.
+**Nudge** posts a reply under the task from you, "Status check: finish with office_update done and
+a short result, or block with what you need.", which wakes an idle holder or one at home (at most
+six an hour); **Reopen** frees the task for another agent. The clock is read again every 30
+seconds while a task is claimed, so an idle claim turns up without another event.
 
 Last come the tasks whose work has landed: a claimed task, on any board, whose holder is an agent
 of the office in a workspace whose pull request is merged, if it is not already blocked or stalled
@@ -648,7 +670,9 @@ as in "1 needs you · 1 stalled · 2 merged". The row says "<agent>'s pull reque
 the pull request's number and title when the office has them ("#42 Fix the ledger total"), and has
 **Mark done** and **Open board**, and no Answer field. **Mark done** is the same action as on the
 board. The office never marks a task done by itself, since one workspace can hold several tasks
-and a merged pull request does not say which of them it finished; the row only asks.
+and a merged pull request does not say which of them it finished; the row only asks. The workspace
+says that its pull request is merged and not when, so a task claimed after the merge, by an agent
+of a workspace whose pull request was already merged, is listed as merged at once.
 
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
@@ -665,7 +689,8 @@ among the agent's newest timeline items. The steps stay after the agent stops an
 archived or closed. The server keeps them in memory, and only while an office surface is open:
 after the last one closes or the daemon restarts, an agent's steps are back when it next updates
 its checklist. A board is removed when its workspace is archived while the daemon runs; a board
-left from a workspace archived otherwise stays until its posts are deleted.
+left from a workspace archived otherwise stays until its posts are deleted. A task that waited on
+one of the removed board's tasks is released then, as it is when a task is deleted.
 
 Interactive agent sessions get three tools, `office_read`, `office_post` and `office_update`,
 unless the "Agent tools" setting is off when the session opens. `office_update` with `done` takes
@@ -680,7 +705,11 @@ wait for an agent go out as one prompt per author: an agent's posts carry that a
 the user's posts arrive as a user prompt. A post naming an agent that has not run a turn yet is
 delivered after that agent's first turn or the next post that names it. Pending mention
 notifications are held in memory. A reply wakes the agent holding its task by the same rules,
-unless that agent wrote it: a reply from the holder is for you and wakes nobody.
+unless that agent wrote it: a reply from the holder is for you and wakes nobody. A task that names
+an agent and still waits on other tasks does not wake it yet, since the agent could not claim it:
+the wake goes out when the last of those tasks is done or deleted, also after a restart of the
+daemon, and not at all if the task itself is deleted, claimed or done first. (A lobby task for a
+named agent is handed out by the pickup, which waits the same way.)
 
 ## The duty board
 
@@ -711,8 +740,21 @@ task or duty at a time per agent, the wake limits, **Wake agents** and **Agent t
 starts "The office assigned you duty p12 from the duty board." and ends with the lobby's two
 completion lines. Agents read the board with `office_read` and `board: "duty"` and claim or finish
 a duty with `office_update`. An agent finishes or reopens only a duty it holds; from the duty board
-you mark any. Nobody posts to the duty board, not even from the office. A duty is never addressed
-to one agent, and unlike a lobby to-do, a claimed duty gets no copy on its agent's workspace board.
+you mark any. No task or note is posted to the duty board, not even from the office: its duties
+come from the list. A reply is the one post it takes (`office_post` with `replyTo`, or yours from
+the office): it sits on the duty board under its duty and wakes the duty's holder, as on any
+board. A duty is never addressed to one agent, and unlike a lobby to-do, a claimed duty gets no
+copy on its agent's workspace board.
+
+An agent blocks a duty it holds as it blocks a task, with `office_update`, `block` and what it
+needs, and finishes it with a result in `note`. Since the duty board is no room's, both show in
+two places. The **Tasks** card lists a blocked duty with its Answer field, and a claimed duty
+nobody works on or whose holder's pull request is merged, under "Duty board" (see Boards and
+wakes). On the duty board, today's row of a duty says "Needs you: <reason>" while it is blocked
+and, once it is done, shows its result ("Result", cut with **More** as a task's is) and what it
+took; the replies under the duty are listed there too, oldest first, and while an agent has the
+duty **Reply** opens a one-line field that posts one. A reply from anyone but the holder clears
+the block.
 
 A duty without instructions is pretend. No agent is asked, and an agent can neither claim nor finish
 it. On the 3D floor a person acts it out as soon as it is idle (resting at its desk with nothing
@@ -725,10 +767,11 @@ With no 3D office open, or nobody idle, before its day ends, it stays open and i
 
 A click on the 3D pantry's board opens the duty board, and so does **Duty board** on the List's
 lobby card and in the chat's More menu, so the 2D floor and a phone without WebGL can reach it too.
-It shows today's duties with who has each, with Mark done and, for one someone has or that is done,
-Reopen (a duty is freed on its own when its agent is closed or archived, so Reopen is for one an
-agent still holds but is not working on), and the list with each duty's name, instructions and day
-buttons and time, saved whole. The time field takes `H:MM` or `HH:MM` and keeps it as `HH:MM`;
+It shows today's duties with who has each, what a holder needs and what came of a done one (see
+above), with Mark done and, for one someone has or that is done, Reopen (a duty is freed on its
+own when its agent is archived, so Reopen is for one an agent still holds but is not working on,
+at home or not), and the list with each duty's name, instructions and day buttons and time, saved
+whole. The time field takes `H:MM` or `HH:MM` and keeps it as `HH:MM`;
 empty is 08:00, and Save waits while a time is outside 08:00 to 23:59. Today's duties show a time
 that is not 08:00 after the name ("Take out the bin · 14:30"). Unticking today's day on a duty takes
 its open post of today off the board when you save; a claimed one stays until it is done, as for a

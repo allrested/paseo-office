@@ -1,5 +1,5 @@
 import type { Post } from "../shared/contracts.js";
-import type { OfficeModel, OfficeRoom } from "../shared/model.js";
+import type { OfficeModel } from "../shared/model.js";
 import { authorName, textPreview } from "./board-text.js";
 
 /** Why a task is on the Tasks card. Each kind has its own words and its own way on. */
@@ -8,17 +8,31 @@ export type TaskAttentionKind = "blocked" | "stalled" | "merged";
 export interface TaskAttentionRow {
   kind: TaskAttentionKind;
   post: Post;
-  /** The board it is on, by name: the room's, or "Lobby". */
+  /** The board it is on, by name: the room's, "Lobby", or "Duty board" for a duty. */
   board: string;
   /** Who holds the task, by name; null when nobody does. */
   holder: string | null;
   /** What the holder needs, in its own words; null for a kind without one. */
   reason: string | null;
-  /** Why a stalled claim is listed: its holder stopped on an error, or has been idle. */
-  cause?: "error" | "idle";
+  /** Why a stalled claim is listed: its holder stopped on an error, has been idle, or is at home. */
+  cause?: StallCause;
   /** A merged row's pull request as "#42 Fix the ledger total"; absent when the model has neither. */
   pullRequest?: string;
 }
+
+export type StallCause = "error" | "idle" | "home";
+
+/**
+ * What the rows are worked out from: the rooms' boards and the duty board, and who holds what, in
+ * the office or at home.
+ */
+export type TaskAttentionModel = Pick<
+  OfficeModel,
+  "rooms" | "duties" | "agents" | "home" | "roomOfAgent"
+>;
+
+/** What a duty's row calls its board: the duty board is no room, and has no name of its own. */
+export const DUTY_BOARD_NAME = "Duty board";
 
 /** The order of the kinds on the card. */
 const KIND_ORDER: readonly TaskAttentionKind[] = ["blocked", "stalled", "merged"];
@@ -38,14 +52,19 @@ function isBlocked(post: Post): boolean {
   return post.kind === "task" && post.state === "claimed" && post.blocked !== undefined;
 }
 
-/** Why a claim nobody works on is stalled, or null while its holder is at it or is not an agent here. */
+/**
+ * Why a claim nobody works on is stalled, or null while its holder is at it or is not an agent
+ * here. A holder at home keeps its claim and does nothing until it is woken, so it is listed at once.
+ */
 function stallCause(
   post: Post,
   now: number,
-  agents: OfficeModel["agents"],
-): "error" | "idle" | null {
+  { agents, home }: Pick<TaskAttentionModel, "agents" | "home">,
+): StallCause | null {
   if (post.kind !== "task" || post.state !== "claimed" || post.blocked !== undefined) return null;
-  const status = post.claimedBy === undefined ? undefined : agents.get(post.claimedBy)?.status;
+  if (post.claimedBy === undefined) return null;
+  if (home.has(post.claimedBy)) return "home";
+  const status = agents.get(post.claimedBy)?.status;
   if (status === "error") return "error";
   return status === "idle" && now - Date.parse(post.updatedAt) >= STALL_MS ? "idle" : null;
 }
@@ -70,43 +89,55 @@ function mergedPullRequest(
   return name;
 }
 
+/** A board whose posts are looked through: a room's, or the duty board's duties. */
+interface Board {
+  name: string;
+  lobby: boolean;
+  posts: readonly Post[];
+}
+
 interface Found {
-  room: OfficeRoom;
+  board: Board;
   post: Post;
   kind: TaskAttentionKind;
-  cause?: "error" | "idle";
+  cause?: StallCause;
   pullRequest?: string;
 }
 
 /**
- * Rows across every board of the model, blocked first, then stalled, then merged, each oldest first. A lobby
- * task and its copy on the claimer's board carry the same mark, so the copy is left out while its
- * lobby task is listed. `now` is for the kinds that go by age.
+ * Rows across every board of the model, the duty board included, blocked first, then stalled, then
+ * merged, each oldest first. A lobby task and its copy on the claimer's board carry the same mark,
+ * so the copy is left out while its lobby task is listed. `now` is for the kinds that go by age.
  */
-export function taskAttentionRows(
-  model: Pick<OfficeModel, "rooms" | "agents" | "roomOfAgent">,
-  now: number,
-): TaskAttentionRow[] {
-  const found = model.rooms.flatMap((room) =>
-    room.posts.flatMap((post): Found[] => {
-      if (isBlocked(post)) return [{ room, post, kind: "blocked" }];
-      const cause = stallCause(post, now, model.agents);
-      if (cause !== null) return [{ room, post, kind: "stalled", cause }];
+export function taskAttentionRows(model: TaskAttentionModel, now: number): TaskAttentionRow[] {
+  // A holder at home is named as it is in the office.
+  const holderName = (id: string) => authorName(id, model.home.has(id) ? model.home : model.agents);
+  const boards: Board[] = [
+    ...model.rooms.map((room) => ({ name: room.name, lobby: room.lobby, posts: room.posts })),
+    { name: DUTY_BOARD_NAME, lobby: false, posts: model.duties.map((row) => row.post) },
+  ];
+  const found = boards.flatMap((board) =>
+    board.posts.flatMap((post): Found[] => {
+      if (isBlocked(post)) return [{ board, post, kind: "blocked" }];
+      const cause = stallCause(post, now, model);
+      if (cause !== null) return [{ board, post, kind: "stalled", cause }];
       const pullRequest = mergedPullRequest(post, model);
       return pullRequest === null
         ? []
-        : [{ room, post, kind: "merged", ...(pullRequest === "" ? {} : { pullRequest }) }];
+        : [{ board, post, kind: "merged", ...(pullRequest === "" ? {} : { pullRequest }) }];
     }),
   );
-  const listedInLobby = new Set(found.filter(({ room }) => room.lobby).map(({ post }) => post.id));
+  const listedInLobby = new Set(
+    found.filter(({ board }) => board.lobby).map(({ post }) => post.id),
+  );
   const rows: TaskAttentionRow[] = [];
-  for (const { room, post, kind, cause, pullRequest } of found) {
-    if (!room.lobby && post.link !== undefined && listedInLobby.has(post.link)) continue;
+  for (const { board, post, kind, cause, pullRequest } of found) {
+    if (!board.lobby && post.link !== undefined && listedInLobby.has(post.link)) continue;
     rows.push({
       kind,
       post,
-      board: room.name,
-      holder: post.claimedBy === undefined ? null : authorName(post.claimedBy, model.agents),
+      board: board.name,
+      holder: post.claimedBy === undefined ? null : holderName(post.claimedBy),
       reason: post.blocked ?? null,
       ...(cause === undefined ? {} : { cause }),
       ...(pullRequest === undefined ? {} : { pullRequest }),
@@ -139,9 +170,10 @@ export function blockedLine(row: Pick<TaskAttentionRow, "holder" | "reason">): s
   return row.holder === null ? `Needs you: ${reason}` : `${row.holder} needs: ${reason}`;
 }
 
-/** A stalled row's line: "Builder stopped on an error" or "Builder is idle". */
+/** A stalled row's line: "Builder stopped on an error", "Builder is idle" or "Builder is at home". */
 export function stalledLine(row: Pick<TaskAttentionRow, "holder" | "cause">): string {
   const holder = row.holder ?? "Nobody";
+  if (row.cause === "home") return `${holder} is at home`;
   return row.cause === "error" ? `${holder} stopped on an error` : `${holder} is idle`;
 }
 

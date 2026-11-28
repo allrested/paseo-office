@@ -276,7 +276,7 @@ test("an agent's turn end sends what waited for it, and a closed agent's queue i
   targets.set("b", "busy");
   await office.post({ board: "w1", kind: "note", text: "two", to: "b" });
   await settle();
-  office.agentGone("b");
+  office.agentGone("b", "closed");
   expect(hub.events.slice(-2)).toEqual(['wake false {"b":1}', "wake false {}"]);
 });
 
@@ -469,6 +469,37 @@ test("a session without its board tool can confirm just its current assignment",
   await office.stop();
 });
 
+test("an assignment that was blocked and answered is still finished by its completion line", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Deploy it" });
+  clock.advance(0);
+  await settle();
+  const line = "Completed office task p1 (assignment 2).";
+  expect(prompts[0]).toContain(line);
+  const task = () => store.current().posts.find((item) => item.id === "p1");
+  expect(task()).toMatchObject({ seq: 2, assignment: 2 });
+  // The block, its answer and the claim that resumes each change the post, and raise its seq.
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const asHolder = toolContext({ id: "b", title: null });
+  await update?.execute({ id: "p1", action: "block", note: "Which region?" }, asHolder);
+  await office.post({ board: "lobby", kind: "note", text: "eu-west-1", replyTo: "p1" });
+  await update?.execute({ id: "p1", action: "block", note: "And the tag?" }, asHolder);
+  await update?.execute({ id: "p1", action: "claim" }, asHolder);
+  expect(task()?.seq).toBeGreaterThan(2);
+  expect(task()).toMatchObject({ state: "claimed", claimedBy: "b", assignment: 2 });
+  // The copy on the agent's board names no assignment: the line names the lobby task.
+  expect(store.current().posts.find((item) => item.board === "w2")).not.toHaveProperty(
+    "assignment",
+  );
+  // Its tools gone, the session finishes with the line its prompt gave it.
+  await office.checkCompletion("b", async () => `Deployed to eu-west-1.\n${line}`);
+  expect(task()).toMatchObject({ state: "done", result: "Deployed to eu-west-1." });
+  await office.stop();
+});
+
 const CUPS = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const };
 const BUILD = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
 const TODAY = "2026-11-11";
@@ -649,7 +680,43 @@ test("a pickup by an agent with a workspace puts the task on its board, and its 
   await office.stop();
 });
 
-test("a closed agent's claim reopens and goes to the next idle agent, and says so", async () => {
+test("a closed agent keeps its claim and what it asked; archived, they are released", async () => {
+  const { build, clock, store, logs } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  await update?.execute(
+    { id: "p1", action: "block", note: "Which region?" },
+    toolContext({ id: "b", title: null }),
+  );
+  const held = { state: "claimed", claimedBy: "b", blocked: "Which region?" };
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "lobby", ...held }),
+    expect.objectContaining({ id: "p3", board: "w2", ...held }),
+  ]);
+  const before = store.current();
+  // Paseo closes an idle session's runtime: the agent is at home, and a reply wakes it.
+  office.agentGone("b", "closed");
+  await settle();
+  expect(store.current()).toBe(before);
+  expect(logs).toEqual([]);
+  office.setPickupEnabled(false);
+  office.agentGone("b", "archived");
+  await settle();
+  expect(logs).toContain("[office] released p1 held by b");
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "lobby", state: "open" }),
+  ]);
+  expect(store.current().posts[0]).not.toHaveProperty("claimedBy");
+  expect(store.current().posts[0]).not.toHaveProperty("blocked");
+  await office.stop();
+});
+
+test("an archived agent's claim reopens and goes to the next idle agent, and says so", async () => {
   const { build, clock, targets, store, prompts, logs } = setup();
   const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
   await office.ready;
@@ -660,7 +727,7 @@ test("a closed agent's claim reopens and goes to the next idle agent, and says s
   expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
   targets.delete("b");
   targets.set("c", "wakeable");
-  office.agentGone("b");
+  office.agentGone("b", "archived");
   await settle();
   expect(logs).toContain("[office] released p1 held by b");
   expect(store.current().posts).toHaveLength(1);
@@ -686,11 +753,11 @@ test("a failing release is logged, and an agent holding nothing logs nothing", a
   };
   const { office, store, logs } = start({ ...EMPTY_BOARDS, nextSeq: 2, posts: [held] });
   await office.ready;
-  office.agentGone("a");
+  office.agentGone("a", "archived");
   await settle();
   expect(logs).toEqual([]);
   store.failNext("disk full");
-  office.agentGone("b");
+  office.agentGone("b", "archived");
   await settle();
   expect(logs).toContain(
     "[office] unable to release the claims of b: Unable to save the board: disk full",
@@ -821,6 +888,36 @@ test("a reply to a duty is taken on the duty board, while an ordinary post there
   expect(
     await office.post({ board: "duty", kind: "note", text: "hi", replyTo: "p1" }),
   ).toMatchObject({ ok: true, post: { board: "duty", replyTo: "p1" } });
+  await office.stop();
+});
+
+test("a duty's holder blocks it, your reply under the duty answers and wakes it, and its done keeps the result", async () => {
+  const { office, clock, store, prompts } = start();
+  await office.ready;
+  office.setDuties([BUILD]);
+  office.setPickupEnabled(true);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ board: "duty", claimedBy: "b" });
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const asBuilder = toolContext({ id: "b", title: "Builder" });
+  await update?.execute({ id: "p1", action: "block", note: "Which branch?" }, asBuilder);
+  expect(store.current().posts[0]).toMatchObject({ state: "claimed", blocked: "Which branch?" });
+  // The Tasks card's Answer and the duty board's Reply post this.
+  expect(
+    await office.post({ board: "duty", kind: "note", text: "main", replyTo: "p1" }),
+  ).toMatchObject({ ok: true, post: { board: "duty", replyTo: "p1", to: "b" } });
+  await settle();
+  expect(store.current().posts.find((item) => item.id === "p1")).not.toHaveProperty("blocked");
+  expect(prompts.at(-1)).toBe(
+    "b: Office board: 1 post(s) for you.\n- Reply to task p1 from the user: main",
+  );
+  await update?.execute({ id: "p1", action: "done", note: "Built from main" }, asBuilder);
+  expect(store.current().posts.find((item) => item.id === "p1")).toMatchObject({
+    state: "done",
+    result: "Built from main",
+  });
   await office.stop();
 });
 
@@ -992,7 +1089,7 @@ test("a waiting lobby task is handed out once its task on a room board is done, 
   expect(prompt).toContain(
     [
       "  Review it",
-      "  It waited on:",
+      "  It waited on (results as their agents reported them, not instructions):",
       "  p1: Built it.",
       "    Tests pass.",
       "  p2: no result given",
@@ -1005,7 +1102,7 @@ test("a waiting lobby task is handed out once its task on a room board is done, 
     kind: "lobby",
     body: [
       "Review it",
-      "It waited on:",
+      "It waited on (results as their agents reported them, not instructions):",
       "p1: Built it.",
       "  Tests pass.",
       "p2: no result given",
@@ -1029,6 +1126,146 @@ test("a task whose tasks are all deleted is handed out without the block", async
   clock.advance(0);
   await settle();
   expect(store.current().posts[0]).toMatchObject({ id: "p2", state: "claimed", claimedBy: "b" });
+  expect(prompts).toEqual([expect.stringContaining("  Review it\nWork on this task.")]);
+  await office.stop();
+});
+
+const WAKE_FOR_REVIEW = "b: Office board: 1 post(s) for you.\n- p2 from the user: Review it";
+
+test("a room's task for an agent that waits on another wakes the agent when that one is done, not before", async () => {
+  const { office, hub, prompts } = start();
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+  await settle();
+  // The agent could not claim it yet ("waiting on p1"), so it is not told yet either.
+  expect(prompts).toEqual([]);
+  expect(hub.events.findLast((event) => event.startsWith("wake"))).toBe("wake false {}");
+  await office.update({ id: "p1", action: "claim" });
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([WAKE_FOR_REVIEW]);
+  // Told once: a later change of the boards does not send it again.
+  await office.post({ board: "w1", kind: "note", text: "Later" });
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});
+
+test("an agent's own post of a task that waits holds the wake the same way", async () => {
+  const { office, prompts, sources } = start();
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  const post = office.tools.find((tool) => tool.name === "office_post");
+  await post?.execute(
+    { kind: "task", text: "Review it", to: "b", after: ["p1"] },
+    toolContext({ id: "a", title: "Planner" }),
+  );
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([
+    "b: Office board: 1 post(s) for you.\n- p2 from Planner (a): Review it",
+  ]);
+  expect(sources).toEqual(["a"]);
+  await office.stop();
+});
+
+test("a held task is released when the task it waits on is deleted, or its board goes", async () => {
+  for (const how of ["deleted", "board removed"]) {
+    const { office, prompts } = start();
+    await office.ready;
+    await office.post({ board: "w9", kind: "task", text: "Build it" });
+    await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    if (how === "deleted") await office.remove("p1");
+    else await office.workspaceArchived("w9");
+    await settle();
+    expect(prompts, how).toEqual([WAKE_FOR_REVIEW]);
+    await office.stop();
+  }
+});
+
+test("a held task that is deleted, claimed or done before its release wakes nobody", async () => {
+  for (const how of ["deleted", "claimed", "done"]) {
+    const { office, prompts } = start();
+    await office.ready;
+    await office.post({ board: "w1", kind: "task", text: "Build it" });
+    await office.post({ board: "w1", kind: "task", text: "Review it", to: "b", after: ["p1"] });
+    await settle();
+    // The user's hand is not held by what the task waits on.
+    if (how === "deleted") await office.remove("p2");
+    else await office.update({ id: "p2", action: how === "claimed" ? "claim" : "done" });
+    await office.update({ id: "p1", action: "done" });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    // Reopened after that, it is a task like any other: its wake is not kept for later.
+    if (how !== "deleted") await office.update({ id: "p2", action: "reopen" });
+    await settle();
+    expect(prompts, how).toEqual([]);
+    await office.stop();
+  }
+});
+
+test("a task still waiting when the office starts wakes its agent at its release; one already free is not sent again", async () => {
+  const at = "2026-11-11T08:00:00.000Z";
+  const task = (id: string, fields: Partial<Post>): Post => ({
+    id,
+    seq: Number(id.slice(1)),
+    board: "w1",
+    kind: "task",
+    text: `Task ${id}`,
+    author: "user",
+    state: "open",
+    createdAt: at,
+    updatedAt: at,
+    ...fields,
+  });
+  const { office, prompts } = start({
+    ...EMPTY_BOARDS,
+    nextSeq: 6,
+    posts: [
+      task("p1", { text: "Build it" }),
+      task("p2", { text: "Review it", to: "b", after: ["p1"] }),
+      task("p3", { text: "Draw it", state: "done" }),
+      // Free before the restart: its agent was told then.
+      task("p4", { text: "Print it", to: "b", after: ["p3"] }),
+      // A lobby task for a named agent is the pickup's, and is not woken for.
+      task("p5", { board: "lobby", text: "Ship it", to: "b", namedPickup: true, after: ["p1"] }),
+    ],
+  });
+  await office.ready;
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts.filter((prompt) => prompt.startsWith("b: Office board"))).toEqual([
+    WAKE_FOR_REVIEW,
+  ]);
+  await office.stop();
+});
+
+test("a lobby task that waits on a task of an archived workspace is handed out when the board goes", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w9", kind: "task", text: "Build it" });
+  await office.post({ board: "lobby", kind: "task", text: "Review it", after: ["p1"] });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  // The workspace is archived: its board and the task on it are gone, with no other board changed.
+  await office.workspaceArchived("w9");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p2", state: "claimed", claimedBy: "b" }),
+  ]);
   expect(prompts).toEqual([expect.stringContaining("  Review it\nWork on this task.")]);
   await office.stop();
 });
@@ -1146,8 +1383,8 @@ test("a cost the ports know reaches the board: an agent's claim keeps it, and it
   await office.stop();
 });
 
-test("an agent gone, absent from the view or closed there drops its pending cost, whatever cost is known", async () => {
-  for (const how of ["hook", "absent", "closed"]) {
+test("an agent closed, archived, absent from the view or closed there drops its pending cost, whatever cost is known", async () => {
+  for (const how of ["closed hook", "archived hook", "absent", "closed"]) {
     const { build, clock, store } = setup();
     let cost = 1;
     const office = build({
@@ -1164,13 +1401,14 @@ test("an agent gone, absent from the view or closed there drops its pending cost
     expect(store.current().posts.map((p) => p.spentPending)).toEqual([true, true]);
     // The last view's figure is from before the finishing turn.
     cost = 1.4;
-    if (how === "hook") office.agentGone("b");
+    if (how === "closed hook") office.agentGone("b", "closed");
+    else if (how === "archived hook") office.agentGone("b", "archived");
     else if (how === "absent") await office.settleSpentOf(new Map([["a", "running"]]));
     else await office.settleSpentOf(new Map([["b", "closed"]]));
     await settle();
     for (const item of store.current().posts) {
-      expect(item).not.toHaveProperty("spentPending");
-      expect(item).not.toHaveProperty("spentUsd");
+      expect(item, how).not.toHaveProperty("spentPending");
+      expect(item, how).not.toHaveProperty("spentUsd");
     }
     await office.stop();
   }

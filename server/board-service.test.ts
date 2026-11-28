@@ -292,6 +292,36 @@ test("lobby pickup serializes competing agents and tasks, even across a restart"
   expect(await restarted.claimLobbyTask("p2", "b", 2)).toMatchObject({ id: "p2", claimedBy: "b" });
 });
 
+test("a pickup's claim keeps the assignment's number through a block and its answer, and a reopen drops it", async () => {
+  const { service } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  expect(claim).toMatchObject({ seq: 2, assignment: 2 });
+  // The copy stands for the task on the agent's board; the assignment is the lobby task's.
+  expect(find(service, "p3")).not.toHaveProperty("assignment");
+  await service.update({ id: "p1", action: "block", actor: "a", note: "Which database?" });
+  await service.post({
+    board: "lobby",
+    kind: "note",
+    text: "The replica",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(find(service, "p1")?.seq).toBeGreaterThan(2);
+  expect(find(service, "p1")).toMatchObject({ assignment: 2 });
+  expect(find(service, "p3")).not.toHaveProperty("assignment");
+  await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(find(service, "p1")).toMatchObject({ state: "open" });
+  expect(find(service, "p1")).not.toHaveProperty("assignment");
+});
+
+test("a claim by hand or by tool is no assignment and keeps no number", async () => {
+  const { service } = await harness(file([lobbyTask(1), lobbyTask(2)]));
+  await service.update({ id: "p1", action: "claim", actor: "a" });
+  await service.update({ id: "p2", action: "claim", actor: "user" });
+  expect(find(service, "p1")).not.toHaveProperty("assignment");
+  expect(find(service, "p2")).not.toHaveProperty("assignment");
+});
+
 test("a late rollback cannot reopen an acknowledged delivery", async () => {
   const { service } = await harness(file([lobbyTask(1)]));
   const claim = await service.claimLobbyTask("p1", "a", 1);
@@ -588,6 +618,31 @@ test("an open or claimed duty of an earlier day is owed: no second post; done on
   expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2", "p4"]);
   await service.syncDuties({ duties: [CUPS, BUILD], day: "2026-11-12", due: [], dayOf });
   expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2"]);
+});
+
+test("a duty finished yesterday whose cost is settled today still left yesterday: it goes, and today's is posted", async () => {
+  const yesterday = "2026-11-11T20:00:00.000Z";
+  const finished = dutyPost(1, "build", "2026-11-11", {
+    state: "done",
+    claimedBy: "a",
+    claimedAt: "2026-11-11T19:00:00.000Z",
+    doneAt: yesterday,
+    updatedAt: yesterday,
+    costAtClaim: 1,
+    spentPending: true,
+  });
+  const { service, clock } = await harness(file([finished]), { costOf: () => 1.5 });
+  // The agent's turn ends the next day: the settle changes the post, and so its updatedAt.
+  clock.advance(DAY);
+  await service.settleSpent("a");
+  expect(service.postsOf("duty")).toMatchObject([
+    { id: "p1", spentUsd: 0.5, doneAt: yesterday, updatedAt: "2026-11-12T09:00:00.000Z" },
+  ]);
+  await service.syncDuties({ duties: [BUILD], day: "2026-11-12", due: [BUILD], dayOf });
+  expect(service.postsOf("duty")).toMatchObject([
+    { state: "open", duty: { id: "build", day: "2026-11-12" } },
+  ]);
+  expect(service.postsOf("duty")).toHaveLength(1);
 });
 
 test("a duty that leaves the list takes its open post; an edit changes its open post's text", async () => {
@@ -1154,6 +1209,20 @@ test("blocking again replaces the reason", async () => {
   await block(service, "p1", "a", "First");
   await block(service, "p1", "a", "Second");
   expect(find(service, "p1")?.blocked).toBe("Second");
+});
+
+test("a block that gives a lobby task its copy puts the mark on the copy too", async () => {
+  // Claimed while its agent had no workspace, so it has no copy; the agent has one now.
+  const held = lobbyTask(1, { state: "claimed", claimedBy: "a" });
+  let room: string | null = null;
+  const { service } = await harness(file([held]), undefined, async () => room);
+  expect(service.boards().w1).toBeUndefined();
+  room = "w1";
+  await block(service, "p1", "a", "Which database?");
+  expect(find(service, "p1")).toMatchObject({ blocked: "Which database?", link: "p3" });
+  expect(service.boards().w1).toMatchObject([
+    { id: "p3", state: "claimed", claimedBy: "a", link: "p1", blocked: "Which database?" },
+  ]);
 });
 
 test("the holder's claim clears the mark; an unblocked repeated claim changes nothing", async () => {

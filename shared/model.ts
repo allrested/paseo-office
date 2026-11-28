@@ -84,7 +84,7 @@ export interface OfficeModel {
   waitingOn: ReadonlyMap<string, number>;
   /** The owner's duty list; null until the host has sent it. */
   dutyList: readonly Duty[] | null;
-  /** The duty board's posts as the day's duties: today's, and the owed ones. */
+  /** The duty board's posts as the day's duties: today's, and the owed ones, each with its replies. */
   duties: DutyRow[];
   /** The office as the timeline saw it at a past moment, not as it is: a replay's model. */
   replayed?: true;

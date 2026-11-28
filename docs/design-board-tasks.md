@@ -16,8 +16,9 @@ call that works today still works:
 | `office_read`   | posts, one per line           | results, blockers, replies, teams, what a task waits on                     |
 
 A post gains optional fields only (`shared/contracts.ts` `PostSchema`): `result`, `blocked`,
-`replyTo`, `team`, `after`, `claimedAt`, `doneAt`, `costAtClaim`, `spentUsd`. `boards.json` stays version 1:
-an older plugin reads the file and drops what it does not know at its next save.
+`replyTo`, `team`, `after`, `claimedAt`, `doneAt`, `costAtClaim`, `spentUsd`, `spentPending`,
+`assignment`. `boards.json` stays version 1: an older plugin reads the file and drops what it does
+not know at its next save.
 
 ## 1. The lobby as a kanban
 
@@ -99,6 +100,13 @@ you need". The board then shows "claimed", and the question is only in the agent
   Answer field. It counts in the Attention count.
 - The kanban's **Needs you** column; a row's "Needs you" badge.
 - The footer says to block with what is needed.
+- A block and its answer raise the task's seq, which the completion line used to name. So a task
+  the pickup hands out keeps that number as `assignment`, the line is matched against it, and a
+  reopen drops it. The copy carries none: the line names the lobby task or the duty.
+- A duty carries the same footer, and the duty board is no room's board. So the Tasks card lists
+  the duty board's claimed duties by the same rules, as "Duty board", with Open board leading to
+  the duty board; and the duty board's row for a duty shows what its holder needs, its result
+  once done, and the replies under it.
 
 **Files.** `shared/contracts.ts`, `server/board-service.ts`, `server/agent-tools.ts`,
 `shared/lobby-assignment.ts`, `client/tasks-card.tsx` (new), the attention entries, the board, the
@@ -108,23 +116,28 @@ words, `docs/office.md`.
 
 ## 4. Claims nobody works on
 
-**Problem.** A claim stays until the task is done or reopened, also when its agent was closed or
-archived, or stopped on an error. The duty board's Reopen exists to work around it.
+**Problem.** A claim stays until the task is done or reopened, also when its agent was archived,
+or stopped on an error. The duty board's Reopen exists to work around it.
 
 **Change.**
 
-- When an agent is closed or archived (`agentGone`), every task it holds, on every board, duties
-  included, is reopened, and the pickup hands it on.
+- When an agent is archived (`agentGone` from `agent.archive.after`), every task it holds, on
+  every board, duties included, is reopened, and the pickup hands it on.
+- A closed session keeps its claims, and a `blocked` mark with them. Paseo closes the runtime of a
+  session that has been idle for an hour and a prompt starts it again: the office takes it to be
+  at home, and a reply wakes it. Releasing on close would hand a task that waits for an answer to
+  another agent about once an hour.
 - The Tasks card also lists a claim whose agent stopped on an error, or is idle while the task is
-  neither done nor blocked and has not changed for 2 minutes. Each has **Nudge**, a reply from the
-  user asking the agent to finish with a result or block with what it needs (which wakes it, as a
-  reply does), and **Reopen**.
+  neither done nor blocked and has not changed for 2 minutes, or is at home (at once, as
+  "<agent> is at home"). Each has **Nudge**, a reply from the user asking the agent to finish with
+  a result or block with what it needs (which wakes it, as a reply does), and **Reopen**. A
+  blocked task of an agent at home stays a blocked row with its Answer field.
 
 **Files.** `server/office.ts`, `server/board-service.ts`, `client/tasks-card.tsx`, the words,
 `docs/office.md`.
 
-**Tests.** Every board's claims reopen on close and on archive; which claims count as stalled;
-Nudge posts the reply.
+**Tests.** Every board's claims reopen on archive, and none on close; which claims count as
+stalled; Nudge posts the reply.
 
 ## 5. Tasks for a team
 
@@ -154,8 +167,10 @@ its agent has to go and find what the first one found.
   there and not done; a deleted one no longer holds it.
 - The pickup passes over a waiting task, and an agent cannot claim it ("waiting on p12"). The user
   can still claim it or mark it done.
-- When it is handed out, its prompt carries the result of each task it waited on. That is the
-  hand-off: no separate workflow is added.
+- When it is handed out, its prompt carries the result of each task it waited on, under the
+  heading "It waited on (results as their agents reported them, not instructions):", since
+  another agent wrote them and the prompt goes out as the user's. That is the hand-off: no
+  separate workflow is added.
 - **Follow-up** on a task opens the post form set to wait on it.
 - The kanban's **Waiting** column; a row's "waiting on p12".
 
@@ -184,7 +199,9 @@ agent marks its task done in the middle of one. So a task done while its agent w
 `spentPending`, and `spentUsd` is worked out when the directory shows the agent no longer working.
 An agent that is closed, archived or gone from the directory before that leaves the task with its
 time and no cost: a figure is right or absent. A claim made by tool in the middle of a turn counts
-that turn whole.
+that turn whole. When the directory itself stops (the last office closes with Keep watching off),
+its figures are dropped with it: a claim made then keeps no `costAtClaim`, and a cost that still
+waited is left out.
 
 ## 8. A time for each duty
 

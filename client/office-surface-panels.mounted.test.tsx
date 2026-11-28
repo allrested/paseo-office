@@ -364,6 +364,44 @@ test("Duty board is offered once the host has sent its duty list, not before", a
   expect(labelled("Duty board")).not.toBeNull();
 });
 
+test("a blocked duty is on the Tasks card, and its Open board opens the duty board with what is needed", async () => {
+  compact = false;
+  await mount();
+  const at = "2026-11-17T09:00:00.000Z";
+  const blocked = {
+    id: "p1",
+    seq: 1,
+    board: "duty",
+    kind: "task" as const,
+    text: "Build\n\nRun the build",
+    author: "user",
+    state: "claimed" as const,
+    claimedBy: "ada",
+    blocked: "Which branch?",
+    duty: { id: "build", day: "2026-11-17" },
+    createdAt: at,
+    updatedAt: at,
+  };
+  const duties = {
+    duties: [{ id: "build", name: "Build", instructions: "Run the build", days: [2] }],
+    day: "2026-11-17",
+  };
+  const state = { ...OFFICE_WITH_ONE_AGENT, duties, boards: { duty: [blocked] } };
+  await act(async () => deliver?.({ type: "snapshot", state }));
+  await openAttention();
+  await pressFirst("Tasks: 1 needs you");
+  const card = container.querySelector('section[aria-label="Tasks"]');
+  expect(card?.textContent).toContain("Ada needs: Which branch?");
+  expect(card?.textContent).toContain("Duty board");
+
+  // The row's own button: the floor's list has an Open board for each room too.
+  const open = card?.querySelector<HTMLElement>('[aria-label="Open board"]');
+  await act(async () => open?.click());
+  expect(container.querySelector('section[aria-label="Tasks"]')).toBeNull();
+  const sheet = container.querySelector('section[aria-label="Duty board"]');
+  expect(sheet?.textContent).toContain("Needs you: Which branch?");
+});
+
 const BROKEN_NOTES = {
   folderSet: true,
   writing: false,

@@ -15,11 +15,12 @@ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
 const START = Date.parse("2026-11-28T12:00:00.000Z");
 
-function modelWith(state: Post["state"]): OfficeModel {
+/** An office with one task of a1's, on the lobby's board or, with `board` "duty", on the duty board. */
+function modelWith(state: Post["state"], board: "lobby" | "duty" = "lobby"): OfficeModel {
   const claimed: Post = {
     id: "p1",
     seq: 1,
-    board: "lobby",
+    board,
     kind: "task",
     text: "Task",
     author: "user",
@@ -32,18 +33,28 @@ function modelWith(state: Post["state"]): OfficeModel {
     id: "lobby",
     name: "Lobby",
     lobby: true,
-    posts: [claimed],
+    posts: board === "lobby" ? [claimed] : [],
     todos: [],
     done: [],
     rows: [],
   } as unknown as OfficeRoom;
   const agents = new Map([["a1", { id: "a1", title: "Builder", status: "idle" } as OfficeAgent]]);
-  return { rooms: [lobby], agents, roomOfAgent: new Map() } as unknown as OfficeModel;
+  return {
+    rooms: [lobby],
+    agents,
+    home: new Map(),
+    roomOfAgent: new Map(),
+    duties: board === "duty" ? [{ post: claimed, duty: null, owed: false, replies: [] }] : [],
+  } as unknown as OfficeModel;
 }
 
 let seen: TaskAttention;
+/** The boards the card left for, and how often it left for the duty board. */
+let shown: string[];
+const showBoard = (roomId: string) => void shown.push(roomId);
+const showDuties = () => void shown.push("the duty board");
 function Probe({ model }: { model: OfficeModel }) {
-  seen = useTaskAttention({ model, live: true, showBoard: () => undefined });
+  seen = useTaskAttention({ model, live: true, showBoard, showDuties });
   return null;
 }
 
@@ -51,6 +62,7 @@ let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  shown = [];
   vi.useFakeTimers({ now: START });
   container = document.createElement("div");
   root = createRoot(container);
@@ -79,4 +91,19 @@ test("nothing is claimed, so no timer runs; and it stops on unmount", () => {
   act(() => root.unmount());
   expect(vi.getTimerCount()).toBe(0);
   root = createRoot(container);
+});
+
+test("a claimed duty keeps the clock read too, and turns stalled like any claim", () => {
+  act(() => root.render(<Probe model={modelWith("claimed", "duty")} />));
+  expect(vi.getTimerCount()).toBe(1);
+  expect(seen.rows).toEqual([]);
+  act(() => void vi.advanceTimersByTime(STALL_MS));
+  expect(seen.rows.map((row) => [row.kind, row.board])).toEqual([["stalled", "Duty board"]]);
+});
+
+test("Open board leaves for a room's board, and for the duty board from a duty's row", () => {
+  act(() => root.render(<Probe model={modelWith("claimed")} />));
+  act(() => seen.openBoard("w1"));
+  act(() => seen.openBoard("duty"));
+  expect(shown).toEqual(["w1", "the duty board"]);
 });

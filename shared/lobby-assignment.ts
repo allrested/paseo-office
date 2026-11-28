@@ -1,10 +1,14 @@
 import type { Post } from "./contracts.js";
 
-type Claim = Pick<Post, "id" | "seq">;
+type Claim = Pick<Post, "id" | "seq" | "assignment">;
 
-/** A session that opened before a plugin reload can report completion in its reply. */
+/**
+ * A session that opened before a plugin reload can report completion in its reply. The line names
+ * the assignment's number, which the post keeps while a block or an answer raises its seq; a claim
+ * from before the number was kept has its seq.
+ */
 export function completionLine(claim: Claim): string {
-  return `Completed office task ${claim.id} (assignment ${claim.seq}).`;
+  return `Completed office task ${claim.id} (assignment ${claim.assignment ?? claim.seq}).`;
 }
 
 function footerOf(claim: Claim, work: string): string {

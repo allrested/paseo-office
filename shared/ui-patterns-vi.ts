@@ -99,6 +99,7 @@ export const RULES: readonly Rule[] = [
   [/^(.+) is stuck in a loop$/, (name) => `${name} bị kẹt trong vòng lặp`],
   [/^(.+) stopped on an error$/, (name) => `${name} dừng vì lỗi`],
   [/^(.+) is idle$/, (name) => `${name} đang rảnh`],
+  [/^(.+) is at home$/, (name) => `${name} đang ở nhà`],
   [/^(.+) waits for your answer$/, (name) => `${name} chờ câu trả lời của bạn`],
   [/^Needs permission: (.+)$/, (what) => `Cần quyền: ${what}`],
   [/^Replay · (.+)$/, (rest) => `Xem lại · ${rest}`],

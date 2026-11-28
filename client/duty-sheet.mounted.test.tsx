@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-// The duty board's editor, mounted: today's duties with Mark done and Reopen, and the list with
-// its names, instructions and days, saved whole. The dialog, inputs and icons are the host's, so
-// plain stand-ins show what they were given.
+// The duty board's editor, mounted: today's duties with Mark done and Reopen, what a holder needs,
+// what came of a duty and the replies under it, and the list with its names, instructions and
+// days, saved whole. The dialog, inputs and icons are the host's, so plain stand-ins show what
+// they were given.
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
@@ -31,6 +32,11 @@ const THEME = { colors: new Proxy({}, { get: () => "#808080" }) } as unknown as 
 let saved: DutyDraft[][];
 let asked: string[];
 let refusal: Error | null;
+/** The replies posted under a duty, as "<duty's post> <text>". */
+let replied: string[];
+const BOARD = {
+  reply: async (task: Post, text: string) => void replied.push(`${task.id} ${text}`),
+};
 
 const ACTIONS: DutyActions = {
   save: async (duties) => {
@@ -76,6 +82,7 @@ function Harness({ list, posts }: { list: Duty[] | null; posts: Post[] }) {
       rows={dutyRows(list === null ? undefined : { duties: list, day: "2026-11-18" }, posts)}
       name={nameOf}
       actions={ACTIONS}
+      board={BOARD}
       styles={styles}
       onClose={NOTHING}
     />
@@ -88,6 +95,7 @@ let root: Root;
 beforeEach(() => {
   saved = [];
   asked = [];
+  replied = [];
   refusal = null;
   container = document.createElement("div");
   document.body.append(container);
@@ -155,6 +163,95 @@ test("a claimed duty can be reopened as well as marked done; an open one only ma
   await press("Reopen Build");
   await press("Mark Build done");
   expect(asked).toEqual(["reopen p2", "done p2"]);
+});
+
+/** Every line of text shown in today's row of the duty named `title`, in order. */
+function rowLines(title: string): string[] {
+  const row = [...container.querySelectorAll<HTMLElement>("div")].findLast((element) =>
+    [...element.children].some((child) => child.textContent === title),
+  )?.parentElement;
+  if (!row) throw new Error(`No row for "${title}"`);
+  return [...row.querySelectorAll("*")]
+    .filter((element) => element.childElementCount === 0 && element.textContent !== "")
+    .filter((element) => element.closest('[aria-hidden="true"]') === null)
+    .map((element) => element.textContent ?? "");
+}
+
+test("a blocked duty says what its holder needs, and Reply under it posts the answer", async () => {
+  await mount(LIST, [
+    post(1, "cups"),
+    post(2, "build", { state: "claimed", claimedBy: "a2", blocked: "Which branch?" }),
+    post(3, "build", {
+      kind: "note",
+      state: undefined,
+      duty: undefined,
+      replyTo: "p2",
+      author: "a2",
+      text: "It is not main",
+    }),
+  ]);
+  expect(rowLines("Build")).toEqual([
+    "Build",
+    "Builder has it",
+    "Needs you: Which branch?",
+    "Builder · It is not main",
+    "Reply",
+    "Reopen",
+    "Mark done",
+  ]);
+  await press("Reply");
+  await type("Write a reply", "release/2");
+  await press("Send");
+  expect(replied).toEqual(["p2 release/2"]);
+  // An open duty nobody has is answered by nobody: it has no thread.
+  expect(rowLines("Wash the cups")).toEqual([
+    "Wash the cups",
+    "Open: the 3D office acts it out",
+    "Mark done",
+  ]);
+});
+
+test("a done duty shows its result, what it took and the replies under it", async () => {
+  const long = "Line one\nLine two\nLine three\nLine four";
+  await mount(LIST, [
+    post(2, "build", {
+      state: "done",
+      claimedBy: "a2",
+      result: long,
+      claimedAt: "2026-11-18T09:00:00.000Z",
+      doneAt: "2026-11-18T09:23:00.000Z",
+      spentUsd: 0.42,
+    }),
+    post(4, "build", {
+      kind: "note",
+      state: undefined,
+      duty: undefined,
+      replyTo: "p2",
+      text: "Thanks",
+    }),
+  ]);
+  expect(rowLines("Build")).toEqual([
+    "Build",
+    "Done by Builder",
+    "Result",
+    "Line one\nLine two\nLine three…",
+    "More",
+    "took 23 min · $0.42",
+    "user · Thanks",
+    "Reopen",
+  ]);
+  await press("More");
+  expect(text()).toContain("Line four");
+  // A finished duty is not answered from here: only one an agent has takes a reply.
+  expect(container.querySelector('[aria-label="Reply"]')).toBeNull();
+});
+
+test("what a duty's holder needs is said in the interface's language", () => {
+  for (const language of ["id", "vi", "th"] as const) {
+    const said = translate(language, "Needs you: Which branch?");
+    expect(said, language).toContain("Which branch?");
+    expect(said, language).not.toContain("Needs you");
+  }
 });
 
 test("a day with nothing due says so", async () => {

@@ -1,4 +1,5 @@
 import type { ChecklistStep, OfficeAgent, Post, WakeState } from "../shared/contracts.js";
+import type { DutyRow } from "../shared/duties.js";
 import { LOBBY, USER_AUTHOR } from "../shared/names.js";
 import {
   agentTitle,
@@ -70,12 +71,16 @@ export function todoMeta(
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-/** The posts of every board: what a task that waits needs to find the tasks it waits on. */
-export function allPosts(rooms: readonly OfficeRoom[]): Post[] {
+/**
+ * The posts of every board: what a task that waits needs to find the tasks it waits on. The duty
+ * board is no room, so its duties are given apart: a task can wait on a duty too.
+ */
+export function allPosts(rooms: readonly OfficeRoom[], duties: readonly DutyRow[]): Post[] {
   const byId = new Map<string, Post>();
   for (const room of rooms) {
     for (const post of [...room.posts, ...room.todos, ...room.done]) byId.set(post.id, post);
   }
+  for (const { post } of duties) byId.set(post.id, post);
   return [...byId.values()];
 }
 
@@ -131,10 +136,14 @@ export function topLevel(posts: readonly Post[]): Post[] {
   return posts.filter((post) => post.replyTo === undefined);
 }
 
-/** The notes under a task, oldest first. */
+/**
+ * The notes under a task, oldest first. A reply to a room's copy of a lobby task is kept under
+ * the lobby task, so a copy's thread is that task's: `posts` are every board's (`allPosts`).
+ */
 export function repliesOf(task: Post, posts: readonly Post[]): Post[] {
+  const root = task.board !== LOBBY && task.link !== undefined ? task.link : task.id;
   return posts
-    .filter((post) => post.kind === "note" && post.replyTo === task.id)
+    .filter((post) => post.kind === "note" && post.replyTo === root)
     .sort((left, right) => left.seq - right.seq);
 }
 
