@@ -42,7 +42,15 @@ export interface PlanWatchPorts {
 export interface PlanWatch {
   /** Reads now and then every interval while on; stops reading when off. */
   keep(on: boolean): void;
+  /**
+   * The counted providers whose closest limit was used up in the last reading, while it is no
+   * older than `OUT_READING_MS`; none while watching is off.
+   */
+  outNow(): ReadonlySet<string>;
 }
+
+/** As the auto-start gate: a reading older than this says nothing of now. */
+export const OUT_READING_MS = 15 * 60_000;
 
 function levelOf(usedPct: number): 0 | 80 | 95 | 100 {
   if (usedPct >= PLAN_OUT_PCT) return 100;
@@ -56,6 +64,8 @@ function levelOf(usedPct: number): 0 | 80 | 95 | 100 {
  */
 export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
   const told = new Map<string, number>();
+  // The last reading's providers at Out, and when it was read; null while there is none.
+  let out: { providers: ReadonlySet<string>; at: number } | null = null;
   let on = false;
   let cancel: (() => void) | null = null;
   let failing = false;
@@ -63,15 +73,22 @@ export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
   let generation = 0;
 
   function observe(usage: readonly PlanUsage[]): void {
+    const crossings: PlanCrossing[] = [];
+    const used = new Set<string>();
     for (const provider of usage) {
       if (!ports.counted(provider.provider)) continue;
       const closest = closestLimit([provider]);
       if (closest === null) continue;
       const level = levelOf(closest.window.usedPct);
+      if (level === 100) used.add(provider.provider);
       const before = told.get(provider.provider) ?? 0;
       told.set(provider.provider, level);
-      if (level !== 0 && level > before) ports.raised({ provider, window: closest.window, level });
+      if (level !== 0 && level > before)
+        crossings.push({ provider, window: closest.window, level });
     }
+    // The whole reading is known before any crossing is told: two providers out at once see each other.
+    out = { providers: used, at: ports.timers.now() };
+    for (const crossing of crossings) ports.raised(crossing);
   }
 
   async function run(): Promise<void> {
@@ -109,7 +126,12 @@ export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
       generation += 1;
       cancel?.();
       cancel = null;
+      out = null;
       ports.observed?.(null);
+    },
+    outNow() {
+      if (out === null || ports.timers.now() - out.at > OUT_READING_MS) return new Set();
+      return new Set([...out.providers].filter((provider) => ports.counted(provider)));
     },
   };
 }

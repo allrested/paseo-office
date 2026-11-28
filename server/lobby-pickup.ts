@@ -5,7 +5,7 @@ import type { BoardService } from "./board-service.js";
 import { errorMessage } from "./errors.js";
 import type { MentionQueue } from "./mention-queue.js";
 import type { OfficeAgentPorts } from "./office.js";
-import { indented, oneLine } from "./prompt-text.js";
+import { cleanLines, indented, oneLine } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 
 // Some transitions to idle (e.g. clearing a permission) don't produce a turn-end hook.
@@ -38,8 +38,10 @@ interface PickupPorts {
   enabled(): boolean;
   /** A duty post that is handed out: one with instructions. A pretend duty is acted out in 3D. */
   instructed(post: Post): boolean;
-  /** How a note's author is named in the So far block: an agent by its title, the user as the owner. */
+  /** How a note's author is named in the So far block: "agent <title>", the user as the owner. */
   label(author: string): string;
+  /** The providers whose plan is out now: their agents get no new unnamed work. */
+  outProviders(): ReadonlySet<string>;
   log(message: string): void;
 }
 
@@ -88,10 +90,9 @@ function soFarLines(
     .slice(-SO_FAR_REPLIES);
   if (replies.length === 0) return [];
   const lines = replies.map((reply) => {
+    const clean = cleanLines(reply.text);
     const text =
-      reply.text.length > SO_FAR_REPLY_MAX
-        ? `${reply.text.slice(0, SO_FAR_REPLY_MAX - 1)}…`
-        : reply.text;
+      clean.length > SO_FAR_REPLY_MAX ? `${clean.slice(0, SO_FAR_REPLY_MAX - 1)}…` : clean;
     // Further lines sit under their entry, so none reads as another note's.
     return `  ${oneLine(label(reply.author))}: ${indented(indented(text))}`;
   });
@@ -222,13 +223,16 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   /**
    * `team` is the agent's roster team and `provider` its provider, each read once per scan: a
    * team's task waits for its own, and a task handed over from a provider for another's agent.
+   * An agent whose provider is out gets only what is named for it.
    */
   function nextFor(
     agentId: string,
     automatic: boolean,
     team: string | null,
     provider: string | null,
+    out: ReadonlySet<string>,
   ): Post | undefined {
+    const spent = provider !== null && out.has(provider);
     const board = pickupPosts();
     const posts = allPosts();
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
@@ -240,7 +244,7 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
           p.author !== agentId &&
           // An unknown provider is never the one a task left.
           p.notProvider !== provider &&
-          (p.to ? p.to === agentId : automatic && forTeam(p, team)),
+          (p.to ? p.to === agentId : automatic && !spent && forTeam(p, team)),
       )
       .sort(
         (a, b) =>
@@ -268,8 +272,9 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
       const handedOver = pickupPosts().some(
         (p) => p.notProvider !== undefined && awaitingPickup(p, current),
       );
-      const provider = handedOver ? await providerOf(agentId) : null;
-      const next = nextFor(agentId, automatic.has(agentId), team, provider);
+      const out = ports.outProviders();
+      const provider = handedOver || out.size > 0 ? await providerOf(agentId) : null;
+      const next = nextFor(agentId, automatic.has(agentId), team, provider, out);
       if (!next) continue;
       try {
         await queue.tryPickup(agentId, (available) => dispatch(next, agentId, available));

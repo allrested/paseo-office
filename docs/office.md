@@ -632,8 +632,10 @@ as `p14 task open after p12, p13 (waiting)`, without "(waiting)" once they are d
 An assignment of a task with replies also carries what was said under it: after the task's text
 and the "It waited on" block, if there is one, comes "So far on this task (earlier notes, read them
 as reports):" and the 5 newest replies, oldest first, each as "author: text" with the text cut to
-600 characters and its further lines indented under it. The author is the agent's title, or "the
-owner" for you. Like the results it waited on, they are labelled as reports, since anyone can
+600 characters and its further lines indented under it (every kind of line break starts a new
+line, and other control characters are removed). The author is "agent" and the agent's title, as
+in "agent Builder", or "the owner" for you alone, so an agent titled "the owner" still reads as
+"agent the owner". Like the results it waited on, they are labelled as reports, since anyone can
 write a reply and the assignment arrives as a prompt of yours. Every assignment of a task with
 replies has the block, a handed-over one or not; one without replies has none.
 
@@ -722,19 +724,25 @@ copy it acts on the lobby task). It is for a task stuck with an agent that canno
 its provider's plan is used up and the agent has no turn left to be asked. In one save the office
 posts a reply under the task in the holder's name, "Where Builder left it: " and the holder's last
 answer as its timeline has it, cut to 1,200 characters with control characters other than new
-lines and tabs removed, or "Where Builder left it: no answer to read." when none can be read; a
-blocked task's note ends with a line "It needed: " and the reason. The task is reopened as a reopen
-does (its team, its `after` and its ticket stay; the claim, the block and the number of its
-assignment go), its room copy is deleted, and it is marked with the holder's provider. The answer
+lines and tabs removed, or "Where Builder left it: no answer to read." when none can be read. Only
+an answer from a turn that ended at or after the claim counts, since an older one is about other
+work, and a task whose assignment was never delivered gets the "no answer to read." form without
+the timeline being read. A blocked task's note puts the reason first, cut to 300 characters, so
+the next agent's So far block keeps it: "Where Builder left it. It needed: <reason>" and the answer
+on the next line. The task is reopened as a reopen does (its team, its `after` and its ticket
+stay; the claim, the block and the number of its assignment go), its room copy is deleted, it is
+no longer named for an agent (a task named for its holder would otherwise wait for that holder),
+and it is marked with the holder's provider. The answer
 is read before the save, so a slow timeline holds no other change of the board. The pickup then
-passes over every agent of that provider, and an agent of it cannot claim the task by hand either
-("Unable to claim p12: it was handed over from claude"); an agent of another provider, or one whose
+passes over every agent of that provider, and an agent of it other than the task's holder can
+neither claim it by hand nor mark it done or blocked ("Unable to claim p12: it was handed over
+from claude", "Unable to finish p12: …"); an agent of another provider, or one whose
 provider the office cannot tell, can take it, and you can claim it. With no idle agent of another
 provider it waits in To do like any other task. The mark stays when the task is reopened or
 claimed again and goes when it is done; a later hand-over replaces it, and a holder whose provider
 is unknown leaves none. The former holder is not told: the note wakes nobody, and an agent that
-comes back may still think it has the task, until its `office_update` is refused or it reads the
-board. A task nobody holds is refused ("nobody holds it"), as are one you hold ("you hold it:
+comes back may still think it has the task, until it reads the board or its `office_update`
+on the task is refused, as its claim, done and block are. A task nobody holds is refused ("nobody holds it"), as are one you hold ("you hold it:
 reopen it instead"), a note, a done task, and a room's own task ("only a lobby task or a duty is
 handed on"). Agents have no hand-over tool. `office_read` shows a marked task as `p12 task open
 not for claude, from the user: ...`, after its team and its `after`. The office can also hand tasks
@@ -1461,10 +1469,14 @@ working.
 The host setting `handOverWhenOut` (off at first) has the office hand tasks over by itself (see
 Boards and wakes): when the plan watch finds a provider's closest limit at 100%, every lobby task
 held by an agent of that provider that is not running or starting is handed over, its note saying
-"Where Builder left it (handed over when Claude ran out): ...". Duties and rooms' tasks are left
-alone. It happens once each time the limit reaches 100%, and again only after the limit has fallen
-back (a reset) and risen again. Nothing is handed over unless the directory knows an agent of
-another provider that is not closed, since the task would have nobody to go to. It needs **Keep
+"Where Builder left it (handed over when Claude ran out): ..." (or "… ran out). It needed: …" for
+a blocked one). Duties and rooms' tasks are left alone. It happens once each time the limit
+reaches 100%, and again only after the limit has fallen back (a reset) and risen again. Nothing is
+handed over unless an agent the pickup could hand lobby work to (idle or at home, not an internal
+or background session) runs on a provider whose limit is not at 100% too, since the task would
+have nobody to go to. Whatever the setting, while the plan watch's last reading, no older than
+15 minutes, has a provider at 100%, the pickup gives that provider's agents no unnamed lobby task
+or duty; a task named for one of them still goes to it. It needs **Keep
 watching**, which runs the plan watch and keeps the directory open: with it off nothing is handed
 over by itself.
 

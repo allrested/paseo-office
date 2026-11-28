@@ -57,8 +57,11 @@ export interface OfficeAgentPorts {
   working(agentId: string): boolean;
   /** The provider id the agent runs on, the same for each of its agents; null when unknown. */
   providerOf(agentId: string): Promise<string | null>;
-  /** The last assistant text of the agent's timeline, as the chat reads a turn; null for none. */
-  lastAnswerOf(agentId: string): Promise<string | null>;
+  /**
+   * The last assistant text of the agent's timeline, as the chat reads a turn, from a turn that
+   * ended at or after `since` (ms); null for none.
+   */
+  lastAnswerOf(agentId: string, since: number): Promise<string | null>;
 }
 
 /** An agent as the directory last reported it, for a hand-over when a plan runs out. */
@@ -78,6 +81,8 @@ export interface OfficeDeps {
   log(message: string): void;
   /** After the boards are read, any board's change and a turn's end: the auto-start gate looks again. */
   onChange?(): void;
+  /** The providers the plan watch has at Out now, from a fresh reading; none when unknown. */
+  outProviders?(): ReadonlySet<string>;
 }
 
 export interface Office {
@@ -117,8 +122,9 @@ export interface Office {
    */
   handOver(id: string): Promise<PostResult>;
   /**
-   * A provider's plan ran out: each lobby task held by one of its agents not in a turn is handed
-   * over, if `agents` has an open agent of another provider to take it. Returns the ids.
+   * A provider's plan ran out: each lobby task held by one of its agents not in a turn (by the
+   * directory's `agents`) is handed over, if an agent the pickup could hand lobby work to runs on
+   * a provider that is not out. Returns the ids.
    */
   handOverOut(
     provider: { id: string; name: string },
@@ -229,10 +235,21 @@ export function createOffice(deps: OfficeDeps): Office {
     providerOf: (agentId) => deps.agents.providerOf(agentId),
   });
 
-  /** A read that fails is logged, and gives the note with no answer. */
-  async function lastAnswerOf(agentId: string): Promise<string | null> {
+  const outProviders = () => deps.outProviders?.() ?? new Set<string>();
+
+  /**
+   * The holder's answer about the task: none while its assignment was never delivered, nor from
+   * before its claim. A read that fails is logged, and gives the note with no answer.
+   */
+  async function lastAnswerOf(
+    agentId: string,
+    claimedAt: string | undefined,
+    delivered: boolean,
+  ): Promise<string | null> {
+    const since = Date.parse(claimedAt ?? "");
+    if (!delivered || Number.isNaN(since)) return null;
     try {
-      return await deps.agents.lastAnswerOf(agentId);
+      return await deps.agents.lastAnswerOf(agentId, since);
     } catch (error) {
       log(`[office] no last answer of ${agentId}: ${errorMessage(error)}`);
       return null;
@@ -248,6 +265,23 @@ export function createOffice(deps: OfficeDeps): Office {
     }
   }
 
+  /** Whether one of the pickup's candidates runs on a provider other than `spent` that is not out. */
+  async function anyTaker(spent: string): Promise<boolean> {
+    const out = outProviders();
+    let candidates: string[];
+    try {
+      candidates = await deps.agents.lobbyCandidates();
+    } catch (error) {
+      log(`[office] no lobby candidates: ${errorMessage(error)}`);
+      return false;
+    }
+    for (const candidate of candidates) {
+      const provider = await providerOf(candidate);
+      if (provider !== null && provider !== spent && !out.has(provider)) return true;
+    }
+    return false;
+  }
+
   /**
    * Reads the holder's answer and provider before the save, outside the board's queue: a slow
    * timeline holds no other change. The former holder is not told.
@@ -256,7 +290,7 @@ export function createOffice(deps: OfficeDeps): Office {
     const found = service.handOverHolder(id);
     if (!found.ok) return found;
     const [answer, provider] = await Promise.all([
-      lastAnswerOf(found.holder),
+      lastAnswerOf(found.holder, found.claimedAt, found.delivered),
       providerOf(found.holder),
     ]);
     return service.handOver({
@@ -362,7 +396,9 @@ export function createOffice(deps: OfficeDeps): Office {
         clock,
         enabled: () => pickupEnabled,
         instructed,
-        label: (author) => (author === USER_AUTHOR ? "the owner" : label(author)),
+        // Only the user is the owner: an agent titled so is still "agent the owner".
+        label: (author) => (author === USER_AUTHOR ? "the owner" : `agent ${label(author)}`),
+        outProviders,
         log,
       });
       pickup.refresh();
@@ -439,11 +475,9 @@ export function createOffice(deps: OfficeDeps): Office {
     },
     async handOverOut(provider, agents) {
       await ready;
-      // With nobody of another provider to take them, the tasks stay with their holders.
-      const elsewhere = agents.some(
-        (agent) => agent.provider !== provider.id && agent.status !== "closed",
-      );
-      if (!elsewhere) return [];
+      // With nobody to take them, the tasks stay with their holders: it takes an agent that could
+      // be handed lobby work, of a provider that is not out itself.
+      if (!(await anyTaker(provider.id))) return [];
       const idle = new Set(
         agents
           .filter(

@@ -425,7 +425,10 @@ export function createOfficePlugin(
   let autoStart: AutoStart | null = null;
   // Made once the office is: a board change can be a task from a ticket now done.
   let intake: Intake | null = null;
+  // The plan watch's providers at Out now; set once it is made, and none before.
+  let outProviders: () => ReadonlySet<string> = () => new Set();
   const office = createOffice({
+    outProviders: () => outProviders(),
     store: deps.store,
     clock: deps.clock,
     hub,
@@ -556,6 +559,7 @@ export function createOfficePlugin(
     timers: deps.clock,
     log,
   });
+  outProviders = () => planWatch.outNow();
   // Starts the lobby's oldest backlog task while the plan, the claims and the day's count allow.
   autoStart = createAutoStart({
     board: office,

@@ -243,3 +243,50 @@ describe("handing over when a plan runs out", () => {
     expect(closed.calls).toEqual([]);
   });
 });
+
+test("the providers out now are those counted at 100 in the last reading, while it is no older than 15 minutes", async () => {
+  const clock = createFakeClock();
+  let reading: PlanUsage[] | Error = [usage("claude", 100), usage("codex", 100), usage("pi", 50)];
+  let hidden = new Set<string>();
+  const seen: string[][] = [];
+  const holder: { watch: ReturnType<typeof createPlanWatch> | null } = { watch: null };
+  const outNow = () => [...(holder.watch?.outNow() ?? [])].sort();
+  const watch = createPlanWatch({
+    async read() {
+      if (reading instanceof Error) throw reading;
+      return reading;
+    },
+    counted: (provider) => !hidden.has(provider),
+    // Both reach Out in one reading: at the first raise the second is out too.
+    raised: () => seen.push(outNow()),
+    timers: clock,
+    log: () => undefined,
+  });
+  holder.watch = watch;
+  expect(outNow()).toEqual([]);
+  watch.keep(true);
+  await settle();
+  expect(seen[0]).toEqual(["claude", "codex"]);
+  hidden = new Set(["codex"]);
+  expect(outNow()).toEqual(["claude"]);
+  watch.keep(false);
+  expect(outNow()).toEqual([]);
+  reading = [usage("claude", 100)];
+  watch.keep(true);
+  await settle();
+  expect(outNow()).toEqual(["claude"]);
+  // A reading that no longer says so: Claude is not known to be out.
+  reading = [usage("claude", 20)];
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(outNow()).toEqual([]);
+  reading = [usage("claude", 100)];
+  clock.advance(PLAN_WATCH_MS);
+  await settle();
+  expect(outNow()).toEqual(["claude"]);
+  // The reads fail from now on: the last reading grows old.
+  reading = new Error("down");
+  clock.advance(PLAN_WATCH_MS * 4);
+  await settle();
+  expect(outNow()).toEqual([]);
+});

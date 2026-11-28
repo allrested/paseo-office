@@ -567,14 +567,26 @@ test("an agent's provider is the daemon's, and its last answer the newest assist
   const { ports } = setup();
   expect(await ports.providerOf("nobody")).toBeNull();
   let options: unknown = null;
-  const entries = [
-    { turnId: "t0", item: { type: "assistant_message", text: "Earlier." } },
-    { turnId: "t1", item: { type: "user_message", text: "Go on" } },
-    { turnId: "t1", item: { type: "assistant_message", text: "Halfway: " } },
-    { turnId: "t1", item: { type: "assistant_message", text: "the tests pass." } },
+  const at = (time: string) => `2026-11-11T${time}:00.000Z`;
+  const entries: { turnId: string; timestamp?: string; item: { type: string; text: string } }[] = [
+    { turnId: "t0", timestamp: at("08:00"), item: { type: "assistant_message", text: "Earlier." } },
+    { turnId: "t1", timestamp: at("08:20"), item: { type: "user_message", text: "Go on" } },
+    {
+      turnId: "t1",
+      timestamp: at("08:40"),
+      item: { type: "assistant_message", text: "Halfway: " },
+    },
+    {
+      turnId: "t1",
+      timestamp: at("08:41"),
+      item: { type: "assistant_message", text: "the tests pass." },
+    },
     // The turn the plan ran out in has no answer: the one before it is the last.
-    { turnId: "t2", item: { type: "user_message", text: "And now?" } },
+    { turnId: "t2", timestamp: at("08:50"), item: { type: "user_message", text: "And now?" } },
+    // An entry with no time cannot be placed after the claim, so it is not read.
+    { turnId: "t3", item: { type: "assistant_message", text: "Timeless." } },
   ];
+  const since = (time: string) => Date.parse(at(time));
   const paseo = {
     agents: {
       ref: () => ({
@@ -596,9 +608,9 @@ test("an agent's provider is the daemon's, and its last answer the newest assist
   };
   const live = liveAgentPorts(holder);
   expect(await live.providerOf("a")).toBe("codex");
-  expect(await live.lastAnswerOf("a")).toBe("Halfway: the tests pass.");
+  // A turn that started before the claim and ended after it is read whole.
+  expect(await live.lastAnswerOf("a", since("08:30"))).toBe("Halfway: the tests pass.");
   expect(options).toMatchObject({ direction: "tail", wholeTurns: true });
-  entries.length = 1;
-  entries[0] = { turnId: "t0", item: { type: "user_message", text: "Hi" } };
-  expect(await live.lastAnswerOf("a")).toBeNull();
+  // Nothing ended after the claim: the answer before it is not this task's.
+  expect(await live.lastAnswerOf("a", since("08:45"))).toBeNull();
 });

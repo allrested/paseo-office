@@ -20,6 +20,7 @@ import {
 import { dutyPostText } from "../shared/duties.js";
 import type { BoardStore, BoardsFile } from "./board-store.js";
 import { errorMessage } from "./errors.js";
+import { cleanLines } from "./prompt-text.js";
 import type { Clock } from "./timers.js";
 
 export interface NewPost {
@@ -85,6 +86,20 @@ export interface BoardServicePorts {
 
 /** A hand-over note's answer: the holder's last words, never a whole transcript. */
 export const HAND_OVER_ANSWER_MAX = 1_200;
+/** A hand-over note's block reason, which comes first, so the So far block's cut keeps it. */
+export const HAND_OVER_REASON_MAX = 300;
+
+/** Who holds a task that can be handed over, and what says whether its answer is the task's. */
+export type HandOverHolder =
+  | {
+      ok: true;
+      holder: string;
+      /** When the holder took it; an answer from before then is not about the task. */
+      claimedAt?: string;
+      /** False while its assignment waits for delivery: the holder has not seen it. */
+      delivered: boolean;
+    }
+  | { ok: false; error: string };
 
 /** What a hand-over saves, read before it: reading the holder's answer never holds the queue. */
 export interface HandOver {
@@ -122,7 +137,7 @@ export interface BoardService {
   post(input: NewPost): Promise<PostResult>;
   update(input: PostUpdate): Promise<PostResult>;
   /** The agent holding a task that can be handed over, or why it cannot be. */
-  handOverHolder(id: string): { ok: true; holder: string } | { ok: false; error: string };
+  handOverHolder(id: string): HandOverHolder;
   /**
    * In one save: the holder's note under the task, the task reopened marked with its provider, and
    * its copy deleted. The result is the reopened task (the lobby task when called on its copy).
@@ -567,15 +582,22 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return (await providerOf(agentId)) !== task.notProvider;
   }
 
-  /** An agent's claim of a task handed over from its own provider; the user takes any. */
+  /**
+   * An agent's claim, finish or block of a task handed over from its own provider: the former
+   * holder coming back must not close what another agent now holds. The holder is never refused,
+   * and the user takes any.
+   */
   async function providerRefusal(input: PostUpdate): Promise<PostResult | null> {
-    if (input.action !== "claim" || input.actor === USER_AUTHOR) return null;
+    if (input.action === "reopen" || input.actor === USER_AUTHOR) return null;
     const post = data.posts.find((item) => item.id === input.id);
-    if (post?.kind !== "task" || post.state !== "open" || post.claimedBy !== undefined) return null;
-    if (post.notProvider === undefined || (await providerFits(post, input.actor))) return null;
+    if (post?.kind !== "task" || post.claimedBy === input.actor) return null;
+    // A copy stands for its lobby task, which carries the mark.
+    const partner = partnerOf(post);
+    const task = partner?.board === LOBBY ? partner : post;
+    if (task.notProvider === undefined || (await providerFits(task, input.actor))) return null;
     return {
       ok: false,
-      error: `Unable to claim ${post.id}: it was handed over from ${post.notProvider}`,
+      error: `Unable to ${VERBS[input.action]} ${post.id}: it was handed over from ${task.notProvider}`,
     };
   }
 
@@ -850,15 +872,18 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
   /** Where the holder left the task, as its note says: its answer, cleaned and cut, and its block. */
   function handOverText(task: Post, input: HandOver): string {
     // Control characters could move a terminal's cursor or forge a line; a newline and a tab stay.
-    const answer = (input.answer ?? "").replace(/(?![\t\n])\p{Cc}/gu, "").trim();
-    const cut =
-      answer.length > HAND_OVER_ANSWER_MAX
-        ? `${answer.slice(0, HAND_OVER_ANSWER_MAX - 1)}…`
-        : answer;
+    const cut = (text: string, max: number) =>
+      text.length > max ? `${text.slice(0, max - 1)}…` : text;
+    const answer = cut(cleanLines(input.answer ?? "").trim(), HAND_OVER_ANSWER_MAX);
     const how = input.outOf === undefined ? "" : ` (handed over when ${input.outOf} ran out)`;
-    const words = cut === "" ? "no answer to read." : cut;
-    const needed = task.blocked === undefined ? "" : `\nIt needed: ${task.blocked}`;
-    const text = `Where ${ports.label(input.holder)} left it${how}: ${words}${needed}`;
+    const words = answer === "" ? "no answer to read." : answer;
+    const head = `Where ${ports.label(input.holder)} left it${how}`;
+    // The reason first: the next agent's prompt cuts each note, and the answer can be long.
+    const reason = cleanLines(task.blocked ?? "").trim();
+    const text =
+      reason === ""
+        ? `${head}: ${words}`
+        : `${head}. It needed: ${cut(reason, HAND_OVER_REASON_MAX)}\n${words}`;
     return text.length > POST_TEXT_MAX ? `${text.slice(0, POST_TEXT_MAX - 1)}…` : text;
   }
 
@@ -886,6 +911,9 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const reopened: Post = { ...withoutClaim(task), state: "open", seq: seq++, updatedAt: stamp };
     if (input.provider === null) delete reopened.notProvider;
     else reopened.notProvider = input.provider;
+    // Named for the holder it would wait for that holder: it is free for anyone of another provider.
+    delete reopened.to;
+    delete reopened.namedPickup;
     const partner = partnerOf(task);
     // Make room as a reply does: the task and its replies stay.
     const held = postsOf(task.board).filter(
@@ -1154,7 +1182,14 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       ),
     handOverHolder(id) {
       const found = handOverTask(id);
-      return found.ok ? { ok: true, holder: found.value.claimedBy } : found;
+      if (!found.ok) return found;
+      const { claimedBy, claimedAt, pickupMessageId } = found.value;
+      return {
+        ok: true,
+        holder: claimedBy,
+        ...(claimedAt === undefined ? {} : { claimedAt }),
+        delivered: !pickupMessageId,
+      };
     },
     handOver: (input) => exclusive(() => handOverPost(input)),
     startTask: (id) =>

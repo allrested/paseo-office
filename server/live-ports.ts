@@ -186,13 +186,26 @@ export function liveAgentPorts(
       const result = await refresh(agentId);
       return result?.agent.provider || null;
     },
-    async lastAnswerOf(agentId) {
+    async lastAnswerOf(agentId, since) {
       const page = await holder
         .require()
         .agents.ref(agentId)
         .timeline.refetch({ direction: "tail", limit: LAST_ANSWER_TAIL_LIMIT, wholeTurns: true });
       if (page.error) throw new Error(page.error);
-      return lastAssistantText(page.entries.map((entry) => entry.item));
+      // An entry with no time cannot be placed after the claim. A turn counts by when it ended.
+      const timed = page.entries.flatMap((entry) => {
+        const at = Date.parse(entry.timestamp ?? "");
+        return Number.isNaN(at) ? [] : [{ entry, at }];
+      });
+      const ended = new Map<string, number>();
+      for (const { entry, at } of timed) {
+        const turn = entry.turnId ?? `@${at}`;
+        ended.set(turn, Math.max(ended.get(turn) ?? at, at));
+      }
+      const recent = timed.filter(
+        ({ entry, at }) => (ended.get(entry.turnId ?? `@${at}`) ?? at) >= since,
+      );
+      return lastAssistantText(recent.map(({ entry }) => entry.item));
     },
   };
 }
