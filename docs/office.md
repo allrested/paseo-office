@@ -670,7 +670,9 @@ as in "1 needs you · 1 stalled · 2 merged". The row says "<agent>'s pull reque
 the pull request's number and title when the office has them ("#42 Fix the ledger total"), and has
 **Mark done** and **Open board**, and no Answer field. **Mark done** is the same action as on the
 board. The office never marks a task done by itself, since one workspace can hold several tasks
-and a merged pull request does not say which of them it finished; the row only asks.
+and a merged pull request does not say which of them it finished; the row only asks. The workspace
+says that its pull request is merged and not when, so a task claimed after the merge, by an agent
+of a workspace whose pull request was already merged, is listed as merged at once.
 
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
 form a room's board lists the room's agents: each one's name, what it is at, and the unfinished
