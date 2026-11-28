@@ -47,10 +47,15 @@ export const PostInputSchema = z.object({
   text: z.string().min(1).max(POST_TEXT_MAX),
   to: z.string().min(1).optional(),
   board: BoardChoiceSchema.optional(),
+  replyTo: z.string().min(1).optional(),
 });
 export type PostInput = z.output<typeof PostInputSchema>;
 
-export const UpdateInputSchema = z.object({ id: z.string().min(1), action: UpdateActionSchema });
+export const UpdateInputSchema = z.object({
+  id: z.string().min(1),
+  action: UpdateActionSchema,
+  note: z.string().min(1).max(POST_TEXT_MAX).optional(),
+});
 export type UpdateInput = z.output<typeof UpdateInputSchema>;
 
 /** "room" is the caller's workspace board; without a workspace it is the lobby. */
@@ -69,7 +74,9 @@ export function postLine(post: Post, label: (author: string) => string): string 
   const claim = post.claimedBy ? ` by ${name(post.claimedBy)}` : "";
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${link}, from ${name(post.author)}${to}: ${indented(post.text)}`;
+  const re = post.replyTo ? ` re ${post.replyTo}` : "";
+  const result = post.result ? `\n  result: ${indented(post.result)}` : "";
+  return `${post.id} ${post.kind}${state}${claim}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${result}`;
 }
 
 export function readText(
@@ -98,7 +105,11 @@ export async function runPost(
   input: PostInput,
 ): Promise<AgentToolResult> {
   ports.seen(agent);
-  const to = input.to === undefined ? undefined : await ports.resolveAgent(input.to);
+  // A reply is addressed by the service: its root task's holder, not a `to` of the caller's.
+  const to =
+    input.to === undefined || input.replyTo !== undefined
+      ? undefined
+      : await ports.resolveAgent(input.to);
   if (to === null) return { text: `Unable to post: no agent ${input.to}`, isError: true };
   const result = await ports.service.post({
     board: boardFor(agent, input.board),
@@ -106,6 +117,7 @@ export async function runPost(
     text: input.text,
     author: agent.id,
     ...(to === undefined ? {} : { to }),
+    ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
   });
   if (!result.ok) return { text: result.error, isError: true };
   ports.mentioned(result.post);
@@ -114,7 +126,11 @@ export async function runPost(
     target !== undefined && target !== agent.id
       ? ` ${oneLine(ports.label(target))} gets it as a prompt when idle and wakes are on.`
       : "";
-  return { text: `Posted ${result.post.id}.${wake}`, structuredContent: { id: result.post.id } };
+  const under = result.post.replyTo === undefined ? "" : ` under ${result.post.replyTo}`;
+  return {
+    text: `Posted ${result.post.id}${under}.${wake}`,
+    structuredContent: { id: result.post.id },
+  };
 }
 
 export async function runUpdate(
@@ -127,6 +143,7 @@ export async function runUpdate(
     id: input.id,
     action: input.action,
     actor: agent.id,
+    ...(input.note === undefined ? {} : { note: input.note }),
   });
   if (!result.ok) return { text: result.error, isError: true };
   return { text: postLine(result.post, ports.label) };
@@ -144,14 +161,14 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_post",
       description:
-        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post.",
+        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply.",
       input: PostInputSchema,
       execute: (input, { agent }) => runPost(ports, agent, input),
     }),
     defineAgentTool({
       name: "office_update",
       description:
-        "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id.",
+        "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note.",
       input: UpdateInputSchema,
       execute: (input, { agent }) => runUpdate(ports, agent, input),
     }),

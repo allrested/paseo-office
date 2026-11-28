@@ -469,7 +469,7 @@ test("an instructed duty goes to an idle agent as a lobby task does; a pretend o
       "  Build",
       "  ",
       "  Run the build",
-      'Work on this task. When it is complete, use office_update with id "p2" and action "done". If you need input, leave it claimed and explain what you need.',
+      'Work on this task. When it is complete, use office_update with id "p2", action "done" and a short result in note. If you need input, leave it claimed and explain what you need.',
       "If the tool is unavailable and you have finished, put this exact line at the end of your reply: Completed office task p2 (assignment 3).",
     ].join("\n"),
   ]);
