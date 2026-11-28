@@ -4,6 +4,7 @@ import {
   JIRA_KEY,
   officeDeviceSettings,
   officeHostSettings,
+  officeBoardsSettings,
   officeLanguageSettings,
   parseKeys,
   SENTRY_SLUG,
@@ -313,6 +314,18 @@ test("the language choice is a separate device document with Automatic as its de
   for (const choice of ["auto", "en", "vi", "th", "id"])
     expect(setting.schema.parse({ choice })).toEqual({ choice });
   for (const choice of ["fr", 1]) expect(setting.schema.safeParse({ choice }).success).toBe(false);
+});
+
+test("the boards' layouts are a separate device document: the lobby a kanban, the rooms a list", () => {
+  const setting = officeBoardsSettings;
+  expect(setting.id).toBe("office-boards");
+  expect(setting.scope).toBe("device");
+  expect(setting.schema.parse({})).toEqual({ lobby: "kanban", rooms: "list" });
+  expect(setting.schema.parse({ lobby: "list", rooms: "kanban" })).toEqual({
+    lobby: "list",
+    rooms: "kanban",
+  });
+  expect(setting.schema.safeParse({ lobby: "grid" }).success).toBe(false);
 });
 
 test("the street is optional and preserves either explicit device choice", () => {

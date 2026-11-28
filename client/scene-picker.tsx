@@ -2,14 +2,22 @@ import { useCallback, useMemo } from "react";
 import { Image, Pressable, StyleSheet, View, type PressableStateCallbackType } from "react-native";
 import { Text } from "./text.js";
 import { Icon } from "@getpaseo/plugin/client/ui";
-import { OFFICE_GRAPHICS, OFFICE_LIGHTING, OFFICE_SCENES } from "../shared/settings.js";
+import {
+  BOARD_LAYOUTS,
+  OFFICE_GRAPHICS,
+  OFFICE_LIGHTING,
+  OFFICE_SCENES,
+} from "../shared/settings.js";
 import type { OfficeStyles } from "./styles.js";
 import type { useOfficeScene } from "./use-street.js";
+import type { useBoardLayoutChoices } from "./use-board-layouts.js";
 import { scenePreviews } from "./scene-previews.js";
 
 const scenes = { plain: "Plain", city: "City", countryside: "Countryside", beach: "Beach" };
 const lighting = { auto: "App theme", day: "Day", night: "Night" };
 const graphics = { auto: "Auto", low: "Low", medium: "Medium", high: "High" };
+const boardLayouts = { kanban: "Kanban", list: "List" };
+const ROOM_ORDER = ["list", "kanban"] as const;
 const lightIcons = { auto: "Monitor", day: "Sun", night: "Moon" };
 const layout = StyleSheet.create({
   body: { gap: 20 },
@@ -166,6 +174,41 @@ export function SceneChoices({
           30 frames a second.
         </Text>
       </View>
+    </View>
+  );
+}
+
+export function BoardChoices({
+  choice,
+  styles,
+}: {
+  choice: ReturnType<typeof useBoardLayoutChoices>;
+  styles: OfficeStyles;
+}) {
+  return (
+    <View style={layout.body}>
+      <Text style={styles.sheetLabel}>Boards</Text>
+      {(
+        [
+          ["Lobby board", choice.lobby, BOARD_LAYOUTS],
+          ["Room boards", choice.rooms, ROOM_ORDER],
+        ] as const
+      ).map(([name, setting, values]) => (
+        <View key={name} style={layout.section}>
+          <Text style={styles.fieldHint}>{name}</Text>
+          <View role="group" aria-label={name} style={layout.row}>
+            {values.map((value) => (
+              <Choice
+                key={value}
+                value={value}
+                label={boardLayouts[value]}
+                setting={setting}
+                styles={styles}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }

@@ -38,6 +38,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   Back: "Quay lại",
   "Back to Lobby board": "Quay lại bảng Sảnh",
   Board: "Bảng",
+  Boards: "Bảng",
   "Brand color": "Màu thương hiệu",
   "Busiest team": "Nhóm bận nhất",
   CPU: "CPU",
@@ -120,6 +121,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Jira projects": "Dự án Jira",
   Keep: "Giữ",
   "Jump to latest": "Tới tin mới nhất",
+  Kanban: "Bảng Kanban",
   "Keep planning": "Tiếp tục lập kế hoạch",
   "Keep watching": "Tiếp tục theo dõi",
   "Keeping...": "Đang giữ...",
@@ -127,6 +129,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Left running": "Còn đang chạy",
   Library: "Thư viện",
   Lighting: "Ánh sáng",
+  List: "Danh sách",
   "Loading...": "Đang tải...",
   "Lobby board": "Bảng sảnh",
   "Log group names, comma separated. Lines that match the pattern ring once an hour for each group.":
@@ -202,6 +205,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   Retry: "Thử lại",
   "Retrying...": "Đang thử lại...",
   Reviews: "Đánh giá",
+  "Room boards": "Bảng phòng",
   "Running services and listeners": "Dịch vụ và listener đang chạy",
   SSH: "SSH",
   "Said again to an agent whose conversation is compacted during a turn, so a rule you gave it is not lost. Empty says nothing.":

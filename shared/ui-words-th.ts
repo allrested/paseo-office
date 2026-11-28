@@ -38,6 +38,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   Back: "กลับ",
   "Back to Lobby board": "กลับไปบอร์ดล็อบบี้",
   Board: "บอร์ด",
+  Boards: "บอร์ด",
   "Brand color": "สีแบรนด์",
   "Busiest team": "ทีมที่ยุ่งที่สุด",
   CPU: "CPU",
@@ -116,6 +117,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Jira projects": "โปรเจกต์ Jira",
   Keep: "เก็บไว้",
   "Jump to latest": "ไปที่ข้อความล่าสุด",
+  Kanban: "คัมบัง",
   "Keep planning": "วางแผนต่อ",
   "Keep watching": "เฝ้าดูต่อ",
   "Keeping...": "กำลังเก็บไว้...",
@@ -123,6 +125,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Left running": "ยังทำงานค้างอยู่",
   Library: "ห้องสมุด",
   Lighting: "แสงสว่าง",
+  List: "รายการ",
   "Loading...": "กำลังโหลด...",
   "Lobby board": "บอร์ดล็อบบี้",
   "Log group names, comma separated. Lines that match the pattern ring once an hour for each group.":
@@ -198,6 +201,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   Retry: "ลองอีกครั้ง",
   "Retrying...": "กำลังลองอีกครั้ง...",
   Reviews: "การรีวิว",
+  "Room boards": "บอร์ดห้อง",
   "Running services and listeners": "บริการและ listener ที่กำลังทำงาน",
   SSH: "SSH",
   "Said again to an agent whose conversation is compacted during a turn, so a rule you gave it is not lost. Empty says nothing.":
