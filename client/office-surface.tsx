@@ -91,6 +91,7 @@ import { useReplyDrafts } from "./use-reply-drafts.js";
 import { OfficeWorkspace, type WorkspaceSelection } from "./workspace-office-tools.js";
 import { OfficeCardsDialog, type OfficeCard } from "./office-cards.js";
 import { OfficeDialogs } from "./office-modal.js";
+import { useBoardLayoutChoices } from "./use-board-layouts.js";
 import { FullscreenSettings, useOfficeSettingsDialog } from "./office-settings.js";
 import { OfficeColumn, type ColumnBadges, type ColumnSession } from "./office-column.js";
 import { EMPTY_CHOICE, type NewAgentChoice } from "./new-agent-model.js";
@@ -2003,6 +2004,7 @@ export function OfficeSurface(
   const readNotes = useRpc(notesReadRpc);
   const notesTimeZone = useNotesTimeZone();
   const viewChoice = useViewChoice(layout.platform);
+  const boardChoices = useBoardLayoutChoices();
   const settings = useOfficeSettingsDialog(
     full.integrated || viewChoice.choice === "3d",
     onOpenSettings,
@@ -2538,6 +2540,7 @@ export function OfficeSurface(
         view={viewChoice}
         street={street}
         sound={sound}
+        boards={boardChoices}
       />
     </View>
   );

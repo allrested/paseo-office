@@ -38,6 +38,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   Back: "Kembali",
   "Back to Lobby board": "Kembali ke papan Lobi",
   Board: "Papan",
+  Boards: "Papan",
   "Brand color": "Warna merek",
   "Busiest team": "Tim tersibuk",
   CPU: "CPU",
@@ -80,6 +81,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Dismiss tip": "Tutup tips",
   "Dismissing...": "Mengabaikan...",
   "Dismissing…": "Mengabaikan…",
+  Done: "Selesai",
   "Display name. Leave blank to use the host default.":
     "Nama tampilan. Kosongkan untuk memakai bawaan host.",
   "Duty board": "Papan piket",
@@ -120,6 +122,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Jira projects": "Proyek Jira",
   Keep: "Pertahankan",
   "Jump to latest": "Ke pesan terbaru",
+  Kanban: "Papan Kanban",
   "Keep planning": "Lanjut merencanakan",
   "Keep watching": "Tetap memantau",
   "Keeping...": "Mempertahankan...",
@@ -127,6 +130,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Left running": "Masih berjalan",
   Library: "Perpustakaan",
   Lighting: "Pencahayaan",
+  List: "Daftar",
   "Loading...": "Memuat...",
   "Lobby board": "Papan lobi",
   "Log group names, comma separated. Lines that match the pattern ring once an hour for each group.":
@@ -202,6 +206,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   Retry: "Coba lagi",
   "Retrying...": "Mencoba lagi...",
   Reviews: "Tinjauan",
+  "Room boards": "Papan ruangan",
   "Running services and listeners": "Layanan dan listener yang berjalan",
   SSH: "SSH",
   "Said again to an agent whose conversation is compacted during a turn, so a rule you gave it is not lost. Empty says nothing.":
@@ -389,6 +394,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
     "Sesi menerima pesan Anda dan membalas di sini.",
   "This browser couldn’t display the workspace.": "Peramban ini tidak dapat menampilkan workspace.",
   "This host reports no plan limits.": "Host ini tidak melaporkan batas paket.",
+  "To do": "Akan dikerjakan",
   "To switch accounts, use the account-switcher plugin. The office reads the limits and handles no sign-in.":
     "Untuk berganti akun, pakai plugin account-switcher. Kantor membaca batasnya dan tidak menangani login.",
   "To-do": "Tugas",
@@ -502,6 +508,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Host details could not be read. Try refreshing.":
     "Detail host tidak dapat dibaca. Coba segarkan.",
   "Host resources": "Sumber daya host",
+  "In progress": "Sedang dikerjakan",
   "In the teams' workspaces": "Di workspace tim",
   "In this mode the writer runs any tool or command without asking.":
     "Dalam mode ini penulis menjalankan alat atau perintah apa pun tanpa bertanya.",
@@ -706,6 +713,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Using a skill": "Memakai skill",
   "Using a tool": "Memakai alat",
   "Waited for you": "Menunggu Anda",
+  Waiting: "Menunggu",
   "Waiting for a review": "Menunggu tinjauan",
   "Waiting for the first answer.": "Menunggu jawaban pertama.",
   "Waiting for your answer": "Menunggu jawaban Anda",

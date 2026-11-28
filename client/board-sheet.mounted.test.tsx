@@ -2,7 +2,9 @@
  * @vitest-environment jsdom
  */
 // A board's sheet, mounted: its form, the page that chooses who a post wakes, the room's agents
-// and what is posted; on the lobby, the to-do list and the agents at work in every room.
+// and what is posted; on the lobby, the to-do list and the agents at work in every room. Each
+// board is a list or a kanban as the device's setting says; the tests are on the list unless
+// they say otherwise.
 // The sheet, the inputs and the icon are the host's, so plain stand-ins show what they were given.
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -11,6 +13,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import { BoardSheet } from "./board-sheet.js";
 import { buildOfficeModel, type AgentTaskGroup, type OfficeRoom } from "../shared/model.js";
+import type { BoardLayout } from "../shared/settings.js";
+import { OfficeDialogs } from "./office-modal.js";
 import { useOfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
@@ -18,7 +22,12 @@ import type { BoardActions } from "./use-board-actions.js";
 let dismiss: () => void = () => undefined;
 
 const rename = vi.hoisted(() => vi.fn(async (_input: object) => ({ ok: true as const })));
-vi.mock("@getpaseo/plugin/client", () => ({ useRpc: () => rename }));
+/** What the device holds of the boards' layouts. */
+const layoutSetting = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+vi.mock("@getpaseo/plugin/client", () => ({
+  useRpc: () => rename,
+  useSettings: () => layoutSetting.current,
+}));
 vi.mock("@getpaseo/plugin/client/ui", async () => {
   const { ScrollView, TextInput } = await import("react-native");
   const Modal = (props: {
@@ -166,6 +175,8 @@ interface HarnessProps {
   wakesPaused?: boolean;
   /** The board was opened from the lobby's. */
   fromLobby?: boolean;
+  /** In fullscreen: the office's own dialog, not the host's sheet. */
+  fullscreen?: boolean;
 }
 
 function Harness({
@@ -176,30 +187,39 @@ function Harness({
   sheetLeavesFirst = false,
   wakesPaused = false,
   fromLobby = false,
+  fullscreen = false,
 }: HarnessProps) {
   const styles = useOfficeStyles(THEME, compact, false);
   return (
-    <BoardSheet
-      room={rooms.find((room) => room.id === roomId) ?? null}
-      rooms={rooms}
-      agentTasks={agentTasks}
-      name={nameOf}
-      actions={ACTIONS}
-      wakesPaused={wakesPaused}
-      sheetLeavesFirst={sheetLeavesFirst}
-      styles={styles}
-      onSelectAgent={onSelectAgent}
-      onOpenBoard={onOpenBoard}
-      onBack={fromLobby ? onBack : undefined}
-      onClose={onClose}
-    />
+    <OfficeDialogs fullscreen={fullscreen} theme={THEME} styles={styles}>
+      <BoardSheet
+        room={rooms.find((room) => room.id === roomId) ?? null}
+        rooms={rooms}
+        agentTasks={agentTasks}
+        name={nameOf}
+        actions={ACTIONS}
+        wakesPaused={wakesPaused}
+        sheetLeavesFirst={sheetLeavesFirst}
+        styles={styles}
+        onSelectAgent={onSelectAgent}
+        onOpenBoard={onOpenBoard}
+        onBack={fromLobby ? onBack : undefined}
+        onClose={onClose}
+      />
+    </OfficeDialogs>
   );
 }
 
 let container: HTMLElement;
 let root: Root;
 
+/** The device's boards are laid out so. */
+function layouts(lobby: BoardLayout, rooms: BoardLayout): void {
+  layoutSetting.current = { status: "ready", values: { lobby, rooms } };
+}
+
 beforeEach(() => {
+  layouts("list", "list");
   posted = [];
   asked = [];
   refusal = null;
@@ -809,4 +829,121 @@ test("another room's board still shows the posts form", async () => {
   expect(container.querySelector('[aria-label="Clear finished"]')).toBeNull();
   expect(container.querySelector('[aria-label="Add a to-do"]')).toBeNull();
   expect(checkboxes()).toEqual([]);
+});
+
+test("the lobby as a kanban keeps the form above its columns and Agent tasks under them", async () => {
+  layouts("kanban", "list");
+  const posts = [
+    post(1, { text: "Rotate keys" }),
+    post(2, { text: "Check the build", state: "claimed", claimedBy: "a1" }),
+    post(3, { text: "Update the README", state: "done" }),
+    post(4, { kind: "note", state: undefined, text: "The demo is on Thursday" }),
+  ];
+  await mount({ rooms: lobbyRooms(posts), roomId: "lobby" });
+
+  byLabel("Add a to-do");
+  const all = lines();
+  expect(all.indexOf("Any idle agent")).toBeLessThan(all.indexOf("To do · 1"));
+  expect(all).not.toContain("To-do");
+  // The sheet is narrow until it is measured: the columns stack, Done folded.
+  expect(linesFrom("To do · 1")).toEqual([
+    "To do · 1",
+    "Rotate keys",
+    "In progress · 1",
+    "Check the build",
+    "claimed by a1",
+    "Done · 1",
+    "Clear finished",
+    "Notes · 1",
+    "Note · user",
+    "The demo is on Thursday",
+    "Delete",
+    "Agent tasks",
+    "No agent tasks",
+  ]);
+  await press("Done · 1");
+  expect(byLabel("Update the README").getAttribute("aria-checked")).toBe("true");
+});
+
+test("a room's board as a kanban draws its columns under the form and the agents", async () => {
+  layouts("list", "kanban");
+  const posts = [
+    post(1, { board: "w1", text: "Ship it" }),
+    post(2, { board: "w1", kind: "note", state: undefined, text: "Freeze on Friday" }),
+  ];
+  await mount({ rooms: officeRooms([], { w1: posts }) });
+
+  byLabel("Post");
+  expect(lines()).not.toContain("Posts");
+  expect(linesFrom("No agents")).toEqual([
+    "No agents",
+    "To do · 1",
+    "Ship it",
+    "In progress · 0",
+    "Notes · 1",
+    "Note · user",
+    "Freeze on Friday",
+    "Delete",
+  ]);
+  expect(checkboxes().map((box) => box.getAttribute("aria-label"))).toEqual(["Ship it"]);
+});
+
+test("until the device's setting is read the lobby is a kanban and a room's board a list", async () => {
+  layoutSetting.current = { status: "loading" };
+  await mount({ rooms: lobbyRooms([]), roomId: "lobby" });
+  expect(lines()).toContain("To do · 0");
+  expect(lines()).not.toContain("To-do");
+
+  await mount({ rooms: officeRooms([], { w1: [post(1, { board: "w1", text: "Ship it" })] }) });
+  expect(linesFrom("Posts")).toEqual([
+    "Posts",
+    "Task · open · user",
+    "Ship it",
+    "Mark done",
+    "Delete",
+  ]);
+});
+
+test("in fullscreen the board's dialog opens wide for a kanban and at its own size for a list", async () => {
+  // jsdom has no dialog top layer: opening and closing one only sets its attribute.
+  const proto = Object.getPrototypeOf(document.createElement("dialog"));
+  Object.defineProperties(proto, {
+    showModal: {
+      configurable: true,
+      value() {
+        this.setAttribute("open", "");
+      },
+    },
+    close: {
+      configurable: true,
+      value() {
+        this.removeAttribute("open");
+      },
+    },
+  });
+  const size = () => {
+    const dialog = container.querySelector("dialog[open]");
+    if (dialog === null) throw new Error("No dialog is open");
+    return dialog.getAttribute("data-size");
+  };
+  const lobby = { rooms: lobbyRooms([]), roomId: "lobby", fullscreen: true };
+  const room = { rooms: officeRooms([]), roomId: "w1", fullscreen: true };
+  try {
+    layouts("kanban", "list");
+    await mount(lobby);
+    expect(size()).toBe("wide");
+    await mount(room);
+    expect(size()).toBeNull();
+
+    layouts("list", "kanban");
+    await mount(room);
+    expect(size()).toBe("wide");
+    await mount(lobby);
+    expect(size()).toBeNull();
+  } finally {
+    // The dialog closes before its methods go.
+    await mount({ rooms: [], fullscreen: true });
+    Reflect.deleteProperty(proto, "showModal");
+    Reflect.deleteProperty(proto, "close");
+  }
 });

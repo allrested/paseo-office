@@ -38,6 +38,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   Back: "Quay lại",
   "Back to Lobby board": "Quay lại bảng Sảnh",
   Board: "Bảng",
+  Boards: "Bảng",
   "Brand color": "Màu thương hiệu",
   "Busiest team": "Nhóm bận nhất",
   CPU: "CPU",
@@ -80,6 +81,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Dismiss tip": "Đóng gợi ý",
   "Dismissing...": "Đang bỏ qua...",
   "Dismissing…": "Đang bỏ qua…",
+  Done: "Xong",
   "Display name. Leave blank to use the host default.":
     "Tên hiển thị. Để trống để dùng mặc định của host.",
   "Duty board": "Bảng trực nhật",
@@ -120,6 +122,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Jira projects": "Dự án Jira",
   Keep: "Giữ",
   "Jump to latest": "Tới tin mới nhất",
+  Kanban: "Bảng Kanban",
   "Keep planning": "Tiếp tục lập kế hoạch",
   "Keep watching": "Tiếp tục theo dõi",
   "Keeping...": "Đang giữ...",
@@ -127,6 +130,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Left running": "Còn đang chạy",
   Library: "Thư viện",
   Lighting: "Ánh sáng",
+  List: "Danh sách",
   "Loading...": "Đang tải...",
   "Lobby board": "Bảng sảnh",
   "Log group names, comma separated. Lines that match the pattern ring once an hour for each group.":
@@ -202,6 +206,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   Retry: "Thử lại",
   "Retrying...": "Đang thử lại...",
   Reviews: "Đánh giá",
+  "Room boards": "Bảng phòng",
   "Running services and listeners": "Dịch vụ và listener đang chạy",
   SSH: "SSH",
   "Said again to an agent whose conversation is compacted during a turn, so a rule you gave it is not lost. Empty says nothing.":
@@ -390,6 +395,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "This browser couldn’t display the workspace.":
     "Trình duyệt này không hiển thị được không gian làm việc.",
   "This host reports no plan limits.": "Host này không báo giới hạn gói.",
+  "To do": "Cần làm",
   "To switch accounts, use the account-switcher plugin. The office reads the limits and handles no sign-in.":
     "Để đổi tài khoản, hãy dùng plugin account-switcher. Văn phòng chỉ đọc giới hạn và không xử lý đăng nhập.",
   "To-do": "Việc cần làm",
@@ -500,6 +506,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Host details could not be read. Try refreshing.":
     "Không đọc được chi tiết host. Hãy thử làm mới.",
   "Host resources": "Tài nguyên host",
+  "In progress": "Đang làm",
   "In the teams' workspaces": "Trong không gian làm việc của các nhóm",
   "In this mode the writer runs any tool or command without asking.":
     "Ở chế độ này, người viết chạy mọi công cụ hoặc lệnh mà không hỏi.",
@@ -699,6 +706,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Using a skill": "Đang dùng skill",
   "Using a tool": "Đang dùng công cụ",
   "Waited for you": "Đã chờ bạn",
+  Waiting: "Đang chờ",
   "Waiting for a review": "Đang chờ đánh giá",
   "Waiting for the first answer.": "Đang chờ câu trả lời đầu tiên.",
   "Waiting for your answer": "Đang chờ bạn trả lời",

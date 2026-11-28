@@ -11,6 +11,7 @@ import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeEvent } from "../shared/contracts.js";
 import {
+  officeBoardsSettings,
   officeDeviceSettings,
   officeHostSettings,
   officeLanguageSettings,
@@ -20,6 +21,7 @@ import { stockSave } from "./stock-save.test.js";
 
 let hostSaves: unknown[];
 let deviceSaves: unknown[];
+let boardsSaves: unknown[];
 let deliver: ((event: OfficeEvent) => void) | null;
 
 /** What the device's setting holds; a test sets it before it mounts. */
@@ -43,6 +45,18 @@ vi.mock("@getpaseo/plugin/client", async (importOriginal) => ({
         saving: false,
         saveError: null,
         save: stockSave(officeLanguageSettings),
+      };
+    if (settings.id === "office-boards")
+      return {
+        status: "ready",
+        revision: "boards-1",
+        values: officeBoardsSettings.schema.parse({}),
+        saving: false,
+        saveError: null,
+        save: async (values: unknown) => {
+          boardsSaves.push(values);
+          return stockSave(officeBoardsSettings)(values);
+        },
       };
     const device = settings.id === "office-device";
     return {
@@ -119,6 +133,7 @@ beforeEach(() => {
   deviceValues.current = { threeD: true, view: "list", rungIncidents: {}, sound: false };
   hostSaves = [];
   deviceSaves = [];
+  boardsSaves = [];
   deliver = null;
   container = document.createElement("div");
   document.body.append(container);
@@ -250,4 +265,20 @@ test("older devices keep their street choice and can switch to countryside in da
   expect(deviceSaves).toContainEqual({ ...deviceValues.current, scene: "countryside" });
   await act(async () => labelled("Day")?.click());
   expect(deviceSaves).toContainEqual(expect.objectContaining({ lighting: "day" }));
+});
+
+test("the Boards section draws both choices and saves the picked layout whole", async () => {
+  await mount();
+  expect(labelled("Lobby board")?.getAttribute("role")).toBe("group");
+  expect(labelled("Room boards")?.getAttribute("role")).toBe("group");
+  const pick = (group: string, name: string) =>
+    labelled(group)!.querySelector<HTMLElement>(`[aria-label="${name}"]`)!;
+  expect(pick("Lobby board", "Kanban").getAttribute("aria-pressed")).toBe("true");
+  expect(pick("Room boards", "List").getAttribute("aria-pressed")).toBe("true");
+
+  await act(async () => pick("Lobby board", "List").click());
+  expect(boardsSaves).toEqual([{ lobby: "list", rooms: "list" }]);
+  await act(async () => pick("Room boards", "Kanban").click());
+  expect(boardsSaves).toContainEqual({ lobby: "kanban", rooms: "kanban" });
+  expect(deviceSaves).toEqual([]);
 });

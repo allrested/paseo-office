@@ -351,3 +351,21 @@ export const officeLanguageSettings = defineSettings({
   version: 1,
   schema: z.object({ choice: z.enum(LANGUAGE_CHOICES).default("auto") }),
 });
+
+export const BOARD_LAYOUTS = ["kanban", "list"] as const;
+export type BoardLayout = (typeof BOARD_LAYOUTS)[number];
+
+/**
+ * Per device: how the lobby's board and the rooms' boards are laid out. A setting of its own, as the
+ * column's is: the view's and the incidents' saves write `office-device` whole, and would drop a
+ * field of this one.
+ */
+export const officeBoardsSettings = defineSettings({
+  id: "office-boards",
+  scope: "device",
+  version: 1,
+  schema: z.object({
+    lobby: z.enum(BOARD_LAYOUTS).default("kanban"),
+    rooms: z.enum(BOARD_LAYOUTS).default("list"),
+  }),
+});

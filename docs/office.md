@@ -515,6 +515,23 @@ done or reopened. Choose a specific agent to send it the task when idle. Turning
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
 
+The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
+(claimed), **Done** and **Notes**. To do and In progress are always there; Done and Notes show only
+when they hold something. Each heading says how many the column holds, as in "To do · 3". A task
+is a card with the list's checkbox and delete button, and a note keeps its Delete button. A card
+changes column through those buttons; nothing is dragged. **Clear finished** is in Done's heading.
+When the board is 720 px wide or more, the columns sit side by side, 280 px each, and scroll
+sideways when they do not fit; in fullscreen a kanban's board opens in the wide dialog to make
+room for them. Narrower, as on a phone, they are stacked sections: a press on a heading folds or
+unfolds its section, and Done starts folded. The form stays above the columns and **Agent tasks**
+under them.
+
+**Boards** in the settings chooses each board's layout on this device: **Lobby board** Kanban (the
+default) or List, and **Room boards** List (the default) or Kanban. A room's board as a kanban has
+the same columns under its form and its agents. A room's board does not show done tasks, so it has
+no Done column. The list is the board as it was: the lobby's to-do list with its notes under it,
+and a room's posts in one list.
+
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 
 A board also shows who is at work, so a room with nothing posted is not an empty board. Under its
@@ -611,14 +628,14 @@ Each saved value overrides its environment variable. On web, the name and logo c
 
 The gear in fullscreen opens **Office settings** over the floor. You can also open the plugin’s settings from Paseo settings or the Command Center.
 
-| Section    | Controls                                                                                     |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| Appearance | Office view, floor plan, outdoor scene, lighting, sound, scene language and shared branding. |
-| Teams      | The [team roster](#team-roster): teams, their teammates, and the switch for naming from it.  |
-| Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.            |
-| Services   | Jira, Sentry and CloudWatch, and the optional weather service.                               |
+| Section    | Controls                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| Appearance | Office view, floor plan, outdoor scene, lighting, boards, sound, scene language and shared branding. |
+| Teams      | The [team roster](#team-roster): teams, their teammates, and the switch for naming from it.          |
+| Automation | Agent wake-ups, agent tools, stand-up notes folder, time zone and scheduled days.                    |
+| Services   | Jira, Sentry and CloudWatch, and the optional weather service.                                       |
 
-View and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
+View, board layout and sound preferences apply to the device. The host stores the floor plan, branding, automation and integration settings. The [branding defaults](#custom-branding) can also come from the daemon environment.
 
 ## Timeline and the week
 

@@ -12,9 +12,10 @@ import { deviceProblemOf, hasTouchScreen, readPointer, useViewChoice } from "./o
 import { useOfficeStyles, type OfficeStyles } from "./styles.js";
 import { useBoardActions } from "./use-board-actions.js";
 import { useOffice } from "./use-office.js";
+import { useBoardLayoutChoices } from "./use-board-layouts.js";
 import { useOfficeScene } from "./use-street.js";
 import { useSoundSwitch } from "./use-sound.js";
-import { SceneChoices } from "./scene-picker.js";
+import { BoardChoices, SceneChoices } from "./scene-picker.js";
 import { holdersOf } from "./teams-text.js";
 import { ViewSwitch } from "./view-switch.js";
 import { UiLanguage } from "./ui-language.js";
@@ -38,6 +39,7 @@ function SettingsPage({ theme, layout }: PluginSurfaceProps) {
   const view = useViewChoice(layout.platform);
   const street = useOfficeScene(layout);
   const sound = useSoundSwitch();
+  const boards = useBoardLayoutChoices();
   return (
     <OfficeSettingsFields
       office={office}
@@ -46,6 +48,7 @@ function SettingsPage({ theme, layout }: PluginSurfaceProps) {
       view={view}
       street={street}
       sound={sound}
+      boards={boards}
     />
   );
 }
@@ -57,6 +60,7 @@ interface FieldsProps {
   view: ReturnType<typeof useViewChoice>;
   street: ReturnType<typeof useOfficeScene>;
   sound: ReturnType<typeof useSoundSwitch>;
+  boards: ReturnType<typeof useBoardLayoutChoices>;
   /** In a dialog: the sections scroll inside its body. */
   bounded?: boolean;
 }
@@ -68,6 +72,7 @@ function OfficeSettingsFields({
   view,
   street,
   sound,
+  boards,
   bounded,
 }: FieldsProps) {
   const language = useMemo(() => <LanguageSetting styles={styles} />, [styles]);
@@ -93,6 +98,7 @@ function OfficeSettingsFields({
       >
         <>
           <SceneChoices choice={street} styles={styles} />
+          <BoardChoices choice={boards} styles={styles} />
           <View style={settingsLayout.strip}>
             <Text style={styles.sheetLabel}>Office view</Text>
             <ViewSwitch
