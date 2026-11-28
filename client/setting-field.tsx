@@ -22,7 +22,7 @@ interface SettingFieldProps {
 /**
  * A host setting typed as text. It saves when it is submitted or loses focus, not on each
  * keystroke, since each save brings the daemon's schedule in step again. The text, trimmed, shows
- * until the host has answered; a refused save goes back to the stored value.
+ * until the host has answered; a refused save (one that resolves false) keeps the typed text for correcting.
  */
 export function SettingField(props: SettingFieldProps) {
   const { value, onSave, problem, lines, maxLength, styles } = props;
@@ -49,9 +49,11 @@ export function SettingField(props: SettingFieldProps) {
     }
     saving.current = true;
     setDraft(next);
-    void onSave(next).finally(() => {
+    void onSave(next).then((accepted) => {
       saving.current = false;
-      if (mounted.current) setDraft(null);
+      // A refused save keeps what was typed, so it can be corrected.
+      if (mounted.current && accepted !== false) setDraft(null);
+      return undefined;
     });
   }, [draft, value, onSave]);
   return (

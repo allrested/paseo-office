@@ -66,8 +66,8 @@ function usersProblem(entries: readonly string[]): string | null {
 
 interface TokenProps {
   telegram: TelegramState | undefined;
-  /** Whether a chat is set: the test writes to it. */
-  hasChat: boolean;
+  /** The chat set: the test writes to it. */
+  chat: string;
   styles: OfficeStyles;
 }
 
@@ -76,15 +76,22 @@ interface TokenProps {
  * (or Remove) has answered, success or failure, and is never shown again: the line under the
  * field says where the host's one comes from. No text built here holds it.
  */
-function TelegramToken({ telegram, hasChat, styles }: TokenProps) {
+function TelegramToken({ telegram, chat, styles }: TokenProps) {
   const callSave = useRpc(telegramSaveRpc);
   const callTest = useRpc(telegramTestRpc);
   const [token, setToken] = useState("");
   const [asking, setAsking] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  // What the last test came to, with the token source and chat it was made for.
+  const [tested, setTested] = useState<{ text: string; basis: string } | null>(null);
+  const basis = `${telegram?.source ?? ""}|${chat}`;
+  const note = tested !== null && tested.basis === basis ? tested.text : null;
+  const type = useCallback((next: string) => {
+    setToken(next);
+    setTested(null);
+  }, []);
   const save = useCallback(async () => {
     const typed = token.trim();
-    setNote(null);
+    setTested(null);
     try {
       await callSave({ token: typed });
     } finally {
@@ -95,18 +102,19 @@ function TelegramToken({ telegram, hasChat, styles }: TokenProps) {
   const ask = useCallback(() => setAsking(true), []);
   const keep = useCallback(() => setAsking(false), []);
   const remove = useCallback(async () => {
-    setNote(null);
-    setAsking(false);
+    setTested(null);
     setToken("");
+    // The question stays until the host has answered, so a refusal shows on its button.
     await callSave({ token: "" });
+    setAsking(false);
   }, [callSave]);
   const test = useCallback(async () => {
-    setNote(null);
+    setTested(null);
     const result = await callTest({});
     // The host's own safe reason becomes the button's error.
     if (!result.ok) throw new Error(result.problem);
-    setNote(`Connected as @${result.bot}. A message was sent to the chat.`);
-  }, [callTest]);
+    setTested({ text: `Connected as @${result.bot}. A message was sent to the chat.`, basis });
+  }, [callTest, basis]);
   const source = sourceText(telegram);
   return (
     <View style={styles.headerField}>
@@ -115,7 +123,8 @@ function TelegramToken({ telegram, hasChat, styles }: TokenProps) {
         accessibilityLabel="Telegram bot token"
         accessibilityHint={TOKEN_HINT}
         value={token}
-        onChangeText={setToken}
+        onChangeText={type}
+        autoComplete="new-password"
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -136,7 +145,7 @@ function TelegramToken({ telegram, hasChat, styles }: TokenProps) {
           pendingLabel="Testing..."
           name="Test Telegram"
           onPress={test}
-          disabled={telegram?.source == null || !hasChat}
+          disabled={telegram?.source == null || chat === ""}
           styles={styles}
         />
         <ActionButton
@@ -254,11 +263,7 @@ export function TelegramSettings({ values, telegram, change, saveProblem, styles
   );
   return (
     <View style={styles.headerFields}>
-      <TelegramToken
-        telegram={telegram}
-        hasChat={(values?.telegramChat ?? "") !== ""}
-        styles={styles}
-      />
+      <TelegramToken telegram={telegram} chat={values?.telegramChat ?? ""} styles={styles} />
       <SettingField
         label="Chat id"
         hint={CHAT_HINT}

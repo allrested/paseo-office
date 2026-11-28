@@ -219,7 +219,6 @@ test("the chat id saves trimmed, and a refused one is told and not sent", async 
   await typeAndLeave(chat(), "12ab");
   expect(alerts()).toEqual(["A chat id is digits, with a minus first for a group"]);
   expect(saved).toHaveLength(1);
-  expect(saved).toHaveLength(1);
 });
 
 test("the user ids are one per line, with the hint exactly, and save as a list", async () => {
@@ -302,4 +301,52 @@ test("others' messages that were ignored are counted, and none is not mentioned"
   expect(status()).toBe("On.Messages from others ignored: 3");
   await mount({ ...READY, dropped: 0 });
   expect(status()).toBe("On.");
+});
+
+test("a failed Remove is shown, and the question stays to try again", async () => {
+  refusal = new Error("the host is busy");
+  await mount(READY);
+  await act(async () => button("Remove saved Telegram token")?.click());
+  await act(async () => button("Confirm remove the saved Telegram token")?.click());
+  expect(alerts()).toEqual(["Unable to remove: the host is busy"]);
+});
+
+test("a Remove that went through closes the question", async () => {
+  await mount(READY);
+  await act(async () => button("Remove saved Telegram token")?.click());
+  await act(async () => button("Confirm remove the saved Telegram token")?.click());
+  expect(alerts()).toEqual([]);
+  expect(container.textContent).not.toContain("Remove the saved token?");
+});
+
+test("the token field is not offered to a password manager", async () => {
+  await mount();
+  expect(tokenField()?.getAttribute("autocomplete")).toBe("new-password");
+});
+
+test("the Connected note goes when the token, its source or the chat changes", async () => {
+  const withChat = { ...VALUES, telegramChat: "-100123" };
+  const note = "Connected as @office_bot. A message was sent to the chat.";
+  await mount(READY, withChat);
+  await act(async () => button("Test Telegram")?.click());
+  expect(container.textContent).toContain(note);
+  await mount(READY, { ...withChat, telegramChat: "-100456" });
+  expect(container.textContent).not.toContain(note);
+  await act(async () => button("Test Telegram")?.click());
+  expect(container.textContent).toContain(note);
+  await mount({ ...READY, source: "env" }, { ...withChat, telegramChat: "-100456" });
+  expect(container.textContent).not.toContain(note);
+  await act(async () => button("Test Telegram")?.click());
+  await type(tokenField(), "1");
+  expect(container.textContent).not.toContain(note);
+});
+
+test("a refused user list keeps what was typed, a saved one lets go of it", async () => {
+  await mount(READY, { ...VALUES, telegramUsers: ["42"] });
+  await typeAndLeave(users(), "42\n0123");
+  expect(users()?.value).toBe("42\n0123");
+  expect(alerts()).toEqual(['Line 2: "0123" is not a Telegram user id']);
+  await typeAndLeave(users(), "42\n99");
+  expect(saved).toEqual([{ telegramUsers: ["42", "99"] }]);
+  expect(users()?.value).toBe("42");
 });
