@@ -118,13 +118,23 @@ export function nextPace(track: PaceTrack, usage: readonly PlanUsage[], now: num
   return next;
 }
 
-/** The soonest instant a window of these providers runs out at its pace; null when none does. */
-export function soonestPace(track: PaceTrack, usage: readonly PlanUsage[]): number | null {
-  let soonest: number | null = null;
+/** A window running out at its pace: when, and whose it is. */
+export interface PaceOut {
+  at: number;
+  /** The provider's display name and the window's label, as the pill writes them. */
+  provider: string;
+  window: string;
+}
+
+/** The soonest window of these providers to run out at its pace; null when none does. */
+export function soonestPace(track: PaceTrack, usage: readonly PlanUsage[]): PaceOut | null {
+  let soonest: PaceOut | null = null;
   for (const provider of usage) {
     for (const window of provider.windows) {
-      const pace = track.get(paceKey(provider, window))?.pace ?? null;
-      if (pace !== null && (soonest === null || pace < soonest)) soonest = pace;
+      const at = track.get(paceKey(provider, window))?.pace ?? null;
+      if (at !== null && (soonest === null || at < soonest.at)) {
+        soonest = { at, provider: provider.name, window: window.label };
+      }
     }
   }
   return soonest;
@@ -137,31 +147,34 @@ export function paceText(at: number): string {
   const time = when.toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   });
   return `${day} ${time}`;
 }
 
+/** "Claude 5 hours: at this pace out by Thu 14:00": it names its own window, whoever the closest limit is. */
+const paceNote = (out: PaceOut) =>
+  `${out.provider} ${out.window}: at this pace out by ${paceText(out.at)}`;
+
 /**
  * The closest limit in a few words, for the toolbar; null while every limit is under the warning.
- * `outAt` is the soonest instant a counted window runs out at its pace, when there is one.
+ * `pace` is the soonest window that runs out at its pace, when there is one: it follows the note
+ * after " · ", or is the note alone, in the warning tone, when no limit is near yet.
  */
 export function planNote(
   usage: readonly PlanUsage[],
-  outAt: number | null = null,
+  pace: PaceOut | null = null,
 ): { text: string; tone: "warning" | "danger" } | null {
   const closest = closestLimit(usage);
-  if (closest === null || closest.window.usedPct < PLAN_WARN_PCT) return null;
+  if (closest === null || closest.window.usedPct < PLAN_WARN_PCT) {
+    return pace === null ? null : { text: paceNote(pace), tone: "warning" };
+  }
   const { provider, window } = closest;
   const used =
     window.usedPct >= PLAN_OUT_PCT
       ? `Out of ${provider.name}`
       : `${provider.name} ${Math.floor(window.usedPct)}%`;
-  // A limit already out has no pace to tell: it says so.
-  const text =
-    outAt === null || window.usedPct >= PLAN_OUT_PCT
-      ? used
-      : `${used} · at this pace out by ${paceText(outAt)}`;
+  const text = pace === null ? used : `${used} · ${paceNote(pace)}`;
   return { text, tone: window.usedPct >= PLAN_DANGER_PCT ? "danger" : "warning" };
 }
 

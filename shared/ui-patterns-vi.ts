@@ -194,8 +194,12 @@ export const RULES: readonly Rule[] = [
   [/^No output yet, read at (.+)$/, (time) => `Chưa có kết quả, đọc lúc ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `Hết ${name}`],
   [
-    /^(.+) · at this pace out by (.+)$/,
-    (note, time) => `${translatePattern(note)} · theo tốc độ này sẽ hết lúc ${time}`,
+    /^(.+?) · (.+): at this pace out by (.+)$/,
+    (note, name, time) => `${translatePattern(note)} · ${name}: theo tốc độ này sẽ hết lúc ${time}`,
+  ],
+  [
+    /^(.+): at this pace out by (.+)$/,
+    (name, time) => `${name}: theo tốc độ này sẽ hết lúc ${time}`,
   ],
   [/^Starting by itself: (.+)$/, (why) => `Tự động bắt đầu: ${translatePattern(why)}`],
   [

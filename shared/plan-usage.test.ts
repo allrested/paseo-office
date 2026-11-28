@@ -34,6 +34,12 @@ describe("planPace", () => {
     expect(planPace(earlier, { usedPct: 10, readAt: T0 + HOUR, resetsAt })).toBeNull();
   });
 
+  test("is nothing for a pair whose usage fell", () => {
+    expect(
+      planPace({ usedPct: 50, readAt: T0 }, { usedPct: 40, readAt: T0 + HOUR, resetsAt }),
+    ).toBeNull();
+  });
+
   test("is nothing when the reset is not known", () => {
     expect(planPace(earlier, { usedPct: 30, readAt: T0 + HOUR, resetsAt: null })).toBeNull();
   });
@@ -74,14 +80,14 @@ describe("the pace across readings", () => {
     track = nextPace(track, usage(22), T0 + 2 * MIN);
     track = nextPace(track, usage(30), T0 + 30 * MIN);
     // Against the reading at T0, not the one 2 minutes in: 10 points in 30 minutes.
-    expect(soonestPace(track, usage(30))).toBe(T0 + 30 * MIN + 3.5 * HOUR);
+    expect(soonestPace(track, usage(30))?.at).toBe(T0 + 30 * MIN + 3.5 * HOUR);
   });
 
   test("the pace lasts until the next reading that is 5 minutes later", () => {
     let track: PaceTrack = nextPace(new Map(), usage(20), T0);
     track = nextPace(track, usage(30), T0 + 30 * MIN);
     track = nextPace(track, usage(31), T0 + 32 * MIN);
-    expect(soonestPace(track, usage(31))).toBe(T0 + 30 * MIN + 3.5 * HOUR);
+    expect(soonestPace(track, usage(31))?.at).toBe(T0 + 30 * MIN + 3.5 * HOUR);
     track = nextPace(track, usage(31), T0 + 40 * MIN);
     expect(soonestPace(track, usage(31))).toBeNull();
   });
@@ -102,9 +108,12 @@ describe("the pace across readings", () => {
     ];
     let track: PaceTrack = nextPace(new Map(), before, T0);
     track = nextPace(track, two, T0 + 30 * MIN);
-    const both = soonestPace(track, two);
-    expect(both).toBe(T0 + 30 * MIN + HOUR);
-    expect(soonestPace(track, [two[0]!])).toBe(T0 + 30 * MIN + 3.5 * HOUR);
+    expect(soonestPace(track, two)).toEqual({
+      at: T0 + 30 * MIN + HOUR,
+      provider: "Codex",
+      window: "week",
+    });
+    expect(soonestPace(track, [two[0]!])?.at).toBe(T0 + 30 * MIN + 3.5 * HOUR);
   });
 
   test("a window that left the readings is forgotten", () => {
@@ -115,37 +124,44 @@ describe("the pace across readings", () => {
 });
 
 describe("planNote with a pace", () => {
-  const usage: PlanUsage[] = [
+  const usage = (usedPct: number): PlanUsage[] => [
     {
       provider: "claude",
       name: "Claude",
       plan: null,
-      windows: [{ id: "five", label: "5 hours", usedPct: 85, resetsAt: null }],
+      windows: [{ id: "five", label: "5 hours", usedPct, resetsAt: null }],
     },
   ];
+  const out = Date.UTC(2026, 10, 26, 14, 0);
+  const codex = { at: out, provider: "Codex", window: "week" };
 
   test("is as before without a pace", () => {
-    expect(planNote(usage)).toEqual({ text: "Claude 85%", tone: "warning" });
-    expect(planNote(usage, null)).toEqual({ text: "Claude 85%", tone: "warning" });
+    expect(planNote(usage(85))).toEqual({ text: "Claude 85%", tone: "warning" });
+    expect(planNote(usage(85), null)).toEqual({ text: "Claude 85%", tone: "warning" });
+    expect(planNote(usage(40))).toBeNull();
   });
 
-  test("adds when the window runs out at this pace", () => {
-    const out = Date.UTC(2026, 10, 26, 14, 0);
-    const note = planNote(usage, out);
-    expect(note).toEqual({
-      text: `Claude 85% · at this pace out by ${paceText(out)}`,
+  test("follows the closest limit, naming the provider and window it is about", () => {
+    expect(planNote(usage(85), codex)).toEqual({
+      text: `Claude 85% · Codex week: at this pace out by ${paceText(out)}`,
       tone: "warning",
     });
+    expect(planNote(usage(96), codex)?.tone).toBe("danger");
   });
 
-  test("a limit under the warning has no note, pace or not", () => {
-    const calm = [{ ...usage[0]!, windows: [{ ...usage[0]!.windows[0]!, usedPct: 40 }] }];
-    expect(planNote(calm, T0)).toBeNull();
+  test("is the whole note, in the warning tone, when no limit is near yet", () => {
+    expect(planNote(usage(40), codex)).toEqual({
+      text: `Codex week: at this pace out by ${paceText(out)}`,
+      tone: "warning",
+    });
+    expect(planNote([], codex)?.tone).toBe("warning");
   });
 
-  test("a limit that is out says so, with no pace", () => {
-    const out = [{ ...usage[0]!, windows: [{ ...usage[0]!.windows[0]!, usedPct: 100 }] }];
-    expect(planNote(out, T0)).toEqual({ text: "Out of Claude", tone: "danger" });
+  test("a limit that is out says so, and the pace of another follows", () => {
+    expect(planNote(usage(100))).toEqual({ text: "Out of Claude", tone: "danger" });
+    expect(planNote(usage(100), codex)?.text).toBe(
+      `Out of Claude · Codex week: at this pace out by ${paceText(out)}`,
+    );
   });
 });
 
@@ -157,4 +173,9 @@ describe("paceText", () => {
     expect(text).toContain(date.toLocaleDateString(undefined, { weekday: "short" }));
     expect(text).toMatch(/\d{1,2}:\d{2}$/);
   });
+});
+
+test("the time at 00:05 reads 00:05, not 24:05", () => {
+  const at = new Date(2026, 10, 27, 0, 5).getTime();
+  expect(paceText(at)).toMatch(/00:05$/);
 });

@@ -9,7 +9,13 @@ import {
 } from "react";
 import { useRpc, useSettings } from "@getpaseo/plugin/client";
 import { planUsageRpc } from "../shared/contracts.js";
-import { nextPace, soonestPace, type PaceTrack, type PlanUsage } from "../shared/plan-usage.js";
+import {
+  nextPace,
+  soonestPace,
+  type PaceOut,
+  type PaceTrack,
+  type PlanUsage,
+} from "../shared/plan-usage.js";
 import { officeHostSettings } from "../shared/settings.js";
 
 const NO_USAGE: readonly PlanUsage[] = [];
@@ -24,8 +30,8 @@ export function usePlanUsageValue(): readonly PlanUsage[] {
   return useContext(PlanUsageContext);
 }
 
-/** When the soonest counted limit runs out at its pace, for the toolbar's note; null when none does. */
-export const PlanPaceContext = createContext<number | null>(null);
+/** The soonest counted limit to run out at its pace, for the toolbar's note; null when none does. */
+export const PlanPaceContext = createContext<PaceOut | null>(null);
 
 /** Which providers' plans count: every provider the host reports, and the switch for each. */
 export interface PlanPicker {
@@ -42,7 +48,7 @@ export interface PlanState {
   /** The plans that count: the ones the owner has not left out. */
   counted: readonly PlanUsage[];
   /** When the soonest of those limits reaches 100% at the pace of its last readings, if before its reset. */
-  outAt: number | null;
+  outAt: PaceOut | null;
   picker: PlanPicker;
 }
 
@@ -79,6 +85,8 @@ export function usePlanUsage(live: boolean): PlanState {
     return () => {
       ended = true;
       clearInterval(timer);
+      // Readings from before the office was closed say nothing of the pace after it: two fresh ones do.
+      setTrack(NO_TRACK);
     };
   }, [live]);
   const settings = useSettings(officeHostSettings);

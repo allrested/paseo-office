@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { View } from "react-native";
-import { Text } from "./text.js";
-import { TextInput } from "./text.js";
+import { Text, TextInput } from "./text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 

@@ -100,8 +100,16 @@ test("the cards' longer lines are in Vietnamese too, with their names and number
     ["Context 91% full, 182k of 200k tokens", "Ngữ cảnh đầy 91%, 182k trên 200k token"],
     ["Out of Claude", "Hết Claude"],
     [
-      "Claude 85% · at this pace out by Thu 14:00",
-      "Claude 85% · theo tốc độ này sẽ hết lúc Thu 14:00",
+      "Claude 85% · Codex week: at this pace out by Thu 14:00",
+      "Claude 85% · Codex week: theo tốc độ này sẽ hết lúc Thu 14:00",
+    ],
+    [
+      "Claude 5 hours: at this pace out by Thu 14:00",
+      "Claude 5 hours: theo tốc độ này sẽ hết lúc Thu 14:00",
+    ],
+    [
+      "Host resources. Plan limit: Claude 5 hours: at this pace out by Thu 14:00",
+      "Tài nguyên của host. Giới hạn gói: Claude 5 hours: theo tốc độ này sẽ hết lúc Thu 14:00",
     ],
     ["Starting by itself", "Tự động bắt đầu"],
     [

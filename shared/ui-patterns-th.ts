@@ -186,9 +186,10 @@ export const RULES: readonly Rule[] = [
   [/^No output yet, read at (.+)$/, (time) => `ยังไม่มีเอาต์พุต อ่านเมื่อ ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `${name} หมดแล้ว`],
   [
-    /^(.+) · at this pace out by (.+)$/,
-    (note, time) => `${translatePattern(note)} · ที่ความเร็วนี้จะหมดภายใน ${time}`,
+    /^(.+?) · (.+): at this pace out by (.+)$/,
+    (note, name, time) => `${translatePattern(note)} · ${name}: ที่ความเร็วนี้จะหมดภายใน ${time}`,
   ],
+  [/^(.+): at this pace out by (.+)$/, (name, time) => `${name}: ที่ความเร็วนี้จะหมดภายใน ${time}`],
   [/^Starting by itself: (.+)$/, (why) => `เริ่มงานเอง: ${translatePattern(why)}`],
   [
     /^waiting, (.+)'s (.+) is at (\d+)% \(starts under (\d+)%\)$/,

@@ -50,8 +50,10 @@ task does not go back to the backlog.
   itself", or the reason in the order the gate looks: not picking up work (`no-pickup`), nothing
   ready (`empty`), no reading (`no-reading`), a limit (`limit`), too many in progress or to do
   (`at-once`), the day's count reached (`per-day`), the count unreadable (`no-count`).
-- **Pace.** The plan pill adds "at this pace out by Thu 14:00" when two readings at least 5 minutes
-  apart put a limit at 100% before its reset. It is a line, not a rule of the gate.
+- **Pace.** The plan pill says "Claude 5 hours: at this pace out by Thu 14:00" when two readings at
+  least 5 minutes apart put a limit at 100% before its reset, at any level of use: alone while no
+  limit is near, else after the usual note. It names its provider and window. It is a line, not a
+  rule of the gate.
 
 The gate only ever starts backlog tasks. A task posted to To do is handed out as today.
 

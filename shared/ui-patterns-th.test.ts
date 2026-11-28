@@ -88,7 +88,18 @@ test("the cards' longer lines are in Thai too, with their names and numbers kept
     ["Checks fail on #12", "การตรวจสอบล้มเหลวใน #12"],
     ["Context 91% full, 182k of 200k tokens", "Context เต็ม 91%, 182k จาก 200k token"],
     ["Out of Claude", "Claude หมดแล้ว"],
-    ["Claude 85% · at this pace out by Thu 14:00", "Claude 85% · ที่ความเร็วนี้จะหมดภายใน Thu 14:00"],
+    [
+      "Claude 85% · Codex week: at this pace out by Thu 14:00",
+      "Claude 85% · Codex week: ที่ความเร็วนี้จะหมดภายใน Thu 14:00",
+    ],
+    [
+      "Claude 5 hours: at this pace out by Thu 14:00",
+      "Claude 5 hours: ที่ความเร็วนี้จะหมดภายใน Thu 14:00",
+    ],
+    [
+      "Host resources. Plan limit: Claude 5 hours: at this pace out by Thu 14:00",
+      "ทรัพยากรของ host ลิมิตของแพลน: Claude 5 hours: ที่ความเร็วนี้จะหมดภายใน Thu 14:00",
+    ],
     ["Starting by itself", "เริ่มงานเอง"],
     ["Starting by itself: nothing here is ready to start", "เริ่มงานเอง: ที่นี่ยังไม่มีงานที่พร้อมเริ่ม"],
     [

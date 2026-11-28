@@ -1241,11 +1241,14 @@ listed, and a host whose Paseo has no provider usage shows no limits at all.
 From 80% used the Host button in the toolbar names the closest limit instead of the memory, in the
 warning colour; from 95% in the danger colour; at 100% it reads "Out of Claude" (or the provider's
 name). When a limit's use rose between two readings at least 5 minutes apart, and at that rate it
-reaches 100% before its reset, the note adds "at this pace out by Thu 14:00" (the weekday and the
-24-hour time in the device's locale and zone) for the soonest such limit of the counted providers.
-The page keeps each limit's earlier reading for this and replaces it only by one at least 5 minutes
-later, so the pace shows after the second reading 5 minutes on and is worked out again every 5 to 7
-minutes. It is a line, not a rule of the gate, and a limit already out has none. On the 3D floor a plan at 100% puts the countdown board on the wall, and the people on that
+reaches 100% before its reset, the toolbar shows "Claude 5 hours: at this pace out by Thu 14:00"
+(the provider, the window, the weekday and the 24-hour time in the device's locale and zone) for
+the soonest such limit of the counted providers, whatever the limits' level: with no limit at 80%
+yet it is the whole note, in the warning colour; otherwise it follows the note after " · ". The page
+keeps each limit's earlier reading for this and replaces it only by one at least 5 minutes later,
+so the pace shows after the second reading 5 minutes on and is worked out again every 5 to 7
+minutes. The kept readings are dropped when the office closes, so a pace needs two fresh ones. It
+is a line, not a rule of the gate, and a limit already out has none. On the 3D floor a plan at 100% puts the countdown board on the wall, and the people on that
 plan who are resting take a break in the pantry until it resets. Whoever is still working keeps
 working.
 

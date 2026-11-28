@@ -200,8 +200,12 @@ export const RULES: readonly Rule[] = [
   [/^No output yet, read at (.+)$/, (time) => `Belum ada keluaran, dibaca pukul ${time}`],
   [/^Out of ([A-Z][A-Za-z]+)$/, (name) => `${name} habis`],
   [
-    /^(.+) · at this pace out by (.+)$/,
-    (note, time) => `${translatePattern(note)} · dengan laju ini habis pada ${time}`,
+    /^(.+?) · (.+): at this pace out by (.+)$/,
+    (note, name, time) => `${translatePattern(note)} · ${name}: dengan laju ini habis pada ${time}`,
+  ],
+  [
+    /^(.+): at this pace out by (.+)$/,
+    (name, time) => `${name}: dengan laju ini habis pada ${time}`,
   ],
   [/^Starting by itself: (.+)$/, (why) => `Memulai sendiri: ${translatePattern(why)}`],
   [

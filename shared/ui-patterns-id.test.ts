@@ -98,8 +98,16 @@ test("the cards' longer lines are in Indonesian too, with their names and number
     ["Context 91% full, 182k of 200k tokens", "Konteks 91% penuh, 182k dari 200k token"],
     ["Out of Claude", "Claude habis"],
     [
-      "Claude 85% · at this pace out by Thu 14:00",
-      "Claude 85% · dengan laju ini habis pada Thu 14:00",
+      "Claude 85% · Codex week: at this pace out by Thu 14:00",
+      "Claude 85% · Codex week: dengan laju ini habis pada Thu 14:00",
+    ],
+    [
+      "Claude 5 hours: at this pace out by Thu 14:00",
+      "Claude 5 hours: dengan laju ini habis pada Thu 14:00",
+    ],
+    [
+      "Host resources. Plan limit: Claude 5 hours: at this pace out by Thu 14:00",
+      "Sumber daya host. Batas paket: Claude 5 hours: dengan laju ini habis pada Thu 14:00",
     ],
     ["Starting by itself", "Memulai sendiri"],
     [
