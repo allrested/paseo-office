@@ -1512,6 +1512,16 @@ describe("the lobby's backlog", () => {
     expect(fieldText("Add a to-do")).toBe("Later");
   });
 
+  test("the field has its own row and the two Add buttons share the one under it, Add first", async () => {
+    await mount({ rooms: lobbyRooms([]), roomId: "lobby" });
+    const buttons = byLabel("Add").parentElement?.parentElement;
+    expect(buttons).toBe(byLabel("Add to backlog").parentElement?.parentElement);
+    expect(buttons?.contains(byLabel("Add a to-do"))).toBe(false);
+    expect(buttons?.children[0]?.contains(byLabel("Add"))).toBe(true);
+    expect(buttons?.children[1]?.contains(byLabel("Add to backlog"))).toBe(true);
+    expect(getComputedStyle(buttons as HTMLElement).flexWrap).toBe("wrap");
+  });
+
   test("a room's form has no Add to backlog", async () => {
     await mount({ rooms: officeRooms([]), roomId: "w1" });
     expect(container.querySelector('[aria-label="Add to backlog"]')).toBeNull();

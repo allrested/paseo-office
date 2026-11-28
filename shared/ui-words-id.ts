@@ -16,7 +16,7 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Add duty": "Tambah piket",
   "Add quick message": "Tambah pesan cepat",
   "Add team": "Tambah tim",
-  "Add to backlog": "Tambah ke backlog",
+  "Add to backlog": "Tambah ke antrean",
   "Add to lobby": "Tambah ke lobi",
   "Adding...": "Menambahkan...",
   "Agent tools": "Alat agen",

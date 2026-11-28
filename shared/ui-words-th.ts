@@ -16,7 +16,7 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Add duty": "เพิ่มเวร",
   "Add quick message": "เพิ่มข้อความด่วน",
   "Add team": "เพิ่มทีม",
-  "Add to backlog": "เพิ่มไปที่ backlog",
+  "Add to backlog": "เพิ่มไปที่งานค้าง",
   "Add to lobby": "เพิ่มไปที่ล็อบบี้",
   "Adding...": "กำลังเพิ่ม...",
   "Agent tools": "เครื่องมือของ agent",

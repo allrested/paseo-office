@@ -294,24 +294,26 @@ export function LobbyBody({
   return (
     <View style={styles.sheet}>
       <View style={styles.lobbyForm}>
-        <View style={styles.boardTitleRow}>
-          <View style={styles.rowBody}>
-            <TextInput
-              accessibilityLabel="Add a to-do"
-              value={text}
-              onChangeText={setText}
-              onSubmitEditing={add}
-              // Enter adds and the focus stays for the next to-do. react-native-web reads only
-              // blurOnSubmit; native reads submitBehavior.
-              submitBehavior="submit"
-              blurOnSubmit={false}
-              placeholder="Add a to-do"
-              placeholderTextColor={styles.placeholderColor}
-              maxLength={POST_TEXT_MAX}
-              style={styles.fieldInput}
-              ref={followUp.field}
-            />
-          </View>
+        {/* The field has its row to itself, and the buttons share the next: beside two buttons it
+            would be squeezed to a few words on a phone. */}
+        <View>
+          <TextInput
+            accessibilityLabel="Add a to-do"
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={add}
+            // Enter adds and the focus stays for the next to-do. react-native-web reads only
+            // blurOnSubmit; native reads submitBehavior.
+            submitBehavior="submit"
+            blurOnSubmit={false}
+            placeholder="Add a to-do"
+            placeholderTextColor={styles.placeholderColor}
+            maxLength={POST_TEXT_MAX}
+            style={styles.fieldInput}
+            ref={followUp.field}
+          />
+        </View>
+        <View style={styles.actions}>
           <ActionButton
             label="Add"
             pendingLabel="Adding..."

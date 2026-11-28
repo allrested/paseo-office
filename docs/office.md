@@ -550,7 +550,7 @@ beside it. A room's card still shows and counts only open and claimed tasks and 
 
 A lobby task can be held in the **Backlog**: it stays open but is not handed out, and no agent can
 claim it, until you press **Start** on its card or row, which takes it out (it then waits on
-what it is after, as any task does). The lobby's form has **Add to backlog** beside **Add**: it
+what it is after, as any task does). The lobby's form has **Add to backlog** beside **Add**, both under the field: it
 posts exactly what Add would (the text, the agent or team chosen, the follow-up) and holds it, and
 is off under the same conditions as Add; Enter in the field still adds. A held task is in Backlog
 as a column, even when it also waits on others, and its card still says "Waiting on p12"; in the

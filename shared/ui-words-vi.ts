@@ -16,7 +16,7 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Add duty": "Thêm trực nhật",
   "Add quick message": "Thêm tin nhắn nhanh",
   "Add team": "Thêm nhóm",
-  "Add to backlog": "Thêm vào backlog",
+  "Add to backlog": "Thêm vào tồn đọng",
   "Add to lobby": "Thêm vào sảnh",
   "Adding...": "Đang thêm...",
   "Agent tools": "Công cụ của agent",
