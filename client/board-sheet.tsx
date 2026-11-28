@@ -26,7 +26,7 @@ import { PostRow } from "./room-board.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 import type { OfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
-import { useBoardLayouts } from "./use-board-layouts.js";
+import { useBoardLayouts, type BoardLayouts } from "./use-board-layouts.js";
 
 interface ChipProps {
   label: string;
@@ -412,6 +412,16 @@ export interface BoardSheetProps {
 }
 
 /**
+ * A kanban's columns sit side by side from 720 px, wider than the standard dialog, so a board laid
+ * out as a kanban opens it wide. Under 600 px every dialog is the screen's width: a phone still
+ * stacks the columns.
+ */
+function dialogSize(room: OfficeRoom | null, layouts: BoardLayouts): "wide" | undefined {
+  const layout = room?.lobby ? layouts.lobby : layouts.rooms;
+  return layout === "kanban" ? "wide" : undefined;
+}
+
+/**
  * Post a task or note, optionally waking an agent; mark a task done or delete a post. Under the
  * form are the room's agents with what each is at. The lobby's board is its to-dos instead, with
  * the agents at work in every room under them. Each board is a kanban or a list as the device's
@@ -458,6 +468,7 @@ export function BoardSheet({
     <Modal
       title={picking ? pickerTitle : board}
       icon={icon}
+      size={dialogSize(room, layouts)}
       open={room !== null}
       onOpenChange={change}
     >

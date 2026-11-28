@@ -521,9 +521,10 @@ when they hold something. Each heading says how many the column holds, as in "To
 is a card with the list's checkbox and delete button, and a note keeps its Delete button. A card
 changes column through those buttons; nothing is dragged. **Clear finished** is in Done's heading.
 When the board is 720 px wide or more, the columns sit side by side, 280 px each, and scroll
-sideways when they do not fit. Narrower, as on a phone, they are stacked sections: a press on a
-heading folds or unfolds its section, and Done starts folded. The form stays above the columns and
-**Agent tasks** under them.
+sideways when they do not fit; in fullscreen a kanban's board opens in the wide dialog to make
+room for them. Narrower, as on a phone, they are stacked sections: a press on a heading folds or
+unfolds its section, and Done starts folded. The form stays above the columns and **Agent tasks**
+under them.
 
 **Boards** in the settings chooses each board's layout on this device: **Lobby board** Kanban (the
 default) or List, and **Room boards** List (the default) or Kanban. A room's board as a kanban has

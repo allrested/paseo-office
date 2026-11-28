@@ -14,6 +14,7 @@ import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
 import { BoardSheet } from "./board-sheet.js";
 import { buildOfficeModel, type AgentTaskGroup, type OfficeRoom } from "../shared/model.js";
 import type { BoardLayout } from "../shared/settings.js";
+import { OfficeDialogs } from "./office-modal.js";
 import { useOfficeStyles } from "./styles.js";
 import type { BoardActions } from "./use-board-actions.js";
 
@@ -174,6 +175,8 @@ interface HarnessProps {
   wakesPaused?: boolean;
   /** The board was opened from the lobby's. */
   fromLobby?: boolean;
+  /** In fullscreen: the office's own dialog, not the host's sheet. */
+  fullscreen?: boolean;
 }
 
 function Harness({
@@ -184,23 +187,26 @@ function Harness({
   sheetLeavesFirst = false,
   wakesPaused = false,
   fromLobby = false,
+  fullscreen = false,
 }: HarnessProps) {
   const styles = useOfficeStyles(THEME, compact, false);
   return (
-    <BoardSheet
-      room={rooms.find((room) => room.id === roomId) ?? null}
-      rooms={rooms}
-      agentTasks={agentTasks}
-      name={nameOf}
-      actions={ACTIONS}
-      wakesPaused={wakesPaused}
-      sheetLeavesFirst={sheetLeavesFirst}
-      styles={styles}
-      onSelectAgent={onSelectAgent}
-      onOpenBoard={onOpenBoard}
-      onBack={fromLobby ? onBack : undefined}
-      onClose={onClose}
-    />
+    <OfficeDialogs fullscreen={fullscreen} theme={THEME} styles={styles}>
+      <BoardSheet
+        room={rooms.find((room) => room.id === roomId) ?? null}
+        rooms={rooms}
+        agentTasks={agentTasks}
+        name={nameOf}
+        actions={ACTIONS}
+        wakesPaused={wakesPaused}
+        sheetLeavesFirst={sheetLeavesFirst}
+        styles={styles}
+        onSelectAgent={onSelectAgent}
+        onOpenBoard={onOpenBoard}
+        onBack={fromLobby ? onBack : undefined}
+        onClose={onClose}
+      />
+    </OfficeDialogs>
   );
 }
 
@@ -896,4 +902,48 @@ test("until the device's setting is read the lobby is a kanban and a room's boar
     "Mark done",
     "Delete",
   ]);
+});
+
+test("in fullscreen the board's dialog opens wide for a kanban and at its own size for a list", async () => {
+  // jsdom has no dialog top layer: opening and closing one only sets its attribute.
+  const proto = Object.getPrototypeOf(document.createElement("dialog"));
+  Object.defineProperties(proto, {
+    showModal: {
+      configurable: true,
+      value() {
+        this.setAttribute("open", "");
+      },
+    },
+    close: {
+      configurable: true,
+      value() {
+        this.removeAttribute("open");
+      },
+    },
+  });
+  const size = () => {
+    const dialog = container.querySelector("dialog[open]");
+    if (dialog === null) throw new Error("No dialog is open");
+    return dialog.getAttribute("data-size");
+  };
+  const lobby = { rooms: lobbyRooms([]), roomId: "lobby", fullscreen: true };
+  const room = { rooms: officeRooms([]), roomId: "w1", fullscreen: true };
+  try {
+    layouts("kanban", "list");
+    await mount(lobby);
+    expect(size()).toBe("wide");
+    await mount(room);
+    expect(size()).toBeNull();
+
+    layouts("list", "kanban");
+    await mount(room);
+    expect(size()).toBe("wide");
+    await mount(lobby);
+    expect(size()).toBeNull();
+  } finally {
+    // The dialog closes before its methods go.
+    await mount({ rooms: [], fullscreen: true });
+    Reflect.deleteProperty(proto, "showModal");
+    Reflect.deleteProperty(proto, "close");
+  }
 });
