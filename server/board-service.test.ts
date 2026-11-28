@@ -620,6 +620,31 @@ test("an open or claimed duty of an earlier day is owed: no second post; done on
   expect(service.postsOf("duty").map((item) => item.id)).toEqual(["p1", "p2"]);
 });
 
+test("a duty finished yesterday whose cost is settled today still left yesterday: it goes, and today's is posted", async () => {
+  const yesterday = "2026-11-11T20:00:00.000Z";
+  const finished = dutyPost(1, "build", "2026-11-11", {
+    state: "done",
+    claimedBy: "a",
+    claimedAt: "2026-11-11T19:00:00.000Z",
+    doneAt: yesterday,
+    updatedAt: yesterday,
+    costAtClaim: 1,
+    spentPending: true,
+  });
+  const { service, clock } = await harness(file([finished]), { costOf: () => 1.5 });
+  // The agent's turn ends the next day: the settle changes the post, and so its updatedAt.
+  clock.advance(DAY);
+  await service.settleSpent("a");
+  expect(service.postsOf("duty")).toMatchObject([
+    { id: "p1", spentUsd: 0.5, doneAt: yesterday, updatedAt: "2026-11-12T09:00:00.000Z" },
+  ]);
+  await service.syncDuties({ duties: [BUILD], day: "2026-11-12", due: [BUILD], dayOf });
+  expect(service.postsOf("duty")).toMatchObject([
+    { state: "open", duty: { id: "build", day: "2026-11-12" } },
+  ]);
+  expect(service.postsOf("duty")).toHaveLength(1);
+});
+
 test("a duty that leaves the list takes its open post; an edit changes its open post's text", async () => {
   const { service } = await harness(
     file([

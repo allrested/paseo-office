@@ -179,9 +179,12 @@ function isDutyTask(post: Post): boolean {
   return post.board === DUTY && post.kind === "task" && post.duty !== undefined;
 }
 
-/** The board's day a done duty was finished on: an owed one is finished on a later day than its own. */
+/**
+ * The board's day a done duty was finished on: an owed one is finished on a later day than its
+ * own. By when it was done, not when it last changed: a cost settled the next day changes it too.
+ */
 function finishedDay(post: Post, plan: DutySync): string {
-  return plan.dayOf(Date.parse(post.updatedAt));
+  return plan.dayOf(Date.parse(post.doneAt ?? post.updatedAt));
 }
 
 /** The weekday of a day (YYYY-MM-DD), 0 for Sunday. */
