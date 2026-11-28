@@ -905,3 +905,135 @@ test("a boards file from before links loads unchanged", async () => {
   expect(store.saved).toHaveLength(0);
   expect(service.boards()).toEqual({ lobby: [old.posts[0]], w1: [old.posts[1]] });
 });
+
+function taskOn(seq: number, fields: Partial<Post> = {}): Post {
+  return post(seq, { kind: "task", state: "open", ...fields });
+}
+
+test("done with a note keeps it as the result; without one nothing is set", async () => {
+  const { service } = await harness(file([taskOn(1), taskOn(2), taskOn(3)]));
+  const done = await service.update({
+    id: "p1",
+    action: "done",
+    actor: "a",
+    note: "  Merged it  ",
+  });
+  expect(done.ok && done.post).toMatchObject({ state: "done", result: "Merged it" });
+  const blank = await service.update({ id: "p2", action: "done", actor: "a", note: "  " });
+  expect(blank.ok && blank.post).not.toHaveProperty("result");
+  const bare = await service.update({ id: "p3", action: "done", actor: "a" });
+  expect(bare.ok && bare.post).not.toHaveProperty("result");
+});
+
+test("a linked partner gets the same result when it is marked done with it", async () => {
+  const { service } = await claimedByA();
+  await service.update({ id: "p1", action: "done", actor: "user", note: "All good" });
+  expect(find(service, "p1")).toMatchObject({ state: "done", result: "All good" });
+  expect(find(service, "p3")).toMatchObject({ state: "done", result: "All good" });
+});
+
+test("reopening a done task drops its result, from the task or from its copy", async () => {
+  const { service } = await harness(file([taskOn(1, { state: "done", result: "Done it" })]));
+  const reopened = await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(reopened.ok && reopened.post).toMatchObject({ state: "open" });
+  expect(reopened.ok && reopened.post).not.toHaveProperty("result");
+  const lobby = await claimedByA();
+  await lobby.service.update({ id: "p1", action: "done", actor: "a", note: "Fine" });
+  await lobby.service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(find(lobby.service, "p1")).not.toHaveProperty("result");
+});
+
+test("a reply is a note on its task's board, whatever kind it says", async () => {
+  const { service } = await harness(file([taskOn(1, { board: "w2" })]));
+  const reply = await service.post({
+    board: "w1",
+    kind: "task",
+    text: "Why?",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(reply).toMatchObject({
+    ok: true,
+    post: { id: "p2", board: "w2", kind: "note", replyTo: "p1", text: "Why?" },
+  });
+  expect(reply.ok && reply.post).not.toHaveProperty("state");
+  expect(service.postsOf("w2").map((item) => item.id)).toEqual(["p1", "p2"]);
+});
+
+test("a reply to a reply, or to a copy, goes under the root task", async () => {
+  const { service } = await claimedByA();
+  const first = await service.post({
+    board: "w1",
+    kind: "note",
+    text: "one",
+    author: "user",
+    replyTo: "p3",
+  });
+  expect(first).toMatchObject({ ok: true, post: { board: "lobby", replyTo: "p1" } });
+  const second = await service.post({
+    board: "w1",
+    kind: "note",
+    text: "two",
+    author: "b",
+    replyTo: first.ok ? first.post.id : "",
+  });
+  expect(second).toMatchObject({ ok: true, post: { board: "lobby", replyTo: "p1" } });
+});
+
+test("a reply needs an existing task", async () => {
+  const { service, store } = await harness(file([post(1)]));
+  for (const replyTo of ["p1", "p9"]) {
+    expect(
+      await service.post({ board: "w1", kind: "note", text: "x", author: "user", replyTo }),
+    ).toEqual({ ok: false, error: `Unable to post: no task ${replyTo}` });
+  }
+  expect(store.saved).toEqual([]);
+});
+
+test("a reply is addressed to the agent holding the task, unless that agent wrote it", async () => {
+  const { service } = await harness(
+    file([
+      taskOn(1, { state: "claimed", claimedBy: "a" }),
+      taskOn(2),
+      taskOn(3, { state: "claimed", claimedBy: "user" }),
+    ]),
+  );
+  const reply = (text: string, author: string, replyTo: string, to?: string) =>
+    service.post({ board: "w1", kind: "note", text, author, replyTo, ...(to ? { to } : {}) });
+  const fromUser = await reply("hi", "user", "p1");
+  expect(fromUser.ok && fromUser.post).toMatchObject({ to: "a" });
+  expect(fromUser.ok && fromUser.post).not.toHaveProperty("namedPickup");
+  const peer = await reply("peer", "b", "p1");
+  expect(peer.ok && peer.post).toMatchObject({ to: "a" });
+  const own = await reply("mine", "a", "p1", "b");
+  expect(own.ok && own.post).not.toHaveProperty("to");
+  const open = await reply("who", "user", "p2");
+  expect(open.ok && open.post).not.toHaveProperty("to");
+  const byUser = await reply("me", "b", "p3");
+  expect(byUser.ok && byUser.post).not.toHaveProperty("to");
+});
+
+test("deleting, clearing or pruning a task takes its replies with it", async () => {
+  const replies = (task: number, first: number, board: string) => [
+    post(first, { board, replyTo: `p${task}` }),
+    post(first + 1, { board, replyTo: `p${first}` }),
+  ];
+  const { service, events } = await harness(
+    file([
+      taskOn(1, { board: "w1" }),
+      ...replies(1, 2, "w1"),
+      taskOn(4, { board: "w2", state: "done" }),
+      ...replies(4, 5, "w3"),
+      taskOn(7, { board: "w4", state: "done", updatedAt: new Date(T0 - 8 * DAY).toISOString() }),
+      post(8, { board: "w4", replyTo: "p7" }),
+    ]),
+  );
+  await service.remove("p1");
+  expect(service.postsOf("w1")).toEqual([]);
+  expect(events.at(-1)).toBe("board w1 ");
+  await service.clearDone("w2");
+  expect(service.postsOf("w3")).toEqual([]);
+  expect(events.at(-1)).toBe("board w3 ");
+  await service.prune();
+  expect(service.postsOf("w4")).toEqual([]);
+});

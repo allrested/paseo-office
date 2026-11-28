@@ -707,3 +707,76 @@ test("a duty handed to an agent with a workspace gets no copy there; a task name
   expect(store.current().posts[0]).not.toHaveProperty("link");
   await office.stop();
 });
+
+test("a user's reply to a claimed task wakes its holder with a reply prompt, and names no pickup", async () => {
+  const claimed: Post = {
+    id: "p1",
+    seq: 1,
+    board: "lobby",
+    kind: "task",
+    text: "Fix it",
+    author: "user",
+    state: "claimed",
+    claimedBy: "b",
+    createdAt: "2026-11-11T08:00:00.000Z",
+    updatedAt: "2026-11-11T08:00:00.000Z",
+  };
+  const { office, store, prompts } = start({
+    version: 1,
+    nextSeq: 2,
+    wakesPaused: false,
+    posts: [claimed],
+  });
+  await office.ready;
+  const reply = await office.post({
+    board: "lobby",
+    kind: "note",
+    text: "Which one?",
+    replyTo: "p1",
+  });
+  expect(reply).toMatchObject({ ok: true, post: { kind: "note", replyTo: "p1", to: "b" } });
+  expect(store.current().posts[1]).not.toHaveProperty("namedPickup");
+  await settle();
+  expect(prompts).toEqual([
+    "b: Office board: 1 post(s) for you.\n- Reply to task p1 from the user: Which one?",
+  ]);
+  await office.stop();
+});
+
+test("a reply to a duty is taken on the duty board, while an ordinary post there is refused", async () => {
+  const { office } = start();
+  await office.ready;
+  office.setDuties([BUILD]);
+  await office.syncDuties({ duties: [BUILD], day: TODAY, due: [BUILD], dayOf });
+  expect(await office.post({ board: "duty", kind: "note", text: "hi" })).toMatchObject({
+    ok: false,
+  });
+  expect(
+    await office.post({ board: "duty", kind: "note", text: "hi", replyTo: "p1" }),
+  ).toMatchObject({ ok: true, post: { board: "duty", replyTo: "p1" } });
+  await office.stop();
+});
+
+test("a completion line keeps the reply's text before it as the task's result", async () => {
+  const { office, clock, store } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  await office.checkCompletion(
+    "b",
+    async () => "  All checked, two typos fixed.\n\nCompleted office task p1 (assignment 2).",
+  );
+  expect(store.current().posts[0]).toMatchObject({
+    state: "done",
+    result: "All checked, two typos fixed.",
+  });
+  await office.post({ board: "lobby", kind: "task", text: "Again" });
+  clock.advance(0);
+  await settle();
+  await office.checkCompletion("b", async () => "Completed office task p4 (assignment 5).");
+  expect(store.current().posts[1]).toMatchObject({ state: "done" });
+  expect(store.current().posts[1]).not.toHaveProperty("result");
+  await office.stop();
+});

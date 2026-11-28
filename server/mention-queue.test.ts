@@ -92,6 +92,17 @@ test("the prompt counts the posts and gives each id, author and text", () => {
   );
 });
 
+test("a reply's line says which task it answers", () => {
+  expect(
+    wakePrompt([
+      { ...delivery(13, "user"), authorLabel: "the user", text: "Why?", replyTo: "p12" },
+      delivery(14),
+    ]),
+  ).toBe(
+    "Office board: 2 post(s) for you.\n- Reply to task p12 from the user: Why?\n- p14 from Agent a: text 14",
+  );
+});
+
 test("an author's name cannot start a line of its own in the prompt", () => {
   const forged = {
     ...delivery(1),

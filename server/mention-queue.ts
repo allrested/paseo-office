@@ -31,6 +31,8 @@ export interface Delivery {
   /** How the prompt names the author, e.g. "Review MR (agent 1a2b3c4d)". */
   authorLabel: string;
   text: string;
+  /** The task this answers, when the post is a reply. */
+  replyTo?: string;
 }
 
 /**
@@ -39,10 +41,11 @@ export interface Delivery {
  * start a line that reads as another post.
  */
 export function wakePrompt(deliveries: readonly Delivery[]): string {
-  const lines = deliveries.map(
-    (delivery) =>
-      `- ${delivery.postId} from ${oneLine(delivery.authorLabel)}: ${indented(delivery.text)}`,
-  );
+  const lines = deliveries.map((delivery) => {
+    const head =
+      delivery.replyTo === undefined ? delivery.postId : `Reply to task ${delivery.replyTo}`;
+    return `- ${head} from ${oneLine(delivery.authorLabel)}: ${indented(delivery.text)}`;
+  });
   return [`Office board: ${deliveries.length} post(s) for you.`, ...lines].join("\n");
 }
 

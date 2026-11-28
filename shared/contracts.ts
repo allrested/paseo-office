@@ -190,6 +190,10 @@ export const PostSchema = z.object({
   duty: z.object({ id: z.string(), day: z.string() }).optional(),
   /** A claimed lobby task's copy on the claimer's board, and the copy's lobby task: each other's id. */
   link: z.string().optional(),
+  /** A done task's result: what the one who finished it reported. */
+  result: z.string().optional(),
+  /** On a note: the task it answers; the note goes when the task does. */
+  replyTo: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -723,13 +727,18 @@ export const postRpc = defineRpc({
     kind: PostKindSchema,
     text: z.string().min(1).max(POST_TEXT_MAX),
     to: z.string().min(1).optional(),
+    replyTo: z.string().min(1).optional(),
   }),
   output: PostResultSchema,
 });
 
 export const updateRpc = defineRpc({
   name: "office.update.request",
-  input: z.object({ id: z.string().min(1), action: UpdateActionSchema }),
+  input: z.object({
+    id: z.string().min(1),
+    action: UpdateActionSchema,
+    note: z.string().max(POST_TEXT_MAX).optional(),
+  }),
   output: PostResultSchema,
 });
 
