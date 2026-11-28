@@ -4,6 +4,15 @@ import { translatePattern } from "./ui-patterns-vi.js";
 test("lines built from data keep their data and take Vietnamese words", () => {
   const lines: [string, string][] = [
     ["12 min ago", "12 phút trước"],
+    [
+      'Line 2: "0123" is not a Telegram user id',
+      'Dòng 2: "0123" không phải ID người dùng Telegram',
+    ],
+    [
+      "Connected as @office_bot. A message was sent to the chat.",
+      "Đã kết nối với tư cách @office_bot. Một tin nhắn đã được gửi vào cuộc trò chuyện.",
+    ],
+    ["Messages from others ignored: 3", "Tin nhắn từ người khác bị bỏ qua: 3"],
     ["3 h ago", "3 giờ trước"],
     ["2 h 5 min", "2 giờ 5 phút"],
     ["Idle for 45 min", "Rảnh 45 phút"],

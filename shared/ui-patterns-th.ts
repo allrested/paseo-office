@@ -291,6 +291,15 @@ export const RULES: readonly Rule[] = [
   [/^(\S+) is no longer read: not commented$/, (repo) => `${repo} ไม่ได้อ่านแล้ว: ไม่ได้คอมเมนต์`],
   [/^Open (\S+) in Jira$/, (key) => `เปิด ${key} ใน Jira`],
   [/^Open (\S+) on GitHub$/, (key) => `เปิด ${key} บน GitHub`],
+  [
+    /^Line (\d+): "(.+)" is not a Telegram user id$/,
+    (n, entry) => `บรรทัด ${n}: "${entry}" ไม่ใช่ไอดีผู้ใช้ Telegram`,
+  ],
+  [
+    /^Connected as @(\S+)\. A message was sent to the chat\.$/,
+    (bot) => `เชื่อมต่อในชื่อ @${bot} แล้ว ส่งข้อความไปยังแชตแล้ว`,
+  ],
+  [/^Messages from others ignored: (\d+)$/, (n) => `ข้อความจากผู้อื่นที่ถูกเมิน: ${n}`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,

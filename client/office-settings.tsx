@@ -96,6 +96,7 @@ function OfficeSettingsFields({
         weather={office.state.weather}
         incidents={office.state.incidents}
         intake={office.state.intake}
+        telegram={office.state.telegram}
       >
         <>
           <SceneChoices choice={street} styles={styles} />

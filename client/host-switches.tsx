@@ -10,7 +10,8 @@ import { NumberField } from "./number-field.js";
 import { WeatherFields, type WeatherSetting } from "./weather-settings.js";
 import { NotifyFields, type NotifySetting } from "./notify-settings.js";
 import { IntakeSettings, type IntakeSetting } from "./intake-settings.js";
-import type { IncidentsState, IntakeState, WakeState } from "../shared/contracts.js";
+import { TelegramSettings, type TelegramSetting } from "./telegram-settings.js";
+import type { IncidentsState, IntakeState, TelegramState, WakeState } from "../shared/contracts.js";
 import {
   CACHE_CLOCKS,
   CHAT_CULTURES,
@@ -74,7 +75,8 @@ type HostSetting =
   | "Error pattern"
   | WeatherSetting
   | NotifySetting
-  | IntakeSetting;
+  | IntakeSetting
+  | TelegramSetting;
 
 /** What the incidents fields need to know from the host: never a token's value. */
 type TrackerState = Pick<
@@ -120,6 +122,8 @@ export interface HostSwitchesProps {
   incidents: TrackerState | undefined;
   /** The intake's state; absent until the office's server has read the settings. */
   intake?: IntakeState | undefined;
+  /** The Telegram bridge's state; absent until the office's server has read its token. */
+  telegram?: TelegramState | undefined;
   /** The device's own switch: last in the row, so on a phone it wraps to the line above the view. */
   weather?: import("../shared/contracts.js").WeatherState | undefined;
   /** Who holds which team and teammate, for the Teams section; none until the office has loaded. */
@@ -144,6 +148,7 @@ export function HostSwitches({
   scheduleError,
   incidents,
   intake,
+  telegram,
   weather,
   rosterHolders,
   language,
@@ -369,6 +374,14 @@ export function HostSwitches({
           <IntakeSettings
             values={stored}
             intake={intake}
+            change={change}
+            saveProblem={saveProblem}
+            styles={styles}
+          />
+          <Text style={styles.sheetLabel}>Telegram</Text>
+          <TelegramSettings
+            values={stored}
+            telegram={telegram}
             change={change}
             saveProblem={saveProblem}
             styles={styles}

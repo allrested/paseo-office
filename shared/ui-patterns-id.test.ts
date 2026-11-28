@@ -11,6 +11,12 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["acme/web is no longer read: not commented", "acme/web tidak lagi dibaca: tidak dikomentari"],
     ["GitHub: last read 12:40: 2 imported", "GitHub: terakhir dibaca 12:40: 2 diimpor"],
     ['Line 2: "-evil/x" is not owner/repo', 'Baris 2: "-evil/x" bukan owner/repo'],
+    ['Line 2: "0123" is not a Telegram user id', 'Baris 2: "0123" bukan ID pengguna Telegram'],
+    [
+      "Connected as @office_bot. A message was sent to the chat.",
+      "Terhubung sebagai @office_bot. Pesan telah dikirim ke chat.",
+    ],
+    ["Messages from others ignored: 3", "Pesan dari orang lain diabaikan: 3"],
     ["3 h ago", "3 jam lalu"],
     ["just now", "baru saja"],
     ["2 h 5 min", "2 jam 5 mnt"],

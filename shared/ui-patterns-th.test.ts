@@ -4,6 +4,12 @@ import { translatePattern } from "./ui-patterns-th.js";
 test("lines built from data keep their data and take Thai words", () => {
   const lines: [string, string][] = [
     ["12 min ago", "12 นาทีที่แล้ว"],
+    ['Line 2: "0123" is not a Telegram user id', 'บรรทัด 2: "0123" ไม่ใช่ไอดีผู้ใช้ Telegram'],
+    [
+      "Connected as @office_bot. A message was sent to the chat.",
+      "เชื่อมต่อในชื่อ @office_bot แล้ว ส่งข้อความไปยังแชตแล้ว",
+    ],
+    ["Messages from others ignored: 3", "ข้อความจากผู้อื่นที่ถูกเมิน: 3"],
     ["3 h ago", "3 ชั่วโมงที่แล้ว"],
     ["2 h 5 min", "2 ชม. 5 นาที"],
     ["Idle for 45 min", "ว่างมา 45 นาที"],

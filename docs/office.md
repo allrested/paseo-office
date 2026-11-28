@@ -995,18 +995,32 @@ The office can speak in a Telegram chat through a bot you make (`server/telegram
 
 **Setting it up.**
 
-1. In Telegram, send `/newbot` to @BotFather and keep the token it gives. Save it through
-   `office.telegram.save.request` (an empty token removes the saved one), or set
+1. In Telegram, send `/newbot` to @BotFather and keep the token it gives. Type it in Settings →
+   Services → Telegram and press Save (`office.telegram.save.request`; an empty token removes the
+   saved one), or set
    `TELEGRAM_BOT_TOKEN` in the daemon's environment; a saved token wins. The token is never sent
-   back to a client.
+   back to a client: the field is masked, is emptied once Save has answered (whether it took the
+   token or not), and the line under it says only "Saved", "From the host's environment
+   (TELEGRAM_BOT_TOKEN)" or "No token yet". Remove shows only for a saved token and asks "Remove the
+   saved token?" first; a token from the environment cannot be removed here.
 2. Add the bot to your group (or open a private chat with it) and write it a line. While no chat
    is set the office does not poll, so `https://api.telegram.org/bot<token>/getUpdates` in a
    browser shows that line with `"chat":{"id":...}` (a group's id starts with `-`) and
    `"from":{"id":...}`, your own user id. The address holds the token: clear it from the
    browser's history afterwards.
-3. Put the chat id in `telegramChat` and your user id in `telegramUsers` (host settings, up to 20
-   ids). `office.telegram.test.request` asks Telegram who the bot is, then writes "The office is
-   connected." to the chat, and answers the bot's name or what went wrong.
+3. Put the chat id in **Chat id** (`telegramChat`) and your user id in **User ids that are
+   heard** (`telegramUsers`): one per line, digits with no leading zero, up to 20. An entry the
+   settings would refuse is told by its line ("Line 2: "0123" is not a Telegram user id") and is not
+   saved. **Test** (`office.telegram.test.request`) asks Telegram who the bot is, then writes "The
+   office is connected." to the chat, and shows "Connected as @<bot>. A message was sent to the
+   chat." or what went wrong; it is off while there is no token or no chat.
+
+**What is sent** in the settings holds the five switches (`telegramNeeds`, `telegramStalled`,
+`telegramDone`, `telegramIncidents`, `telegramPlan`, described below), and **Tasks from Telegram go
+to** is `telegramLands`, Backlog or To do. The line at the bottom of the section says "Off: needs a
+token, a chat and at least one user id." while the bridge is not polling, "On." while it is, the
+bridge's problem (plain text) when it has one, and "Messages from others ignored: N" when the
+bridge has dropped messages from users who are not listed, so you can see someone unlisted writing.
 
 The bridge runs only with a token, a chat and at least one user id. A change of any of them, or
 of the settings at all after Telegram refused the token, stops the running poll and starts again.
