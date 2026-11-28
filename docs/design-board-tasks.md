@@ -179,6 +179,13 @@ board, the words, `docs/office.md`.
 
 **Tests.** Kept at claim, worked out at done, dropped at reopen; unknown or lower cost.
 
+**Settled at the end of the turn.** A provider reports an agent's cost when a turn ends, and an
+agent marks its task done in the middle of one. So a task done while its agent works is marked
+`spentPending`, and `spentUsd` is worked out when the directory shows the agent no longer working.
+An agent that is closed, archived or gone from the directory before that leaves the task with its
+time and no cost: a figure is right or absent. A claim made by tool in the middle of a turn counts
+that turn whole.
+
 ## 8. A time for each duty
 
 **Problem.** Every duty is posted at 8:00.
