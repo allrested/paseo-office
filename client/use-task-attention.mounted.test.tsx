@@ -38,7 +38,12 @@ function modelWith(state: Post["state"]): OfficeModel {
     rows: [],
   } as unknown as OfficeRoom;
   const agents = new Map([["a1", { id: "a1", title: "Builder", status: "idle" } as OfficeAgent]]);
-  return { rooms: [lobby], agents, roomOfAgent: new Map() } as unknown as OfficeModel;
+  return {
+    rooms: [lobby],
+    agents,
+    home: new Map(),
+    roomOfAgent: new Map(),
+  } as unknown as OfficeModel;
 }
 
 let seen: TaskAttention;

@@ -108,23 +108,28 @@ words, `docs/office.md`.
 
 ## 4. Claims nobody works on
 
-**Problem.** A claim stays until the task is done or reopened, also when its agent was closed or
-archived, or stopped on an error. The duty board's Reopen exists to work around it.
+**Problem.** A claim stays until the task is done or reopened, also when its agent was archived,
+or stopped on an error. The duty board's Reopen exists to work around it.
 
 **Change.**
 
-- When an agent is closed or archived (`agentGone`), every task it holds, on every board, duties
-  included, is reopened, and the pickup hands it on.
+- When an agent is archived (`agentGone` from `agent.archive.after`), every task it holds, on
+  every board, duties included, is reopened, and the pickup hands it on.
+- A closed session keeps its claims, and a `blocked` mark with them. Paseo closes the runtime of a
+  session that has been idle for an hour and a prompt starts it again: the office takes it to be
+  at home, and a reply wakes it. Releasing on close would hand a task that waits for an answer to
+  another agent about once an hour.
 - The Tasks card also lists a claim whose agent stopped on an error, or is idle while the task is
-  neither done nor blocked and has not changed for 2 minutes. Each has **Nudge**, a reply from the
-  user asking the agent to finish with a result or block with what it needs (which wakes it, as a
-  reply does), and **Reopen**.
+  neither done nor blocked and has not changed for 2 minutes, or is at home (at once, as
+  "<agent> is at home"). Each has **Nudge**, a reply from the user asking the agent to finish with
+  a result or block with what it needs (which wakes it, as a reply does), and **Reopen**. A
+  blocked task of an agent at home stays a blocked row with its Answer field.
 
 **Files.** `server/office.ts`, `server/board-service.ts`, `client/tasks-card.tsx`, the words,
 `docs/office.md`.
 
-**Tests.** Every board's claims reopen on close and on archive; which claims count as stalled;
-Nudge posts the reply.
+**Tests.** Every board's claims reopen on archive, and none on close; which claims count as
+stalled; Nudge posts the reply.
 
 ## 5. Tasks for a team
 

@@ -113,7 +113,7 @@ export interface BoardService {
   /** Brings the duty board up to the list and the day, in one save. */
   syncDuties(plan: DutySync): Promise<void>;
   /**
-   * Reopens every task `agentId` still holds, as the user would, in one save: the agent is closed or
+   * Reopens every task `agentId` still holds, as the user would, in one save: the agent is
    * archived and will not finish them. Returns the ids left open (a pair's lobby task), in order.
    */
   releaseClaims(agentId: string): Promise<string[]>;

@@ -760,6 +760,75 @@ test("a post for a running agent goes out when its turn ends", async () => {
   await stop();
 });
 
+/** What the office's subscribers were last told a board holds, from their snapshot and its changes. */
+function boardShown(events: readonly object[], board: string): Record<string, unknown>[] {
+  let posts: Record<string, unknown>[] = [];
+  for (const event of events as {
+    type: string;
+    board?: string;
+    posts?: Record<string, unknown>[];
+    state?: { boards?: Record<string, Record<string, unknown>[]> };
+  }[]) {
+    if (event.type === "snapshot") posts = event.state?.boards?.[board] ?? [];
+    if (event.type === "board" && event.board === board) posts = event.posts ?? [];
+  }
+  return posts;
+}
+
+/** Runs one of the office's tools as the agent `agentId`, as the daemon does for a session. */
+async function runTool(
+  session: PluginSessionOpenRequest | undefined,
+  name: string,
+  input: object,
+  agentId: string,
+  context: PluginHandlerContext & { signal: AbortSignal },
+): Promise<unknown> {
+  const tool = session?.tools.find((candidate) => candidate.name === name);
+  return tool?.execute(
+    input as never,
+    {
+      agent: hookAgent(agentId),
+      paseo: context.paseo,
+      signal: context.signal,
+    } as never,
+  );
+}
+
+test("a session the daemon closes keeps the task it claimed, and its archive frees the task", async () => {
+  const { recorded, context, open, logs, stop } = setup(async () => ON);
+  const post = recorded.handlers.get("office.post.request");
+  await post?.({ board: "w1", kind: "task", text: "Build it" }, context);
+  const session = await open({ agentId: "b" });
+  await runTool(session, "office_update", { id: "p1", action: "claim" }, "b", context);
+  await runTool(
+    session,
+    "office_update",
+    { id: "p1", action: "block", note: "Which region?" },
+    "b",
+    context,
+  );
+  const office = openOffice(recorded, context);
+  await settle();
+  const held = { id: "p1", state: "claimed", claimedBy: "b", blocked: "Which region?" };
+  expect(boardShown(office.events, "w1")).toEqual([expect.objectContaining(held)]);
+  // An idle session's runtime is closed after an hour: it is at home, not gone.
+  await recorded.hooks.get("agent.close.after")?.({ agent: hookAgent("b") }, context);
+  await settle();
+  expect(boardShown(office.events, "w1")).toEqual([expect.objectContaining(held)]);
+  await recorded.hooks.get("agent.archive.after")?.(
+    { agent: hookAgent("b"), archivedAt: "2026-11-11T09:01:00.000Z" },
+    context,
+  );
+  await settle();
+  const [freed] = boardShown(office.events, "w1");
+  expect(freed).toMatchObject({ id: "p1", state: "open" });
+  expect(freed).not.toHaveProperty("claimedBy");
+  expect(freed).not.toHaveProperty("blocked");
+  expect(logs).toEqual(["[office] released p1 held by b"]);
+  await office.leave();
+  await stop();
+});
+
 test("the machine is read for a subscriber and no longer once it left", async () => {
   const { recorded, clock, context, stop } = setup(async () => ON);
   const events: unknown[] = [];

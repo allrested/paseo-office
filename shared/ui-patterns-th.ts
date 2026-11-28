@@ -98,6 +98,7 @@ export const RULES: readonly Rule[] = [
   [/^(.+) is stuck in a loop$/, (name) => `${name} ติดลูป`],
   [/^(.+) stopped on an error$/, (name) => `${name} หยุดเพราะข้อผิดพลาด`],
   [/^(.+) is idle$/, (name) => `${name} ว่างอยู่`],
+  [/^(.+) is at home$/, (name) => `${name} อยู่บ้าน`],
   [/^(.+) waits for your answer$/, (name) => `${name} รอคำตอบจากคุณ`],
   [/^Needs permission: (.+)$/, (what) => `ต้องได้รับสิทธิ์: ${what}`],
   [/^Replay · (.+)$/, (rest) => `ย้อนหลัง · ${rest}`],

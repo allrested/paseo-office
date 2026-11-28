@@ -15,10 +15,11 @@ import {
 
 const NOW = Date.parse("2026-11-28T12:00:00.000Z");
 
-type Input = Pick<OfficeModel, "rooms" | "agents"> & Partial<Pick<OfficeModel, "roomOfAgent">>;
-/** The rows of a model; a model without `roomOfAgent` has every agent in the lobby. */
+type Input = Pick<OfficeModel, "rooms" | "agents"> &
+  Partial<Pick<OfficeModel, "roomOfAgent" | "home">>;
+/** The rows of a model; one without `roomOfAgent` has every agent in the lobby, without `home` none at home. */
 const taskAttentionRows = (model: Input, now: number) =>
-  rowsOfModel({ roomOfAgent: new Map(), ...model }, now);
+  rowsOfModel({ roomOfAgent: new Map(), home: new Map(), ...model }, now);
 
 function post(seq: number, fields: Partial<Post> = {}): Post {
   const at = `2026-11-28T09:00:${String(seq).padStart(2, "0")}.000Z`;
@@ -171,6 +172,30 @@ describe("stalled rows", () => {
     expect(taskAttentionRows(model, NOW)).toEqual([]);
   });
 
+  it("lists a claim whose holder is at home at once, by the holder's name", () => {
+    const model = {
+      agents: new Map<string, OfficeAgent>(),
+      home: new Map([["a1", { id: "a1", title: "Builder", status: "closed" } as OfficeAgent]]),
+      rooms: [room("lobby", "Lobby", [post(1, { updatedAt: stalledAt(0) })])],
+    };
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "stalled", cause: "home", holder: "Builder" });
+    expect(stalledLine(rows[0] as TaskAttentionRow)).toBe("Builder is at home");
+  });
+
+  it("keeps a blocked task of a holder at home a blocked row, with what it asked", () => {
+    const model = {
+      agents: new Map<string, OfficeAgent>(),
+      home: new Map([["a1", { id: "a1", title: "Builder", status: "closed" } as OfficeAgent]]),
+      rooms: [room("lobby", "Lobby", [post(1, { blocked: "Which region?" })])],
+    };
+    const rows = taskAttentionRows(model, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "blocked", holder: "Builder", reason: "Which region?" });
+    expect(blockedLine(rows[0] as TaskAttentionRow)).toBe("Builder needs: Which region?");
+  });
+
   it("does not list a blocked task as stalled too", () => {
     const model = {
       agents: withStatus(["a1", "error"]),
@@ -233,6 +258,7 @@ describe("task attention words", () => {
   it("says why a claim is listed", () => {
     expect(stalledLine({ holder: "Builder", cause: "error" })).toBe("Builder stopped on an error");
     expect(stalledLine({ holder: "Builder", cause: "idle" })).toBe("Builder is idle");
+    expect(stalledLine({ holder: "Builder", cause: "home" })).toBe("Builder is at home");
   });
 
   it("nudges with its fixed text", () => {

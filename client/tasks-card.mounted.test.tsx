@@ -90,6 +90,16 @@ const STALLED: TaskAttentionRow[] = [
     cause: "error",
   },
 ];
+const AT_HOME: TaskAttentionRow[] = [
+  {
+    kind: "stalled",
+    post: post(8, { text: "Check the notes" }),
+    board: "Lobby",
+    holder: "Builder",
+    reason: null,
+    cause: "home",
+  },
+];
 const MERGED: TaskAttentionRow[] = [
   {
     kind: "merged",
@@ -271,6 +281,29 @@ test("a stalled row says why, offers Nudge, Reopen and Open board, and has no An
     "Open board",
   ]);
   expect(allLabelled("Answer")).toHaveLength(0);
+});
+
+test("a claim whose holder is at home says so, with Nudge and Reopen, in the interface's language too", async () => {
+  await mount(<Harness rows={AT_HOME} />);
+  expect(lines()).toEqual([
+    "1 stalled",
+    "Check the notes",
+    "Builder is at home",
+    "Lobby",
+    "Nudge",
+    "Reopen",
+    "Open board",
+  ]);
+  act(() => root.unmount());
+  root = createRoot(container);
+  sent.choice = "vi";
+  await mount(
+    <UiLanguage>
+      <Harness rows={AT_HOME} />
+    </UiLanguage>,
+  );
+  expect(lines()).not.toContain("Builder is at home");
+  expect(lines().filter((line) => line.includes("Builder"))).toHaveLength(1);
 });
 
 test("Nudge posts the fixed status check as a reply under the task", async () => {

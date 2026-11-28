@@ -88,7 +88,11 @@ export interface Office {
   actDuty(id: string, agentId: string): Promise<PostResult>;
   turnEnded(agentId: string): void;
   checkCompletion(agentId: string, lastAnswer: () => Promise<string | null>): Promise<void>;
-  agentGone(agentId: string): void;
+  /**
+   * From the close and the archive hooks. A closed session is at home and a reply wakes it, so it
+   * keeps its claims; only an archived one has them released.
+   */
+  agentGone(agentId: string, how: "closed" | "archived"): void;
   /**
    * The directory's view: each agent's status. An agent holding done tasks whose cost waits for
    * its turn to end, and no longer in one, has them settled with the view's figure; one gone from
@@ -331,14 +335,17 @@ export function createOffice(deps: OfficeDeps): Office {
         }
       }
     },
-    agentGone(agentId) {
+    agentGone(agentId, how) {
       queue?.agentGone(agentId);
       void ready
         .then(() => service.settleSpent(agentId, false))
         .catch((error: unknown) =>
           log(`[office] unable to settle the cost of ${agentId}: ${errorMessage(error)}`),
         );
-      // A closed or archived agent never finishes what it held: the tasks go back to the pickup.
+      // Paseo closes an idle session's runtime, and a reply or a task starts it again: what it
+      // holds, and what it asked, wait for it.
+      if (how === "closed") return;
+      // An archived agent never finishes what it held: the tasks go back to the pickup.
       void ready
         .then(() => service.releaseClaims(agentId))
         .then((ids) => {

@@ -1187,7 +1187,7 @@ export function createOfficePlugin(
     }),
     server.addHook("agent.close.after", async ({ agent }) => {
       try {
-        office.agentGone(agent.id);
+        office.agentGone(agent.id, "closed");
         undo.forget(agent.id);
         await writer.agentClosed(agent.id);
       } catch (error) {
@@ -1201,7 +1201,7 @@ export function createOfficePlugin(
     }),
     server.addHook("agent.archive.after", async ({ agent }) => {
       try {
-        office.agentGone(agent.id);
+        office.agentGone(agent.id, "archived");
         undo.forget(agent.id);
         await writer.agentArchived(agent.id);
       } catch (error) {

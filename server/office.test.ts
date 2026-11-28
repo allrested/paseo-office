@@ -276,7 +276,7 @@ test("an agent's turn end sends what waited for it, and a closed agent's queue i
   targets.set("b", "busy");
   await office.post({ board: "w1", kind: "note", text: "two", to: "b" });
   await settle();
-  office.agentGone("b");
+  office.agentGone("b", "closed");
   expect(hub.events.slice(-2)).toEqual(['wake false {"b":1}', "wake false {}"]);
 });
 
@@ -649,7 +649,43 @@ test("a pickup by an agent with a workspace puts the task on its board, and its 
   await office.stop();
 });
 
-test("a closed agent's claim reopens and goes to the next idle agent, and says so", async () => {
+test("a closed agent keeps its claim and what it asked; archived, they are released", async () => {
+  const { build, clock, store, logs } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Check the notes" });
+  clock.advance(0);
+  await settle();
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  await update?.execute(
+    { id: "p1", action: "block", note: "Which region?" },
+    toolContext({ id: "b", title: null }),
+  );
+  const held = { state: "claimed", claimedBy: "b", blocked: "Which region?" };
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "lobby", ...held }),
+    expect.objectContaining({ id: "p3", board: "w2", ...held }),
+  ]);
+  const before = store.current();
+  // Paseo closes an idle session's runtime: the agent is at home, and a reply wakes it.
+  office.agentGone("b", "closed");
+  await settle();
+  expect(store.current()).toBe(before);
+  expect(logs).toEqual([]);
+  office.setPickupEnabled(false);
+  office.agentGone("b", "archived");
+  await settle();
+  expect(logs).toContain("[office] released p1 held by b");
+  expect(store.current().posts).toEqual([
+    expect.objectContaining({ id: "p1", board: "lobby", state: "open" }),
+  ]);
+  expect(store.current().posts[0]).not.toHaveProperty("claimedBy");
+  expect(store.current().posts[0]).not.toHaveProperty("blocked");
+  await office.stop();
+});
+
+test("an archived agent's claim reopens and goes to the next idle agent, and says so", async () => {
   const { build, clock, targets, store, prompts, logs } = setup();
   const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
   await office.ready;
@@ -660,7 +696,7 @@ test("a closed agent's claim reopens and goes to the next idle agent, and says s
   expect(store.current().posts[0]).toMatchObject({ state: "claimed", claimedBy: "b" });
   targets.delete("b");
   targets.set("c", "wakeable");
-  office.agentGone("b");
+  office.agentGone("b", "archived");
   await settle();
   expect(logs).toContain("[office] released p1 held by b");
   expect(store.current().posts).toHaveLength(1);
@@ -686,11 +722,11 @@ test("a failing release is logged, and an agent holding nothing logs nothing", a
   };
   const { office, store, logs } = start({ ...EMPTY_BOARDS, nextSeq: 2, posts: [held] });
   await office.ready;
-  office.agentGone("a");
+  office.agentGone("a", "archived");
   await settle();
   expect(logs).toEqual([]);
   store.failNext("disk full");
-  office.agentGone("b");
+  office.agentGone("b", "archived");
   await settle();
   expect(logs).toContain(
     "[office] unable to release the claims of b: Unable to save the board: disk full",
@@ -1146,8 +1182,8 @@ test("a cost the ports know reaches the board: an agent's claim keeps it, and it
   await office.stop();
 });
 
-test("an agent gone, absent from the view or closed there drops its pending cost, whatever cost is known", async () => {
-  for (const how of ["hook", "absent", "closed"]) {
+test("an agent closed, archived, absent from the view or closed there drops its pending cost, whatever cost is known", async () => {
+  for (const how of ["closed hook", "archived hook", "absent", "closed"]) {
     const { build, clock, store } = setup();
     let cost = 1;
     const office = build({
@@ -1164,13 +1200,14 @@ test("an agent gone, absent from the view or closed there drops its pending cost
     expect(store.current().posts.map((p) => p.spentPending)).toEqual([true, true]);
     // The last view's figure is from before the finishing turn.
     cost = 1.4;
-    if (how === "hook") office.agentGone("b");
+    if (how === "closed hook") office.agentGone("b", "closed");
+    else if (how === "archived hook") office.agentGone("b", "archived");
     else if (how === "absent") await office.settleSpentOf(new Map([["a", "running"]]));
     else await office.settleSpentOf(new Map([["b", "closed"]]));
     await settle();
     for (const item of store.current().posts) {
-      expect(item).not.toHaveProperty("spentPending");
-      expect(item).not.toHaveProperty("spentUsd");
+      expect(item, how).not.toHaveProperty("spentPending");
+      expect(item, how).not.toHaveProperty("spentUsd");
     }
     await office.stop();
   }
