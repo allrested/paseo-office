@@ -652,7 +652,11 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       : null;
     let seq = data.nextSeq;
     const changed: Post = { ...next.value, seq: seq++, updatedAt: now() };
-    if (pickupMessageId) changed.pickupMessageId = pickupMessageId;
+    if (pickupMessageId) {
+      changed.pickupMessageId = pickupMessageId;
+      // The number the prompt's completion line names: it stays while later changes raise the seq.
+      changed.assignment = changed.seq;
+    }
     let posts = data.posts.map((item) => (item.id === post.id ? changed : item));
     const touched = [post.board];
     if (partner !== undefined && changed.state === "open") {

@@ -469,6 +469,37 @@ test("a session without its board tool can confirm just its current assignment",
   await office.stop();
 });
 
+test("an assignment that was blocked and answered is still finished by its completion line", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build({ workspaceOf: async (id) => (id === "b" ? "w2" : null) });
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "lobby", kind: "task", text: "Deploy it" });
+  clock.advance(0);
+  await settle();
+  const line = "Completed office task p1 (assignment 2).";
+  expect(prompts[0]).toContain(line);
+  const task = () => store.current().posts.find((item) => item.id === "p1");
+  expect(task()).toMatchObject({ seq: 2, assignment: 2 });
+  // The block, its answer and the claim that resumes each change the post, and raise its seq.
+  const update = office.tools.find((tool) => tool.name === "office_update");
+  const asHolder = toolContext({ id: "b", title: null });
+  await update?.execute({ id: "p1", action: "block", note: "Which region?" }, asHolder);
+  await office.post({ board: "lobby", kind: "note", text: "eu-west-1", replyTo: "p1" });
+  await update?.execute({ id: "p1", action: "block", note: "And the tag?" }, asHolder);
+  await update?.execute({ id: "p1", action: "claim" }, asHolder);
+  expect(task()?.seq).toBeGreaterThan(2);
+  expect(task()).toMatchObject({ state: "claimed", claimedBy: "b", assignment: 2 });
+  // The copy on the agent's board names no assignment: the line names the lobby task.
+  expect(store.current().posts.find((item) => item.board === "w2")).not.toHaveProperty(
+    "assignment",
+  );
+  // Its tools gone, the session finishes with the line its prompt gave it.
+  await office.checkCompletion("b", async () => `Deployed to eu-west-1.\n${line}`);
+  expect(task()).toMatchObject({ state: "done", result: "Deployed to eu-west-1." });
+  await office.stop();
+});
+
 const CUPS = { id: "cups", name: "Cups", instructions: "", days: [3], chore: "cups" as const };
 const BUILD = { id: "build", name: "Build", instructions: "Run the build", days: [3] };
 const TODAY = "2026-11-11";

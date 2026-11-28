@@ -523,6 +523,10 @@ home (see Agents at home), not gone: it keeps its claims and what it asked for, 
 lists them. Choose a specific agent to send it the task when idle. Turning off **Wake agents**
 pauses both automatic pickup and named wakes. Automatic pickup also requires **Agent tools** so the recipient can finish the task on the board. Open tasks stay on the board between host restarts.
 A session whose board tools became unavailable after a reload can finish its own assignment using the exact completion line in its prompt. Other replies keep the task claimed. **Clear finished** deletes completed to-dos.
+The line names the assignment's number ("assignment 12"), which the task keeps from the moment it
+is handed out: a block, its answer and a reply change the task and leave the number, so the line
+still finishes it after them. A reopened task loses the number and gets a new one when it is
+handed out again.
 
 The lobby's board is a kanban: its to-dos and notes in columns, **To do** (open), **In progress**
 (claimed), **Needs you** (claimed and blocked), **Done** and **Notes**. To do and In progress are

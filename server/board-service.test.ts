@@ -292,6 +292,36 @@ test("lobby pickup serializes competing agents and tasks, even across a restart"
   expect(await restarted.claimLobbyTask("p2", "b", 2)).toMatchObject({ id: "p2", claimedBy: "b" });
 });
 
+test("a pickup's claim keeps the assignment's number through a block and its answer, and a reopen drops it", async () => {
+  const { service } = await harness(file([lobbyTask(1)]), undefined, roomOf);
+  const claim = await service.claimLobbyTask("p1", "a", 1);
+  expect(claim).toMatchObject({ seq: 2, assignment: 2 });
+  // The copy stands for the task on the agent's board; the assignment is the lobby task's.
+  expect(find(service, "p3")).not.toHaveProperty("assignment");
+  await service.update({ id: "p1", action: "block", actor: "a", note: "Which database?" });
+  await service.post({
+    board: "lobby",
+    kind: "note",
+    text: "The replica",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(find(service, "p1")?.seq).toBeGreaterThan(2);
+  expect(find(service, "p1")).toMatchObject({ assignment: 2 });
+  expect(find(service, "p3")).not.toHaveProperty("assignment");
+  await service.update({ id: "p1", action: "reopen", actor: "user" });
+  expect(find(service, "p1")).toMatchObject({ state: "open" });
+  expect(find(service, "p1")).not.toHaveProperty("assignment");
+});
+
+test("a claim by hand or by tool is no assignment and keeps no number", async () => {
+  const { service } = await harness(file([lobbyTask(1), lobbyTask(2)]));
+  await service.update({ id: "p1", action: "claim", actor: "a" });
+  await service.update({ id: "p2", action: "claim", actor: "user" });
+  expect(find(service, "p1")).not.toHaveProperty("assignment");
+  expect(find(service, "p2")).not.toHaveProperty("assignment");
+});
+
 test("a late rollback cannot reopen an acknowledged delivery", async () => {
   const { service } = await harness(file([lobbyTask(1)]));
   const claim = await service.claimLobbyTask("p1", "a", 1);

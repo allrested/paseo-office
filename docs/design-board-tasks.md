@@ -16,8 +16,9 @@ call that works today still works:
 | `office_read`   | posts, one per line           | results, blockers, replies, teams, what a task waits on                     |
 
 A post gains optional fields only (`shared/contracts.ts` `PostSchema`): `result`, `blocked`,
-`replyTo`, `team`, `after`, `claimedAt`, `doneAt`, `costAtClaim`, `spentUsd`. `boards.json` stays version 1:
-an older plugin reads the file and drops what it does not know at its next save.
+`replyTo`, `team`, `after`, `claimedAt`, `doneAt`, `costAtClaim`, `spentUsd`, `spentPending`,
+`assignment`. `boards.json` stays version 1: an older plugin reads the file and drops what it does
+not know at its next save.
 
 ## 1. The lobby as a kanban
 
@@ -99,6 +100,9 @@ you need". The board then shows "claimed", and the question is only in the agent
   Answer field. It counts in the Attention count.
 - The kanban's **Needs you** column; a row's "Needs you" badge.
 - The footer says to block with what is needed.
+- A block and its answer raise the task's seq, which the completion line used to name. So a task
+  the pickup hands out keeps that number as `assignment`, the line is matched against it, and a
+  reopen drops it. The copy carries none: the line names the lobby task or the duty.
 - A duty carries the same footer, and the duty board is no room's board. So the Tasks card lists
   the duty board's claimed duties by the same rules, as "Duty board", with Open board leading to
   the duty board; and the duty board's row for a duty shows what its holder needs, its result
