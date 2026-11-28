@@ -1043,3 +1043,61 @@ test("the user's post takes after as the tool's does", async () => {
   });
   await office.stop();
 });
+
+test("a task released while a scan is under way is handed out when the scan ends", async () => {
+  const { build, clock, store, targets, prompts } = setup();
+  let open: () => void = () => undefined;
+  const office = build({
+    send: async (agentId, prompt) => {
+      // The first delivery waits, so the scan is still under way when Build is finished.
+      if (prompts.length === 0) await new Promise<void>((resolve) => (open = resolve));
+      prompts.push(`${agentId}: ${prompt}`);
+    },
+  });
+  await office.ready;
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({ board: "lobby", kind: "task", text: "Review it", after: ["p1"] });
+  await office.post({ board: "lobby", kind: "task", text: "Tidy up" });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts.find((p) => p.id === "p3")).toMatchObject({ claimedBy: "b" });
+  await office.update({ id: "p1", action: "done", note: "Built." });
+  targets.set("c", "wakeable");
+  open();
+  await settle();
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts.find((p) => p.id === "p2")).toMatchObject({ claimedBy: "c" });
+  expect(prompts).toEqual([
+    expect.stringContaining("b: The office assigned you lobby task p3"),
+    expect.stringContaining("c: The office assigned you lobby task p2"),
+  ]);
+  await office.stop();
+});
+
+test("a scan's own saves never start another scan", async () => {
+  const { build, clock, store } = setup();
+  let scans = 0;
+  const office = build({
+    lobbyCandidates: async () => {
+      scans += 1;
+      return ["d"];
+    },
+    // The agent turns busy once claimed: each claim is saved, then released.
+    lobbyEligible: async () => false,
+  });
+  await office.ready;
+  await office.post({ board: "lobby", kind: "task", text: "Tidy up" });
+  office.setPickupEnabled(true);
+  clock.advance(0);
+  await settle();
+  clock.advance(0);
+  await settle();
+  expect(scans).toBe(1);
+  expect(store.current().posts[0]).toMatchObject({ state: "open" });
+  clock.advance(30_000);
+  await settle();
+  expect(scans).toBe(2);
+  await office.stop();
+});

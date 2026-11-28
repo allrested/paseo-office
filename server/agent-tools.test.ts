@@ -101,9 +101,14 @@ test("a post line names kind, state, claimer, author and target", () => {
     ["a", "Alice"],
     ["b", "Bob"],
   ]);
-  expect(postLine(post, (author) => names.get(author) ?? author)).toBe(
-    "p3 task claimed by Bob, from Alice to Bob: Write tests",
-  );
+  expect(
+    postLine(
+      post,
+      (author) => names.get(author) ?? author,
+      (id) => id,
+      [],
+    ),
+  ).toBe("p3 task claimed by Bob, from Alice to Bob: Write tests");
 });
 
 test("a post line names the lobby task of a copy, and the copy of a lobby task", () => {
@@ -122,10 +127,10 @@ test("a post line names the lobby task of a copy, and the copy of a lobby task",
   };
   const copy: Post = { ...task, id: "p57", seq: 57, board: "w1", link: "p34" };
   const label = (author: string) => (author === "b" ? "Bob" : "the user");
-  expect(postLine(task, label)).toBe(
+  expect(postLine(task, label, (id) => id, [])).toBe(
     "p34 task claimed by Bob (on p57), from the user: Rotate keys",
   );
-  expect(postLine(copy, label)).toBe(
+  expect(postLine(copy, label, (id) => id, [])).toBe(
     "p57 task claimed by Bob (lobby p34), from the user: Rotate keys",
   );
 });
@@ -303,9 +308,14 @@ test("a post line gains re and result only when the post has them", () => {
     createdAt: "2026-11-11T09:00:00.000Z",
     updatedAt: "2026-11-11T09:00:00.000Z",
   };
-  expect(postLine(post, (author) => author)).toBe(
-    "p14 note re p12, from a: line one\n  line two\n  result: Fine.\n  Really.",
-  );
+  expect(
+    postLine(
+      post,
+      (author) => author,
+      (id) => id,
+      [],
+    ),
+  ).toBe("p14 note re p12, from a: line one\n  line two\n  result: Fine.\n  Really.");
 });
 
 test("a post line shows what a blocked task needs, one entry", () => {
@@ -322,7 +332,14 @@ test("a post line shows what a blocked task needs, one entry", () => {
     createdAt: "2026-11-11T09:00:00.000Z",
     updatedAt: "2026-11-11T09:00:00.000Z",
   };
-  expect(postLine(post, (author) => author)).toBe(
+  expect(
+    postLine(
+      post,
+      (author) => author,
+      (id) => id,
+      [],
+    ),
+  ).toBe(
     "p12 task claimed by a, from user: Migrate\n  needs: Which database?\n  Postgres or MySQL?",
   );
   expect(UpdateInputSchema.safeParse({ id: "p12", action: "block", note: "x" }).success).toBe(true);
@@ -390,10 +407,12 @@ test("a post line names a team by its name, or by its id once the team is gone",
     updatedAt: "2026-11-11T09:00:00.000Z",
   };
   const label = (author: string) => (author === "user" ? "the user" : author);
-  expect(postLine(post, label, (id) => (id === "t2" ? "QA-PR" : id))).toBe(
+  expect(postLine(post, label, (id) => (id === "t2" ? "QA-PR" : id), [])).toBe(
     "p4 task open for team QA-PR, from the user: Test",
   );
-  expect(postLine(post, label, (id) => id)).toBe("p4 task open for team t2, from the user: Test");
+  expect(postLine(post, label, (id) => id, [])).toBe(
+    "p4 task open for team t2, from the user: Test",
+  );
 });
 
 test("a post line names the tasks a task waits on, and says so while one is not done", () => {

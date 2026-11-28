@@ -575,7 +575,8 @@ takes its replies with it when it is deleted, cleared or dropped.
 
 A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the
 user's post takes it too), for a task only, never a note or a reply, and each must name a task
-that exists. While one of them is there and not done the task waits: the pickup passes over it, and
+that exists. A copy's id is kept as its lobby task's, since the copy goes when that task is
+reopened. While one of them is there and not done the task waits: the pickup passes over it, and
 an agent can neither claim it nor mark it done ("waiting on p12, p13"). You can still claim it or
 mark it done by hand. It is released when the last of them is done or deleted, since a
 task that is gone no longer holds it; any board's change looks again, so a room's task finished

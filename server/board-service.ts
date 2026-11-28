@@ -375,7 +375,10 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return found === null ? refuse(`no team ${input.team}`) : { ok: true, value: { team: found } };
   }
 
-  /** The tasks a new task waits on: trimmed, once each, and each a task on some board. */
+  /**
+   * The tasks a new task waits on: trimmed, once each, and each a task on some board. A lobby
+   * task's copy stands for its lobby task, which outlives it: the copy goes when the task reopens.
+   */
   function afterFor(input: NewPost): Outcome<Pick<Post, "after">> {
     if (input.after === undefined) return { ok: true, value: {} };
     const refuse = (reason: string): Outcome<Pick<Post, "after">> => ({
@@ -384,12 +387,20 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     });
     if (input.kind !== "task" || input.replyTo !== undefined)
       return refuse("only a task waits on other tasks");
-    const ids = [...new Set(input.after.map((id) => id.trim()).filter((id) => id !== ""))];
+    const named = input.after.map((id) => id.trim()).filter((id) => id !== "");
+    const missing = named.find((id) => data.posts.find((item) => item.id === id)?.kind !== "task");
+    const ids = [...new Set(named.map(lobbyIdOf))];
     if (ids.length > AFTER_MAX) return refuse(`after holds at most ${AFTER_MAX} tasks`);
-    const missing = ids.find((id) => data.posts.find((item) => item.id === id)?.kind !== "task");
     if (missing !== undefined) return refuse(`no task ${missing}`);
     // The new task has no id yet, so it cannot name itself, and no loop can form.
     return { ok: true, value: ids.length === 0 ? {} : { after: ids } };
+  }
+
+  /** The id of the lobby task a copy stands for; any other id as it is. */
+  function lobbyIdOf(id: string): string {
+    const post = data.posts.find((item) => item.id === id);
+    const partner = post === undefined || post.board === LOBBY ? undefined : partnerOf(post);
+    return partner?.board === LOBBY ? partner.id : id;
   }
 
   /**

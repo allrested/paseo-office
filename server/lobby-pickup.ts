@@ -69,6 +69,19 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   let stopped = false;
   let scanning: Promise<void> | null = null;
   let cancel: (() => void) | undefined;
+  // A refresh during a scan, from a change the scan did not make itself: scan again when it ends.
+  let rescan = false;
+  // While above zero the scan is in its own board call, whose save announces its own change.
+  let own = 0;
+
+  async function mine<T>(work: () => Promise<T>): Promise<T> {
+    own += 1;
+    try {
+      return await work();
+    } finally {
+      own -= 1;
+    }
+  }
 
   const active = () => !stopped && !service.wakesPaused();
   const canDispatch = (task: Post) => Boolean(task.namedPickup) || ports.enabled();
@@ -111,11 +124,13 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
         : agents.lobbyEligible(agentId);
     if (task.namedPickup && !(await eligible())) return false;
     const recovering = Boolean(task.pickupMessageId);
-    const claim = recovering ? task : await service.claimLobbyTask(task.id, agentId, task.seq);
+    const claim = recovering
+      ? task
+      : await mine(() => service.claimLobbyTask(task.id, agentId, task.seq));
     if (!claim?.pickupMessageId) return false;
     // Check again after saving the claim. Never reassign an earlier send whose receipt was lost.
     if (!(await eligible()) || !canDispatch(task) || !active() || !available()) {
-      if (!recovering) await service.releaseLobbyTask(claim);
+      if (!recovering) await mine(() => service.releaseLobbyTask(claim));
       return false;
     }
     if (!currentClaim(claim)) return false;
@@ -128,7 +143,7 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     ].join("\n");
     // The daemon deduplicates this ID even after a network failure or a plugin restart.
     await agents.send(agentId, prompt, source, claim.pickupMessageId);
-    await service.confirmLobbyDelivery(claim);
+    await mine(() => service.confirmLobbyDelivery(claim));
     return true;
   }
 
@@ -204,13 +219,18 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
         )
         .finally(() => {
           scanning = null;
-          schedule(LOBBY_RETRY_MS);
+          const again = rescan;
+          rescan = false;
+          schedule(again ? 0 : LOBBY_RETRY_MS);
         });
     }, delay);
   }
 
   return {
-    refresh: () => schedule(0),
+    refresh() {
+      if (scanning && own === 0) rescan = true;
+      schedule(0);
+    },
     async stop() {
       stopped = true;
       cancel?.();

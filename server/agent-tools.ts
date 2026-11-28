@@ -79,8 +79,8 @@ export function boardFor(
 export function postLine(
   post: Post,
   label: (author: string) => string,
-  teamLabel: (teamId: string) => string = (teamId) => teamId,
-  posts: readonly Post[] = [],
+  teamLabel: (teamId: string) => string,
+  posts: readonly Post[],
 ): string {
   const name = (author: string) => oneLine(label(author));
   const state = post.state ? ` ${post.state}` : "";
@@ -100,8 +100,8 @@ export function readText(
   board: string,
   result: ReadResult,
   label: (author: string) => string,
-  teamLabel?: (teamId: string) => string,
-  posts?: readonly Post[],
+  teamLabel: (teamId: string) => string,
+  posts: readonly Post[],
 ): string {
   const more = result.more ? ", more after it" : "";
   const header = `Board ${board}: ${result.posts.length} post(s), cursor ${result.cursor}${more}.`;
