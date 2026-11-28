@@ -3,9 +3,17 @@ import { Platform, Pressable, View } from "react-native";
 import { Text } from "./text.js";
 import { TextInput } from "./text.js";
 import { ActionButton } from "./action-button.js";
-import { NOBODY, pickerGroups, recipientLabels, showsSearch } from "./agent-picker-text.js";
+import {
+  NOBODY,
+  pickerGroups,
+  recipientLabels,
+  showsSearch,
+  teamRows,
+} from "./agent-picker-text.js";
 import type { DotTone, OfficeRoom } from "../shared/model.js";
+import type { RosterTeam } from "../shared/roster.js";
 import type { OfficeStyles } from "./styles.js";
+import { useT } from "./ui-language.js";
 import { focusById, listenForSpace } from "./web-env.web.js";
 
 interface RowProps {
@@ -33,6 +41,7 @@ export function Row({
   styles,
 }: RowProps) {
   const press = useCallback(() => onChoose(value), [onChoose, value]);
+  const t = useT();
   // Enter presses any Pressable; Space, the key that picks a radio, only a button.
   const id = useId();
   useEffect(() => listenForSpace(id, press), [id, press]);
@@ -52,7 +61,7 @@ export function Row({
       id={id}
       accessibilityRole="radio"
       aria-checked={selected}
-      accessibilityLabel={`${title}: ${detail}`}
+      accessibilityLabel={`${t(title)}: ${t(detail)}`}
       onPress={press}
       onPressIn={pressIn}
       onPressOut={pressOut}
@@ -82,16 +91,28 @@ export interface AgentPickerProps {
   rooms: readonly OfficeRoom[];
   /** The board's room: its agents come first. */
   roomId: string;
-  /** The chosen agent's id, or NOBODY. */
+  /** The chosen agent's id, `team:<id>` for a team, or NOBODY. */
   value: string;
+  /** The roster's teams, when the lobby's form offers them: a group under the default choice. */
+  teams?: readonly RosterTeam[];
   /** A row was pressed: the page's owner takes the choice and shows the form again. */
   onChoose(value: string): void;
   onBack(): void;
   styles: OfficeStyles;
 }
 
+const NO_TEAMS: readonly RosterTeam[] = [];
+
 /** The page of a board's sheet that chooses who a post wakes. */
-export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: AgentPickerProps) {
+export function AgentPicker({
+  rooms,
+  roomId,
+  value,
+  teams = NO_TEAMS,
+  onChoose,
+  onBack,
+  styles,
+}: AgentPickerProps) {
   const [query, setQuery] = useState("");
   const labels = recipientLabels(roomId);
   const searchable = showsSearch(rooms);
@@ -99,6 +120,10 @@ export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: 
     () => pickerGroups(rooms, roomId, searchable ? query : ""),
     [rooms, roomId, query, searchable],
   );
+  const wantedTeams = useMemo(() => {
+    const wanted = searchable ? query.trim().toLowerCase() : "";
+    return teamRows(teams.filter((team) => team.name.toLowerCase().includes(wanted)));
+  }, [teams, query, searchable]);
   return (
     <View style={styles.sheet}>
       <View style={styles.actions}>
@@ -129,6 +154,26 @@ export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: 
             styles={styles}
           />
         </View>
+        {wantedTeams.length > 0 ? (
+          <View style={styles.sheetField}>
+            <Text style={styles.sheetLabel}>Teams</Text>
+            <View style={styles.pickerRows}>
+              {wantedTeams.map((row) => (
+                <Row
+                  key={row.value}
+                  value={row.value}
+                  title={row.title}
+                  detail={row.detail}
+                  tone={null}
+                  selected={value === row.value}
+                  takesFocus={!searchable && value === row.value}
+                  onChoose={onChoose}
+                  styles={styles}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
         {groups.map((group) => (
           <View key={group.label} style={styles.sheetField}>
             <Text style={styles.sheetLabel}>{group.label}</Text>
@@ -149,7 +194,7 @@ export function AgentPicker({ rooms, roomId, value, onChoose, onBack, styles }: 
             </View>
           </View>
         ))}
-        {searchable && query.trim() !== "" && groups.length === 0 ? (
+        {searchable && query.trim() !== "" && groups.length === 0 && wantedTeams.length === 0 ? (
           <Text style={styles.muted}>No agent matches.</Text>
         ) : null}
       </View>

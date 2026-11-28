@@ -153,8 +153,8 @@ when the roster had nobody left for it. Up to 0.2.13 a team went to a workspace 
 `office.roster.team` was stored there; it is no longer read or written. Where 0.2.13 gave one
 teammate to agents of two workspaces, the oldest keeps it and the other is named again.
 
-A lobby task can be given to a team: only its teammates' agents are handed it (see Boards and
-wakes).
+A lobby task can be given to a team, from the lobby's form or `office_post`: only its teammates'
+agents are handed it (see Boards and wakes).
 
 ## Views
 
@@ -550,6 +550,15 @@ keeps its tasks; if the team is removed or the roster switched off, the task goe
 instead of waiting for nobody. `office_post` takes `team`, a roster team's name in any case or its
 id, for a lobby task only and never with `to`; `office_read` shows it as `p7 task open for team
 QA-PR`.
+
+The lobby's form gives a task to a team too: with the roster on and teams in it, the **Send task
+to** page has a **Teams** group right under **Any idle agent**, one row per team with its name and
+how many teammates it has ("2 teammates", "1 teammate"). The field then reads "Team QA-PR", and
+Add posts the task for that team and for no agent; afterwards the choice is Any idle agent again,
+and it is also if the team leaves the roster while the form is open. With the roster off or with
+no teams the page is as it was. A room's form has no team choice. A card, a list row and a room
+card say "for team QA-PR" where a task for an agent says "for Builder", with the team's current
+name, or its id once the team is gone.
 
 New lobby to-dos addressed to a specific agent use the same tracked assignment and completion confirmation as automatic pickups. Older addressed messages are not sent a second time. When an agent with a workspace claims a lobby task, a copy of the task appears on that workspace's board, linked to the lobby task. Marking either one done marks both done; reopening either one frees the lobby task and deletes the copy, and deleting the lobby task deletes its copy. Lobby tasks already claimed when the office starts get their copy then.
 

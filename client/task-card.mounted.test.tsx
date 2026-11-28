@@ -76,12 +76,22 @@ const ACTIONS: BoardActions = {
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => (author === "user" ? "You" : `Agent ${author}`);
+const teamIdOf = (id: string) => id;
 
 const NO_REPLIES: Post[] = [];
 
 function Card({ task = TASK, replies = REPLIES }: { task?: Post; replies?: Post[] }) {
   const styles = useOfficeStyles(THEME, false, false);
-  return <TaskCard post={task} replies={replies} name={nameOf} actions={ACTIONS} styles={styles} />;
+  return (
+    <TaskCard
+      post={task}
+      replies={replies}
+      name={nameOf}
+      teamName={teamIdOf}
+      actions={ACTIONS}
+      styles={styles}
+    />
+  );
 }
 
 function Row({ item, replies = REPLIES }: { item: Post; replies?: Post[] }) {
@@ -91,6 +101,7 @@ function Row({ item, replies = REPLIES }: { item: Post; replies?: Post[] }) {
       post={item}
       replies={replies}
       name={nameOf}
+      teamName={teamIdOf}
       actions={ACTIONS}
       styles={styles}
     />

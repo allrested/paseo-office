@@ -35,21 +35,34 @@ export function linkLabel(post: Post, name: (author: string) => string): string 
   return post.claimedBy === undefined ? null : `on ${name(post.claimedBy)}'s board`;
 }
 
-/** Spec: a post that names an agent shows "from → to". */
-export function postMeta(post: Post, name: (author: string) => string): string {
+/** A roster team's name by its id; the id itself once the team is gone. */
+export type TeamNamer = (teamId: string) => string;
+
+/** Spec: a post that names an agent shows "from → to"; a lobby task for a team says which. */
+export function postMeta(
+  post: Post,
+  name: (author: string) => string,
+  teamName: TeamNamer,
+): string {
   const people =
     post.to === undefined ? name(post.author) : `${name(post.author)} → ${name(post.to)}`;
+  const forTeam = post.team === undefined ? "" : ` · for team ${teamName(post.team)}`;
   const link = linkLabel(post, name);
-  return `${postStateLabel(post, name)} · ${people}${link === null ? "" : ` · ${link}`}`;
+  return `${postStateLabel(post, name)} · ${people}${forTeam}${link === null ? "" : ` · ${link}`}`;
 }
 
-/** Who claimed a to-do and whom it names; null when neither. A done to-do is no longer claimed. */
-export function todoMeta(post: Post, name: (author: string) => string): string | null {
+/** Who claimed a to-do and whom or which team it names; null when none. A done to-do is no longer claimed. */
+export function todoMeta(
+  post: Post,
+  name: (author: string) => string,
+  teamName: TeamNamer,
+): string | null {
   const parts: string[] = [];
   if (post.state === "claimed" && post.claimedBy !== undefined) {
     parts.push(`claimed by ${name(post.claimedBy)}`);
   }
   if (post.to !== undefined) parts.push(`for ${name(post.to)}`);
+  if (post.team !== undefined) parts.push(`for team ${teamName(post.team)}`);
   const link = linkLabel(post, name);
   if (link !== null) parts.push(link);
   return parts.length > 0 ? parts.join(" · ") : null;

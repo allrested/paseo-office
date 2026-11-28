@@ -5,7 +5,7 @@ import { Icon } from "@getpaseo/plugin/client/ui";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
-import { clearQuestion, resultPreview, todoMeta } from "./board-text.js";
+import { clearQuestion, resultPreview, todoMeta, type TeamNamer } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { useT } from "./ui-language.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -216,6 +216,7 @@ export interface TaskCardProps {
   /** The notes under it, oldest first (`repliesOf`). */
   replies: readonly Post[];
   name(author: string): string;
+  teamName: TeamNamer;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -224,9 +225,9 @@ export interface TaskCardProps {
  * A to-do: its checkbox ticks or unticks it, and Delete asks first. Its result and replies are
  * under it. The list draws it as a row, the kanban as a card.
  */
-export function TaskCard({ post, replies, name, actions, styles }: TaskCardProps) {
+export function TaskCard({ post, replies, name, teamName, actions, styles }: TaskCardProps) {
   const done = post.state === "done";
-  const meta = todoMeta(post, name);
+  const meta = todoMeta(post, name, teamName);
   const mounted = useMounted();
   // The box shows the board's state: it changes when the board does, and is off until the answer.
   const [pending, setPending] = useState(false);

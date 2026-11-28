@@ -198,6 +198,9 @@ export const RULES: readonly Rule[] = [
   [/^ended with an error \(exit (\d+)\)$/, (code) => `kết thúc với lỗi (exit ${code})`],
   [/^from lobby task (.+)$/, (id) => `từ việc ở sảnh ${id}`],
   [/^on (.+)'s board$/, (name) => `trên bảng của ${name}`],
+  [/^Team (.+)$/, (name) => `Nhóm ${name}`],
+  [/^for team (.+)$/, (name) => `cho nhóm ${name}`],
+  [/^(\d+) teammates?$/, (n) => `${n} thành viên`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,
     (language) => `Không tải được văn bản ${language}; cảnh hiển thị bằng tiếng Anh`,
