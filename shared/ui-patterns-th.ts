@@ -268,6 +268,11 @@ export const RULES: readonly Rule[] = [
     (example) =>
       `ที่อยู่ที่ตอบกลับในรูปแบบของ open-meteo เช่น ${example} ใช้ https หรือ http บน host เอง host จะอ่านทุก 15 นาทีขณะที่เปิดออฟฟิศอยู่`,
   ],
+  // The intake's status line, and the chip that opens a task's ticket.
+  [/^Last read (\d{2}:\d{2}): (\d+) imported$/, (time, n) => `อ่านล่าสุด ${time}: นำเข้า ${n}`],
+  [/^Last read (\d{2}:\d{2}): nothing new$/, (time) => `อ่านล่าสุด ${time}: ไม่มีอะไรใหม่`],
+  [/^Open (\S+) in Jira$/, (key) => `เปิด ${key} ใน Jira`],
+  [/^Open (\S+) on GitHub$/, (key) => `เปิด ${key} บน GitHub`],
   // A failure reads "Unable to <the button>: <why>"; the why is the host's own, as it said it.
   [
     /^Unable to ([^:]+?)(?:: ([\s\S]*))?$/,

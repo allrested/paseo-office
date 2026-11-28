@@ -56,6 +56,10 @@ test("lines built from data keep their data and take Vietnamese words", () => {
     ["1 file restored, 0 skipped", "1 tệp đã khôi phục, 0 bỏ qua"],
     ["2 files changed after the turn", "2 tệp đã thay đổi sau lượt đó"],
     ["1 file left alone, being a link", "1 tệp được giữ nguyên vì là liên kết"],
+    ["Last read 12:40: 3 imported", "Đọc lần cuối 12:40: đã nhập 3"],
+    ["Last read 12:40: nothing new", "Đọc lần cuối 12:40: không có gì mới"],
+    ["Open PROJ-12 in Jira", "Mở PROJ-12 trong Jira"],
+    ["Open acme/x#4 on GitHub", "Mở acme/x#4 trên GitHub"],
   ];
   for (const [english, vietnamese] of lines) expect(translatePattern(english)).toBe(vietnamese);
 });

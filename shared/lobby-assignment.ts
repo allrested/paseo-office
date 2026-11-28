@@ -1,4 +1,10 @@
-import type { Post } from "./contracts.js";
+import {
+  POST_SOURCE_KINDS,
+  SOURCE_KEYS,
+  SOURCE_NAMES,
+  type Post,
+  type PostSourceKind,
+} from "./contracts.js";
 
 type Claim = Pick<Post, "id" | "seq" | "assignment">;
 
@@ -39,8 +45,14 @@ export function legacyFooters(claim: Claim): string[] {
   ];
 }
 
-const HEADING =
-  /^The office assigned you (?:lobby task (p\d+) from (?:the user|agent \S.*)|duty (p\d+) from the duty board)\.$/;
+/** A kind's key as part of a pattern: its own pattern without the anchors. */
+const keyPattern = (kind: PostSourceKind) => SOURCE_KEYS[kind].source.slice(1, -1);
+const SOURCED = POST_SOURCE_KINDS.map((kind) => `${SOURCE_NAMES[kind]} ${keyPattern(kind)}`);
+
+// A lobby task is the user's, an agent's, or a ticket's (`Jira PROJ-12`, `GitHub owner/repo#12`).
+const HEADING = new RegExp(
+  `^The office assigned you (?:lobby task (p\\d+) from (?:the user|agent \\S.*|${SOURCED.join("|")})|duty (p\\d+) from the duty board)\\.$`,
+);
 
 /** Recognize a complete generated prompt before presenting its task separately from the instructions. */
 export function readLobbyAssignment(

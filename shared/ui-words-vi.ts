@@ -823,4 +823,21 @@ export const UI_VI: Readonly<Record<string, string>> = {
   "Per day": "Mỗi ngày",
   "Needs Keep watching: with no reading of the plan's limits nothing is started.":
     "Cần Tiếp tục theo dõi: không có số đọc giới hạn của gói thì không bắt đầu việc nào.",
+  Intake: "Tiếp nhận",
+  "Jira tickets to bring in (JQL)": "Ticket Jira cần đưa vào (JQL)",
+  "Tickets this matches become lobby tasks, each once. Leave imported tickets out of it, for example by a label.":
+    "Các ticket khớp sẽ thành việc ở sảnh, mỗi ticket một lần. Hãy loại ticket đã nhập khỏi JQL, ví dụ bằng một nhãn.",
+  "Imported tasks go to": "Việc đã nhập được đưa vào",
+  "Backlog holds a ticket until you start it.": "Tồn đọng giữ ticket cho đến khi bạn bắt đầu.",
+  "Let the gate start imported tasks": "Cho cổng bắt đầu các việc đã nhập",
+  "A ticket's text reaches an agent without you reading it first. Leave it off unless only people you trust can write tickets.":
+    "Nội dung ticket đến tay agent mà bạn chưa đọc trước. Hãy để tắt trừ khi chỉ những người bạn tin cậy mới viết được ticket.",
+  "Comment the result on the ticket": "Bình luận kết quả vào ticket",
+  "The comment is the result as the agent wrote it, readable by everyone who can read the ticket.":
+    "Bình luận là kết quả đúng như agent viết, ai đọc được ticket cũng đọc được.",
+  "Not set up: needs a JQL and the Jira connection.":
+    "Chưa thiết lập: cần một JQL và kết nối Jira.",
+  "Not read yet.": "Chưa đọc.",
+  "Waiting: 50 imported tasks are open.": "Đang chờ: 50 việc đã nhập vẫn đang mở.",
+  "Read now": "Đọc ngay",
 };

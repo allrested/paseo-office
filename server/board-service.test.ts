@@ -2178,3 +2178,76 @@ describe("the backlog", () => {
     });
   });
 });
+
+describe("a task from a ticket", () => {
+  const SOURCE = { kind: "jira" as const, key: "OPS-7", url: "https://acme.example/browse/OPS-7" };
+  const ticket = (extra: Partial<Parameters<BoardService["post"]>[0]> = {}) => ({
+    board: "lobby",
+    kind: "task" as const,
+    text: "OPS-7 Checkout fails",
+    author: "user",
+    source: SOURCE,
+    ...extra,
+  });
+
+  test("a lobby task keeps its source; nothing else takes one", async () => {
+    const { service, store } = await harness();
+    expect(await service.post(ticket({ backlog: true }))).toMatchObject({
+      ok: true,
+      post: { source: SOURCE, backlog: true, state: "open" },
+    });
+    const saves = store.saved.length;
+    const text = "Unable to post: only a lobby task comes from a ticket";
+    expect(await service.post(ticket({ board: "w1" }))).toEqual({ ok: false, error: text });
+    expect(await service.post(ticket({ kind: "note" }))).toEqual({ ok: false, error: text });
+    expect(await service.post(ticket({ replyTo: "p1" }))).toEqual({ ok: false, error: text });
+    expect(store.saved).toHaveLength(saves);
+  });
+
+  test("a reopen keeps the source and drops the write back's mark, also from a copy", async () => {
+    const { service } = await harness(undefined, {}, async () => "w1");
+    await service.post(ticket());
+    await service.update({ id: "p1", action: "done", actor: "user", note: "Fixed." });
+    expect(await service.markWroteBack("p1")).toMatchObject({
+      ok: true,
+      post: { wroteBack: true },
+    });
+    await service.update({ id: "p1", action: "reopen", actor: "user" });
+    expect(find(service, "p1")?.source).toEqual(SOURCE);
+    expect(find(service, "p1")).not.toHaveProperty("wroteBack");
+    // Claimed by an agent, its copy carries no source: only the lobby task is the ticket's.
+    await service.update({ id: "p1", action: "claim", actor: "a" });
+    const copyId = find(service, "p1")?.link ?? "";
+    expect(find(service, copyId)).not.toHaveProperty("source");
+    await service.update({ id: copyId, action: "done", actor: "a", note: "Again." });
+    expect(find(service, "p1")).toMatchObject({ state: "done", result: "Again.", source: SOURCE });
+    await service.markWroteBack("p1");
+    await service.update({ id: "p1", action: "reopen", actor: "user" });
+    expect(find(service, "p1")?.source).toEqual(SOURCE);
+    expect(find(service, "p1")).not.toHaveProperty("wroteBack");
+  });
+
+  test("only a done task from a ticket is marked written back, once", async () => {
+    const { service } = await harness();
+    await service.post(ticket());
+    await service.post({ board: "lobby", kind: "task", text: "Plain", author: "user" });
+    expect(await service.markWroteBack("p1")).toEqual({
+      ok: false,
+      error: "Unable to mark p1: it is not done",
+    });
+    await service.update({ id: "p2", action: "done", actor: "user" });
+    expect(await service.markWroteBack("p2")).toEqual({
+      ok: false,
+      error: "Unable to mark p2: it is not from a ticket",
+    });
+    expect(await service.markWroteBack("p9")).toEqual({
+      ok: false,
+      error: "Unable to mark p9: no such post",
+    });
+    await service.update({ id: "p1", action: "done", actor: "user", note: "Fixed." });
+    const marked = await service.markWroteBack("p1");
+    if (!marked.ok) throw new Error(marked.error);
+    const again = await service.markWroteBack("p1");
+    expect(again).toEqual({ ok: true, post: marked.post });
+  });
+});

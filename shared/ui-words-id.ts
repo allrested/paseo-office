@@ -829,4 +829,20 @@ export const UI_ID: Readonly<Record<string, string>> = {
   "Per day": "Per hari",
   "Needs Keep watching: with no reading of the plan's limits nothing is started.":
     "Perlu Tetap memantau: tanpa pembacaan batas paket, tidak ada yang dimulai.",
+  Intake: "Pemasukan",
+  "Jira tickets to bring in (JQL)": "Tiket Jira yang dibawa masuk (JQL)",
+  "Tickets this matches become lobby tasks, each once. Leave imported tickets out of it, for example by a label.":
+    "Tiket yang cocok menjadi tugas lobi, masing-masing sekali. Keluarkan tiket yang sudah diimpor dari JQL ini, misalnya dengan label.",
+  "Imported tasks go to": "Tugas yang diimpor masuk ke",
+  "Backlog holds a ticket until you start it.": "Antrean menahan tiket sampai Anda memulainya.",
+  "Let the gate start imported tasks": "Biarkan gerbang memulai tugas yang diimpor",
+  "A ticket's text reaches an agent without you reading it first. Leave it off unless only people you trust can write tickets.":
+    "Teks tiket sampai ke agen tanpa Anda membacanya lebih dulu. Biarkan mati kecuali hanya orang yang Anda percaya yang bisa menulis tiket.",
+  "Comment the result on the ticket": "Komentari hasilnya di tiket",
+  "The comment is the result as the agent wrote it, readable by everyone who can read the ticket.":
+    "Komentarnya adalah hasil seperti yang ditulis agen, dapat dibaca semua orang yang dapat membaca tiket.",
+  "Not set up: needs a JQL and the Jira connection.": "Belum diatur: perlu JQL dan koneksi Jira.",
+  "Not read yet.": "Belum dibaca.",
+  "Waiting: 50 imported tasks are open.": "Menunggu: 50 tugas impor masih terbuka.",
+  "Read now": "Baca sekarang",
 };

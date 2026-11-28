@@ -109,3 +109,8 @@ export function dutiesFile(env: NodeJS.ProcessEnv, home: string) {
 export function autoStartFile(env: NodeJS.ProcessEnv, home: string) {
   return join(officeDir(env, home), "auto-start.json");
 }
+
+/** The tickets the intake has posted, so a task deleted from the board does not come back. */
+export function intakeFile(env: NodeJS.ProcessEnv, home: string) {
+  return join(officeDir(env, home), "intake.json");
+}

@@ -1,5 +1,5 @@
 import { waitingOn } from "../shared/board-rules.js";
-import { DUTY, LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
+import { DUTY, LOBBY, SOURCE_NAMES, USER_AUTHOR, type Post } from "../shared/contracts.js";
 import { assignmentFooter } from "../shared/lobby-assignment.js";
 import type { BoardService } from "./board-service.js";
 import { errorMessage } from "./errors.js";
@@ -68,6 +68,11 @@ function waitedOnLines(task: Post, posts: readonly Post[]): string[] {
 /** The first line of an assignment: whose task it is, or the duty board's. */
 function assignmentHeading(task: Post): string {
   if (task.board === DUTY) return `The office assigned you duty ${task.id} from the duty board.`;
+  // A task from a ticket names the ticket: its words are a stranger's, not the user's.
+  if (task.source !== undefined) {
+    const { kind, key } = task.source;
+    return `The office assigned you lobby task ${task.id} from ${SOURCE_NAMES[kind]} ${oneLine(key)}.`;
+  }
   const author = task.author === USER_AUTHOR ? "the user" : `agent ${oneLine(task.author)}`;
   return `The office assigned you lobby task ${task.id} from ${author}.`;
 }

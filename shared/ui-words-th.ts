@@ -799,4 +799,20 @@ export const UI_TH: Readonly<Record<string, string>> = {
   "Per day": "ต่อวัน",
   "Needs Keep watching: with no reading of the plan's limits nothing is started.":
     "ต้องเปิด เฝ้าดูต่อ: ถ้าไม่มีการอ่านขีดจำกัดของแพ็กเกจ จะไม่เริ่มงานใดเลย",
+  Intake: "รับงานเข้า",
+  "Jira tickets to bring in (JQL)": "ตั๋ว Jira ที่จะนำเข้า (JQL)",
+  "Tickets this matches become lobby tasks, each once. Leave imported tickets out of it, for example by a label.":
+    "ตั๋วที่ตรงกับ JQL นี้จะกลายเป็นงานในล็อบบี้ ตั๋วละครั้งเดียว ควรกันตั๋วที่นำเข้าแล้วออกจาก JQL เช่นใช้ป้ายกำกับ",
+  "Imported tasks go to": "งานที่นำเข้าไปที่",
+  "Backlog holds a ticket until you start it.": "งานค้างจะเก็บตั๋วไว้จนกว่าคุณจะเริ่ม",
+  "Let the gate start imported tasks": "ให้ประตูเริ่มงานที่นำเข้า",
+  "A ticket's text reaches an agent without you reading it first. Leave it off unless only people you trust can write tickets.":
+    "ข้อความของตั๋วจะถึงเอเจนต์โดยที่คุณยังไม่ได้อ่านก่อน ควรปิดไว้ เว้นแต่มีเฉพาะคนที่คุณไว้ใจเท่านั้นที่เขียนตั๋วได้",
+  "Comment the result on the ticket": "คอมเมนต์ผลลัพธ์ในตั๋ว",
+  "The comment is the result as the agent wrote it, readable by everyone who can read the ticket.":
+    "คอมเมนต์คือผลลัพธ์ตามที่เอเจนต์เขียน ทุกคนที่อ่านตั๋วได้ก็อ่านได้",
+  "Not set up: needs a JQL and the Jira connection.": "ยังไม่ได้ตั้งค่า: ต้องมี JQL และการเชื่อมต่อ Jira",
+  "Not read yet.": "ยังไม่ได้อ่าน",
+  "Waiting: 50 imported tasks are open.": "กำลังรอ: งานที่นำเข้า 50 งานยังเปิดอยู่",
+  "Read now": "อ่านตอนนี้",
 };

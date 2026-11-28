@@ -54,6 +54,10 @@ test("lines built from data keep their data and take Indonesian words", () => {
     ["1 file restored, 0 skipped", "1 berkas dikembalikan, 0 dilewati"],
     ["2 files changed after the turn", "2 berkas diubah setelah giliran"],
     ["1 file left alone, being a link", "1 berkas dibiarkan karena berupa tautan"],
+    ["Last read 12:40: 3 imported", "Terakhir dibaca 12:40: 3 diimpor"],
+    ["Last read 12:40: nothing new", "Terakhir dibaca 12:40: tidak ada yang baru"],
+    ["Open PROJ-12 in Jira", "Buka PROJ-12 di Jira"],
+    ["Open acme/x#4 on GitHub", "Buka acme/x#4 di GitHub"],
   ];
   for (const [english, indonesian] of lines) expect(translatePattern(english)).toBe(indonesian);
 });

@@ -12,6 +12,10 @@ interface SettingFieldProps {
   /** Resolves once the host has answered, and never rejects. */
   onSave(next: string): Promise<unknown>;
   problem: string | null;
+  /** A field of this many lines, for text that is long or has line breaks; one line when absent. */
+  lines?: number;
+  /** The most characters it takes. */
+  maxLength?: number;
   styles: OfficeStyles;
 }
 
@@ -21,7 +25,7 @@ interface SettingFieldProps {
  * until the host has answered; a refused save goes back to the stored value.
  */
 export function SettingField(props: SettingFieldProps) {
-  const { value, onSave, problem, styles } = props;
+  const { value, onSave, problem, lines, maxLength, styles } = props;
   const t = useT();
   const label = t(props.label);
   const hint = t(props.hint);
@@ -64,7 +68,10 @@ export function SettingField(props: SettingFieldProps) {
         autoCapitalize="none"
         autoCorrect={false}
         spellCheck={false}
-        style={styles.fieldInput}
+        multiline={lines !== undefined}
+        numberOfLines={lines}
+        maxLength={maxLength}
+        style={lines === undefined ? styles.fieldInput : styles.input}
       />
       <Text style={styles.fieldHint}>{hint}</Text>
       {problem === null ? null : (

@@ -3,6 +3,7 @@ import type {
   ChatChange,
   ChatSnapshot,
   IncidentsState,
+  IntakeState,
   WeatherState,
   Checklists,
   ChecklistCounts,
@@ -89,6 +90,8 @@ export interface Hub {
   setDuties(duties: DutyBoard): void;
   /** The auto-start gate's state; the same state again sends nothing. */
   setAutoStart(autoStart: AutoStartState): void;
+  /** The intake's state; the same state again sends nothing. */
+  setIntake(intake: IntakeState): void;
   /** The open incidents and the trackers' state; the same state again sends nothing. */
   setIncidents(incidents: IncidentsState): void;
   /** A changed sky or service status is sent to every subscriber. */
@@ -169,6 +172,8 @@ export function createHub(ports: HubPorts): Hub {
   let sentDuties = "";
   let autoStart: AutoStartState | null = null;
   let sentAutoStart = "";
+  let intake: IntakeState | null = null;
+  let sentIntake = "";
   let incidents: IncidentsState | null = null;
   let brand: OfficeSnapshot["brand"];
   let weather: WeatherState | null = null;
@@ -207,6 +212,7 @@ export function createHub(ports: HubPorts): Hub {
       ...(chatSource === null ? {} : { chat: chatSource() }),
       ...(duties === null ? {} : { duties: { ...duties, duties: [...duties.duties] } }),
       ...(autoStart === null ? {} : { autoStart: { ...autoStart } }),
+      ...(intake === null ? {} : { intake: structuredClone(intake) }),
     };
   }
 
@@ -631,6 +637,13 @@ export function createHub(ports: HubPorts): Hub {
       sentAutoStart = text;
       autoStart = { ...next };
       broadcast({ type: "auto-start", autoStart: { ...next } });
+    },
+    setIntake(next) {
+      const text = JSON.stringify(next);
+      if (text === sentIntake) return;
+      sentIntake = text;
+      intake = structuredClone(next);
+      broadcast({ type: "intake", intake: structuredClone(next) });
     },
     setBrand(next) {
       if (JSON.stringify(brand) === JSON.stringify(next)) return;

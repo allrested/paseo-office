@@ -37,6 +37,11 @@ export interface GateSettings {
 
 /** The gate's settings and the notes' zone, whose calendar day the count is of. */
 export interface AutoStartSettings extends GateSettings {
+  /**
+   * Whether a held task from a ticket is started too. Off, the owner starts it: a stranger's words
+   * reach no agent's prompt unread.
+   */
+  intakeAutoStart: boolean;
   zone: string;
 }
 
@@ -253,9 +258,13 @@ export function createAutoStart(ports: AutoStartPorts): AutoStart {
       (post) => post.board === LOBBY && post.kind === "task",
     );
     // A held task that still waits would use a start, then be handed out later with no plan check.
+    const imported = settings?.intakeAutoStart === true;
     const ready = posts.filter(
       (post) =>
-        post.backlog === true && post.state === "open" && waitingOn(post, everything).length === 0,
+        post.backlog === true &&
+        post.state === "open" &&
+        (post.source === undefined || imported) &&
+        waitingOn(post, everything).length === 0,
     );
     const committed = posts.filter(
       (post) => post.state === "claimed" || (post.state === "open" && post.backlog !== true),

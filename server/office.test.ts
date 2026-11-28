@@ -1651,3 +1651,47 @@ test("turning the pickup on or off, and pausing wakes, tell the gate to look aga
   expect(changes.count).toBeGreaterThan(before + 1);
   await office.stop();
 });
+
+test("a task from a ticket is assigned under a heading that names it, and reads as an assignment", async () => {
+  const { office, prompts, clock } = start();
+  await office.ready;
+  office.setPickupEnabled(true);
+  const posted = await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "PROJ-12 Checkout fails\nhttps://acme.example/browse/PROJ-12",
+    source: { kind: "jira", key: "PROJ-12", url: "https://acme.example/browse/PROJ-12" },
+  });
+  expect(posted).toMatchObject({ ok: true, post: { author: "user", source: { key: "PROJ-12" } } });
+  clock.advance(0);
+  await settle();
+  const prompt = (prompts[0] ?? "").replace(/^b: /, "");
+  expect(prompt.split("\n")[0]).toBe("The office assigned you lobby task p1 from Jira PROJ-12.");
+  expect(readLobbyAssignment(prompt)).toEqual({
+    id: "p1",
+    kind: "lobby",
+    body: "PROJ-12 Checkout fails\nhttps://acme.example/browse/PROJ-12",
+  });
+  await office.stop();
+});
+
+test("the office marks a written back task and names an agent by its title", async () => {
+  const { office } = start();
+  await office.ready;
+  const posted = await office.post({
+    board: "lobby",
+    kind: "task",
+    text: "PROJ-12 Checkout fails",
+    source: { kind: "jira", key: "PROJ-12", url: "https://acme.example/browse/PROJ-12" },
+  });
+  if (!posted.ok) throw new Error(posted.error);
+  await office.update({ id: posted.post.id, action: "done", note: "Fixed." });
+  expect(await office.markWroteBack(posted.post.id)).toMatchObject({
+    ok: true,
+    post: { wroteBack: true },
+  });
+  office.noteAgent({ id: "a", workspaceId: "w1", title: "Rani" });
+  expect(office.label("a")).toBe("Rani");
+  expect(office.label("user")).toBe("the user");
+  await office.stop();
+});

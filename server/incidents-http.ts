@@ -26,13 +26,23 @@ export const RESOLVED_MAX = 20;
  * holds a status and the tracker's own words only: never a header, a token or an address.
  */
 export class TrackerProblem extends Error {
-  constructor(message: string) {
-    super(message);
+  /** The message without the tracker's own words: what a log line may say. */
+  readonly withoutWords: string;
+  /** The tracker did not answer in time: a request that changes something may have been done. */
+  readonly timedOut: boolean;
+
+  /** `words` are the tracker's own, put after the message; they can quote what was asked. */
+  constructor(message: string, options: { words?: string; timedOut?: boolean } = {}) {
+    super(options.words ? `${message}: ${options.words}` : message);
     this.name = "TrackerProblem";
+    this.withoutWords = message;
+    this.timedOut = options.timedOut ?? false;
   }
 }
 
 const TIMEOUT_MS = 30_000;
+/** The most of an answer read: a larger one is refused, not held in memory. */
+const BODY_MAX = 5_000_000;
 /** How much of the tracker's own words a problem keeps. */
 const WORDS_MAX = 200;
 
@@ -61,7 +71,9 @@ const RefusalSchema = z.object({
 /** A failed request's error says nothing safe but its code: its text can hold the address. */
 function unreachable(name: string, error: unknown): TrackerProblem {
   if (error instanceof Error && error.name === "TimeoutError") {
-    return new TrackerProblem(`${name} did not answer in ${TIMEOUT_MS / 1000} s`);
+    return new TrackerProblem(`${name} did not answer in ${TIMEOUT_MS / 1000} s`, {
+      timedOut: true,
+    });
   }
   const cause = error instanceof Error ? error.cause : undefined;
   const hasCode = cause instanceof Error && "code" in cause && typeof cause.code === "string";
@@ -83,27 +95,62 @@ function refusal(name: string, status: number, body: unknown): TrackerProblem {
   const parsed = RefusalSchema.safeParse(body);
   const said = parsed.success ? (parsed.data.errorMessages?.[0] ?? parsed.data.detail ?? "") : "";
   const words = said.replace(/\s+/g, " ").trim().slice(0, WORDS_MAX);
-  if (words === "") return new TrackerProblem(`${name} answered HTTP ${status}`);
-  return new TrackerProblem(`${name} answered HTTP ${status}: ${words}`);
+  return new TrackerProblem(`${name} answered HTTP ${status}`, { words });
 }
 
-/** One GET to a tracker, read through `schema`. Rejects with a `TrackerProblem`. */
-export async function getJson<Schema extends z.ZodType>(
-  input: GetJsonInput<Schema>,
-): Promise<z.output<Schema>> {
-  const { tracker, url, schema } = input;
+/**
+ * One request to a tracker; resolves its parsed body once it answered 2xx. Rejects with a
+ * `TrackerProblem`.
+ */
+function tooMuch(name: string): TrackerProblem {
+  return new TrackerProblem(`${name} answered with too much data`);
+}
+
+/** The answer's text, read until `BODY_MAX` bytes and refused past it. */
+async function cappedText(name: string, response: Response): Promise<string> {
+  const declared = Number(response.headers.get("content-length") ?? "");
+  if (declared > BODY_MAX) {
+    await response.body?.cancel().catch(() => undefined);
+    throw tooMuch(name);
+  }
+  if (response.body === null) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > BODY_MAX) {
+      await reader.cancel().catch(() => undefined);
+      throw tooMuch(name);
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+interface SendInit {
+  method?: "POST";
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+async function send(tracker: Tracker, url: string, init: SendInit): Promise<unknown> {
   const { name } = tracker;
   let response: Response;
   let text: string;
   try {
     response = await tracker.fetchFn(url, {
-      headers: { ...tracker.headers, Accept: "application/json" },
+      ...init,
+      headers: { ...tracker.headers, Accept: "application/json", ...init.headers },
       // A redirect would carry the token to wherever it points.
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    text = await response.text();
+    text = await cappedText(name, response);
   } catch (error) {
+    if (error instanceof TrackerProblem) throw error;
     throw unreachable(name, error);
   }
   const { status } = response;
@@ -115,9 +162,30 @@ export async function getJson<Schema extends z.ZodType>(
   }
   const body = parseBody(text);
   if (!response.ok) throw refusal(name, status, body);
+  return body;
+}
+
+/** One GET to a tracker, read through `schema`. Rejects with a `TrackerProblem`. */
+export async function getJson<Schema extends z.ZodType>(
+  input: GetJsonInput<Schema>,
+): Promise<z.output<Schema>> {
+  const { tracker, url, schema } = input;
+  const body = await send(tracker, url, {});
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new TrackerProblem(`${name} answered in a shape the office does not read`);
+    throw new TrackerProblem(`${tracker.name} answered in a shape the office does not read`);
   }
   return parsed.data;
+}
+
+/**
+ * One POST of `body` as JSON to a tracker, with the GET's safety: its answer is not read. Rejects
+ * with a `TrackerProblem`.
+ */
+export async function postJson(input: { tracker: Tracker; url: string; body: unknown }) {
+  await send(input.tracker, input.url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input.body),
+  });
 }

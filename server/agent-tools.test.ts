@@ -502,3 +502,28 @@ test("office_post holds a lobby task in the backlog; its line says so and the ag
     isError: true,
   });
 });
+
+test("a post line names a task's ticket before whose it is", () => {
+  const post: Post = {
+    id: "p12",
+    seq: 12,
+    board: "lobby",
+    kind: "task",
+    text: "PROJ-12 Checkout fails",
+    author: "user",
+    state: "open",
+    backlog: true,
+    source: { kind: "jira", key: "PROJ-12", url: "https://acme.example/browse/PROJ-12" },
+    createdAt: "2026-11-11T09:00:00.000Z",
+    updatedAt: "2026-11-11T09:00:00.000Z",
+  };
+  const label = () => "the user";
+  expect(postLine(post, label, (id) => id, [])).toBe(
+    "p12 task open (backlog) [Jira PROJ-12], from the user: PROJ-12 Checkout fails",
+  );
+  const github: Post = {
+    ...post,
+    source: { kind: "github", key: "o/r#3", url: "https://github.com/o/r/issues/3" },
+  };
+  expect(postLine(github, label, (id) => id, [])).toContain(" [GitHub o/r#3], from the user");
+});

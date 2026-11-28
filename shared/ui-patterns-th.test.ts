@@ -47,6 +47,10 @@ test("lines built from data keep their data and take Thai words", () => {
     ["1 file restored, 0 skipped", "คืนค่า 1 ไฟล์ ข้าม 0 ไฟล์"],
     ["2 files changed after the turn", "2 ไฟล์ถูกแก้ไขหลังรอบนั้น"],
     ["1 file left alone, being a link", "1 ไฟล์ที่ไม่แตะต้องเพราะเป็นลิงก์"],
+    ["Last read 12:40: 3 imported", "อ่านล่าสุด 12:40: นำเข้า 3"],
+    ["Last read 12:40: nothing new", "อ่านล่าสุด 12:40: ไม่มีอะไรใหม่"],
+    ["Open PROJ-12 in Jira", "เปิด PROJ-12 ใน Jira"],
+    ["Open acme/x#4 on GitHub", "เปิด acme/x#4 บน GitHub"],
   ];
   for (const [english, thai] of lines) expect(translatePattern(english)).toBe(thai);
 });

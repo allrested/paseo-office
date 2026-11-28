@@ -10,6 +10,7 @@ import {
   type Post,
   type PostKind,
   type PostResult,
+  type PostSource,
   type UpdateAction,
   type WakeState,
 } from "../shared/contracts.js";
@@ -87,7 +88,13 @@ export interface Office {
     team?: string;
     after?: string[];
     backlog?: boolean;
+    /** The ticket an intake's task came from; never from a client. */
+    source?: PostSource;
   }): Promise<PostResult>;
+  /** Marks a done task from a ticket as commented on. */
+  markWroteBack(id: string): Promise<PostResult>;
+  /** How the board names an author: an agent by its title, the user as "the user". */
+  label(author: string): string;
   /** Takes a held lobby task out of the backlog, so the pickup hands it out. */
   start(id: string): Promise<PostResult>;
   /** The auto-start gate's start: only the revision it looked at, told as the owner's Start is. */
@@ -338,6 +345,11 @@ export function createOffice(deps: OfficeDeps): Office {
       if (result.ok) mentioned(result.post);
       return result;
     },
+    async markWroteBack(id) {
+      await ready;
+      return service.markWroteBack(id);
+    },
+    label,
     async start(id) {
       await ready;
       const wasHeld = service.postsOf("lobby").some((post) => post.id === id && post.backlog);

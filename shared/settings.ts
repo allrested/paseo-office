@@ -89,6 +89,11 @@ export type ChatCulture = (typeof CHAT_CULTURES)[number];
 export const CACHE_CLOCKS = ["off", "5m", "1h"] as const;
 export type CacheClock = (typeof CACHE_CLOCKS)[number];
 
+/** The longest JQL the intake takes. */
+export const JQL_MAX = 1_000;
+/** Where a ticket the intake posts lands: held in the backlog, or To do at once. */
+export const INTAKE_LANDS = ["backlog", "todo"] as const;
+
 const HostValuesSchema = z.object({
   ...brandFields,
   archiveOnDeparture: z.boolean().default(false),
@@ -134,6 +139,10 @@ const HostValuesSchema = z.object({
   autoStartUnderPct: z.number().int().min(10).max(100).default(70),
   autoStartAtOnce: z.number().int().min(1).max(20).default(3),
   autoStartPerDay: z.number().int().min(1).max(200).default(10),
+  jiraIntakeJql: z.string().max(JQL_MAX).default(""),
+  intakeLands: z.enum(INTAKE_LANDS).default("backlog"),
+  intakeWriteBack: z.boolean().default(false),
+  intakeAutoStart: z.boolean().default(false),
 });
 type HostValues = z.output<typeof HostValuesSchema>;
 
@@ -243,11 +252,15 @@ const SUNDAY_TO_THURSDAY = [0, 1, 2, 3, 4];
  * office start the oldest backlog task by itself while every counted plan limit is under
  * `autoStartUnderPct`, fewer than `autoStartAtOnce` lobby tasks are claimed or started and fewer than
  * `autoStartPerDay` were started by it today; it needs `keepWatching`, which reads the limits.
+ * `jiraIntakeJql` is the owner's JQL whose tickets the office posts as lobby tasks every 10 minutes,
+ * none while empty; each lands where `intakeLands` says. `intakeWriteBack` on has the office comment
+ * a done imported task's result on its ticket. `intakeAutoStart` on lets
+ * the auto-start gate start held imported tasks too; off, the owner starts each one.
  */
 export const officeHostSettings = defineSettings({
   id: "office",
   scope: "host",
-  version: 14,
+  version: 15,
   schema: HostValuesSchema.superRefine(refuseBadTrackerValues)
     .superRefine(refuseBadAwsValues)
     .superRefine(refuseBadDays)
@@ -276,6 +289,7 @@ export const officeHostSettings = defineSettings({
   // Version 9 adds `keepWatching`, off. Version 10 adds `notifyUrl`, empty, and `notifyLevel`, danger.
   // Version 11 adds `jiraTypes`, Bug. Version 12 adds `loopGuard`, off. Version 13 adds `undoTurn`, off.
   // Version 14 adds `autoStart`, off, with `autoStartUnderPct` 70, `autoStartAtOnce` 3 and `autoStartPerDay` 10.
+  // Version 15 adds `jiraIntakeJql`, empty, `intakeLands`, backlog, `intakeWriteBack`, off, and `intakeAutoStart`, off.
   migrate: (values, fromVersion) =>
     fromVersion < 4 && typeof values === "object" && values !== null
       ? { notesDays: SUNDAY_TO_THURSDAY, ...values }

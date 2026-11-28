@@ -676,6 +676,11 @@ wakes not paused) and all three of its numbers allow it:
   from midnight in the notes' zone, not the duty board's 08:00 day, and your own Start presses do
   not count.
 
+A held task the intake imported from a ticket (see Intake) is passed over unless the host setting
+`intakeAutoStart` is on (off at first); with only imported tasks held, the reason is `empty`. With
+it on, a ticket is started and reaches an agent's prompt without the owner reading it: leave it off
+unless only people you trust can write tickets.
+
 It needs **Keep watching**. The limits come only from the server's plan watch (see Plan limits),
 and a reading older than 15 minutes counts as none. With Keep watching off, before the first read,
 or with no counted provider reporting a limit, nothing starts. If the office cannot read its count
@@ -1351,10 +1356,10 @@ the next run.
 
 ## Schedules
 
-The office runs three schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
+The office runs four schedules of its own (`server/local-schedules.ts`): the stand-up notes at 08:00
 on the "Stand-up days" in the notes' zone, while a notes folder and a day are set, the duty board
 at 08:00 every day in the same zone and at each later time a listed duty has (one schedule of
-several times, set again when the list is saved), and the incidents check every 5 minutes, while a tracker is on. They are timers in the plugin's process,
+several times, set again when the list is saved), the incidents check every 5 minutes, while a tracker is on, and the intake every 10 minutes, while a source is set up (see Intake). They are timers in the plugin's process,
 not Paseo schedules, so they are not in the app, `paseo schedule ls` or `list_schedules`. The
 office sets them from its settings each time it starts and at each save, and stores nothing.
 
@@ -1443,6 +1448,90 @@ my-office's siren for one this device has not rung for. A device keeps what it r
 `office-device` setting, so opening the office again rings nothing. The siren plays only while
 Sound is on, and only after a press in the scene.
 
+## Intake
+
+The office can post tickets from Jira as lobby tasks by itself. **Jira intake** in the host
+settings (`jiraIntakeJql`) takes a JQL of the owner's own, up to 1,000 characters; while it is
+empty, or Jira has no sign-in (the one under Services, or the daemon's environment, as for
+Incidents), the intake is off and has no timer.
+
+- **Where the settings are.** Settings, Services, **Intake**, after the connections. "Jira tickets
+  to bring in (JQL)" is a field of three lines, up to 1,000 characters, saved when it loses focus,
+  with the hint that the tickets it matches become lobby tasks, each once, and that imported
+  tickets should be left out of it. "Imported tasks go to" is Backlog or To do (`intakeLands`).
+  The switch "Let the gate start imported tasks" (`intakeAutoStart`) warns that a ticket's text
+  reaches an agent without you reading it; "Comment the result on the ticket"
+  (`intakeWriteBack`) warns that everyone who can read the ticket reads the comment. The intake
+  uses the Jira connection above it and takes no token of its own.
+- **The status line and Read now.** Under the fields: "Not set up: needs a JQL and the Jira
+  connection." while the source is not set up; otherwise the last run, as "Last read 12:40: 3
+  imported" or "Last read 12:40: nothing new" (the device's clock), or "Not read yet." before the
+  first, then the run's problem in the warning colour, and "Waiting: 50 imported tasks are open."
+  while the cap holds the intake back. **Read now** runs the intake at once
+  (`office.intake.run.request`), shows "Reading..." meanwhile and a failure like any other
+  button's, and is off while the source is not set up.
+- **The chip.** A task from a ticket shows the ticket's key ("PROJ-12") on its meta line, on the
+  kanban card, the list row and a room's copy alike. It is a link: it opens the ticket's address
+  as the Reviews card opens a pull request, and its name for a screen reader is "Open PROJ-12 in
+  Jira" (or "Open <key> on GitHub"). Only an http or https address is opened; any other is shown
+  as plain text. A press on it changes nothing on the task.
+
+- **What is read, and how often.** Every 10 minutes the office sends the JQL to Jira as written
+  (`GET /rest/api/3/search/jql`, the office adds nothing to it) and reads the summary and the
+  description, 20 tickets a page. Tickets already imported do not use up a run: it reads page after
+  page until it has 20 it has not posted, or has read 5 pages (100 matches). When those 100 are all
+  imported, the problem says "the first 100 matches are already imported: narrow the JQL", and
+  nothing new arrives until the JQL leaves imported tickets out. So write a JQL that does: a label
+  the team takes off (`labels = agent`), or a status the team moves tickets out of (`status = "To
+Do"`). A run that comes due while one is still going is skipped. An answer over 5,000,000 bytes
+  is refused ("Jira answered with too much data").
+  `office.intake.run.request` runs it at once and answers the state, so the settings can test a
+  JQL without waiting. The JQL is never written to the plugin's log, and neither is the token.
+- **Where a ticket lands.** Each ticket becomes a lobby task posted as the user, for no agent and
+  no team: `KEY summary`, the ticket's link on the next line, then a blank line and the
+  description as plain text, cut to 1,000 characters with "…". The post keeps the ticket as its
+  `source`. It is held in the **Backlog** unless `intakeLands` is `todo`; Backlog is the default so
+  that the owner reads a ticket before an agent does. The auto-start gate leaves held imported
+  tasks alone unless `intakeAutoStart` is on: with it on, a ticket is started without the owner
+  reading it, so leave it off unless only people you trust can write tickets. An agent handed it reads `The office
+assigned you lobby task p12 from Jira PROJ-12.`, and `office_read` shows the task as
+  `p12 task open (backlog) [Jira PROJ-12], from the user: ...`. A reopen keeps the source.
+- **Once only.** A ticket is posted once. Before posting, the office looks for a post with the
+  same source on any board, done or not, then in `<PASEO_HOME>/office/intake.json`, which keeps
+  the newest 5,000 tickets posted. The task is posted first and recorded after, so a crash between
+  the two leaves it on the board, where the next run finds it. A task the owner deletes does not
+  come back. A ticket moved to another project gets a new key, and is imported again under it. A
+  seen file that cannot be read posts nothing until it can (the state says so):
+  the office never imports on bad data. Deleting the file on purpose brings back every ticket the
+  JQL still matches that is not on a board.
+- **The cap.** With 50 imported tasks open or held (any source's, not done), a run posts nothing
+  more and the state says it is waiting. Finish or delete some and the next run goes on.
+- **Write back** (`intakeWriteBack`, off). When a task from a ticket becomes done with a result,
+  the office comments on the ticket once: `Done in the office by <agent's title, or "the owner">:
+<result>`, cut to 2,000 characters (`POST /rest/api/3/issue/<key>/comment`). The token must be
+  allowed to comment; nothing else is written and no ticket is moved. A task done without a
+  result, or while the switch is off, writes nothing. A failed comment is tried once more at the
+  next run; after that its problem stays in the state and it is not tried again (after a daemon
+  restart it may be tried twice more). A comment that timed out is not tried again, since Jira may
+  have taken it; the state says "the comment may not have arrived". A task reopened and done again
+  comments again. The comment is the task's result as its agent wrote it, and everyone who can read
+  the ticket reads it: with write back on, a ticket's author can ask for something in the ticket's
+  text and read the answer on the ticket.
+- **The ticket's words are other people's.** Anyone who can write the ticket writes the task, and
+  the task reaches an agent's prompt, which can lead the agent to run commands with its
+  permissions. The office keeps the text in its place: the summary is one line of 300 characters
+  at most (cut further when the key and link are long, and a ticket whose key and link alone
+  would not fit in a post is skipped), control characters are removed from the description, the link is built from the saved
+  Jira address and the key (never taken from Jira's answer), a ticket whose key is not a Jira key
+  (`PROJ-12`) is skipped and counted ("1 ticket skipped: unreadable key"), and in the assignment
+  the text is indented like any task's, so it cannot pass for the office's own lines. That is no
+  defence against words that only ask: read a ticket in the Backlog before you start it.
+
+The state for clients (`intake` in the office's state) has, for Jira, whether it is set up, the
+last run's problem (a short safe text, logged once each time it changes; Jira's own words are kept
+apart from its status and left out of the log, since they can quote the JQL), when it last ran and how many tasks that run posted,
+and whether the intake waits at the cap.
+
 ## Weather
 
 Weather defaults to Off. Under Manual, choose Clear, Cloudy, Rain, Storm or Follow the season.
@@ -1519,7 +1608,8 @@ the workspace, where it is in the changes to review. The office installs and rem
 
 The office keeps its files in `<PASEO_HOME>/office/`: `boards.json`, `duties.json`, `chat.json`,
 `notes-writer.json`, `incidents.json`, `tenure.json` (the team ledger), `lift.json` (the build last serviced) and
-`auto-start.json` (`{ version: 1, day, count }`: the backlog tasks the office started by itself that day). Its settings are Paseo settings documents
+`auto-start.json` (`{ version: 1, day, count }`: the backlog tasks the office started by itself that day) and
+`intake.json` (`{ version: 1, seen }`: the tickets the intake posted, see Intake). Its settings are Paseo settings documents
 (`shared/settings.ts`): `office` for the host, and `office-device` and `office-column` for each
 device. The host's are in `<PASEO_HOME>/plugin-settings/office/office.json`; an earlier version of
 the plugin refuses a document a newer one has saved, and removing the plugin deletes it.

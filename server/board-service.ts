@@ -14,6 +14,7 @@ import {
   type Post,
   type PostKind,
   type PostResult,
+  type PostSource,
   type UpdateAction,
 } from "../shared/contracts.js";
 import { dutyPostText } from "../shared/duties.js";
@@ -34,6 +35,8 @@ export interface NewPost {
   after?: readonly string[];
   /** A lobby task held until the owner starts it. */
   backlog?: boolean;
+  /** The ticket a lobby task the intake posts came from. */
+  source?: PostSource;
   /** An agent id, or "user". */
   author: string;
 }
@@ -106,6 +109,8 @@ export interface BoardService {
    * at; otherwise it is returned as it is, with `started` false.
    */
   startHeld(id: string, expectedSeq: number): Promise<StartResult>;
+  /** Marks a done task from a ticket as commented on; one marked already is returned as it is. */
+  markWroteBack(id: string): Promise<PostResult>;
   /**
    * Claims a lobby task or a duty for an automatic assignment. Returns null if the task changed or
    * the agent can no longer pick it up: it holds one already, on either board.
@@ -183,7 +188,8 @@ function withoutClaim(post: Post): Post {
   if (post.duty !== undefined) next.duty = post.duty;
   if (post.team !== undefined) next.team = post.team;
   if (post.after !== undefined) next.after = post.after;
-  // A reopened task has no result: the next finish brings its own.
+  if (post.source !== undefined) next.source = post.source;
+  // A reopened task has no result, and nothing written back: the next finish brings its own.
   return next;
 }
 
@@ -364,7 +370,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
 
   async function createPost(
     input: NewPost,
-    fields: Pick<Post, "team" | "after" | "backlog">,
+    fields: Pick<Post, "team" | "after" | "backlog" | "source">,
   ): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
@@ -434,6 +440,31 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (input.board !== LOBBY || input.kind !== "task" || input.replyTo !== undefined)
       return { ok: false, error: "Unable to post: only a lobby task goes to the backlog" };
     return { ok: true, value: { backlog: true } };
+  }
+
+  /** A new post's ticket: only a lobby task the intake posts has one. */
+  function sourceFor(input: NewPost): Outcome<Pick<Post, "source">> {
+    if (input.source === undefined) return { ok: true, value: {} };
+    if (input.board !== LOBBY || input.kind !== "task" || input.replyTo !== undefined)
+      return { ok: false, error: "Unable to post: only a lobby task comes from a ticket" };
+    return { ok: true, value: { source: input.source } };
+  }
+
+  /** Marks a done task from a ticket as written back, in the queue. */
+  async function markWritten(id: string): Promise<PostResult> {
+    const post = data.posts.find((item) => item.id === id);
+    const refuse = (reason: string): PostResult => ({
+      ok: false,
+      error: `Unable to mark ${id}: ${reason}`,
+    });
+    if (post === undefined) return refuse("no such post");
+    if (post.kind !== "task" || post.source === undefined) return refuse("it is not from a ticket");
+    if (post.state !== "done") return refuse("it is not done");
+    if (post.wroteBack) return { ok: true, post };
+    const marked: Post = { ...post, wroteBack: true, seq: data.nextSeq, updatedAt: now() };
+    const posts = data.posts.map((item) => (item.id === id ? marked : item));
+    const saved = await commit({ ...data, nextSeq: data.nextSeq + 1, posts }, [post.board]);
+    return saved.ok ? { ok: true, post: marked } : saved;
   }
 
   /**
@@ -971,7 +1002,14 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         if (!after.ok) return after;
         const backlog = backlogFor(input);
         if (!backlog.ok) return backlog;
-        return createPost(input, { ...team.value, ...after.value, ...backlog.value });
+        const source = sourceFor(input);
+        if (!source.ok) return source;
+        return createPost(input, {
+          ...team.value,
+          ...after.value,
+          ...backlog.value,
+          ...source.value,
+        });
       }),
     update: (input) =>
       exclusive(
@@ -987,6 +1025,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         return result.ok ? { ok: true, post: result.post } : result;
       }),
     startHeld: (id, expectedSeq) => exclusive(() => unhold(id, expectedSeq)),
+    markWroteBack: (id) => exclusive(() => markWritten(id)),
     claimLobbyTask: (id, agentId, expectedSeq) =>
       exclusive(async () => {
         const pickup = data.posts.filter((post) => PICKUP_BOARDS.has(post.board));
