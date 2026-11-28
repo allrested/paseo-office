@@ -676,6 +676,11 @@ wakes not paused) and all three of its numbers allow it:
   from midnight in the notes' zone, not the duty board's 08:00 day, and your own Start presses do
   not count.
 
+A held task the intake imported from a ticket (see Intake) is passed over unless the host setting
+`intakeAutoStart` is on (off at first); with only imported tasks held, the reason is `empty`. With
+it on, a ticket is started and reaches an agent's prompt without the owner reading it: leave it off
+unless only people you trust can write tickets.
+
 It needs **Keep watching**. The limits come only from the server's plan watch (see Plan limits),
 and a reading older than 15 minutes counts as none. With Keep watching off, before the first read,
 or with no counted provider reporting a limit, nothing starts. If the office cannot read its count
@@ -1453,21 +1458,30 @@ change; the settings document holds it now.
 
 - **What is read, and how often.** Every 10 minutes the office sends the JQL to Jira as written
   (`GET /rest/api/3/search/jql`, the office adds nothing to it) and reads the summary and the
-  description of 20 tickets at most. A run that comes due while one is still going is skipped.
+  description, 20 tickets a page. Tickets already imported do not use up a run: it reads page after
+  page until it has 20 it has not posted, or has read 5 pages (100 matches). When those 100 are all
+  imported, the problem says "the first 100 matches are already imported: narrow the JQL", and
+  nothing new arrives until the JQL leaves imported tickets out. So write a JQL that does: a label
+  the team takes off (`labels = agent`), or a status the team moves tickets out of (`status = "To
+  Do"`). A run that comes due while one is still going is skipped. An answer over 5,000,000 bytes
+  is refused ("Jira answered with too much data").
   `office.intake.run.request` runs it at once and answers the state, so the settings can test a
   JQL without waiting. The JQL is never written to the plugin's log, and neither is the token.
 - **Where a ticket lands.** Each ticket becomes a lobby task posted as the user, for no agent and
   no team: `KEY summary`, the ticket's link on the next line, then a blank line and the
   description as plain text, cut to 1,000 characters with "…". The post keeps the ticket as its
   `source`. It is held in the **Backlog** unless `intakeLands` is `todo`; Backlog is the default so
-  that the owner reads a ticket before an agent does. An agent handed it reads `The office
+  that the owner reads a ticket before an agent does. The auto-start gate leaves held imported
+  tasks alone unless `intakeAutoStart` is on: with it on, a ticket is started without the owner
+  reading it, so leave it off unless only people you trust can write tickets. An agent handed it reads `The office
   assigned you lobby task p12 from Jira PROJ-12.`, and `office_read` shows the task as
   `p12 task open (backlog) [Jira PROJ-12], from the user: ...`. A reopen keeps the source.
 - **Once only.** A ticket is posted once. Before posting, the office looks for a post with the
   same source on any board, done or not, then in `<PASEO_HOME>/office/intake.json`, which keeps
   the newest 5,000 tickets posted. The task is posted first and recorded after, so a crash between
   the two leaves it on the board, where the next run finds it. A task the owner deletes does not
-  come back. A seen file that cannot be read posts nothing until it can (the state says so):
+  come back. A ticket moved to another project gets a new key, and is imported again under it. A
+  seen file that cannot be read posts nothing until it can (the state says so):
   the office never imports on bad data. Deleting the file on purpose brings back every ticket the
   JQL still matches that is not on a board.
 - **The cap.** With 50 imported tasks open or held (any source's, not done), a run posts nothing
@@ -1478,19 +1492,24 @@ change; the settings document holds it now.
   allowed to comment; nothing else is written and no ticket is moved. A task done without a
   result, or while the switch is off, writes nothing. A failed comment is tried once more at the
   next run; after that its problem stays in the state and it is not tried again (after a daemon
-  restart it may be tried twice more). A task reopened and done again comments again.
+  restart it may be tried twice more). A comment that timed out is not tried again, since Jira may
+  have taken it; the state says "the comment may not have arrived". A task reopened and done again
+  comments again. The comment is the task's result as its agent wrote it, and everyone who can read
+  the ticket reads it: with write back on, a ticket's author can ask for something in the ticket's
+  text and read the answer on the ticket.
 - **The ticket's words are other people's.** Anyone who can write the ticket writes the task, and
   the task reaches an agent's prompt, which can lead the agent to run commands with its
   permissions. The office keeps the text in its place: the summary is one line of 300 characters
-  at most, control characters are removed from the description, the link is built from the saved
+  at most (cut further when the key and link are long, and a ticket whose key and link alone
+  would not fit in a post is skipped), control characters are removed from the description, the link is built from the saved
   Jira address and the key (never taken from Jira's answer), a ticket whose key is not a Jira key
   (`PROJ-12`) is skipped and counted ("1 ticket skipped: unreadable key"), and in the assignment
   the text is indented like any task's, so it cannot pass for the office's own lines. That is no
   defence against words that only ask: read a ticket in the Backlog before you start it.
 
 The state for clients (`intake` in the office's state) has, for Jira, whether it is set up, the
-last run's problem (a short safe text, logged once each time it changes, with Jira's own words left
-out of the log since they can quote the JQL), when it last ran and how many tasks that run posted,
+last run's problem (a short safe text, logged once each time it changes; Jira's own words are kept
+apart from its status and left out of the log, since they can quote the JQL), when it last ran and how many tasks that run posted,
 and whether the intake waits at the cap.
 
 ## Weather

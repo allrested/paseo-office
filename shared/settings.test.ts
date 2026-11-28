@@ -68,6 +68,7 @@ const COMPANY = {
   jiraIntakeJql: "",
   intakeLands: "backlog",
   intakeWriteBack: false,
+  intakeAutoStart: false,
   ...WEATHER_DEFAULTS,
 };
 
@@ -436,6 +437,7 @@ test("the Jira intake is off with no JQL, lands in the backlog, writes nothing b
     jiraIntakeJql: "",
     intakeLands: "backlog",
     intakeWriteBack: false,
+    intakeAutoStart: false,
   });
   // A version 14 document starts with it off.
   expect(await upgraded({ agentTools: true, autoStart: true }, 14)).toMatchObject({

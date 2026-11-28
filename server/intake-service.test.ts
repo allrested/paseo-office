@@ -14,6 +14,7 @@ import {
   type IntakeSeenFile,
   type IntakeSettings,
   type IntakeSource,
+  ticketText,
 } from "./intake-service.js";
 
 const T0 = Date.parse("2026-11-11T09:00:00.000Z");
@@ -35,6 +36,9 @@ function memoryStore(initial: BoardsFile = EMPTY_BOARDS): BoardStore & { current
 interface FakeSource extends IntakeSource {
   issues: IntakeIssue[];
   skipped: number;
+  crowded: boolean;
+  /** The seen test the last read was given. */
+  seenTest: ((key: string) => boolean) | null;
   setUp: boolean;
   reads: number;
   failure: Error | null;
@@ -51,6 +55,8 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
     kind,
     issues,
     skipped: 0,
+    crowded: false,
+    seenTest: null,
     setUp: true,
     reads: 0,
     failure: null,
@@ -64,11 +70,12 @@ function fakeSource(issues: IntakeIssue[] = [], kind: PostSourceKind = "jira"): 
       return release;
     },
     configured: () => source.setUp,
-    read: async () => {
+    read: async (seen) => {
       source.reads += 1;
+      source.seenTest = seen;
       if (gate !== null) await gate;
       if (source.failure !== null) throw source.failure;
-      return { issues: source.issues, skipped: source.skipped };
+      return { issues: source.issues, skipped: source.skipped, crowded: source.crowded };
     },
     comment: async (key, text) => {
       source.comments.push([key, text]);
@@ -119,7 +126,10 @@ async function harness(
     sources?: IntakeSource[];
     file?: MemoryFile;
     boards?: BoardsFile;
-    settings?: IntakeSettings | null;
+    /** Undefined settings: none given yet, as before the office read them. */
+    settings?: IntakeSettings | null | "none";
+    /** The board refuses a post whose text starts with this. */
+    refuse?: string;
   } = {},
 ) {
   const clock = createFakeClock(T0);
@@ -144,7 +154,10 @@ async function harness(
     sources,
     board: {
       allPosts: () => Object.values(service.boards()).flat(),
-      post: (input) => service.post({ ...input, author: "user" }),
+      post: async (input) =>
+        options.refuse !== undefined && input.text.startsWith(options.refuse)
+          ? { ok: false, error: "Unable to post: the board holds 200 open or claimed tasks" }
+          : service.post({ ...input, author: "user" }),
       markWroteBack: (id) => service.markWroteBack(id),
       label: (author) => NAMES.get(author) ?? author,
     },
@@ -155,7 +168,9 @@ async function harness(
     log: (message) => logs.push(message),
   });
   intake.boardChanged();
-  await intake.settingsChanged(options.settings === undefined ? HELD : options.settings);
+  if (options.settings !== "none") {
+    await intake.settingsChanged(options.settings === undefined ? HELD : options.settings);
+  }
   const lobby = () => service.postsOf("lobby");
   return { intake, service, store, clock, logs, file, schedules, states, sources, lobby };
 }
@@ -399,7 +414,9 @@ test("a run asked for while one is running is that run", async () => {
 
 test("a source's failure is a safe problem, logged once per change, and cleared by a good read", async () => {
   const source = fakeSource([ticket(1)]);
-  source.failure = new TrackerProblem("Jira answered HTTP 400: Error in the JQL Query");
+  source.failure = new TrackerProblem("Jira answered HTTP 400", {
+    words: "Error in the JQL Query",
+  });
   const { intake, logs, states } = await harness({ sources: [source] });
   const failed = await intake.run();
   expect(failed.jira).toEqual({
@@ -558,4 +575,102 @@ test("the seen file keeps the newest 5,000 keys", async () => {
   expect(kept).toContain("jira:OPS-1");
   expect(kept).not.toContain("jira:OLD-0");
   expect(kept).toContain("jira:OLD-1");
+});
+
+test("the read is told what is seen, on the board or in the seen file", async () => {
+  const file = memoryFile({ version: 1, seen: { "jira:OPS-1": "2026-11-01T00:00:00.000Z" } });
+  const source = fakeSource([]);
+  const { intake } = await harness({
+    sources: [source],
+    file,
+    boards: boardsOf([sourced(1, "OPS-2", { state: "done" })]),
+  });
+  await intake.run();
+  const seen = source.seenTest ?? (() => false);
+  expect([seen("OPS-1"), seen("OPS-2"), seen("OPS-3")]).toEqual([true, true, false]);
+});
+
+test("when the first 100 matches are all imported, the problem says to narrow the JQL", async () => {
+  const source = fakeSource([ticket(1)]);
+  source.crowded = true;
+  const file = memoryFile({ version: 1, seen: { "jira:OPS-1": "2026-11-01T00:00:00.000Z" } });
+  const { intake } = await harness({ sources: [source], file });
+  expect((await intake.run()).jira.problem).toBe(
+    "the first 100 matches are already imported: narrow the JQL",
+  );
+});
+
+test("Jira's words never reach the log, though they hold a semicolon and come after other problems", async () => {
+  const source = fakeSource([ticket(1)]);
+  source.skipped = 1;
+  source.failure = new TrackerProblem("Jira answered HTTP 400", {
+    words: "Field 'secret' does not exist; project = SECRET",
+  });
+  const { intake, logs } = await harness({ sources: [source] });
+  const state = await intake.run();
+  expect(state.jira.problem).toBe(
+    "Jira answered HTTP 400: Field 'secret' does not exist; project = SECRET",
+  );
+  expect(logs.join("\n")).not.toContain("secret");
+  expect(logs.join("\n")).not.toContain("SECRET");
+  expect(logs).toContain("[office] intake from Jira: Jira answered HTTP 400");
+});
+
+test("a comment that timed out may have arrived: it is not tried again, and the state says so", async () => {
+  const source = fakeSource([ticket(1)]);
+  const { intake, service } = await harness({ sources: [source], settings: WRITE_BACK });
+  source.comment = async (key, text) => {
+    source.comments.push([key, text]);
+    throw new TrackerProblem("Jira did not answer in 30 s", { timedOut: true });
+  };
+  const id = await claimed(service, intake);
+  await service.update({ id, action: "done", actor: "a", note: "Fixed." });
+  await settle();
+  expect(intake.state().jira.problem).toBe(
+    "Unable to comment on OPS-1: Jira did not answer in 30 s: the comment may not have arrived",
+  );
+  await intake.run();
+  expect(source.comments).toHaveLength(1);
+  expect(service.postsOf("lobby")[0]).not.toHaveProperty("wroteBack");
+});
+
+test("a title too long for its link is cut so the post fits", async () => {
+  const key = `OPS-${"7".repeat(196)}`;
+  const url = `https://${"u".repeat(1_492)}`;
+  const source = fakeSource([{ key, url, title: "t".repeat(300), body: "Body" }]);
+  const { intake, lobby } = await harness({ sources: [source] });
+  await intake.run();
+  const [head, link] = (lobby()[0]?.text ?? "").split("\n");
+  expect(link).toBe(url);
+  expect((head?.length ?? 0) + 1 + url.length).toBeLessThanOrEqual(2_000);
+  expect(head?.startsWith(`${key} ttt`)).toBe(true);
+  expect(
+    ticketText({ key: "OPS-1", url: `https://${"u".repeat(2_000)}`, title: "T", body: "" }),
+  ).toBeNull();
+});
+
+test("a ticket the board refuses is passed over, and the run goes on with the next", async () => {
+  const source = fakeSource([ticket(1), ticket(2)]);
+  const { intake, lobby } = await harness({ sources: [source], refuse: "OPS-1 " });
+  const state = await intake.run();
+  expect(lobby().map((post) => post.source?.key)).toEqual(["OPS-2"]);
+  expect(state.jira).toMatchObject({
+    imported: 1,
+    problem: "Unable to post: the board holds 200 open or claimed tasks",
+  });
+});
+
+test("a task done before the settings are known is written back once they are", async () => {
+  const source = fakeSource([]);
+  const { intake, service } = await harness({
+    sources: [source],
+    settings: "none",
+    boards: boardsOf([sourced(1, "OPS-1")]),
+  });
+  await service.update({ id: "p1", action: "done", actor: "user", note: "Fixed early." });
+  await settle();
+  expect(source.comments).toEqual([]);
+  await intake.settingsChanged(WRITE_BACK);
+  await settle();
+  expect(source.comments).toEqual([["OPS-1", "Done in the office by the owner: Fixed early."]]);
 });

@@ -27,7 +27,11 @@ function fakeFetch(body: unknown, status = 200) {
 test("the owner's JQL is sent as written, for the summary and description of 20 at most", async () => {
   const fetchFn = fakeFetch({ issues: [] });
   const jql = 'project = OPS AND labels = "agent" ORDER BY created ASC';
-  expect(await readJiraIssues(ENV, jql, fetchFn)).toEqual({ issues: [], skipped: 0 });
+  expect(await readJiraIssues(ENV, jql, fetchFn)).toEqual({
+    issues: [],
+    skipped: 0,
+    crowded: false,
+  });
   expect(fetchFn).toHaveBeenCalledOnce();
   const [url, init] = fetchFn.mock.calls[0] ?? [];
   const asked = new URL(String(url));
@@ -90,6 +94,7 @@ test("a description in Atlassian's document format is plain text: text joined, b
       },
     ],
     skipped: 0,
+    crowded: false,
   });
 });
 
@@ -240,10 +245,96 @@ test("the Jira source is set up only with a sign-in and a JQL that is not blank"
   jql = "   ";
   expect(source.configured()).toBe(false);
   jql = " project = OPS ";
-  expect((await source.read()).issues).toHaveLength(1);
+  expect((await source.read(() => false)).issues).toHaveLength(1);
   expect(new URL(String(fetchFn.mock.calls[0]?.[0])).searchParams.get("jql")).toBe(
     " project = OPS ",
   );
   await source.comment?.("OPS-1", "Done");
   expect(String(fetchFn.mock.calls[1]?.[0])).toBe(`${ENV.baseUrl}/rest/api/3/issue/OPS-1/comment`);
+});
+
+/** A fake fetch that answers each search with the next of `pages`. */
+function pagedFetch(pages: unknown[]) {
+  let served = 0;
+  return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+    answer(pages[served++] ?? { issues: [], isLast: true }),
+  );
+}
+
+function page(from: number, count: number, next: string | null) {
+  return {
+    issues: Array.from({ length: count }, (_, index) => issue(`OPS-${from + index}`, "T")),
+    ...(next === null ? { isLast: true } : { nextPageToken: next, isLast: false }),
+  };
+}
+
+test("seen tickets do not use up the 20: the reader pages on until it has 20 unseen", async () => {
+  // The first 30 are imported already.
+  const seen = (key: string) => Number(key.slice(4)) <= 30;
+  const fetchFn = pagedFetch([page(1, 20, "t2"), page(21, 20, "t3"), page(41, 20, "t4")]);
+  const read = await readJiraIssues(ENV, "project = OPS", fetchFn, seen);
+  expect(fetchFn).toHaveBeenCalledTimes(3);
+  const second = new URL(String(fetchFn.mock.calls[1]?.[0])).searchParams;
+  expect(second.get("nextPageToken")).toBe("t2");
+  expect(second.get("jql")).toBe("project = OPS");
+  expect(second.get("maxResults")).toBe("20");
+  const unseen = read.issues.filter((found) => !seen(found.key)).map((found) => found.key);
+  expect(unseen).toEqual(Array.from({ length: 20 }, (_, index) => `OPS-${31 + index}`));
+  expect(read.crowded).toBe(false);
+});
+
+test("the reader stops at the last page, and after 5 pages all seen it says the matches are crowded", async () => {
+  const last = pagedFetch([page(1, 20, "t2"), page(21, 3, null)]);
+  const short = await readJiraIssues(
+    ENV,
+    "project = OPS",
+    last,
+    (key) => Number(key.slice(4)) <= 10,
+  );
+  expect(last).toHaveBeenCalledTimes(2);
+  expect(short.issues).toHaveLength(23);
+  expect(short.crowded).toBe(false);
+
+  const pages = [1, 2, 3, 4, 5, 6].map((n) => page((n - 1) * 20 + 1, 20, `t${n + 1}`));
+  const crowdedFetch = pagedFetch(pages);
+  const crowded = await readJiraIssues(ENV, "project = OPS", crowdedFetch, () => true);
+  expect(crowdedFetch).toHaveBeenCalledTimes(5);
+  expect(crowded.crowded).toBe(true);
+  // A token Jira gives again is not followed.
+  const loop = pagedFetch([page(1, 20, "t2"), page(21, 20, "t2"), page(41, 20, "t2")]);
+  await readJiraIssues(ENV, "project = OPS", loop, () => true);
+  expect(loop).toHaveBeenCalledTimes(2);
+});
+
+test("an answer over 5,000,000 bytes is refused with a safe problem, also when it says so up front", async () => {
+  const big = vi.fn(async () => new Response(`{"issues":[],"x":"${"a".repeat(5_000_001)}"}`));
+  await expect(readJiraIssues(ENV, "project = OPS", big)).rejects.toThrow(
+    "Jira answered with too much data",
+  );
+  const declared = vi.fn(
+    async () => new Response("{}", { headers: { "content-length": "6000000" } }),
+  );
+  await expect(readJiraIssues(ENV, "project = OPS", declared)).rejects.toThrow(
+    "Jira answered with too much data",
+  );
+});
+
+test("a refusal keeps Jira's words apart from its status, and a timeout says so", async () => {
+  const fetchFn = fakeFetch({ errorMessages: ["Field 'secret' does not exist; really"] }, 400);
+  const failure = await readJiraIssues(ENV, "secret = 1", fetchFn).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(TrackerProblem);
+  expect(failure).toMatchObject({
+    message: "Jira answered HTTP 400: Field 'secret' does not exist; really",
+    withoutWords: "Jira answered HTTP 400",
+    timedOut: false,
+  });
+  const slow = vi.fn(async () => {
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  });
+  const timeout = await commentOnJira(ENV, "OPS-1", "Done", slow).catch((error: unknown) => error);
+  expect(timeout).toMatchObject({
+    message: "Jira did not answer in 30 s",
+    withoutWords: "Jira did not answer in 30 s",
+    timedOut: true,
+  });
 });

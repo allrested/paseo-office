@@ -246,6 +246,7 @@ const SETTINGS: AutoStartSettings = {
   autoStartAtOnce: 3,
   autoStartPerDay: 10,
   planHidden: [],
+  intakeAutoStart: false,
   zone: "UTC",
 };
 
@@ -750,4 +751,17 @@ test("the count file: missing is null, a good one is read, anything else rejects
     await writeFile(path, bad);
     await expect(store.load()).rejects.toThrow();
   }
+});
+
+test("a held task from a ticket is left alone unless imported tasks may start by themselves", async () => {
+  const source = { kind: "jira" as const, key: "OPS-1", url: "https://acme.example/browse/OPS-1" };
+  const s = setup({ posts: [held("p1", "2026-11-10T10:00:00.000Z", { source })] });
+  s.service.planRead(fresh(s.clock));
+  s.service.settingsChanged(SETTINGS);
+  await settle();
+  expect(s.started).toEqual([]);
+  expect(s.states.at(-1)).toMatchObject({ reason: "empty" });
+  s.service.settingsChanged({ ...SETTINGS, intakeAutoStart: true });
+  await settle();
+  expect(s.started).toEqual(["p1"]);
 });

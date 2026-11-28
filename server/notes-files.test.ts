@@ -66,6 +66,7 @@ function ready(notesFolder: string, notesTimeZone: string): SettingsState {
       jiraIntakeJql: "",
       intakeLands: "backlog",
       intakeWriteBack: false,
+      intakeAutoStart: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],

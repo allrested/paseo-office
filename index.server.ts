@@ -794,6 +794,7 @@ export function createOfficePlugin(
       autoStartAtOnce: state.values.autoStartAtOnce,
       autoStartPerDay: state.values.autoStartPerDay,
       planHidden: state.values.planHidden,
+      intakeAutoStart: state.values.intakeAutoStart,
       // The notes' day: a calendar day from midnight in their zone.
       zone: knownZone(notesTimeZone(state.values, deps.hostTimeZone), deps.hostTimeZone),
     });

@@ -3,6 +3,7 @@ import { SOURCE_KEYS } from "../shared/contracts.js";
 import { getJson, postJson, TrackerProblem } from "./incidents-http.js";
 import { jiraTracker, type JiraEnv } from "./incidents-jira.js";
 import {
+  INTAKE_PAGES_MAX,
   INTAKE_READ_MAX,
   ticketBody,
   ticketTitle,
@@ -12,7 +13,11 @@ import {
 } from "./intake-service.js";
 
 // Each issue is read on its own, so one of an odd shape is skipped and the rest still come.
-const SearchSchema = z.object({ issues: z.array(z.unknown()) });
+const SearchSchema = z.object({
+  issues: z.array(z.unknown()),
+  nextPageToken: z.string().nullish(),
+  isLast: z.boolean().nullish(),
+});
 const IssueSchema = z.object({
   key: z.string(),
   fields: z.object({ summary: z.string().nullish(), description: z.unknown().optional() }),
@@ -56,42 +61,62 @@ function descriptionText(description: unknown): string {
 }
 
 /**
- * The tickets the owner's JQL matches, 20 at most. The JQL is sent as written: the office adds
+ * The tickets the owner's JQL matches, read 20 a page until 20 are not `seen` or 5 pages were
+ * read: tickets already imported do not use up a run. The JQL is sent as written: the office adds
  * nothing to it. The link is built from the saved address and the key, never taken from the
- * answer, and a ticket whose key is not a Jira key is skipped and counted.
+ * answer, and a ticket whose key is not a Jira key is skipped and counted. Seen tickets are
+ * returned too, so the intake can record one it finds only on the board.
  */
 export async function readJiraIssues(
   env: JiraEnv,
   jql: string,
   fetchFn: typeof fetch = fetch,
+  seen: (key: string) => boolean = () => false,
 ): Promise<IntakeRead> {
-  const query = new URLSearchParams({
-    jql,
-    fields: "summary,description",
-    maxResults: String(INTAKE_READ_MAX),
-  });
-  const answer = await getJson({
-    tracker: jiraTracker(env, fetchFn),
-    url: `${env.baseUrl}/rest/api/3/search/jql?${query}`,
-    schema: SearchSchema,
-  });
+  const tracker = jiraTracker(env, fetchFn);
   const issues: IntakeIssue[] = [];
   let skipped = 0;
-  for (const found of answer.issues.slice(0, INTAKE_READ_MAX)) {
-    const parsed = IssueSchema.safeParse(found);
-    if (!parsed.success || !SOURCE_KEYS.jira.test(parsed.data.key)) {
-      skipped += 1;
-      continue;
-    }
-    const { key, fields } = parsed.data;
-    issues.push({
-      key,
-      url: `${env.baseUrl}/browse/${key}`,
-      title: ticketTitle(fields.summary ?? ""),
-      body: ticketBody(descriptionText(fields.description)),
+  let unseen = 0;
+  let pages = 0;
+  const tokensSeen = new Set<string>();
+  let pageToken: string | null = null;
+  do {
+    const query = new URLSearchParams({
+      jql,
+      fields: "summary,description",
+      maxResults: String(INTAKE_READ_MAX),
     });
-  }
-  return { issues, skipped };
+    if (pageToken !== null) query.set("nextPageToken", pageToken);
+    const answer = await getJson({
+      tracker,
+      url: `${env.baseUrl}/rest/api/3/search/jql?${query}`,
+      schema: SearchSchema,
+    });
+    pages += 1;
+    for (const found of answer.issues.slice(0, INTAKE_READ_MAX)) {
+      const parsed = IssueSchema.safeParse(found);
+      if (!parsed.success || !SOURCE_KEYS.jira.test(parsed.data.key)) {
+        skipped += 1;
+        continue;
+      }
+      const { key, fields } = parsed.data;
+      issues.push({
+        key,
+        url: `${env.baseUrl}/browse/${key}`,
+        title: ticketTitle(fields.summary ?? ""),
+        body: ticketBody(descriptionText(fields.description)),
+      });
+      if (!seen(key)) unseen += 1;
+      if (unseen >= INTAKE_READ_MAX) break;
+    }
+    // Jira can hand out a token with an empty page, or the same token again: following it would
+    // never end.
+    const next = answer.nextPageToken ?? null;
+    const more = answer.isLast !== true && answer.issues.length > 0 && next !== null;
+    pageToken = more && !tokensSeen.has(next) ? next : null;
+    if (next !== null) tokensSeen.add(next);
+  } while (pageToken !== null && unseen < INTAKE_READ_MAX && pages < INTAKE_PAGES_MAX);
+  return { issues, skipped, crowded: pages >= INTAKE_PAGES_MAX && unseen === 0 };
 }
 
 /** One comment on a ticket, as a document of one paragraph. Rejects with a `TrackerProblem`. */
@@ -130,7 +155,7 @@ export function createJiraSource(ports: {
   return {
     kind: "jira",
     configured: () => ports.env() !== null && ports.jql().trim() !== "",
-    read: async () => readJiraIssues(signIn(), ports.jql(), fetchFn),
+    read: async (seen) => readJiraIssues(signIn(), ports.jql(), fetchFn, seen),
     comment: async (key, text) => commentOnJira(signIn(), key, text, fetchFn),
   };
 }

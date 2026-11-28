@@ -26,8 +26,10 @@ export const INTAKE_SCHEDULE = "intake";
 const INTAKE: OfficeSchedule = { name: INTAKE_SCHEDULE, label: "Intake", logName: "intake" };
 const EVERY_MS = 600_000;
 
-/** The most tickets one run reads from a source. */
+/** The most tickets not seen before that one run reads from a source, and a page's size. */
 export const INTAKE_READ_MAX = 20;
+/** The most pages one run reads: past seen tickets, 100 matches at most. */
+export const INTAKE_PAGES_MAX = 5;
 /** With this many imported tasks open or held, a run posts nothing more. */
 export const IMPORTED_OPEN_MAX = 50;
 export const TITLE_MAX = 300;
@@ -42,6 +44,7 @@ const WRITE_BACK_TRIES = 2;
 
 const UNREADABLE = "intake.json cannot be read: nothing is imported until it can";
 const UNSAVED = "intake.json could not be saved";
+const CROWDED = "the first 100 matches are already imported: narrow the JQL";
 
 /**
  * A ticket as a source read it. Its title and body are other people's words on their way to an
@@ -58,8 +61,11 @@ export interface IntakeIssue {
 
 /** A read's tickets, and how many it left out because their key or shape was unreadable. */
 export interface IntakeRead {
+  /** Seen ones too: one found only on the board is then recorded. */
   issues: IntakeIssue[];
   skipped: number;
+  /** It read the most pages it may and every ticket was seen: nothing new can come. */
+  crowded?: boolean;
 }
 
 /** Where tickets come from. The intake knows nothing of a tracker beyond this. */
@@ -67,8 +73,11 @@ export interface IntakeSource {
   kind: PostSourceKind;
   /** Whether it has what a read needs: a sign-in and a query. */
   configured(): boolean;
-  /** Rejects with a `TrackerProblem`, whose message is safe to show. */
-  read(): Promise<IntakeRead>;
+  /**
+   * Reads past tickets `seen` says were posted (on the board or in the seen file), so they do not
+   * use up a run. Rejects with a `TrackerProblem`, whose message is safe to show.
+   */
+  read(seen: (key: string) => boolean): Promise<IntakeRead>;
   /** Comments on the ticket; rejects with a `TrackerProblem`. A source without it writes nothing back. */
   comment?(key: string, text: string): Promise<void>;
 }
@@ -163,9 +172,15 @@ export function ticketBody(text: string): string {
   return cutMarked(plain, BODY_MAX);
 }
 
-/** `KEY title`, the link, and the body after a blank line; the body is cut to keep the post whole. */
-export function ticketText(issue: IntakeIssue): string {
-  const head = `${[issue.key, issue.title].filter((part) => part !== "").join(" ")}\n${issue.url}`;
+/**
+ * `KEY title`, the link, and the body after a blank line. The title is cut for the head to fit and
+ * the body for the whole to; null when even the key and the link do not fit.
+ */
+export function ticketText(issue: IntakeIssue): string | null {
+  const bare = issue.key.length + 1 + issue.url.length;
+  if (bare > POST_TEXT_MAX) return null;
+  const title = cut(issue.title, Math.max(0, POST_TEXT_MAX - bare - 1)).trim();
+  const head = `${[issue.key, title].filter((part) => part !== "").join(" ")}\n${issue.url}`;
   const room = POST_TEXT_MAX - head.length - 2;
   if (issue.body === "" || room < 2) return head;
   return `${head}\n\n${cutMarked(issue.body, room)}`;
@@ -180,11 +195,20 @@ function cleaned(kind: PostSourceKind, issue: IntakeIssue): IntakeIssue | null {
 }
 
 /**
- * A problem as it is logged: a tracker's own words after its status are left out, since a refused
- * search can quote the owner's JQL, which is never logged. The state keeps them for the owner.
+ * A problem as the state shows it, and as it is logged: without a tracker's own words, since a
+ * refused search can quote the owner's JQL, which is never logged.
  */
-function unquoted(problem: string): string {
-  return problem.replace(/(answered HTTP \d+): [^;]*/g, "$1");
+interface Problem {
+  shown: string;
+  logged: string;
+}
+
+const said = (text: string): Problem => ({ shown: text, logged: text });
+
+/** A failure as it may be shown: a tracker's own safe words, or only `otherwise`. */
+function problemFrom(error: unknown, otherwise: string, before = ""): Problem {
+  if (!(error instanceof TrackerProblem)) return said(`${before}${otherwise}`);
+  return { shown: `${before}${error.message}`, logged: `${before}${error.withoutWords}` };
 }
 
 export interface IntakePorts {
@@ -216,10 +240,10 @@ export interface Intake {
 interface SourceRun {
   lastRun: string | null;
   imported: number;
-  problem: string | null;
+  problems: readonly Problem[];
 }
 
-const NO_RUN: SourceRun = { lastRun: null, imported: 0, problem: null };
+const NO_RUN: SourceRun = { lastRun: null, imported: 0, problems: [] };
 
 /**
  * Posts each ticket a source reads, once, as the user's lobby task. Two guards keep a ticket from
@@ -237,8 +261,8 @@ export function createIntake(ports: IntakePorts): Intake {
   let settings: IntakeSettings | null | undefined;
   const runs = new Map<PostSourceKind, SourceRun>();
   // Why a write back of the kind gave up; it stays until a later one succeeds.
-  const writeBackProblems = new Map<PostSourceKind, string>();
-  const said = new Map<PostSourceKind, string | null>();
+  const writeBackProblems = new Map<PostSourceKind, Problem>();
+  const told = new Map<PostSourceKind, string | null>();
   let waiting = false;
   let sent = "";
   let running: Promise<IntakeState> | null = null;
@@ -254,10 +278,13 @@ export function createIntake(ports: IntakePorts): Intake {
   const isOn = (source: IntakeSource) => !stopped && !!settings && source.configured();
   const iso = () => new Date(ports.now()).toISOString();
 
+  function problemsOf(kind: PostSourceKind): Problem[] {
+    const written = writeBackProblems.get(kind);
+    return [...(runs.get(kind)?.problems ?? []), ...(written === undefined ? [] : [written])];
+  }
+
   function problemOf(kind: PostSourceKind): string | null {
-    const parts = [runs.get(kind)?.problem, writeBackProblems.get(kind)].filter(
-      (part): part is string => typeof part === "string",
-    );
+    const parts = problemsOf(kind).map((problem) => problem.shown);
     return parts.length === 0 ? null : parts.join("; ");
   }
 
@@ -280,11 +307,11 @@ export function createIntake(ports: IntakePorts): Intake {
   function publish(): void {
     for (const source of ports.sources) {
       const problem = problemOf(source.kind);
-      if (problem === (said.get(source.kind) ?? null)) continue;
-      said.set(source.kind, problem);
-      if (problem !== null) {
-        ports.log(`[office] intake from ${SOURCE_NAMES[source.kind]}: ${unquoted(problem)}`);
-      }
+      if (problem === (told.get(source.kind) ?? null)) continue;
+      told.set(source.kind, problem);
+      if (problem === null) continue;
+      const logged = problemsOf(source.kind).map((part) => part.logged);
+      ports.log(`[office] intake from ${SOURCE_NAMES[source.kind]}: ${logged.join("; ")}`);
     }
     const next = state();
     const text = JSON.stringify(next);
@@ -326,39 +353,44 @@ export function createIntake(ports: IntakePorts): Intake {
     }
   }
 
-  /** A source's failure as it may be shown: a tracker's own safe words, or only that it failed. */
-  function safeProblem(error: unknown, otherwise: string): string {
-    return error instanceof TrackerProblem ? error.message : otherwise;
-  }
-
   async function runSource(source: IntakeSource, seen: IntakeSeen): Promise<void> {
     const { kind } = source;
     const name = SOURCE_NAMES[kind];
-    const problems: string[] = [];
+    const problems: Problem[] = [];
+    const add = (problem: Problem) => {
+      if (!problems.some((kept) => kept.shown === problem.shown)) problems.push(problem);
+    };
     let imported = 0;
-    const finish = () =>
-      runs.set(kind, {
-        lastRun: iso(),
-        imported,
-        problem: problems.length === 0 ? null : problems.join("; "),
-      });
+    let skipped = 0;
+    const finish = () => {
+      if (skipped > 0) {
+        problems.unshift(
+          said(`${skipped} ticket${skipped === 1 ? "" : "s"} skipped: unreadable key`),
+        );
+      }
+      runs.set(kind, { lastRun: iso(), imported, problems });
+    };
     if (openImported() >= IMPORTED_OPEN_MAX) {
       waiting = true;
       finish();
       return;
     }
+    const isSeen = (key: string) =>
+      onBoard(kind, key) || Object.hasOwn(seen.seen, `${kind}:${key}`);
     let read: IntakeRead;
     try {
-      read = await source.read();
+      read = await source.read(isSeen);
     } catch (error) {
-      problems.push(safeProblem(error, `${name} could not be read`));
+      add(problemFrom(error, `${name} could not be read`));
       finish();
       return;
     }
-    let skipped = read.skipped;
-    for (const found of read.issues.slice(0, INTAKE_READ_MAX)) {
+    skipped = read.skipped;
+    if (read.crowded) add(said(CROWDED));
+    for (const found of read.issues.slice(0, INTAKE_READ_MAX * INTAKE_PAGES_MAX)) {
       const issue = cleaned(kind, found);
-      if (issue === null) {
+      const text = issue === null ? null : ticketText(issue);
+      if (issue === null || text === null) {
         skipped += 1;
         continue;
       }
@@ -369,7 +401,7 @@ export function createIntake(ports: IntakePorts): Intake {
         if (known) continue;
         remember(seen, id);
         if (await saved(seen)) continue;
-        problems.push(UNSAVED);
+        add(said(UNSAVED));
         break;
       }
       if (known) continue;
@@ -380,24 +412,21 @@ export function createIntake(ports: IntakePorts): Intake {
       const posted = await ports.board.post({
         board: LOBBY,
         kind: "task",
-        text: ticketText(issue),
+        text,
         source: { kind, key: issue.key, url: issue.url },
         ...(settings?.lands === "todo" ? {} : { backlog: true }),
       });
       if (!posted.ok) {
-        // A full board refuses the rest too.
-        problems.push(posted.error);
-        break;
+        // One ticket refused is no reason to leave the next.
+        add(said(posted.error));
+        continue;
       }
       imported += 1;
       remember(seen, id);
       if (!(await saved(seen))) {
-        problems.push(UNSAVED);
+        add(said(UNSAVED));
         break;
       }
-    }
-    if (skipped > 0) {
-      problems.unshift(`${skipped} ticket${skipped === 1 ? "" : "s"} skipped: unreadable key`);
     }
     finish();
   }
@@ -410,7 +439,7 @@ export function createIntake(ports: IntakePorts): Intake {
     for (const source of ports.sources) {
       if (!active.includes(source)) {
         const last = runs.get(source.kind) ?? NO_RUN;
-        runs.set(source.kind, { ...last, imported: 0, problem: null });
+        runs.set(source.kind, { ...last, imported: 0, problems: [] });
       }
     }
     if (active.length === 0) return;
@@ -420,7 +449,7 @@ export function createIntake(ports: IntakePorts): Intake {
     } catch {
       // Only that it is unreadable: never import on bad data.
       for (const source of active) {
-        runs.set(source.kind, { lastRun: iso(), imported: 0, problem: UNREADABLE });
+        runs.set(source.kind, { lastRun: iso(), imported: 0, problems: [said(UNREADABLE)] });
       }
       return;
     }
@@ -479,11 +508,18 @@ export function createIntake(ports: IntakePorts): Intake {
     try {
       await sourceOf(kind)?.comment?.(key, text);
     } catch (error) {
-      const count = (tries.get(id) ?? 0) + 1;
-      tries.set(id, count);
-      if (count >= WRITE_BACK_TRIES) {
-        const why = safeProblem(error, "the comment failed");
-        writeBackProblems.set(kind, `Unable to comment on ${key}: ${why}`);
+      const before = `Unable to comment on ${key}: `;
+      // Refused, or the host not reached: the comment did not arrive, and is tried once more. A
+      // timeout, or anything else, may have been taken: it is not sent twice.
+      if (error instanceof TrackerProblem && !error.timedOut) {
+        const count = (tries.get(id) ?? 0) + 1;
+        tries.set(id, count);
+        if (count >= WRITE_BACK_TRIES) writeBackProblems.set(kind, problemFrom(error, "", before));
+      } else {
+        tries.set(id, WRITE_BACK_TRIES);
+        const why = problemFrom(error, "the comment failed", before);
+        const after = ": the comment may not have arrived";
+        writeBackProblems.set(kind, { shown: why.shown + after, logged: why.logged + after });
       }
       publish();
       return;
@@ -508,6 +544,8 @@ export function createIntake(ports: IntakePorts): Intake {
     const posts = ports.board.allPosts();
     if (posts === null || stopped) return;
     const before = doneBefore;
+    // Until the settings are known, nothing is judged: what became done waits for them.
+    if (before !== null && !settings) return;
     const sourced = posts.filter((post) => post.source !== undefined && post.kind === "task");
     doneBefore = new Map(sourced.map((post) => [post.id, post.state === "done"]));
     // The first look is where things stand: a task done before it did not become done now.
@@ -532,6 +570,8 @@ export function createIntake(ports: IntakePorts): Intake {
   return {
     async settingsChanged(next) {
       settings = next;
+      // What became done while the settings were not known is judged now.
+      boardChanged();
       await sync();
     },
     sync,
