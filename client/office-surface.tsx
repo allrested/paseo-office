@@ -43,7 +43,8 @@ import { resourcesOpener } from "./beside.js";
 import { BoardSheet } from "./board-sheet.js";
 import { DutySheet } from "./duty-sheet.js";
 import { useDutyActions } from "./use-duty-actions.js";
-import { authorName } from "./board-text.js";
+import { authorName, type TeamNamer } from "./board-text.js";
+import { useRosterTeams } from "./use-roster.js";
 import { useChatSeen } from "./chat-seen.js";
 import { TeamChatPreview } from "./team-chat-preview.js";
 import { useGroupPhoto } from "./use-group-photo.js";
@@ -677,6 +678,7 @@ interface SurfaceBodyProps {
   compact: boolean;
   actions: AgentActions;
   name(author: string): string;
+  teamName: TeamNamer;
   /** Null from the 3D office, when the chosen person is tapped again. */
   onSelectAgent(agentId: string | null): void;
   onOpenSession: ((agentId: string) => void) | undefined;
@@ -726,6 +728,7 @@ function SurfaceBody({
   compact,
   actions,
   name,
+  teamName,
   onSelectAgent,
   onOpenSession,
   onOpenAgentWorkspace,
@@ -834,6 +837,7 @@ function SurfaceBody({
       compact={compact}
       actions={actions}
       name={name}
+      teamName={teamName}
       onSelectAgent={onSelectAgent}
       onOpenSession={onOpenSession}
       onOpenBoard={onOpenBoard}
@@ -2030,6 +2034,7 @@ export function OfficeSurface(
     [model.rooms, focusRoomId],
   );
   const name = useCallback((author: string) => authorName(author, model.agents), [model.agents]);
+  const { teams: rosterTeams, teamName } = useRosterTeams();
   // In error or closed the data is frozen: no strip, no card and no board sheet to act on it.
   const live = office.subscription.status !== "error" && office.subscription.status !== "closed";
   const { machineOpen, openMachine, closeMachine, hostEntry, ssh } = useHostResources(
@@ -2339,6 +2344,7 @@ export function OfficeSurface(
             compact={layout.compact}
             actions={actions}
             name={name}
+            teamName={teamName}
             onSelectAgent={panels.selectAgent}
             onOpenSession={openSession}
             onOpenAgentWorkspace={showAgentWorkspace}
@@ -2523,6 +2529,8 @@ export function OfficeSurface(
         rooms={model.rooms}
         agentTasks={model.agentTasks}
         name={name}
+        teams={rosterTeams}
+        teamName={teamName}
         actions={boardActions}
         wakesPaused={office.state.wake.paused}
         sheetLeavesFirst={sheetLeavesFirstOn(layout.compact, layout.platform)}

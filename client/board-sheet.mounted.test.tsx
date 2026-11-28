@@ -6,11 +6,12 @@
 // board is a list or a kanban as the device's setting says; the tests are on the list unless
 // they say otherwise.
 // The sheet, the inputs and the icon are the host's, so plain stand-ins show what they were given.
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, useCallback, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { OfficeAgent, OfficeSnapshot, Post } from "../shared/contracts.js";
+import type { RosterTeam } from "../shared/roster.js";
 import { BoardSheet } from "./board-sheet.js";
 import { buildOfficeModel, type AgentTaskGroup, type OfficeRoom } from "../shared/model.js";
 import type { BoardLayout } from "../shared/settings.js";
@@ -178,7 +179,11 @@ interface HarnessProps {
   fromLobby?: boolean;
   /** In fullscreen: the office's own dialog, not the host's sheet. */
   fullscreen?: boolean;
+  /** The roster's teams the lobby's form offers; none by default (a roster that is off). */
+  teams?: RosterTeam[];
 }
+
+const NO_TEAMS: RosterTeam[] = [];
 
 function Harness({
   rooms,
@@ -189,8 +194,13 @@ function Harness({
   wakesPaused = false,
   fromLobby = false,
   fullscreen = false,
+  teams = NO_TEAMS,
 }: HarnessProps) {
   const styles = useOfficeStyles(THEME, compact, false);
+  const teamName = useCallback(
+    (id: string) => teams.find((team) => team.id === id)?.name ?? id,
+    [teams],
+  );
   return (
     <OfficeDialogs fullscreen={fullscreen} theme={THEME} styles={styles}>
       <BoardSheet
@@ -198,6 +208,8 @@ function Harness({
         rooms={rooms}
         agentTasks={agentTasks}
         name={nameOf}
+        teams={teams}
+        teamName={teamName}
         actions={ACTIONS}
         wakesPaused={wakesPaused}
         sheetLeavesFirst={sheetLeavesFirst}
@@ -1088,4 +1100,81 @@ test("in fullscreen the board's dialog opens wide for a kanban and at its own si
     Reflect.deleteProperty(proto, "showModal");
     Reflect.deleteProperty(proto, "close");
   }
+});
+
+const QA = {
+  id: "t1",
+  name: "QA-PR",
+  members: [
+    { id: "m1", name: "Ayu" },
+    { id: "m2", name: "Budi" },
+  ],
+};
+const OPS = { id: "t2", name: "Ops", members: [{ id: "m3", name: "Citra" }] };
+
+test("with the roster on, the lobby's picker lists the teams right under Any idle agent", async () => {
+  const rooms = lobbyRooms([], [agent("2", { title: "Builder" })]);
+  await mount({ rooms, roomId: "lobby", teams: [QA, OPS] });
+  await press("Send task to: Any idle agent");
+  expect(radios()).toEqual([
+    "Any idle agent: An available agent picks up the task automatically.",
+    "QA-PR: 2 teammates",
+    "Ops: 1 teammate",
+    "Builder: shop-api · Idle",
+  ]);
+  expect(container.textContent).toContain("Teams");
+});
+
+test("without teams the lobby's picker is as before, and a room's has none", async () => {
+  const agents = [agent("2", { title: "Builder" })];
+  await mount({ rooms: lobbyRooms([], agents), roomId: "lobby" });
+  await press("Send task to: Any idle agent");
+  expect(radios()).toEqual([
+    "Any idle agent: An available agent picks up the task automatically.",
+    "Builder: shop-api · Idle",
+  ]);
+  expect(container.textContent).not.toContain("Teams");
+
+  await mount({ rooms: officeRooms(agents), roomId: "w1", teams: [QA] });
+  await press("Wake an agent with it: Nobody");
+  expect(radios().some((label) => label?.startsWith("QA-PR"))).toBe(false);
+});
+
+test("choosing a team and adding posts the team and no recipient", async () => {
+  await mount({ rooms: lobbyRooms([]), roomId: "lobby", teams: [QA] });
+  await type("Add a to-do", "Check the build");
+  await press("Send task to: Any idle agent");
+  await press("QA-PR: 2 teammates");
+  expect(title()).toBe("Lobby board");
+  byLabel("Send task to: Team QA-PR");
+  await press("Add");
+
+  expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Check the build", team: "t1" }]);
+  expect(posted[0]).not.toHaveProperty("to");
+  byLabel("Send task to: Any idle agent");
+});
+
+test("a team that leaves the roster while the form is open falls back to any idle agent", async () => {
+  const rooms = lobbyRooms([]);
+  await mount({ rooms, roomId: "lobby", teams: [QA, OPS] });
+  await press("Send task to: Any idle agent");
+  await press("QA-PR: 2 teammates");
+  byLabel("Send task to: Team QA-PR");
+
+  await mount({ rooms, roomId: "lobby", teams: [OPS] });
+  byLabel("Send task to: Any idle agent");
+  await type("Add a to-do", "Check the build");
+  await press("Add");
+  expect(posted).toEqual([{ board: "lobby", kind: "task", text: "Check the build" }]);
+});
+
+test("a team task says which team it is for, by name and by id once the team is gone", async () => {
+  const task = post(1, { text: "Rotate keys", team: "t1" });
+  await mount({ rooms: lobbyRooms([task]), roomId: "lobby", teams: [QA] });
+  expect(container.textContent).toContain("for team QA-PR");
+  await mount({ rooms: lobbyRooms([task]), roomId: "lobby", teams: [] });
+  expect(container.textContent).toContain("for team t1");
+  layouts("kanban", "list");
+  await mount({ rooms: lobbyRooms([task]), roomId: "lobby", teams: [QA] });
+  expect(container.textContent).toContain("for team QA-PR");
 });

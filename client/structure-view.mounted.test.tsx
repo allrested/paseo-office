@@ -97,6 +97,7 @@ const BOB = row({ id: "a3", title: "Bob", status: "error", workspaceId: null });
 const OFFICE = [lobby([BOB]), shop([ALI, SARA])];
 
 const nameOf = (author: string) => author;
+const teamIdOf = (id: string) => id;
 const ignore = () => undefined;
 const ACTIONS: AgentActions = {
   send: async () => undefined,
@@ -112,6 +113,7 @@ function Harness({ rooms }: { rooms: readonly OfficeRoom[] }) {
       styles={styles}
       actions={ACTIONS}
       name={nameOf}
+      teamName={teamIdOf}
       compact={false}
       onSelectAgent={ignore}
       onOpenBoard={ignore}

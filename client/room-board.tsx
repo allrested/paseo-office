@@ -3,23 +3,24 @@ import { View } from "react-native";
 import { Text } from "./text.js";
 import type { Post } from "../shared/contracts.js";
 import { ActionButton } from "./action-button.js";
-import { boardPreview, postMeta, todoPreview } from "./board-text.js";
+import { boardPreview, postMeta, todoPreview, type TeamNamer } from "./board-text.js";
 import type { OfficeRoom } from "../shared/model.js";
 import type { OfficeStyles } from "./styles.js";
 
 export interface PostRowProps {
   post: Post;
   name(author: string): string;
+  teamName: TeamNamer;
   styles: OfficeStyles;
   /** In a room card: one line of who and what, two of text. The board sheet shows all of both. */
   brief?: boolean;
 }
 
-export function PostRow({ post, name, styles, brief = false }: PostRowProps) {
+export function PostRow({ post, name, teamName, styles, brief = false }: PostRowProps) {
   return (
     <View style={styles.post}>
       <Text style={styles.postMeta} numberOfLines={brief ? 1 : undefined}>
-        {postMeta(post, name)}
+        {postMeta(post, name, teamName)}
       </Text>
       <Text style={styles.postText} numberOfLines={brief ? 2 : undefined}>
         {post.text}
@@ -31,6 +32,7 @@ export function PostRow({ post, name, styles, brief = false }: PostRowProps) {
 export interface RoomBoardProps {
   room: OfficeRoom;
   name(author: string): string;
+  teamName: TeamNamer;
   styles: OfficeStyles;
   onOpenBoard(roomId: string): void;
   /** The duty board's editor: the lobby's card offers it beside its own board. */
@@ -42,7 +44,14 @@ export interface RoomBoardProps {
  * more the board holds. The lobby's shows its unfinished to-dos instead. An empty board is one
  * line, so a list of quiet rooms stays short.
  */
-export function RoomBoard({ room, name, styles, onOpenBoard, onOpenDuties }: RoomBoardProps) {
+export function RoomBoard({
+  room,
+  name,
+  teamName,
+  styles,
+  onOpenBoard,
+  onOpenDuties,
+}: RoomBoardProps) {
   const open = useCallback(() => onOpenBoard(room.id), [onOpenBoard, room.id]);
   const preview = useMemo(
     () => (room.lobby ? todoPreview(room.todos) : boardPreview(room.posts)),
@@ -82,7 +91,7 @@ export function RoomBoard({ room, name, styles, onOpenBoard, onOpenDuties }: Roo
         )}
       </View>
       {preview.shown.map((post) => (
-        <PostRow key={post.id} post={post} name={name} styles={styles} brief />
+        <PostRow key={post.id} post={post} name={name} teamName={teamName} styles={styles} brief />
       ))}
       {preview.more > 0 ? <Text style={styles.postMeta}>{preview.more} more</Text> : null}
     </View>

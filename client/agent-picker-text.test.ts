@@ -6,6 +6,8 @@ import {
   closeStep,
   keptChoice,
   pickerGroups,
+  teamChoice,
+  teamRows,
   sheetLeavesFirstOn,
   showsSearch,
 } from "./agent-picker-text.js";
@@ -148,4 +150,31 @@ test("only the web's wide dialog stays when it reports a close", () => {
   expect(sheetLeavesFirstOn(true, "ios")).toBe(true);
   expect(sheetLeavesFirstOn(false, "android")).toBe(true);
   expect(sheetLeavesFirstOn(false, "ios")).toBe(true);
+});
+
+const QA = {
+  id: "t1",
+  name: "QA-PR",
+  members: [
+    { id: "m1", name: "Ayu" },
+    { id: "m2", name: "Budi" },
+  ],
+};
+const OPS = { id: "t2", name: "Ops", members: [{ id: "m3", name: "Citra" }] };
+
+test("a team is chosen as team:<id>, which no agent id is, and rows say how many teammates", () => {
+  expect(teamChoice("t1")).toBe("team:t1");
+  expect(teamRows([QA, OPS])).toEqual([
+    { value: "team:t1", title: "QA-PR", detail: "2 teammates" },
+    { value: "team:t2", title: "Ops", detail: "1 teammate" },
+  ]);
+});
+
+test("a chosen team shows as Team <name> and stays only while the roster has it", () => {
+  const all = rooms([agent("1")]);
+  expect(choiceLabel("team:t1", all, "Any idle agent", [QA])).toBe("Team QA-PR");
+  expect(keptChoice("team:t1", all, [QA, OPS])).toBe("team:t1");
+  expect(keptChoice("team:t1", all, [OPS])).toBe(NOBODY);
+  expect(keptChoice("team:t1", all, [])).toBe(NOBODY);
+  expect(choiceLabel("team:t1", all, "Any idle agent", [OPS])).toBe("Any idle agent");
 });

@@ -196,6 +196,8 @@ export const PostSchema = z.object({
   blocked: z.string().optional(),
   /** On a note: the task it answers; the note goes when the task does. */
   replyTo: z.string().optional(),
+  /** On a lobby task: the roster team, by id, whose idle agents alone are handed it. */
+  team: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -730,6 +732,8 @@ export const postRpc = defineRpc({
     text: z.string().min(1).max(POST_TEXT_MAX),
     to: z.string().min(1).optional(),
     replyTo: z.string().min(1).optional(),
+    /** A roster team's id (or name): the lobby task goes to that team. */
+    team: z.string().min(1).optional(),
   }),
   output: PostResultSchema,
 });

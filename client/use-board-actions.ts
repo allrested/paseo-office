@@ -16,6 +16,8 @@ export interface BoardActions {
     kind: PostKind;
     text: string;
     to?: string;
+    /** A roster team's id: only on a lobby task, and never with `to`. */
+    team?: string;
     replyTo?: string;
   }): Promise<void>;
   /** A note under the task, on the task's board; the server wakes the task's holder. */

@@ -1,9 +1,40 @@
 import { stateLabel } from "./agent-card.js";
 import { agentTask, agentTitle, dotTone, type DotTone, type OfficeRoom } from "../shared/model.js";
 import { LOBBY } from "../shared/names.js";
+import type { RosterTeam } from "../shared/roster.js";
 
 /** The post has no named recipient. */
 export const NOBODY = "";
+/** A chosen team is carried as `team:<teamId>`, a prefix no agent id has. */
+const TEAM_PREFIX = "team:";
+const NO_TEAMS: readonly RosterTeam[] = [];
+
+export function teamChoice(teamId: string): string {
+  return `${TEAM_PREFIX}${teamId}`;
+}
+
+/** The team a choice names, or null for nobody and for an agent. */
+export function teamIdOf(choice: string): string | null {
+  return choice.startsWith(TEAM_PREFIX) ? choice.slice(TEAM_PREFIX.length) : null;
+}
+
+export interface TeamRow {
+  /** The choice the row makes: `team:<id>`. */
+  value: string;
+  title: string;
+  /** How many teammates the team has. */
+  detail: string;
+}
+
+/** One row per team, under "Any idle agent": its name and how many teammates it has. */
+export function teamRows(teams: readonly RosterTeam[]): TeamRow[] {
+  return teams.map((team) => ({
+    value: teamChoice(team.id),
+    title: team.name,
+    detail: team.members.length === 1 ? "1 teammate" : `${team.members.length} teammates`,
+  }));
+}
+
 /** The search field shows from this many agents: more than eight. */
 export const SEARCH_FROM = 9;
 
@@ -85,17 +116,29 @@ function titleOf(to: string, rooms: readonly OfficeRoom[]): string | null {
   return null;
 }
 
-/** The choice to keep: nobody once the chosen agent has left the office. */
-export function keptChoice(to: string, rooms: readonly OfficeRoom[]): string {
+/** The choice to keep: nobody once the chosen agent has left the office or the team the roster. */
+export function keptChoice(
+  to: string,
+  rooms: readonly OfficeRoom[],
+  teams: readonly RosterTeam[] = NO_TEAMS,
+): string {
+  const teamId = teamIdOf(to);
+  if (teamId !== null) return teams.some((team) => team.id === teamId) ? to : NOBODY;
   return to !== NOBODY && titleOf(to, rooms) !== null ? to : NOBODY;
 }
 
-/** The selected agent's title, or the board's default recipient. */
+/** The selected agent's title or "Team <name>", or the board's default recipient. */
 export function choiceLabel(
   to: string,
   rooms: readonly OfficeRoom[],
   defaultChoice: string,
+  teams: readonly RosterTeam[] = NO_TEAMS,
 ): string {
+  const teamId = teamIdOf(to);
+  if (teamId !== null) {
+    const team = teams.find((candidate) => candidate.id === teamId);
+    return team === undefined ? defaultChoice : `Team ${team.name}`;
+  }
   return (to === NOBODY ? null : titleOf(to, rooms)) ?? defaultChoice;
 }
 

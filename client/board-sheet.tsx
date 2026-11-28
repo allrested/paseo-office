@@ -18,8 +18,9 @@ import {
 } from "./agent-picker-text.js";
 import { BoardAgents } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
-import { orderBoardPosts, repliesOf, roomAgents, topLevel } from "./board-text.js";
+import { orderBoardPosts, repliesOf, roomAgents, topLevel, type TeamNamer } from "./board-text.js";
 import type { AgentTaskGroup, OfficeRoom } from "../shared/model.js";
+import type { RosterTeam } from "../shared/roster.js";
 import type { BoardLayout } from "../shared/settings.js";
 import { LobbyBody } from "./lobby-board.js";
 import { PostRow } from "./room-board.js";
@@ -64,6 +65,7 @@ interface PostActionsProps {
   /** A task's notes under it, oldest first (`repliesOf`); a note has none. */
   replies?: readonly Post[];
   name(author: string): string;
+  teamName: TeamNamer;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -74,6 +76,7 @@ export function PostWithActions({
   post,
   replies = NO_REPLIES,
   name,
+  teamName,
   actions,
   styles,
 }: PostActionsProps) {
@@ -90,7 +93,7 @@ export function PostWithActions({
   const keep = useCallback(() => setAsking(false), []);
   return (
     <View style={styles.boardPost}>
-      <PostRow post={post} name={name} styles={styles} />
+      <PostRow post={post} name={name} teamName={teamName} styles={styles} />
       {post.kind === "task" ? (
         <View style={styles.taskThread}>
           <TaskThread task={post} replies={replies} name={name} actions={actions} styles={styles} />
@@ -144,6 +147,7 @@ interface ChoiceFieldProps {
 
 /** A form's row that opens a page: what it chooses, the choice, and a chevron. */
 function ChoiceField({ id, label, value, inline, onOpen, styles }: ChoiceFieldProps) {
+  const t = useT();
   const [hovered, setHovered] = useState(false);
   const hoverIn = useCallback(() => setHovered(true), []);
   const hoverOut = useCallback(() => setHovered(false), []);
@@ -155,7 +159,7 @@ function ChoiceField({ id, label, value, inline, onOpen, styles }: ChoiceFieldPr
     <Pressable
       id={id}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={`${t(label)}: ${t(value)}`}
       onPress={onOpen}
       onPressIn={pressIn}
       onPressOut={pressOut}
@@ -178,14 +182,18 @@ function ChoiceField({ id, label, value, inline, onOpen, styles }: ChoiceFieldPr
   );
 }
 
+const NO_TEAMS: readonly RosterTeam[] = [];
+
 interface WakeChoiceInput {
   rooms: readonly OfficeRoom[];
+  /** The roster's teams the form offers: only the lobby's passes any. */
+  teams?: readonly RosterTeam[];
   picking: boolean;
   onPicking(picking: boolean): void;
 }
 
 interface WakeChoice {
-  /** The agent the post wakes, or nobody. */
+  /** The agent the post wakes, `team:<id>` for a team, or nobody. */
   to: string;
   /** The form's row that opens the page. */
   fieldId: string;
@@ -197,10 +205,16 @@ interface WakeChoice {
 }
 
 /** Whom a post wakes, and the page that chooses it. */
-export function useWakeChoice({ rooms, picking, onPicking }: WakeChoiceInput): WakeChoice {
+export function useWakeChoice({
+  rooms,
+  teams = NO_TEAMS,
+  picking,
+  onPicking,
+}: WakeChoiceInput): WakeChoice {
   const [picked, setPicked] = useState(NOBODY);
-  // An agent that left the office cannot be woken: the choice is nobody again.
-  const to = keptChoice(picked, rooms);
+  // An agent that left the office cannot be woken, nor a team the roster dropped: the choice is
+  // nobody again.
+  const to = keptChoice(picked, rooms, teams);
   // Back from the page, the pressed row is gone: the focus returns to the row that opened it.
   const fieldId = useId();
   const wasPicking = useRef(false);
@@ -226,13 +240,23 @@ interface WakeFieldProps {
   roomId: string;
   to: string;
   rooms: readonly OfficeRoom[];
+  teams?: readonly RosterTeam[];
   wakesPaused: boolean;
   onOpen(): void;
   styles: OfficeStyles;
 }
 
 /** The form's row that opens the page, and while wakes are off, that the agent waits. */
-export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }: WakeFieldProps) {
+export function WakeField({
+  id,
+  roomId,
+  to,
+  rooms,
+  teams = NO_TEAMS,
+  wakesPaused,
+  onOpen,
+  styles,
+}: WakeFieldProps) {
   const labels = recipientLabels(roomId);
   const paused = wakesPaused && (roomId === LOBBY || to !== NOBODY);
   return (
@@ -240,7 +264,7 @@ export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }
       <ChoiceField
         id={id}
         label={labels.field}
-        value={choiceLabel(to, rooms, labels.defaultChoice)}
+        value={choiceLabel(to, rooms, labels.defaultChoice, teams)}
         inline={roomId === LOBBY}
         onOpen={onOpen}
         styles={styles}
@@ -259,6 +283,7 @@ export function WakeField({ id, roomId, to, rooms, wakesPaused, onOpen, styles }
 interface DoneSectionProps {
   room: OfficeRoom;
   name(author: string): string;
+  teamName: TeamNamer;
   actions: BoardActions;
   styles: OfficeStyles;
 }
@@ -267,7 +292,7 @@ interface DoneSectionProps {
  * A room's done tasks under its list, folded at first as the kanban's stacked Done is: a press on
  * "Done · 2" unfolds them, each with its result and replies and the buttons a list row has.
  */
-function DoneSection({ room, name, actions, styles }: DoneSectionProps) {
+function DoneSection({ room, name, teamName, actions, styles }: DoneSectionProps) {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const t = useT();
@@ -294,6 +319,7 @@ function DoneSection({ room, name, actions, styles }: DoneSectionProps) {
               post={post}
               replies={repliesOf(post, room.posts)}
               name={name}
+              teamName={teamName}
               actions={actions}
               styles={styles}
             />
@@ -309,6 +335,8 @@ export interface SheetBodyProps {
   /** Every agent's unfinished checklist steps: a board shows them under its agents. */
   agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
+  /** How a task for a team names it. */
+  teamName: TeamNamer;
   actions: BoardActions;
   wakesPaused: boolean;
   /** The page that chooses the agent shows, not the form. */
@@ -326,6 +354,7 @@ function SheetBody({
   rooms,
   agentTasks,
   name,
+  teamName,
   actions,
   wakesPaused,
   picking,
@@ -430,7 +459,13 @@ function SheetBody({
         )}
       </View>
       {layout === "kanban" ? (
-        <KanbanBoard posts={board} name={name} actions={actions} styles={styles} />
+        <KanbanBoard
+          posts={board}
+          name={name}
+          teamName={teamName}
+          actions={actions}
+          styles={styles}
+        />
       ) : (
         <View style={styles.boardPosts}>
           {posts.length === 0 ? (
@@ -444,12 +479,19 @@ function SheetBody({
               post={post}
               replies={repliesOf(post, room.posts)}
               name={name}
+              teamName={teamName}
               actions={actions}
               styles={styles}
             />
           ))}
           {room.done.length > 0 ? (
-            <DoneSection room={room} name={name} actions={actions} styles={styles} />
+            <DoneSection
+              room={room}
+              name={name}
+              teamName={teamName}
+              actions={actions}
+              styles={styles}
+            />
           ) : null}
         </View>
       )}
@@ -464,6 +506,9 @@ export interface BoardSheetProps {
   /** Every agent's unfinished checklist steps: a board shows them under its agents. */
   agentTasks: readonly AgentTaskGroup[];
   name(author: string): string;
+  /** The roster's teams the lobby's form can give a task to: none while the roster is off. */
+  teams: readonly RosterTeam[];
+  teamName: TeamNamer;
   actions: BoardActions;
   /** "Wake agents" is off: a post that names an agent waits. */
   wakesPaused: boolean;
@@ -503,6 +548,8 @@ export function BoardSheet({
   rooms,
   agentTasks,
   name,
+  teams,
+  teamName,
   actions,
   wakesPaused,
   sheetLeavesFirst,
@@ -551,6 +598,8 @@ export function BoardSheet({
             rooms={rooms}
             agentTasks={agentTasks}
             name={name}
+            teams={teams}
+            teamName={teamName}
             actions={actions}
             wakesPaused={wakesPaused}
             picking={picking}
@@ -582,6 +631,7 @@ export function BoardSheet({
             rooms={rooms}
             agentTasks={agentTasks}
             name={name}
+            teamName={teamName}
             actions={actions}
             wakesPaused={wakesPaused}
             picking={picking}

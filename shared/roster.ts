@@ -99,6 +99,25 @@ export function seatOf(
   return null;
 }
 
+/** A team by its id; null when the roster is off or has no such team. */
+export function rosterTeamById(roster: Roster, teamId: string): RosterTeam | null {
+  if (!roster.on) return null;
+  return roster.teams.find((team) => team.id === teamId) ?? null;
+}
+
+/**
+ * The team an id or a typed name names: the id first, then the name trimmed and in any case; null
+ * when the roster is off or has no such team.
+ */
+export function findRosterTeam(roster: Roster, nameOrId: string): RosterTeam | null {
+  const name = same(nameOrId.trim());
+  return (
+    rosterTeamById(roster, nameOrId) ??
+    (roster.on ? roster.teams.find((team) => same(team.name) === name) : undefined) ??
+    null
+  );
+}
+
 function idsOf(teams: readonly RosterTeam[]): Set<string> {
   return new Set(teams.flatMap((team) => [team.id, ...team.members.map((member) => member.id)]));
 }

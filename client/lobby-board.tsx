@@ -4,14 +4,15 @@ import { Text } from "./text.js";
 import { TextInput } from "./text.js";
 import { POST_TEXT_MAX, type Post } from "../shared/contracts.js";
 import type { OfficeRoom } from "../shared/model.js";
+import type { RosterTeam } from "../shared/roster.js";
 import { ActionButton, failureText } from "./action-button.js";
 import { textAfterSend } from "./agent-card.js";
 import { AgentPicker } from "./agent-picker.js";
-import { NOBODY } from "./agent-picker-text.js";
+import { NOBODY, teamIdOf } from "./agent-picker-text.js";
 import { BoardTeams } from "./board-agents.js";
 import { KanbanBoard } from "./board-kanban.js";
 import { PostWithActions, WakeField, useWakeChoice, type SheetBodyProps } from "./board-sheet.js";
-import { officeWork, repliesOf, topLevel } from "./board-text.js";
+import { officeWork, repliesOf, topLevel, type TeamNamer } from "./board-text.js";
 import type { OfficeStyles } from "./styles.js";
 import { ClearFinished, TaskCard, useMounted } from "./task-card.js";
 import type { BoardActions } from "./use-board-actions.js";
@@ -41,12 +42,13 @@ interface TodoListProps {
   /** The lobby's notes, oldest first, without the replies, which show under their to-dos. */
   notes: readonly Post[];
   name(author: string): string;
+  teamName: TeamNamer;
   actions: BoardActions;
   styles: OfficeStyles;
 }
 
 /** The list layout: the to-dos with their heading, then the notes when there are any. */
-function TodoList({ room, notes, name, actions, styles }: TodoListProps) {
+function TodoList({ room, notes, name, teamName, actions, styles }: TodoListProps) {
   const done = room.todos.filter((post) => post.state === "done").length;
   return (
     <>
@@ -59,6 +61,7 @@ function TodoList({ room, notes, name, actions, styles }: TodoListProps) {
             post={post}
             replies={repliesOf(post, room.posts)}
             name={name}
+            teamName={teamName}
             actions={actions}
             styles={styles}
           />
@@ -74,6 +77,7 @@ function TodoList({ room, notes, name, actions, styles }: TodoListProps) {
               key={post.id}
               post={post}
               name={name}
+              teamName={teamName}
               actions={actions}
               styles={styles}
             />
@@ -85,6 +89,8 @@ function TodoList({ room, notes, name, actions, styles }: TodoListProps) {
 }
 
 export interface LobbyBodyProps extends SheetBodyProps {
+  /** The roster's teams the form can give a task to: none while the roster is off. */
+  teams: readonly RosterTeam[];
   /** A room's name was chosen under "Agent tasks": that room's board opens. */
   onOpenBoard(roomId: string): void;
 }
@@ -98,6 +104,8 @@ export function LobbyBody({
   rooms,
   name,
   agentTasks,
+  teams: rosterTeams,
+  teamName,
   actions,
   wakesPaused,
   picking,
@@ -108,7 +116,12 @@ export function LobbyBody({
   styles,
 }: LobbyBodyProps) {
   const [text, setText] = useState("");
-  const { to, fieldId, open, back, choose, reset } = useWakeChoice({ rooms, picking, onPicking });
+  const { to, fieldId, open, back, choose, reset } = useWakeChoice({
+    rooms,
+    teams: rosterTeams,
+    picking,
+    onPicking,
+  });
   const mounted = useMounted();
   // Enter adds as well as the button, so the form keeps its own pending state and failure.
   const [adding, setAdding] = useState(false);
@@ -122,11 +135,14 @@ export function LobbyBody({
     setAdding(true);
     setFailure(null);
     try {
+      // A team is chosen as `team:<id>`: it goes as `team`, an agent as `to`, never both.
+      const team = teamIdOf(to);
+      const recipient = team === null ? { to } : { team };
       await actions.post({
         board: room.id,
         kind: "task",
         text: sent,
-        ...(to === NOBODY ? {} : { to }),
+        ...(to === NOBODY ? {} : recipient),
       });
       if (!mounted.current) return;
       // Cleared only if the field still holds what was added, so later typing stays.
@@ -153,6 +169,7 @@ export function LobbyBody({
         rooms={rooms}
         roomId={room.id}
         value={to}
+        teams={rosterTeams}
         onChoose={choose}
         onBack={back}
         styles={styles}
@@ -198,15 +215,29 @@ export function LobbyBody({
           roomId={room.id}
           to={to}
           rooms={rooms}
+          teams={rosterTeams}
           wakesPaused={wakesPaused}
           onOpen={open}
           styles={styles}
         />
       </View>
       {layout === "kanban" ? (
-        <KanbanBoard posts={board} name={name} actions={actions} styles={styles} />
+        <KanbanBoard
+          posts={board}
+          name={name}
+          teamName={teamName}
+          actions={actions}
+          styles={styles}
+        />
       ) : (
-        <TodoList room={room} notes={notes} name={name} actions={actions} styles={styles} />
+        <TodoList
+          room={room}
+          notes={notes}
+          name={name}
+          teamName={teamName}
+          actions={actions}
+          styles={styles}
+        />
       )}
       <View style={styles.lobbySection}>
         <Text accessibilityRole="header" style={styles.lobbyHeading}>

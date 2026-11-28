@@ -107,13 +107,31 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     return true;
   }
 
-  function nextFor(agentId: string, automatic: boolean): Post | undefined {
+  /** A task for a team still on the roster goes to that team's agents; else it is anyone's. */
+  const forTeam = (task: Post, team: string | null) =>
+    task.team === undefined || agents.teamName(task.team) === null || task.team === team;
+
+  /** The roster team of the agent's teammate; a failed lookup is logged and counts as none. */
+  async function teamOf(agentId: string): Promise<string | null> {
+    try {
+      return await agents.teamOf(agentId);
+    } catch (error) {
+      ports.log(`[office] no team for ${agentId}: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  /** `team` is the agent's roster team, read once per scan: a team's task waits for its own. */
+  function nextFor(agentId: string, automatic: boolean, team: string | null): Post | undefined {
     const board = pickupPosts();
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
     if (existing) return existing.pickupMessageId && canDispatch(existing) ? existing : undefined;
     return board
       .filter(
-        (p) => awaitingPickup(p) && p.author !== agentId && (p.to ? p.to === agentId : automatic),
+        (p) =>
+          awaitingPickup(p) &&
+          p.author !== agentId &&
+          (p.to ? p.to === agentId : automatic && forTeam(p, team)),
       )
       .sort(
         (a, b) =>
@@ -132,7 +150,9 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     const automatic = new Set(ports.enabled() ? await agents.lobbyCandidates() : []);
     for (const agentId of new Set([...named, ...automatic])) {
       if (!hasWork()) break;
-      const next = nextFor(agentId, automatic.has(agentId));
+      const teamWork = pickupPosts().some((p) => p.team !== undefined && awaitingPickup(p));
+      const team = automatic.has(agentId) && teamWork ? await teamOf(agentId) : null;
+      const next = nextFor(agentId, automatic.has(agentId), team);
       if (!next) continue;
       try {
         await queue.tryPickup(agentId, (available) => dispatch(next, agentId, available));

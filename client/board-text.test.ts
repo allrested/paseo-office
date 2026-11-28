@@ -63,10 +63,10 @@ test("authors read as You, the agent's title, or a short id", () => {
 
 test("a post's meta line gives its state, the claimer, and from → to", () => {
   expect(postStateLabel(post(1, {}), name)).toBe("Task · open");
-  expect(postMeta(post(1, { state: "claimed", claimedBy: "a1", to: "a1" }), name)).toBe(
+  expect(postMeta(post(1, { state: "claimed", claimedBy: "a1", to: "a1" }), name, teamLabel)).toBe(
     "Task · claimed by Planner · You → Planner",
   );
-  expect(postMeta(post(2, { kind: "note", state: undefined, author: "a1" }), name)).toBe(
+  expect(postMeta(post(2, { kind: "note", state: undefined, author: "a1" }), name, teamLabel)).toBe(
     "Note · Planner",
   );
 });
@@ -176,27 +176,47 @@ const PEOPLE = new Map([
   ["a2", "Sara"],
 ]);
 const person = (author: string) => PEOPLE.get(author) ?? author;
+const TEAMS = new Map([["t1", "QA-PR"]]);
+const teamLabel = (id: string) => TEAMS.get(id) ?? id;
 const open = post(1, {});
 const done = post(2, { state: "done" });
 const claimed = (by: string) => post(3, { state: "claimed", claimedBy: by });
 
 test("a to-do's meta names who claimed it and whom it names", () => {
-  expect(todoMeta(claimed("a1"), person)).toBe("claimed by Ali");
-  expect(todoMeta({ ...open, to: "a2" }, person)).toBe("for Sara");
-  expect(todoMeta({ ...claimed("a1"), to: "a2" }, person)).toBe("claimed by Ali · for Sara");
+  expect(todoMeta(claimed("a1"), person, teamLabel)).toBe("claimed by Ali");
+  expect(todoMeta({ ...open, to: "a2" }, person, teamLabel)).toBe("for Sara");
+  expect(todoMeta({ ...claimed("a1"), to: "a2" }, person, teamLabel)).toBe(
+    "claimed by Ali · for Sara",
+  );
   // A done to-do keeps its claimer, but it is no longer claimed.
-  expect(todoMeta({ ...done, claimedBy: "a1" }, person)).toBeNull();
-  expect(todoMeta(open, person)).toBeNull();
+  expect(todoMeta({ ...done, claimedBy: "a1" }, person, teamLabel)).toBeNull();
+  expect(todoMeta(open, person, teamLabel)).toBeNull();
+});
+
+test("a team task says for team <name>, and the id once the team is gone", () => {
+  expect(todoMeta({ ...open, team: "t1" }, person, teamLabel)).toBe("for team QA-PR");
+  expect(todoMeta({ ...claimed("a1"), team: "t1" }, person, teamLabel)).toBe(
+    "claimed by Ali · for team QA-PR",
+  );
+  expect(todoMeta({ ...open, team: "gone" }, person, teamLabel)).toBe("for team gone");
+  expect(postMeta({ ...open, team: "t1" }, person, teamLabel)).toBe(
+    "Task · open · user · for team QA-PR",
+  );
+  expect(postMeta({ ...open, team: "gone" }, person, teamLabel)).toBe(
+    "Task · open · user · for team gone",
+  );
 });
 
 test("a lobby task and its copy each say where the other is", () => {
   const task = post(1, { board: "lobby", state: "claimed", claimedBy: "a1", link: "p5" });
   const copy = post(5, { state: "claimed", claimedBy: "a1", link: "p1" });
-  expect(todoMeta(task, person)).toBe("claimed by Ali · on Ali's board");
-  expect(todoMeta({ ...task, state: "done" }, person)).toBe("on Ali's board");
-  expect(postMeta(task, person)).toBe("Task · claimed by Ali · user · on Ali's board");
-  expect(postMeta(copy, person)).toBe("Task · claimed by Ali · user · from lobby task p1");
-  expect(postMeta({ ...copy, state: "done" }, person)).toBe(
+  expect(todoMeta(task, person, teamLabel)).toBe("claimed by Ali · on Ali's board");
+  expect(todoMeta({ ...task, state: "done" }, person, teamLabel)).toBe("on Ali's board");
+  expect(postMeta(task, person, teamLabel)).toBe("Task · claimed by Ali · user · on Ali's board");
+  expect(postMeta(copy, person, teamLabel)).toBe(
+    "Task · claimed by Ali · user · from lobby task p1",
+  );
+  expect(postMeta({ ...copy, state: "done" }, person, teamLabel)).toBe(
     "Task · done · user · from lobby task p1",
   );
 });

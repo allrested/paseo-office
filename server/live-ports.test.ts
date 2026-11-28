@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import { GroupSessionUnavailable } from "./chat-service.js";
 import { liveAgentPorts, liveChatPorts, liveNotesPorts } from "./live-ports.js";
 import type { Paseo, PaseoHolder } from "./paseo-holder.js";
+import { ROSTER_MEMBER_KEY, type Roster } from "../shared/roster.js";
 
 interface FakeAgent {
   id: string;
@@ -12,6 +13,7 @@ interface FakeAgent {
   status: string;
   archivedAt: string | null;
   pendingPermissions: unknown[];
+  metadata?: Record<string, unknown>;
 }
 
 function agent(id: string, overrides: Partial<FakeAgent> = {}): FakeAgent {
@@ -25,6 +27,8 @@ const KNOWN = new Map([
   ["run", agent("run", { status: "running" })],
   ["old", agent("old", { archivedAt: "2026-11-10T08:00:00.000Z" })],
   ["shut", agent("shut", { status: "closed" })],
+  ["seated", agent("seated", { metadata: { [ROSTER_MEMBER_KEY]: "m2" } })],
+  ["passed", agent("passed", { metadata: { [ROSTER_MEMBER_KEY]: 3 } })],
 ]);
 
 const GROUP = {
@@ -157,6 +161,33 @@ test("an agent's workspace is read from the daemon; an agent it does not know ha
   expect(await ports.workspaceOf("b-full-id")).toBe("w1");
   expect(await ports.workspaceOf("run")).toBeNull();
   expect(await ports.workspaceOf("nobody")).toBeNull();
+});
+
+test("an agent's team is its roster teammate's, read from its stored mark; a team is found by id or name", async () => {
+  let roster: Roster = {
+    on: true,
+    edition: 1,
+    teams: [
+      { id: "t1", name: "PR-DEV", members: [{ id: "m1", name: "Tze Jun" }] },
+      { id: "t2", name: "QA-PR", members: [{ id: "m2", name: "Rosalyn" }] },
+    ],
+  };
+  const ports = liveAgentPorts(fakeHolder([]), () => roster);
+  expect(await ports.teamOf("seated")).toBe("t2");
+  expect(await ports.teamOf("passed")).toBeNull();
+  expect(await ports.teamOf("b-full-id")).toBeNull();
+  expect(await ports.teamOf("nobody")).toBeNull();
+  expect(await ports.findTeam("qa-pr")).toBe("t2");
+  expect(await ports.findTeam("t1")).toBe("t1");
+  expect(await ports.findTeam("ops")).toBeNull();
+  expect(ports.teamName("t2")).toBe("QA-PR");
+  expect(ports.teamName("gone")).toBeNull();
+  // The roster as it is now: switched off, it seats nobody and names no team.
+  roster = { ...roster, on: false };
+  expect(await ports.teamOf("seated")).toBeNull();
+  expect(await ports.findTeam("t2")).toBeNull();
+  expect(ports.teamName("t2")).toBeNull();
+  expect(await liveAgentPorts(fakeHolder([])).findTeam("t2")).toBeNull();
 });
 
 test("a start of an id resolves to the full id; an agent that can get no post resolves to none", async () => {

@@ -26,6 +26,8 @@ export interface NewPost {
   to?: string;
   /** The task this answers: the post becomes a note on that task's board, for its holder. */
   replyTo?: string;
+  /** A lobby task's roster team, by name or id; it is kept by id. */
+  team?: string;
   /** An agent id, or "user". */
   author: string;
 }
@@ -58,6 +60,12 @@ export interface BoardServicePorts {
   workspaceOf(agentId: string): Promise<string | null>;
   /** Why this update of this post is refused, before the claim rules; null when it is not. */
   refuse?(post: Post, input: PostUpdate): string | null;
+  /** The roster team, by id, of the teammate an agent holds; null for none. */
+  teamOf?(agentId: string): Promise<string | null>;
+  /** The id of the roster team an id or a name names; null for none, or with the roster off. */
+  findTeam?(nameOrId: string): Promise<string | null>;
+  /** A roster team's name by its id; null once it is gone, or with the roster off. */
+  teamName?(teamId: string): string | null;
 }
 
 /** What the duty board is brought up to: the list, the board's day, and the duties due now. */
@@ -145,6 +153,7 @@ function withoutClaim(post: Post): Post {
   if (post.namedPickup) next.namedPickup = true;
   if (post.state !== undefined) next.state = post.state;
   if (post.duty !== undefined) next.duty = post.duty;
+  if (post.team !== undefined) next.team = post.team;
   // A reopened task has no result: the next finish brings its own.
   return next;
 }
@@ -295,7 +304,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return { posts: cleared, seq, boards };
   }
 
-  async function createPost(input: NewPost): Promise<PostResult> {
+  async function createPost(input: NewPost, team: Pick<Post, "team">): Promise<PostResult> {
     const text = validText(input.text);
     if (!text.ok) return text;
     const root = input.replyTo === undefined ? undefined : rootOf(input.replyTo);
@@ -312,6 +321,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       kind,
       text: text.value,
       author: input.author,
+      ...team,
       createdAt: stamp,
       updatedAt: stamp,
     };
@@ -341,6 +351,46 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     const touched = [board, ...answered.boards.filter((item) => item !== board)];
     const saved = await commit({ ...data, nextSeq: answered.seq, posts: answered.posts }, touched);
     return saved.ok ? { ok: true, post: created } : saved;
+  }
+
+  /** The team a new post is for, by id: only a lobby task takes one, and a reply is a note. */
+  async function teamFor(input: NewPost): Promise<Outcome<Pick<Post, "team">>> {
+    if (input.team === undefined) return { ok: true, value: {} };
+    const refuse = (reason: string): Outcome<Pick<Post, "team">> => ({
+      ok: false,
+      error: `Unable to post: ${reason}`,
+    });
+    if (input.to !== undefined) return refuse("give to or team, not both");
+    if (input.board !== LOBBY || input.kind !== "task" || input.replyTo !== undefined)
+      return refuse("only a lobby task goes to a team");
+    const found = (await ports.findTeam?.(input.team)) ?? null;
+    return found === null ? refuse(`no team ${input.team}`) : { ok: true, value: { team: found } };
+  }
+
+  /** The name of the team a task is for, while the roster still has it; else the task is anyone's. */
+  function liveTeam(task: Post): string | null {
+    return task.team === undefined ? null : (ports.teamName?.(task.team) ?? null);
+  }
+
+  /** An agent's claim of an open task for another team; the user hands any task to anyone. */
+  async function teamRefusal(input: PostUpdate): Promise<PostResult | null> {
+    if (input.action !== "claim" || input.actor === USER_AUTHOR) return null;
+    const post = data.posts.find((item) => item.id === input.id);
+    // Any other claim is left to the claim rules: a done task, or one another agent holds.
+    if (post?.kind !== "task" || post.state !== "open" || post.claimedBy !== undefined) return null;
+    if (await teamFits(post, input.actor)) return null;
+    return { ok: false, error: `Unable to claim ${post.id}: it is for team ${liveTeam(post)}` };
+  }
+
+  /** Whether an agent may take a task: it is for no team still on the roster, or for the agent's. */
+  async function teamFits(task: Post, agentId: string): Promise<boolean> {
+    if (liveTeam(task) === null) return true;
+    try {
+      return (await ports.teamOf?.(agentId)) === task.team;
+    } catch (error) {
+      ports.log(`[office] no team for ${agentId}: ${errorMessage(error)}`);
+      return false;
+    }
   }
 
   /** The post linked with `post`, if it still exists and links back. */
@@ -723,8 +773,12 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
       return grouped;
     },
     wakesPaused: () => data.wakesPaused,
-    post: (input) => exclusive(() => createPost(input)),
-    update: (input) => exclusive(() => updatePost(input)),
+    post: (input) =>
+      exclusive(async () => {
+        const team = await teamFor(input);
+        return team.ok ? createPost(input, team.value) : team;
+      }),
+    update: (input) => exclusive(async () => (await teamRefusal(input)) ?? updatePost(input)),
     claimLobbyTask: (id, agentId, expectedSeq) =>
       exclusive(async () => {
         const pickup = data.posts.filter((post) => PICKUP_BOARDS.has(post.board));
@@ -742,6 +796,7 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
         if (pickup.some((post) => post.state === "claimed" && post.claimedBy === agentId))
           return null;
         if (ports.refuse?.(task, { id, actor: agentId, action: "claim" })) return null;
+        if (!(await teamFits(task, agentId))) return null;
         return updateForPickup({ id, actor: agentId, action: "claim" }, randomUUID());
       }),
     finishLobbyClaim: (claim, result) =>

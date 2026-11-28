@@ -45,6 +45,7 @@ function officeRoom(id: string, boards: OfficeSnapshot["boards"]): OfficeRoom {
 }
 
 const nameOf = (author: string) => author;
+const teamIdOf = (id: string) => id;
 const ignore = () => undefined;
 
 let dutiesOpened = 0;
@@ -58,6 +59,7 @@ function Harness({ room }: { room: OfficeRoom }) {
     <RoomBoard
       room={room}
       name={nameOf}
+      teamName={teamIdOf}
       styles={styles}
       onOpenBoard={ignore}
       onOpenDuties={openDuties}

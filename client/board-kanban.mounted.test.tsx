@@ -89,10 +89,19 @@ const ACTIONS: BoardActions = {
   setWakesPaused: async () => undefined,
 };
 const nameOf = (author: string) => author;
+const teamIdOf = (id: string) => id;
 
 function Harness({ posts }: { posts: Post[] }) {
   const styles = useOfficeStyles(THEME, false, false);
-  return <KanbanBoard posts={posts} name={nameOf} actions={ACTIONS} styles={styles} />;
+  return (
+    <KanbanBoard
+      posts={posts}
+      name={nameOf}
+      teamName={teamIdOf}
+      actions={ACTIONS}
+      styles={styles}
+    />
+  );
 }
 
 let container: HTMLElement;

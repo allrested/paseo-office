@@ -14,6 +14,15 @@ import {
 import { PARENT_AGENT_ID_LABEL } from "./directory.js";
 import { writerMode, writerModeChoices } from "./writer-mode.js";
 import type { WriterModes } from "../shared/contracts.js";
+import {
+  NO_ROSTER,
+  ROSTER_MEMBER_KEY,
+  findRosterTeam,
+  rosterTeamById,
+  seatOf,
+  storedRosterMark,
+  type Roster,
+} from "../shared/roster.js";
 import type { Hub, HubPorts } from "./hub.js";
 import type { JanitorPorts } from "./janitor.js";
 import { wakeTargetOf } from "./mention-queue.js";
@@ -88,8 +97,14 @@ function availableForOfficeWork(agent: AgentSnapshotPayload, home = false): bool
   );
 }
 
-/** Wake ports on the daemon's own API; the holder is set by every hook and handler. */
-export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
+/**
+ * Wake ports on the daemon's own API; the holder is set by every hook and handler. `roster` is the
+ * roster as the settings now have it; an agent's teammate is the mark stored on it.
+ */
+export function liveAgentPorts(
+  holder: PaseoHolder,
+  roster: () => Roster = () => NO_ROSTER,
+): OfficeAgentPorts {
   // Resolves null for an agent the daemon does not know; rejects only for an empty id or a start
   // of an id that several agents share.
   const refresh = (agentId: string) => holder.require().agents.ref(agentId).refresh();
@@ -149,6 +164,13 @@ export function liveAgentPorts(holder: PaseoHolder): OfficeAgentPorts {
             : { sourceAgentId: source }),
           ...(messageId ? { messageId } : {}),
         }),
+    async teamOf(agentId) {
+      const result = await refresh(agentId);
+      const mark = storedRosterMark(result?.agent.metadata?.[ROSTER_MEMBER_KEY]);
+      return seatOf(roster(), mark)?.team.id ?? null;
+    },
+    findTeam: async (nameOrId) => findRosterTeam(roster(), nameOrId)?.id ?? null,
+    teamName: (teamId) => rosterTeamById(roster(), teamId)?.name ?? null,
   };
 }
 

@@ -374,11 +374,13 @@ export function createOfficePlugin(
     stopTimeline = hub.watch(timeline.view);
   })().catch((error: unknown) => log(`[office] timeline unavailable: ${errorMessage(error)}`));
   hub.setBrand(hostBrand({}, deps.env));
+  // The roster the names and the team tasks follow; off until the settings are read.
+  let roster: Roster = NO_ROSTER;
   const office = createOffice({
     store: deps.store,
     clock: deps.clock,
     hub,
-    agents: liveAgentPorts(holder),
+    agents: liveAgentPorts(holder, () => roster),
     log,
   });
 
@@ -637,8 +639,6 @@ export function createOfficePlugin(
     planWatch.keep(on);
   };
   void holder.wait().then(followWatching);
-  // The roster the names follow; off until the settings are read.
-  let roster: Roster = NO_ROSTER;
   void holder.wait().then(() => office.setPickupEnabled(agentToolsOn));
   // Neither schedule can follow settings it cannot read: both cards say why until a save is read.
   function settingsUnreadable(reason: string): void {

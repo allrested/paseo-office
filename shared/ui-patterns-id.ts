@@ -205,6 +205,9 @@ export const RULES: readonly Rule[] = [
   [/^ended with an error \(exit (\d+)\)$/, (code) => `berakhir dengan galat (exit ${code})`],
   [/^from lobby task (.+)$/, (id) => `dari tugas lobi ${id}`],
   [/^on (.+)'s board$/, (name) => `di papan ${name}`],
+  [/^Team (.+)$/, (name) => `Tim ${name}`],
+  [/^for team (.+)$/, (name) => `untuk tim ${name}`],
+  [/^(\d+) teammates?$/, (n) => `${n} anggota tim`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,
     (language) => `Teks ${language} tidak dapat dimuat; adegan dalam bahasa Inggris`,

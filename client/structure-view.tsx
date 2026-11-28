@@ -33,6 +33,7 @@ import {
   type OfficeRow,
 } from "../shared/model.js";
 import { PermissionActions } from "./permission-actions.js";
+import type { TeamNamer } from "./board-text.js";
 import { RoomBoard } from "./room-board.js";
 import type { OfficeStyles } from "./styles.js";
 import type { AgentActions } from "./use-agent-actions.js";
@@ -214,6 +215,7 @@ interface RoomCardProps {
   now: number;
   actions: AgentActions;
   name(author: string): string;
+  teamName: TeamNamer;
   onSelectAgent(agentId: string): void;
   onOpenSession: ((agentId: string) => void) | undefined;
   onOpenBoard(roomId: string): void;
@@ -227,6 +229,7 @@ function RoomCard({
   now,
   actions,
   name,
+  teamName,
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
@@ -263,6 +266,7 @@ function RoomCard({
       <RoomBoard
         room={room}
         name={name}
+        teamName={teamName}
         styles={styles}
         onOpenBoard={onOpenBoard}
         onOpenDuties={onOpenDuties}
@@ -379,6 +383,7 @@ export interface StructureViewProps {
   actions: AgentActions;
   /** How a post names its author, its claimer and the agent it is for. */
   name(author: string): string;
+  teamName: TeamNamer;
   onSelectAgent(agentId: string): void;
   /** Opens an agent's session from its row, in the office's column. The surface always supplies it. */
   onOpenSession?(agentId: string): void;
@@ -400,6 +405,7 @@ export function StructureView({
   compact,
   actions,
   name,
+  teamName,
   onSelectAgent,
   onOpenSession,
   onOpenBoard,
@@ -434,6 +440,7 @@ export function StructureView({
           now={now}
           actions={actions}
           name={name}
+          teamName={teamName}
           onSelectAgent={onSelectAgent}
           onOpenSession={onOpenSession}
           onOpenBoard={onOpenBoard}

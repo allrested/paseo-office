@@ -187,6 +187,9 @@ export const RULES: readonly Rule[] = [
   [/^ended with an error \(exit (\d+)\)$/, (code) => `จบด้วยข้อผิดพลาด (exit ${code})`],
   [/^from lobby task (.+)$/, (id) => `จากงานของล็อบบี้ ${id}`],
   [/^on (.+)'s board$/, (name) => `บนบอร์ดของ ${name}`],
+  [/^Team (.+)$/, (name) => `ทีม ${name}`],
+  [/^for team (.+)$/, (name) => `สำหรับทีม ${name}`],
+  [/^(\d+) teammates?$/, (n) => `${n} เพื่อนร่วมทีม`],
   [
     /^(.+) text could not be loaded; the scene is in English$/,
     (language) => `โหลดข้อความ${language}ไม่ได้ ฉากจึงเป็นภาษาอังกฤษ`,
