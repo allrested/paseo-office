@@ -59,6 +59,7 @@ interface Listeners {
   teams?: TeamPorts;
   costOf?: BoardServicePorts["costOf"];
   working?: BoardServicePorts["working"];
+  providerOf?: BoardServicePorts["providerOf"];
 }
 
 type TeamPorts = Pick<BoardServicePorts, "teamOf" | "findTeam" | "teamName">;
@@ -116,6 +117,7 @@ function build(
     ...listeners.teams,
     ...(listeners.costOf ? { costOf: listeners.costOf } : {}),
     ...(listeners.working ? { working: listeners.working } : {}),
+    ...(listeners.providerOf ? { providerOf: listeners.providerOf } : {}),
     workspaceOf,
   });
   return { service, store, clock, events };
@@ -2249,5 +2251,192 @@ describe("a task from a ticket", () => {
     if (!marked.ok) throw new Error(marked.error);
     const again = await service.markWroteBack("p1");
     expect(again).toEqual({ ok: true, post: marked.post });
+  });
+});
+
+describe("hand-over", () => {
+  /** Alice is on Claude, Bob on Codex; anyone else's provider is unknown. */
+  const PROVIDERS = new Map([
+    ["a", "claude"],
+    ["b", "codex"],
+  ]);
+  const providerOf = async (agentId: string) => PROVIDERS.get(agentId) ?? null;
+  const by = (holder: string, fields: Partial<Parameters<BoardService["handOver"]>[0]> = {}) => ({
+    holder,
+    answer: "Halfway: the tests pass.",
+    provider: PROVIDERS.get(holder) ?? null,
+    ...fields,
+  });
+
+  test("each task that cannot be handed over is refused, and says why", async () => {
+    const posts = [
+      post(1),
+      lobbyTask(2),
+      lobbyTask(3, { state: "claimed", claimedBy: "user" }),
+      taskOn(4, { state: "claimed", claimedBy: "a" }),
+      lobbyTask(5, { state: "done", claimedBy: "a" }),
+    ];
+    const { service, store } = await harness(file(posts));
+    const refused = (id: string, reason: string) => ({
+      ok: false,
+      error: `Unable to hand over ${id}: ${reason}`,
+    });
+    expect(service.handOverHolder("p1")).toEqual(refused("p1", "it is a note"));
+    expect(service.handOverHolder("p2")).toEqual(refused("p2", "nobody holds it"));
+    expect(service.handOverHolder("p3")).toEqual(refused("p3", "you hold it: reopen it instead"));
+    expect(service.handOverHolder("p4")).toEqual(
+      refused("p4", "only a lobby task or a duty is handed on"),
+    );
+    expect(service.handOverHolder("p5")).toEqual(refused("p5", "it is done"));
+    expect(service.handOverHolder("p9")).toEqual(refused("p9", "no such post"));
+    for (const id of ["p1", "p2", "p3", "p4", "p5", "p9"])
+      expect(await service.handOver({ id, ...by("a") })).toEqual(service.handOverHolder(id));
+    expect(store.saved).toHaveLength(0);
+  });
+
+  test("a lobby task with its copy: the holder's note, the reopen and the copy's delete in one save", async () => {
+    const source = { kind: "jira" as const, key: "OPS-7", url: "https://acme.example/OPS-7" };
+    const { service, store, events } = await claimedByA([
+      lobbyTask(1, { team: "t1", after: ["p9"], source }),
+    ]);
+    expect(service.handOverHolder("p1")).toEqual({ ok: true, holder: "a" });
+    const saves = store.saved.length;
+    events.length = 0;
+    const result = await service.handOver({ id: "p1", ...by("a") });
+    expect(store.saved).toHaveLength(saves + 1);
+    expect(find(service, "p3")).toBeUndefined();
+    const task = find(service, "p1");
+    expect(result).toEqual({ ok: true, post: task });
+    expect(task).toMatchObject({
+      state: "open",
+      notProvider: "claude",
+      team: "t1",
+      after: ["p9"],
+      source,
+    });
+    for (const key of ["claimedBy", "claimedAt", "link", "assignment", "pickupMessageId"])
+      expect(task).not.toHaveProperty(key);
+    const note = service.postsOf("lobby").find((item) => item.replyTo === "p1");
+    expect(note).toMatchObject({
+      board: "lobby",
+      kind: "note",
+      author: "a",
+      text: "Where Alice left it: Halfway: the tests pass.",
+    });
+    expect(note).not.toHaveProperty("to");
+    expect(events).toContain("board w1 ");
+  });
+
+  test("a duty is handed over on the duty board", async () => {
+    const duty = dutyPost(1, "build", "2026-11-11", { state: "claimed", claimedBy: "b" });
+    const { service } = await harness(file([duty]));
+    const result = await service.handOver({ id: "p1", ...by("b", { answer: "Built half." }) });
+    expect(result.ok && result.post).toMatchObject({
+      board: "duty",
+      state: "open",
+      notProvider: "codex",
+      duty: { id: "build", day: "2026-11-11" },
+    });
+    expect(service.postsOf("duty").find((item) => item.kind === "note")).toMatchObject({
+      author: "b",
+      replyTo: "p1",
+      text: "Where Bob left it: Built half.",
+    });
+  });
+
+  test("a blocked task's note ends with what it needed, and the block goes", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a", blocked: "Which branch?" });
+    const { service } = await harness(file([lobby]));
+    const result = await service.handOver({ id: "p1", ...by("a") });
+    expect(result.ok && result.post).not.toHaveProperty("blocked");
+    expect(service.postsOf("lobby").find((item) => item.kind === "note")?.text).toBe(
+      "Where Alice left it: Halfway: the tests pass.\nIt needed: Which branch?",
+    );
+  });
+
+  test("called on the copy, it hands over the lobby task", async () => {
+    const { service } = await claimedByA();
+    expect(service.handOverHolder("p3")).toEqual({ ok: true, holder: "a" });
+    const result = await service.handOver({ id: "p3", ...by("a") });
+    expect(result.ok && result.post).toMatchObject({ id: "p1", board: "lobby", state: "open" });
+    expect(find(service, "p3")).toBeUndefined();
+    expect(service.postsOf("lobby").find((item) => item.kind === "note")?.replyTo).toBe("p1");
+  });
+
+  test("the answer is cleaned of control characters and cut to 1,200; none reads as such", async () => {
+    const lobby = (seq: number) => lobbyTask(seq, { state: "claimed", claimedBy: "a" });
+    const { service } = await harness(file([lobby(1), lobby(2)]));
+    const answer = `\u0007Line one\r\n\tLine two\u001b[0m ${"x".repeat(2_000)}`;
+    await service.handOver({ id: "p1", ...by("a", { answer }) });
+    await service.handOver({ id: "p2", ...by("a", { answer: null }) });
+    const notes = service.postsOf("lobby").filter((item) => item.kind === "note");
+    const cut = notes[0]?.text.replace("Where Alice left it: ", "") ?? "";
+    expect(cut).toHaveLength(1_200);
+    expect(cut.startsWith("Line one\n\tLine two[0m xx")).toBe(true);
+    expect(cut.endsWith("x…")).toBe(true);
+    expect(notes[1]?.text).toBe("Where Alice left it: no answer to read.");
+  });
+
+  test("with the holder's provider unknown it is still handed over, with no mark", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "c", notProvider: "codex" });
+    const { service } = await harness(file([lobby]));
+    const result = await service.handOver({ id: "p1", ...by("c") });
+    expect(result.ok && result.post).toMatchObject({ state: "open" });
+    expect(result.ok && result.post).not.toHaveProperty("notProvider");
+    expect(service.postsOf("lobby").find((item) => item.kind === "note")?.text).toBe(
+      "Where c left it: Halfway: the tests pass.",
+    );
+  });
+
+  test("a hand-over made when a plan ran out says so; one whose holder changed is refused", async () => {
+    const lobby = (seq: number) => lobbyTask(seq, { state: "claimed", claimedBy: "a" });
+    const { service } = await harness(file([lobby(1), lobby(2)]));
+    await service.handOver({ id: "p1", ...by("a", { outOf: "Claude" }) });
+    expect(service.postsOf("lobby").find((item) => item.kind === "note")?.text).toBe(
+      "Where Alice left it (handed over when Claude ran out): Halfway: the tests pass.",
+    );
+    expect(await service.handOver({ id: "p2", ...by("b") })).toEqual({
+      ok: false,
+      error: "Unable to hand over p2: it changed hands, try again",
+    });
+  });
+
+  test("the mark stays through a reopen and a claim, and goes when the task is done", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a" });
+    const { service } = await harness(file([lobby]), { providerOf });
+    await service.handOver({ id: "p1", ...by("a") });
+    await service.update({ id: "p1", action: "claim", actor: "b" });
+    expect(find(service, "p1")).toMatchObject({ claimedBy: "b", notProvider: "claude" });
+    await service.update({ id: "p1", action: "reopen", actor: "user" });
+    expect(find(service, "p1")).toMatchObject({ state: "open", notProvider: "claude" });
+    await service.update({ id: "p1", action: "claim", actor: "b" });
+    await service.update({ id: "p1", action: "done", actor: "b", note: "Done." });
+    expect(find(service, "p1")).toMatchObject({ state: "done" });
+    expect(find(service, "p1")).not.toHaveProperty("notProvider");
+  });
+
+  test("an agent of the provider it left is refused it, by hand and by the pickup; others and the owner take it", async () => {
+    const marked = (seq: number) => lobbyTask(seq, { notProvider: "claude" });
+    const { service } = await harness(file([marked(1), marked(2), marked(3), marked(4)]), {
+      providerOf,
+    });
+    expect(await service.update({ id: "p1", action: "claim", actor: "a" })).toEqual({
+      ok: false,
+      error: "Unable to claim p1: it was handed over from claude",
+    });
+    expect(await service.claimLobbyTask("p1", "a", 1)).toBeNull();
+    expect(await service.update({ id: "p1", action: "claim", actor: "b" })).toMatchObject({
+      ok: true,
+      post: { claimedBy: "b" },
+    });
+    // An agent whose provider is not known is not passed over.
+    expect(await service.claimLobbyTask("p2", "c", 2)).toMatchObject({ claimedBy: "c" });
+    expect(await service.update({ id: "p3", action: "claim", actor: "user" })).toMatchObject({
+      ok: true,
+      post: { claimedBy: "user" },
+    });
+    expect(await service.update({ id: "p4", action: "claim", actor: "d" })).toMatchObject({
+      ok: true,
+    });
   });
 });

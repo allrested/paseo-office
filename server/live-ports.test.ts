@@ -562,3 +562,43 @@ test("an agent's cost is read from what the directory last had", () => {
   expect(ports.costOf("a")).toBe(1);
   expect(liveAgentPorts(fakeHolder([])).costOf("a")).toBeUndefined();
 });
+
+test("an agent's provider is the daemon's, and its last answer the newest assistant text of its timeline", async () => {
+  const { ports } = setup();
+  expect(await ports.providerOf("nobody")).toBeNull();
+  let options: unknown = null;
+  const entries = [
+    { turnId: "t0", item: { type: "assistant_message", text: "Earlier." } },
+    { turnId: "t1", item: { type: "user_message", text: "Go on" } },
+    { turnId: "t1", item: { type: "assistant_message", text: "Halfway: " } },
+    { turnId: "t1", item: { type: "assistant_message", text: "the tests pass." } },
+    // The turn the plan ran out in has no answer: the one before it is the last.
+    { turnId: "t2", item: { type: "user_message", text: "And now?" } },
+  ];
+  const paseo = {
+    agents: {
+      ref: () => ({
+        refresh: async () => ({ agent: { id: "a", provider: "codex" }, project: null }),
+        timeline: {
+          refetch: async (given: unknown) => {
+            options = given;
+            return { entries };
+          },
+        },
+      }),
+    },
+  } as unknown as Paseo;
+  const holder: PaseoHolder = {
+    remember: () => undefined,
+    require: () => paseo,
+    held: () => true,
+    wait: async () => paseo,
+  };
+  const live = liveAgentPorts(holder);
+  expect(await live.providerOf("a")).toBe("codex");
+  expect(await live.lastAnswerOf("a")).toBe("Halfway: the tests pass.");
+  expect(options).toMatchObject({ direction: "tail", wholeTurns: true });
+  entries.length = 1;
+  entries[0] = { turnId: "t0", item: { type: "user_message", text: "Hi" } };
+  expect(await live.lastAnswerOf("a")).toBeNull();
+});

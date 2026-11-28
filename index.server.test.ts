@@ -129,6 +129,7 @@ const ON: SettingsState = {
     telegramIncidents: true,
     telegramPlan: true,
     telegramLands: "backlog",
+    handOverWhenOut: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -174,6 +175,7 @@ const OFF: SettingsState = {
     telegramIncidents: true,
     telegramPlan: true,
     telegramLands: "backlog",
+    handOverWhenOut: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -773,6 +775,7 @@ function notesSettings(
       telegramIncidents: true,
       telegramPlan: true,
       telegramLands: "backlog",
+      handOverWhenOut: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -1107,6 +1110,7 @@ test("the entry serves the office state, the 3D page script, the machine, the ja
     "office.post.request",
     "office.update.request",
     "office.task.start.request",
+    "office.task.hand_over.request",
     "office.delete.request",
     "office.board.clear_done.request",
     "office.set_wakes_paused.request",
@@ -1404,6 +1408,7 @@ const NOTES: SettingsState = {
     telegramIncidents: true,
     telegramPlan: true,
     telegramLands: "backlog",
+    handOverWhenOut: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -1547,6 +1552,7 @@ test("the writer starts in the settings' mode, and accepts edits while none is s
       telegramIncidents: true,
       telegramPlan: true,
       telegramLands: "backlog",
+      handOverWhenOut: false,
       notifyUrl: "",
       notifyLevel: "danger",
       teams: [],
@@ -2029,6 +2035,7 @@ const JIRA_ON: SettingsState = {
     telegramIncidents: true,
     telegramPlan: true,
     telegramLands: "backlog",
+    handOverWhenOut: false,
     notifyUrl: "",
     notifyLevel: "danger",
     teams: [],
@@ -2391,6 +2398,18 @@ test("a notes time zone the host does not know leaves the duty board on the host
   expect(snapshot?.duties?.day).toBe("2026-11-11");
   expect(snapshot?.boards.duty?.map((post) => post.id)).toEqual(["p1", "p2", "p3", "p4"]);
   await office.leave();
+  await stop();
+});
+
+test("the hand-over call reaches the office, which refuses a task nobody holds", async () => {
+  const { recorded, context, stop } = setup(async () => ON);
+  const post = recorded.handlers.get("office.post.request");
+  await post?.({ board: "lobby", kind: "task", text: "Fix it" }, context);
+  const handOver = recorded.handlers.get("office.task.hand_over.request");
+  expect(await handOver?.({ id: "p1" }, context)).toEqual({
+    ok: false,
+    error: "Unable to hand over p1: nobody holds it",
+  });
   await stop();
 });
 

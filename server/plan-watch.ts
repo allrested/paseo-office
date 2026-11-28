@@ -6,6 +6,7 @@ import {
   closestLimit,
 } from "../shared/plan-usage.js";
 import { errorMessage } from "./errors.js";
+import type { HandOverAgent } from "./office.js";
 import type { Clock } from "./timers.js";
 
 /**
@@ -110,5 +111,36 @@ export function createPlanWatch(ports: PlanWatchPorts): PlanWatch {
       cancel = null;
       ports.observed?.(null);
     },
+  };
+}
+
+export interface OutHandOverPorts {
+  /** The owner's switch: hand over the tasks of a provider whose plan ran out. */
+  on(): boolean;
+  /** The agents as the directory last had them; null while it is closed, and then nothing is done. */
+  agents(): readonly HandOverAgent[] | null;
+  handOver(
+    provider: { id: string; name: string },
+    agents: readonly HandOverAgent[],
+  ): Promise<unknown>;
+  log(message: string): void;
+}
+
+/**
+ * Told each crossing: at Out, with the switch on, the provider's held tasks are handed over. The
+ * watch tells a level once, so this runs once per raise and again only after a reset.
+ */
+export function handOverWhenOut(ports: OutHandOverPorts): (crossing: PlanCrossing) => void {
+  return ({ provider, level }) => {
+    if (level !== 100 || !ports.on()) return;
+    const agents = ports.agents();
+    if (agents === null) return;
+    ports
+      .handOver({ id: provider.provider, name: provider.name }, agents)
+      .catch((error: unknown) =>
+        ports.log(
+          `[office] hand-over when ${provider.name} ran out failed: ${errorMessage(error)}`,
+        ),
+      );
   };
 }

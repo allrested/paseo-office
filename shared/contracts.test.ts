@@ -20,6 +20,7 @@ import {
   officeStateSubscription,
   postRpc,
   startRpc,
+  handOverRpc,
   setWakesPausedRpc,
   updateRpc,
   UpdateActionSchema,
@@ -322,4 +323,11 @@ test("the backlog: a post carries it as a boolean, and the start call takes an i
   expect(startRpc.name).toBe("office.task.start.request");
   expect(startRpc.input.safeParse({ id: "p1" }).success).toBe(true);
   expect(startRpc.input.safeParse({ id: "" }).success).toBe(false);
+});
+
+test("a hand-over takes a task's id and answers with the reopened task", () => {
+  expect(handOverRpc.name).toBe("office.task.hand_over.request");
+  expect(handOverRpc.input.safeParse({ id: "p1" }).success).toBe(true);
+  expect(handOverRpc.input.safeParse({ id: "" }).success).toBe(false);
+  expect(handOverRpc.output.safeParse({ ok: false, error: "x" }).success).toBe(true);
 });

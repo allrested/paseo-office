@@ -77,6 +77,12 @@ export function liveHubPorts(
   };
 }
 
+/**
+ * How far back a hand-over looks for the holder's last answer: whole turns, so a turn the plan
+ * ran out in, with no answer of its own, still leaves the one before it.
+ */
+const LAST_ANSWER_TAIL_LIMIT = 50;
+
 /** A finished-turn notification is normal for an available agent. Other attention needs the user. */
 function availableForOfficeWork(agent: AgentSnapshotPayload, home = false): boolean {
   const attention = agent.requiresAttention || agent.attentionReason;
@@ -176,6 +182,18 @@ export function liveAgentPorts(
     teamName: (teamId) => rosterTeamById(roster(), teamId)?.name ?? null,
     costOf,
     working,
+    async providerOf(agentId) {
+      const result = await refresh(agentId);
+      return result?.agent.provider || null;
+    },
+    async lastAnswerOf(agentId) {
+      const page = await holder
+        .require()
+        .agents.ref(agentId)
+        .timeline.refetch({ direction: "tail", limit: LAST_ANSWER_TAIL_LIMIT, wholeTurns: true });
+      if (page.error) throw new Error(page.error);
+      return lastAssistantText(page.entries.map((entry) => entry.item));
+    },
   };
 }
 

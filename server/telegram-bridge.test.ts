@@ -925,6 +925,8 @@ describe("a reply", () => {
         teamName: () => null,
         costOf: () => undefined,
         working: () => false,
+        providerOf: async () => null,
+        lastAnswerOf: async () => null,
       },
     });
     return { office, prompts, listeners, current: () => current };

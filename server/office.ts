@@ -55,6 +55,17 @@ export interface OfficeAgentPorts {
   costOf(agentId: string): number | undefined;
   /** Whether the agent is in a turn now, as the directory last had it; false when unknown. */
   working(agentId: string): boolean;
+  /** The provider id the agent runs on, the same for each of its agents; null when unknown. */
+  providerOf(agentId: string): Promise<string | null>;
+  /** The last assistant text of the agent's timeline, as the chat reads a turn; null for none. */
+  lastAnswerOf(agentId: string): Promise<string | null>;
+}
+
+/** An agent as the directory last reported it, for a hand-over when a plan runs out. */
+export interface HandOverAgent {
+  id: string;
+  provider: string;
+  status: string;
 }
 
 export type OfficeHub = Pick<Hub, "setBoards" | "setBoard" | "removeBoard" | "setWake">;
@@ -100,6 +111,19 @@ export interface Office {
   /** The auto-start gate's start: only the revision it looked at, told as the owner's Start is. */
   startHeld(id: string, expectedSeq: number): Promise<StartResult>;
   update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
+  /**
+   * Takes a lobby task or a duty from the agent holding it: its last answer is posted under the
+   * task as its note, and the task reopens for an agent of another provider.
+   */
+  handOver(id: string): Promise<PostResult>;
+  /**
+   * A provider's plan ran out: each lobby task held by one of its agents not in a turn is handed
+   * over, if `agents` has an open agent of another provider to take it. Returns the ids.
+   */
+  handOverOut(
+    provider: { id: string; name: string },
+    agents: readonly HandOverAgent[],
+  ): Promise<string[]>;
   remove(id: string): Promise<DeleteResult>;
   clearDone(board: string): Promise<DeleteResult>;
   setWakesPaused(paused: boolean): Promise<WakeState>;
@@ -202,7 +226,47 @@ export function createOffice(deps: OfficeDeps): Office {
     teamName: (teamId) => deps.agents.teamName(teamId),
     costOf: (agentId) => deps.agents.costOf(agentId),
     working: (agentId) => deps.agents.working(agentId),
+    providerOf: (agentId) => deps.agents.providerOf(agentId),
   });
+
+  /** A read that fails is logged, and gives the note with no answer. */
+  async function lastAnswerOf(agentId: string): Promise<string | null> {
+    try {
+      return await deps.agents.lastAnswerOf(agentId);
+    } catch (error) {
+      log(`[office] no last answer of ${agentId}: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  async function providerOf(agentId: string): Promise<string | null> {
+    try {
+      return await deps.agents.providerOf(agentId);
+    } catch (error) {
+      log(`[office] no provider for ${agentId}: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Reads the holder's answer and provider before the save, outside the board's queue: a slow
+   * timeline holds no other change. The former holder is not told.
+   */
+  async function handOver(id: string, outOf?: string): Promise<PostResult> {
+    const found = service.handOverHolder(id);
+    if (!found.ok) return found;
+    const [answer, provider] = await Promise.all([
+      lastAnswerOf(found.holder),
+      providerOf(found.holder),
+    ]);
+    return service.handOver({
+      id,
+      holder: found.holder,
+      answer,
+      provider,
+      ...(outOf === undefined ? {} : { outOf }),
+    });
+  }
 
   function noteAgent(agent: ToolAgent): void {
     // One line, so a name cannot start a line that reads as another post or another entry.
@@ -298,6 +362,7 @@ export function createOffice(deps: OfficeDeps): Office {
         clock,
         enabled: () => pickupEnabled,
         instructed,
+        label: (author) => (author === USER_AUTHOR ? "the owner" : label(author)),
         log,
       });
       pickup.refresh();
@@ -367,6 +432,46 @@ export function createOffice(deps: OfficeDeps): Office {
     async update(input) {
       await ready;
       return service.update({ ...input, actor: USER_AUTHOR });
+    },
+    async handOver(id) {
+      await ready;
+      return handOver(id);
+    },
+    async handOverOut(provider, agents) {
+      await ready;
+      // With nobody of another provider to take them, the tasks stay with their holders.
+      const elsewhere = agents.some(
+        (agent) => agent.provider !== provider.id && agent.status !== "closed",
+      );
+      if (!elsewhere) return [];
+      const idle = new Set(
+        agents
+          .filter(
+            (agent) =>
+              agent.provider === provider.id &&
+              agent.status !== "running" &&
+              agent.status !== "initializing",
+          )
+          .map((agent) => agent.id),
+      );
+      const theirs = service
+        .postsOf(LOBBY)
+        .filter(
+          (post) =>
+            post.kind === "task" &&
+            post.state === "claimed" &&
+            post.claimedBy !== undefined &&
+            idle.has(post.claimedBy),
+        );
+      const ids: string[] = [];
+      for (const task of theirs) {
+        const result = await handOver(task.id, provider.name);
+        if (result.ok) ids.push(task.id);
+        else log(`[office] ${result.error}`);
+      }
+      if (ids.length > 0)
+        log(`[office] handed over ${ids.join(", ")} when ${provider.name} ran out`);
+      return ids;
     },
     async remove(id) {
       await ready;
