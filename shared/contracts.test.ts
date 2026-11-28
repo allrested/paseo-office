@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  AFTER_MAX,
   ChatMessageSchema,
   ChatRequestSchema,
   ChecklistStepSchema,
@@ -288,4 +289,27 @@ test("a lobby task carries its roster team's id, and the post rpc takes one", ()
   const input = { board: "lobby", kind: "task", text: "x" };
   expect(postRpc.input.parse({ ...input, team: "t2" })).toEqual({ ...input, team: "t2" });
   expect(postRpc.input.safeParse({ ...input, team: "" }).success).toBe(false);
+});
+
+test("a task carries up to AFTER_MAX task ids it waits on, and the post rpc takes them", () => {
+  expect(AFTER_MAX).toBe(5);
+  const task = {
+    id: "p9",
+    seq: 9,
+    board: "lobby",
+    kind: "task",
+    text: "Review it",
+    author: "user",
+    state: "open",
+    after: ["p1", "p2"],
+    createdAt: "2026-11-11T00:00:00.000Z",
+    updatedAt: "2026-11-11T00:00:00.000Z",
+  };
+  expect(PostSchema.parse(task)).toEqual(task);
+  expect(
+    PostSchema.safeParse({ ...task, after: ["p1", "p2", "p3", "p4", "p5", "p6"] }).success,
+  ).toBe(false);
+  const input = { board: "lobby", kind: "task", text: "x" };
+  expect(postRpc.input.parse({ ...input, after: ["p1"] })).toEqual({ ...input, after: ["p1"] });
+  expect(postRpc.input.safeParse({ ...input, after: [""] }).success).toBe(false);
 });

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type { AgentToolContext } from "@getpaseo/plugin/server";
 import type { Post, WakeState } from "../shared/contracts.js";
+import { readLobbyAssignment } from "../shared/lobby-assignment.js";
 import { EMPTY_BOARDS, type BoardStore, type BoardsFile } from "./board-store.js";
 import { createFakeClock, settle } from "./fake-clock.js";
 import {
@@ -952,5 +953,93 @@ test("an office tool's read names a team task's team", async () => {
   const read = office.tools.find((tool) => tool.name === "office_read");
   const result = await read?.execute({ board: "lobby" }, toolContext({ id: "a", title: "Alice" }));
   expect(result?.text).toContain("p1 task open for team QA-PR, from the user: Test it");
+  await office.stop();
+});
+
+test("a waiting lobby task is handed out once its task on a room board is done, with the results", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  for (const text of ["Build it", "Write the notes", "Measure it", "Draw it"])
+    await office.post({ board: "w1", kind: "task", text });
+  expect(
+    await office.post({
+      board: "lobby",
+      kind: "task",
+      text: "Review it",
+      after: ["p1", "p2", "p3", "p4"],
+    }),
+  ).toMatchObject({ ok: true, post: { id: "p5", after: ["p1", "p2", "p3", "p4"] } });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.update({ id: "p1", action: "done", note: "Built it.\nTests pass." });
+  await office.update({ id: "p2", action: "done" });
+  await office.update({ id: "p3", action: "done", note: "x".repeat(700) });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(store.current().posts.find((p) => p.id === "p5")).toMatchObject({ state: "open" });
+  // Deleting the last one frees it: no other event is needed.
+  await office.remove("p4");
+  clock.advance(0);
+  await settle();
+  expect(prompts).toHaveLength(1);
+  const prompt = prompts[0]?.replace(/^b: /, "") ?? "";
+  expect(prompt).toContain(
+    [
+      "  Review it",
+      "  It waited on:",
+      "  p1: Built it.",
+      "    Tests pass.",
+      "  p2: no result given",
+      `  p3: ${"x".repeat(599)}…`,
+      "Work on this task.",
+    ].join("\n"),
+  );
+  expect(readLobbyAssignment(prompt)).toEqual({
+    id: "p5",
+    kind: "lobby",
+    body: [
+      "Review it",
+      "It waited on:",
+      "p1: Built it.",
+      "  Tests pass.",
+      "p2: no result given",
+      `p3: ${"x".repeat(599)}…`,
+    ].join("\n"),
+  });
+  await office.stop();
+});
+
+test("a task whose tasks are all deleted is handed out without the block", async () => {
+  const { build, clock, store, prompts } = setup();
+  const office = build();
+  await office.ready;
+  office.setPickupEnabled(true);
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await office.post({ board: "lobby", kind: "task", text: "Review it", after: ["p1"] });
+  clock.advance(0);
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.remove("p1");
+  clock.advance(0);
+  await settle();
+  expect(store.current().posts[0]).toMatchObject({ id: "p2", state: "claimed", claimedBy: "b" });
+  expect(prompts).toEqual([expect.stringContaining("  Review it\nWork on this task.")]);
+  await office.stop();
+});
+
+test("the user's post takes after as the tool's does", async () => {
+  const { office } = start();
+  await office.ready;
+  expect(
+    await office.post({ board: "lobby", kind: "task", text: "Review it", after: ["p9"] }),
+  ).toEqual({ ok: false, error: "Unable to post: no task p9" });
+  expect(await office.post({ board: "w1", kind: "note", text: "x", after: ["p9"] })).toEqual({
+    ok: false,
+    error: "Unable to post: only a task waits on other tasks",
+  });
   await office.stop();
 });

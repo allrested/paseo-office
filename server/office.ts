@@ -68,6 +68,7 @@ export interface Office {
     to?: string;
     replyTo?: string;
     team?: string;
+    after?: string[];
   }): Promise<PostResult>;
   update(input: { id: string; action: UpdateAction; note?: string }): Promise<PostResult>;
   remove(id: string): Promise<DeleteResult>;
@@ -139,7 +140,9 @@ export function createOffice(deps: OfficeDeps): Office {
     label,
     onBoard: (board, posts) => {
       hub.setBoard(board, posts);
-      if (board === LOBBY || board === DUTY) pickup?.refresh();
+      // Any board: a lobby task can wait on a room's task, and is handed out once that is done. A
+      // save the pickup makes while it scans does not start another scan.
+      pickup?.refresh();
     },
     onBoardRemoved: (board) => hub.removeBoard(board),
     workspaceOf: (agentId) => deps.agents.workspaceOf(agentId),

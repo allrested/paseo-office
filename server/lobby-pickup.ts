@@ -1,3 +1,4 @@
+import { waitingOn } from "../shared/board-rules.js";
 import { DUTY, LOBBY, USER_AUTHOR, type Post } from "../shared/contracts.js";
 import { assignmentFooter } from "../shared/lobby-assignment.js";
 import type { BoardService } from "./board-service.js";
@@ -9,6 +10,8 @@ import type { Clock } from "./timers.js";
 
 // Some transitions to idle (e.g. clearing a permission) don't produce a turn-end hook.
 export const LOBBY_RETRY_MS = 30_000;
+/** One waited-on task's result in an assignment: five of them never make a huge prompt. */
+export const WAITED_RESULT_MAX = 600;
 
 export interface LobbyPickup {
   refresh(): void;
@@ -26,13 +29,32 @@ interface PickupPorts {
   log(message: string): void;
 }
 
-function awaitingPickup(task: Post): boolean {
+/** `posts` are every board's: a task waits while a task of its `after`, on any board, is not done. */
+function awaitingPickup(task: Post, posts: readonly Post[]): boolean {
   return (
     task.kind === "task" &&
     task.state === "open" &&
     (!task.to || !!task.namedPickup) &&
-    !task.claimedBy
+    !task.claimedBy &&
+    waitingOn(task, posts).length === 0
   );
+}
+
+/**
+ * The results of the tasks an assignment's task waited on, as lines of its indented body; a task
+ * that is gone is left out, and with none left there are no lines.
+ */
+function waitedOnLines(task: Post, posts: readonly Post[]): string[] {
+  const waited = (task.after ?? []).flatMap((id) => {
+    const done = posts.find((item) => item.id === id && item.kind === "task");
+    if (done === undefined) return [];
+    const result = done.result ?? "no result given";
+    const cut =
+      result.length > WAITED_RESULT_MAX ? `${result.slice(0, WAITED_RESULT_MAX - 1)}…` : result;
+    // Further lines sit under their entry, so none reads as another task's.
+    return [`  ${id}: ${indented(indented(cut))}`];
+  });
+  return waited.length === 0 ? [] : ["  It waited on:", ...waited];
 }
 
 /** The first line of an assignment: whose task it is, or the duty board's. */
@@ -62,12 +84,14 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     return [...service.postsOf(LOBBY), ...service.postsOf(DUTY).filter(handedOut)];
   }
 
+  /** Every board's posts, which say whether a task still waits. */
+  const allPosts = () => Object.values(service.boards()).flat();
+
   function hasWork(): boolean {
-    return (
-      active() &&
-      pickupPosts().some(
-        (task) => canDispatch(task) && (awaitingPickup(task) || Boolean(task.pickupMessageId)),
-      )
+    if (!active()) return false;
+    const posts = allPosts();
+    return pickupPosts().some(
+      (task) => canDispatch(task) && (awaitingPickup(task, posts) || Boolean(task.pickupMessageId)),
     );
   }
 
@@ -99,6 +123,7 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
     const prompt = [
       assignmentHeading(task),
       `  ${indented(task.text)}`,
+      ...waitedOnLines(task, allPosts()),
       assignmentFooter(claim),
     ].join("\n");
     // The daemon deduplicates this ID even after a network failure or a plugin restart.
@@ -124,12 +149,13 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   /** `team` is the agent's roster team, read once per scan: a team's task waits for its own. */
   function nextFor(agentId: string, automatic: boolean, team: string | null): Post | undefined {
     const board = pickupPosts();
+    const posts = allPosts();
     const existing = board.find((p) => p.state === "claimed" && p.claimedBy === agentId);
     if (existing) return existing.pickupMessageId && canDispatch(existing) ? existing : undefined;
     return board
       .filter(
         (p) =>
-          awaitingPickup(p) &&
+          awaitingPickup(p, posts) &&
           p.author !== agentId &&
           (p.to ? p.to === agentId : automatic && forTeam(p, team)),
       )
@@ -142,15 +168,19 @@ export function createLobbyPickup(ports: PickupPorts): LobbyPickup {
   }
 
   async function scan(): Promise<void> {
+    const posts = allPosts();
     const named = service
       .postsOf(LOBBY)
       .flatMap((p) =>
-        p.namedPickup && p.to && (awaitingPickup(p) || p.pickupMessageId) ? [p.to] : [],
+        p.namedPickup && p.to && (awaitingPickup(p, posts) || p.pickupMessageId) ? [p.to] : [],
       );
     const automatic = new Set(ports.enabled() ? await agents.lobbyCandidates() : []);
     for (const agentId of new Set([...named, ...automatic])) {
       if (!hasWork()) break;
-      const teamWork = pickupPosts().some((p) => p.team !== undefined && awaitingPickup(p));
+      const current = allPosts();
+      const teamWork = pickupPosts().some(
+        (p) => p.team !== undefined && awaitingPickup(p, current),
+      );
       const team = automatic.has(agentId) && teamWork ? await teamOf(agentId) : null;
       const next = nextFor(agentId, automatic.has(agentId), team);
       if (!next) continue;

@@ -228,7 +228,7 @@ test("the three tools are named and their inputs follow the spec", async () => {
   expect(read?.input.safeParse({ board: "kitchen" }).success).toBe(false);
   expect(post?.input.safeParse({ kind: "task", text: "x".repeat(2001) }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "close" }).success).toBe(false);
-  for (const tool of tools) expect(tool.description.length).toBeLessThan(300);
+  for (const tool of tools) expect(tool.description.length).toBeLessThan(340);
 });
 
 test("the duty board is read with board: duty, but nobody posts to it from a tool", async () => {
@@ -257,7 +257,7 @@ test("the tools take a reply and a result, and today's inputs still parse", asyn
   expect(update?.input.safeParse({ id: "p1", action: "done", note: "" }).success).toBe(false);
   expect(update?.input.safeParse({ id: "p1", action: "done" }).success).toBe(true);
   expect(post?.description).toBe(
-    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team.",
+    "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for.",
   );
   expect(update?.description).toBe(
     "Claim, finish (done) or reopen a task or a duty on an office board (the duty board too), by post id. With done, put the outcome in note. Block it with note when you need input from the user.",
@@ -394,4 +394,65 @@ test("a post line names a team by its name, or by its id once the team is gone",
     "p4 task open for team QA-PR, from the user: Test",
   );
   expect(postLine(post, label, (id) => id)).toBe("p4 task open for team t2, from the user: Test");
+});
+
+test("a post line names the tasks a task waits on, and says so while one is not done", () => {
+  const at = "2026-11-11T09:00:00.000Z";
+  const base = {
+    board: "lobby",
+    kind: "task" as const,
+    author: "user",
+    createdAt: at,
+    updatedAt: at,
+  };
+  const build: Post = { ...base, id: "p12", seq: 12, state: "done", text: "Build" };
+  const design: Post = { ...base, id: "p13", seq: 13, state: "open", text: "Design" };
+  const post: Post = {
+    ...base,
+    id: "p14",
+    seq: 14,
+    state: "open",
+    text: "Review",
+    team: "t2",
+    after: ["p12", "p13"],
+  };
+  const label = (author: string) => (author === "user" ? "the user" : author);
+  const teamLabel = () => "QA-PR";
+  expect(postLine(post, label, teamLabel, [build, design, post])).toBe(
+    "p14 task open for team QA-PR after p12, p13 (waiting), from the user: Review",
+  );
+  expect(postLine(post, label, teamLabel, [build, { ...design, state: "done" }, post])).toBe(
+    "p14 task open for team QA-PR after p12, p13, from the user: Review",
+  );
+});
+
+test("office_post takes after, and office_read shows a waiting task until its task is done", async () => {
+  const { ports } = await harness();
+  const [, post] = officeTools(ports);
+  expect(post?.input.safeParse({ kind: "task", text: "x", after: ["p1", "p2"] }).success).toBe(
+    true,
+  );
+  expect(post?.input.safeParse({ kind: "task", text: "x", after: [""] }).success).toBe(false);
+  await runPost(ports, ALICE, { kind: "task", text: "Build it" });
+  expect(
+    await runPost(ports, ALICE, { kind: "task", text: "Review it", board: "lobby", after: ["p1"] }),
+  ).toEqual({ text: "Posted p2.", structuredContent: { id: "p2" } });
+  expect(await runPost(ports, ALICE, { kind: "note", text: "x", after: ["p1"] })).toEqual({
+    text: "Unable to post: only a task waits on other tasks",
+    isError: true,
+  });
+  expect(runRead(ports, ALICE, { board: "lobby" }).text).toContain(
+    "p2 task open after p1 (waiting), from Alice: Review it",
+  );
+  expect(await runUpdate(ports, BOB, { id: "p2", action: "claim" })).toEqual({
+    text: "Unable to claim p2: waiting on p1",
+    isError: true,
+  });
+  await runUpdate(ports, BOB, { id: "p1", action: "done" });
+  expect(runRead(ports, ALICE, { board: "lobby" }).text).toContain(
+    "p2 task open after p1, from Alice: Review it",
+  );
+  expect((await runUpdate(ports, BOB, { id: "p2", action: "claim" })).text).toBe(
+    "p2 task claimed by Bob after p1 (on p5), from Alice: Review it",
+  );
 });

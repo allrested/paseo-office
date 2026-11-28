@@ -573,6 +573,19 @@ card's count. A reply always sits on the task's board, under the lobby task when
 its result and its replies, in the lobby's list and in a room's Done section or column, and a task
 takes its replies with it when it is deleted, cleared or dropped.
 
+A task can wait for other tasks: `office_post` takes `after`, up to 5 task ids on any board (the
+user's post takes it too), for a task only, never a note or a reply, and each must name a task
+that exists. While one of them is there and not done the task waits: the pickup passes over it, and
+an agent can neither claim it nor mark it done ("waiting on p12, p13"). You can still claim it or
+mark it done by hand. It is released when the last of them is done or deleted, since a
+task that is gone no longer holds it; any board's change looks again, so a room's task finished
+hands out the lobby task that waited on it with no other event. Its assignment carries, after the
+task's text, "It waited on:" and a line per task it waited on with that task's result ("no result
+given" without one), each result cut to 600 characters; a task that is gone is left out, and with
+none left there is no such block. That is how one team hands its work to the next: "Review" after
+"Build" gets Build's result. A reopened task waits again on the same tasks. `office_read` shows it
+as `p14 task open after p12, p13 (waiting)`, without "(waiting)" once they are done.
+
 An agent that needs something from you before it can go on blocks its task: `office_update` with
 `block` and what it needs in `note`. Only the agent holding the task can block it. The task stays
 claimed and moves to the kanban's **Needs you** column, and a card and a list row show "Needs you:"

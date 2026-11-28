@@ -5,6 +5,7 @@ import {
   type PluginHookAgent,
 } from "@getpaseo/plugin/server";
 import { z } from "zod";
+import { waitingOn } from "../shared/board-rules.js";
 import {
   DUTY,
   LOBBY,
@@ -51,6 +52,7 @@ export const PostInputSchema = z.object({
   board: BoardChoiceSchema.optional(),
   replyTo: z.string().min(1).optional(),
   team: z.string().min(1).optional(),
+  after: z.array(z.string().min(1)).optional(),
 });
 export type PostInput = z.output<typeof PostInputSchema>;
 
@@ -70,22 +72,28 @@ export function boardFor(
   return choice === "lobby" || agent.workspaceId === null ? LOBBY : agent.workspaceId;
 }
 
-/** One post as one entry: its further lines are indented and every name is on one line. */
+/**
+ * One post as one entry: its further lines are indented and every name is on one line. `posts`
+ * are the boards' posts, which say whether a task still waits on the tasks of its `after`.
+ */
 export function postLine(
   post: Post,
   label: (author: string) => string,
   teamLabel: (teamId: string) => string = (teamId) => teamId,
+  posts: readonly Post[] = [],
 ): string {
   const name = (author: string) => oneLine(label(author));
   const state = post.state ? ` ${post.state}` : "";
   const claim = post.claimedBy ? ` by ${name(post.claimedBy)}` : "";
   const team = post.team ? ` for team ${oneLine(teamLabel(post.team))}` : "";
+  const waiting = waitingOn(post, posts).length > 0 ? " (waiting)" : "";
+  const after = post.after?.length ? ` after ${post.after.join(", ")}${waiting}` : "";
   const link = post.link ? ` (${post.board === LOBBY ? "on" : "lobby"} ${post.link})` : "";
   const to = post.to ? ` to ${name(post.to)}` : "";
   const re = post.replyTo ? ` re ${post.replyTo}` : "";
   const needs = post.blocked ? `\n  needs: ${indented(post.blocked)}` : "";
   const result = post.result ? `\n  result: ${indented(post.result)}` : "";
-  return `${post.id} ${post.kind}${state}${claim}${team}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
+  return `${post.id} ${post.kind}${state}${claim}${team}${after}${link}${re}, from ${name(post.author)}${to}: ${indented(post.text)}${needs}${result}`;
 }
 
 export function readText(
@@ -93,10 +101,18 @@ export function readText(
   result: ReadResult,
   label: (author: string) => string,
   teamLabel?: (teamId: string) => string,
+  posts?: readonly Post[],
 ): string {
   const more = result.more ? ", more after it" : "";
   const header = `Board ${board}: ${result.posts.length} post(s), cursor ${result.cursor}${more}.`;
-  return [header, ...result.posts.map((post) => postLine(post, label, teamLabel))].join("\n");
+  return [header, ...result.posts.map((post) => postLine(post, label, teamLabel, posts))].join(
+    "\n",
+  );
+}
+
+/** Every board's posts: a task can wait on a task of another board. */
+function allPosts(service: BoardService): Post[] {
+  return Object.values(service.boards()).flat();
 }
 
 export function runRead(
@@ -107,7 +123,9 @@ export function runRead(
   ports.seen(agent);
   const board = boardFor(agent, input.board);
   const result = ports.service.read(board, input.since ?? null);
-  return { text: readText(board, result, ports.label, ports.teamLabel) };
+  return {
+    text: readText(board, result, ports.label, ports.teamLabel, allPosts(ports.service)),
+  };
 }
 
 export async function runPost(
@@ -130,6 +148,7 @@ export async function runPost(
     ...(to === undefined ? {} : { to }),
     ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
     ...(input.team === undefined ? {} : { team: input.team }),
+    ...(input.after === undefined ? {} : { after: input.after }),
   });
   if (!result.ok) return { text: result.error, isError: true };
   ports.mentioned(result.post);
@@ -158,7 +177,9 @@ export async function runUpdate(
     ...(input.note === undefined ? {} : { note: input.note }),
   });
   if (!result.ok) return { text: result.error, isError: true };
-  return { text: postLine(result.post, ports.label, ports.teamLabel) };
+  return {
+    text: postLine(result.post, ports.label, ports.teamLabel, allPosts(ports.service)),
+  };
 }
 
 export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
@@ -173,7 +194,7 @@ export function officeTools(ports: OfficeToolPorts): AgentToolDefinition[] {
     defineAgentTool({
       name: "office_post",
       description:
-        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team.",
+        "Post a task or note to your workspace's office board (or board: lobby). Set to to an agent id from list_agents to wake it with the post. Set replyTo to a task id to reply under that task; its holder gets the reply. Set team to a roster team's name to give a lobby task to that team. Set after to task ids it must wait for.",
       input: PostInputSchema,
       execute: (input, { agent }) => runPost(ports, agent, input),
     }),
