@@ -295,7 +295,13 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     if (board === LOBBY && kind === "task" && input.to && input.to !== input.author)
       created.namedPickup = true;
     // Make room among the existing posts, so the new one is never the one dropped.
-    const kept = trimBoard(postsOf(board), BOARD_POST_MAX - 1);
+    // A reply's task and that task's replies stay: the reply would go with them.
+    const held = postsOf(board).filter(
+      (item) => root !== undefined && (item.id === root.id || item.replyTo === root.id),
+    );
+    const heldIds = new Set(held.map((item) => item.id));
+    const rest = postsOf(board).filter((item) => !heldIds.has(item.id));
+    const kept = [...trimBoard(rest, BOARD_POST_MAX - 1 - held.length), ...held];
     if (kept.length >= BOARD_POST_MAX) {
       return { ok: false, error: "Unable to post: the board holds 200 open or claimed tasks" };
     }

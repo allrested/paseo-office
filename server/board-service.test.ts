@@ -939,7 +939,7 @@ test("reopening a done task drops its result, from the task or from its copy", a
   expect(reopened.ok && reopened.post).not.toHaveProperty("result");
   const lobby = await claimedByA();
   await lobby.service.update({ id: "p1", action: "done", actor: "a", note: "Fine" });
-  await lobby.service.update({ id: "p1", action: "reopen", actor: "user" });
+  await lobby.service.update({ id: "p3", action: "reopen", actor: "a" });
   expect(find(lobby.service, "p1")).not.toHaveProperty("result");
 });
 
@@ -1036,4 +1036,43 @@ test("deleting, clearing or pruning a task takes its replies with it", async () 
   expect(events.at(-1)).toBe("board w3 ");
   await service.prune();
   expect(service.postsOf("w4")).toEqual([]);
+});
+
+test("making room for a reply never trims its task or the task's replies", async () => {
+  const notes = Array.from({ length: 198 }, (_, index) => post(index + 3));
+  const { service } = await harness(
+    file([taskOn(1, { state: "done" }), post(2, { replyTo: "p1" }), ...notes]),
+  );
+  expect(service.postsOf("w1")).toHaveLength(200);
+  const reply = await service.post({
+    board: "w1",
+    kind: "note",
+    text: "One more",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(reply.ok).toBe(true);
+  const ids = service.postsOf("w1").map((item) => item.id);
+  expect(ids).toContain("p1");
+  expect(ids).toContain("p2");
+  expect(ids).toContain(reply.ok ? reply.post.id : "");
+  expect(ids).not.toContain("p3");
+  expect(ids).toHaveLength(200);
+});
+
+test("a reply is refused when only its task and replies could make room", async () => {
+  const open = Array.from({ length: 199 }, (_, index) => taskOn(index + 2));
+  const { service, store } = await harness(file([taskOn(1), ...open]));
+  const reply = await service.post({
+    board: "w1",
+    kind: "note",
+    text: "x",
+    author: "user",
+    replyTo: "p1",
+  });
+  expect(reply).toEqual({
+    ok: false,
+    error: "Unable to post: the board holds 200 open or claimed tasks",
+  });
+  expect(store.saved).toEqual([]);
 });
