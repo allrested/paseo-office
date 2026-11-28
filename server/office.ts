@@ -298,6 +298,7 @@ export function createOffice(deps: OfficeDeps): Office {
         .then(() => service.releaseClaims(agentId))
         .then((ids) => {
           if (ids.length > 0) log(`[office] released ${ids.join(", ")} held by ${agentId}`);
+          // The promise lint rule wants every then() to return.
           return ids;
         })
         .catch((error: unknown) =>

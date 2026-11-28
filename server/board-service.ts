@@ -543,39 +543,44 @@ export function createBoardService(ports: BoardServicePorts): BoardService {
     return saved.ok ? { ok: true, post: reopened } : saved;
   }
 
-  /** A lobby task with its copy reopens as one; any other held task reopens in place. */
+  /**
+   * A lobby task the agent holds reopens with its copy; a copy of a lobby task the agent does not
+   * hold is a leftover and only goes; any other held task reopens in place.
+   */
   async function releaseHeld(agentId: string): Promise<string[]> {
     const held = data.posts.filter(
       (item) => item.kind === "task" && item.state === "claimed" && item.claimedBy === agentId,
     );
-    const handled = new Set<string>();
     const reopened = new Map<string, Post>();
     const gone = new Set<string>();
     const touched: string[] = [];
     const ids: string[] = [];
     let seq = data.nextSeq;
     for (const task of held) {
-      if (handled.has(task.id)) continue;
       const partner = partnerOf(task);
-      const pair = partner !== undefined && (task.board === LOBBY || partner.board === LOBBY);
-      const target = pair && partner.board === LOBBY ? partner : task;
-      handled.add(task.id);
-      if (pair) {
-        const copy = target === task ? partner : task;
-        handled.add(partner.id);
-        gone.add(copy.id);
-        touched.push(copy.board);
+      if (task.board !== LOBBY && partner?.board === LOBBY) {
+        // Its lobby task, if the agent holds it too, is handled in its own turn.
+        const pair = partner.state === "claimed" && partner.claimedBy === agentId;
+        if (!pair) {
+          gone.add(task.id);
+          touched.push(task.board);
+        }
+        continue;
       }
-      reopened.set(target.id, {
-        ...withoutClaim(target),
+      if (partner !== undefined && task.board === LOBBY) {
+        gone.add(partner.id);
+        touched.push(partner.board);
+      }
+      reopened.set(task.id, {
+        ...withoutClaim(task),
         state: "open",
         seq: seq++,
         updatedAt: now(),
       });
-      touched.push(target.board);
-      ids.push(target.id);
+      touched.push(task.board);
+      ids.push(task.id);
     }
-    if (ids.length === 0) return [];
+    if (touched.length === 0) return [];
     const posts = data.posts
       .filter((item) => !gone.has(item.id))
       .map((item) => reopened.get(item.id) ?? item);

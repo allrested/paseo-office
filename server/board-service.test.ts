@@ -1251,4 +1251,40 @@ describe("releaseClaims", () => {
     expect(store.saved).toHaveLength(0);
     expect(events).toEqual([]);
   });
+
+  test("a copy whose lobby task is done leaves the finished task alone and goes", async () => {
+    const lobby = lobbyTask(1, { state: "done", claimedBy: "a", result: "Merged", link: "p2" });
+    const copy = claimed(2, { link: "p1" });
+    const { service } = await harness(file([lobby, copy]));
+    expect(await service.releaseClaims("a")).toEqual([]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "done", claimedBy: "a", result: "Merged" });
+  });
+
+  test("a copy whose lobby task another agent holds leaves that claim alone", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "b", link: "p2" });
+    const { service } = await harness(file([lobby, claimed(2, { link: "p1" })]));
+    expect(await service.releaseClaims("a")).toEqual([]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "claimed", claimedBy: "b" });
+  });
+
+  test("a pair both held by the agent is released once", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a", link: "p2" });
+    const { service, store } = await harness(file([lobby, claimed(2, { link: "p1" })]));
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(store.saved).toHaveLength(1);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+    expect(find(service, "p1")).not.toHaveProperty("claimedBy");
+  });
+
+  test("a done copy of a lobby task the agent holds goes with the reopen", async () => {
+    const lobby = lobbyTask(1, { state: "claimed", claimedBy: "a", link: "p2" });
+    const copy = taskOn(2, { state: "done", claimedBy: "a", link: "p1" });
+    const { service } = await harness(file([lobby, copy]));
+    expect(await service.releaseClaims("a")).toEqual(["p1"]);
+    expect(find(service, "p2")).toBeUndefined();
+    expect(find(service, "p1")).toMatchObject({ state: "open" });
+  });
 });
