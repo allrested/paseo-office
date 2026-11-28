@@ -1536,3 +1536,63 @@ test("a held task does not block the next task, and leaves the pickup with no wo
   expect(prompts).toHaveLength(sent);
   await office.stop();
 });
+
+test("an agent's held lobby task to itself is told to nobody, with or without after, and nothing is sent once started", async () => {
+  const { office, clock, prompts, hub } = start();
+  await office.ready;
+  const post = office.tools.find((tool) => tool.name === "office_post");
+  const context = toolContext({ id: "b", title: "Builder" });
+  await office.post({ board: "w1", kind: "task", text: "Build it" });
+  await post?.execute(
+    { kind: "task", text: "Mine", to: "b", board: "lobby", backlog: true },
+    context,
+  );
+  await post?.execute(
+    { kind: "task", text: "Mine later", to: "b", board: "lobby", backlog: true, after: ["p1"] },
+    context,
+  );
+  await office.update({ id: "p1", action: "done" });
+  await settle();
+  expect(prompts).toEqual([]);
+  expect(hub.events.findLast((event) => event.startsWith("wake"))).toBe("wake false {}");
+  await office.start("p2");
+  await office.start("p3");
+  clock.advance(0);
+  await settle();
+  // The queue drops a post to its own author, as it does for any self-addressed post.
+  expect(prompts).toEqual([]);
+  await office.stop();
+});
+
+test("a stored held lobby task for an agent is told as a new post once it is started, and only once", async () => {
+  const at = "2026-11-11T08:00:00.000Z";
+  const { office, prompts } = start({
+    ...EMPTY_BOARDS,
+    nextSeq: 3,
+    posts: [
+      {
+        id: "p2",
+        seq: 2,
+        board: "lobby",
+        kind: "task",
+        text: "Review it",
+        author: "user",
+        to: "b",
+        state: "open",
+        backlog: true,
+        createdAt: at,
+        updatedAt: at,
+      },
+    ],
+  });
+  await office.ready;
+  await settle();
+  expect(prompts).toEqual([]);
+  await office.start("p2");
+  await settle();
+  expect(prompts).toEqual([WAKE_FOR_REVIEW]);
+  await office.start("p2");
+  await settle();
+  expect(prompts).toHaveLength(1);
+  await office.stop();
+});

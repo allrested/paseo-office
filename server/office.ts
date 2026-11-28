@@ -214,7 +214,8 @@ export function createOffice(deps: OfficeDeps): Office {
   }
 
   function mentioned(post: Post): void {
-    if (post.to === undefined || post.namedPickup || queue === null) return;
+    // A held task is told to nobody until it is started.
+    if (post.to === undefined || post.namedPickup || post.backlog || queue === null) return;
     // The agent cannot claim a task that still waits: it is told when nothing holds the task.
     if (waitsForRelease(post, allPosts())) {
       held.add(post.id);
@@ -234,7 +235,7 @@ export function createOffice(deps: OfficeDeps): Office {
       const post = posts.find((item) => item.id === id);
       if (post !== undefined && waitsForRelease(post, posts)) continue;
       held.delete(id);
-      const free = post?.state === "open" && post.claimedBy === undefined;
+      const free = post?.state === "open" && post.claimedBy === undefined && !post.backlog;
       if (post?.to !== undefined && free) wakeFor(post.to, post);
     }
   }
@@ -321,7 +322,11 @@ export function createOffice(deps: OfficeDeps): Office {
     },
     async start(id) {
       await ready;
-      return service.startTask(id);
+      const wasHeld = service.postsOf("lobby").some((post) => post.id === id && post.backlog);
+      const result = await service.startTask(id);
+      // Started, it is told as a new post is.
+      if (result.ok && wasHeld) mentioned(result.post);
+      return result;
     },
     async update(input) {
       await ready;
